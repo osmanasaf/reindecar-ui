@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="bodyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8B4513"/>
+      <stop offset="100%" style="stop-color:#654321"/>
+    </linearGradient>
+    <linearGradient id="antlerGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#D2691E"/>
+      <stop offset="100%" style="stop-color:#8B4513"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Left Antlers -->
+  <path d="M12 8 Q10 12 8 10 Q6 8 4 12 Q2 16 6 18 Q10 20 14 16 L16 20" 
+        fill="none" stroke="url(#antlerGrad)" stroke-width="3" stroke-linecap="round"/>
+  <path d="M14 12 Q12 8 10 6" 
+        fill="none" stroke="url(#antlerGrad)" stroke-width="2.5" stroke-linecap="round"/>
+  
+  <!-- Right Antlers -->
+  <path d="M52 8 Q54 12 56 10 Q58 8 60 12 Q62 16 58 18 Q54 20 50 16 L48 20" 
+        fill="none" stroke="url(#antlerGrad)" stroke-width="3" stroke-linecap="round"/>
+  <path d="M50 12 Q52 8 54 6" 
+        fill="none" stroke="url(#antlerGrad)" stroke-width="2.5" stroke-linecap="round"/>
+  
+  <!-- Ears -->
+  <ellipse cx="18" cy="22" rx="5" ry="8" fill="url(#bodyGrad)" transform="rotate(-20 18 22)"/>
+  <ellipse cx="46" cy="22" rx="5" ry="8" fill="url(#bodyGrad)" transform="rotate(20 46 22)"/>
+  <ellipse cx="18" cy="22" rx="3" ry="5" fill="#DEB887" transform="rotate(-20 18 22)"/>
+  <ellipse cx="46" cy="22" rx="3" ry="5" fill="#DEB887" transform="rotate(20 46 22)"/>
+  
+  <!-- Head -->
+  <ellipse cx="32" cy="36" rx="18" ry="20" fill="url(#bodyGrad)"/>
+  
+  <!-- Face light area -->
+  <ellipse cx="32" cy="42" rx="12" ry="14" fill="#DEB887"/>
+  
+  <!-- Eyes -->
+  <ellipse cx="24" cy="32" rx="4" ry="4.5" fill="white"/>
+  <ellipse cx="40" cy="32" rx="4" ry="4.5" fill="white"/>
+  <circle cx="24" cy="32" r="2.5" fill="#2C1810"/>
+  <circle cx="40" cy="32" r="2.5" fill="#2C1810"/>
+  <circle cx="25" cy="31" r="1" fill="white"/>
+  <circle cx="41" cy="31" r="1" fill="white"/>
+  
+  <!-- Nose base -->
+  <ellipse cx="32" cy="46" rx="6" ry="5" fill="#2C1810"/>
+  <ellipse cx="32" cy="45" rx="4" ry="3" fill="#3D2817"/>
+  <ellipse cx="31" cy="44" rx="1.5" ry="1" fill="#4A3728"/>
+  
+  <!-- Mouth -->
+  <path d="M28 52 Q32 55 36 52" fill="none" stroke="#654321" stroke-width="1.5" stroke-linecap="round"/>
+  
+  <!-- Red nose (Rudolph style) -->
+  <circle cx="32" cy="46" r="5" fill="#DC143C" opacity="0.9"/>
+  <circle cx="30" cy="44" r="1.5" fill="white" opacity="0.6"/>
+</svg>

@@ -1,0 +1,543 @@
+<script setup lang="ts">
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { customersApi } from '@/api'
+import { useValidation, rules, useToast } from '@/composables'
+import type { CustomerType, CreatePersonalCustomerRequest, CreateCompanyCustomerRequest } from '@/types'
+
+const route = useRoute()
+const router = useRouter()
+const toast = useToast()
+
+const isEditMode = computed(() => route.params.id !== undefined)
+const customerType = ref<CustomerType>(
+  (route.params.type as CustomerType)?.toUpperCase() as CustomerType || 'PERSONAL'
+)
+
+const loading = ref(false)
+
+// Form State
+const form = ref({
+  // Common
+  phone: '',
+  email: '',
+  address: '',
+  city: '',
+  
+  // Personal
+  firstName: '',
+  lastName: '',
+  nationalId: '',
+  birthDate: '',
+  licenseNumber: '',
+  licenseClass: '',
+  licenseExpiryDate: '',
+  
+  // Company
+  companyName: '',
+  taxNumber: '',
+  taxOffice: '',
+  contactPersonName: '',
+  contactPersonPhone: '',
+  tradeRegistryNumber: ''
+})
+
+const { validateForm, getError, hasError, touch, reset, isValid } = useValidation()
+
+// Dynamic Validation Rules
+const formRules = computed(() => {
+  const common = {
+    phone: { value: form.value.phone, rules: [rules.required(), rules.phone()] },
+    email: { value: form.value.email, rules: [rules.required(), rules.email()] },
+    address: { value: form.value.address, rules: [rules.required()] },
+    city: { value: form.value.city, rules: [rules.required()] }
+  }
+
+  if (customerType.value === 'PERSONAL') {
+    return {
+      ...common,
+      firstName: { value: form.value.firstName, rules: [rules.required()] },
+      lastName: { value: form.value.lastName, rules: [rules.required()] },
+      nationalId: { value: form.value.nationalId, rules: [rules.required(), rules.tckn()] },
+      birthDate: { value: form.value.birthDate, rules: [rules.required(), rules.minAge(18, 'Müşteri en az 18 yaşında olmalıdır')] },
+      licenseNumber: { value: form.value.licenseNumber, rules: [rules.required()] },
+      licenseClass: { value: form.value.licenseClass, rules: [rules.required()] },
+      licenseExpiryDate: { value: form.value.licenseExpiryDate, rules: [rules.required('Ehliyet geçerlilik tarihi zorunludur'), rules.futureDate('Ehliyet süresi dolmuş')] }
+    }
+  } else {
+    return {
+      ...common,
+      companyName: { value: form.value.companyName, rules: [rules.required()] },
+      taxNumber: { value: form.value.taxNumber, rules: [rules.required(), rules.taxNumber()] },
+      taxOffice: { value: form.value.taxOffice, rules: [rules.required()] },
+      contactPersonName: { value: form.value.contactPersonName, rules: [rules.required()] },
+      contactPersonPhone: { value: form.value.contactPersonPhone, rules: [rules.required(), rules.phone()] }
+    }
+  }
+})
+
+async function fetchCustomer() {
+  if (!isEditMode.value) return
+  
+  loading.value = true
+  try {
+    const data = await customersApi.getById(Number(route.params.id))
+    customerType.value = data.customerType
+    
+    // Map API data to form
+    const [first, ...last] = (data.displayName || '').split(' ')
+    form.value = {
+      phone: data.phone,
+      email: data.email,
+      address: data.address,
+      city: data.city,
+      
+      firstName: first || '',
+      lastName: last.join(' ') || '',
+      nationalId: data.nationalId || '',
+      birthDate: data.birthDate ? data.birthDate.split('T')[0] : '',
+      licenseNumber: data.licenseNumber || '',
+      licenseClass: data.licenseClass || '',
+      licenseExpiryDate: data.licenseExpiryDate ? data.licenseExpiryDate.split('T')[0] : '',
+      
+      companyName: data.displayName || '',
+      taxNumber: data.taxNumber || '',
+      taxOffice: '', // API'de yoksa boş
+      contactPersonName: data.authorizedPersonName || '',
+      contactPersonPhone: data.authorizedPersonPhone || '',
+      tradeRegistryNumber: data.tradeRegistryNumber || ''
+    }
+  } catch {
+    toast.error('Müşteri bilgileri yüklenemedi')
+    router.push('/customers')
+  } finally {
+    loading.value = false
+  }
+}
+
+async function handleSubmit() {
+  if (!validateForm(formRules.value)) {
+    toast.error('Lütfen formdaki hataları düzeltin')
+    return
+  }
+
+  loading.value = true
+  try {
+    if (customerType.value === 'PERSONAL') {
+      const payload: CreatePersonalCustomerRequest = {
+        firstName: form.value.firstName,
+        lastName: form.value.lastName,
+        nationalId: form.value.nationalId,
+        birthDate: form.value.birthDate,
+        phone: form.value.phone,
+        email: form.value.email,
+        address: form.value.address,
+        city: form.value.city,
+        licenseNumber: form.value.licenseNumber,
+        licenseClass: form.value.licenseClass,
+        licenseExpiryDate: form.value.licenseExpiryDate
+      }
+      // Edit mode logic here if API supports update
+      await customersApi.createPersonal(payload)
+    } else {
+      const payload: CreateCompanyCustomerRequest = {
+        companyName: form.value.companyName,
+        taxNumber: form.value.taxNumber,
+        phone: form.value.phone,
+        email: form.value.email,
+        address: form.value.address,
+        city: form.value.city,
+        authorizedPersonName: form.value.contactPersonName,
+        authorizedPersonPhone: form.value.contactPersonPhone,
+        tradeRegistryNumber: form.value.tradeRegistryNumber
+      }
+      await customersApi.createCompany(payload)
+    }
+    
+    toast.success('Müşteri başarıyla kaydedildi')
+    router.push('/customers')
+  } catch (err: any) {
+    if (err.response?.data?.message) {
+      toast.error(err.response.data.message)
+    } else {
+      toast.error('Kaydetme işlemi başarısız')
+    }
+  } finally {
+    loading.value = false
+  }
+}
+
+function handleBlur(field: string) {
+  touch(field)
+  // Re-validate single field logic could be added here if needed
+}
+
+onMounted(fetchCustomer)
+
+watch(customerType, () => reset())
+</script>
+
+<template>
+  <div class="customer-form-page">
+    <header class="page-header">
+      <div class="header-left">
+        <button class="back-btn" @click="router.back()">← Geri</button>
+        <h1>{{ isEditMode ? 'Müşteriyi Düzenle' : 'Yeni Müşteri Ekle' }}</h1>
+      </div>
+    </header>
+
+    <div class="form-container">
+      <!-- Type Selection (Only in Create Mode) -->
+      <div v-if="!isEditMode" class="type-selector">
+        <button 
+          :class="['type-btn', { active: customerType === 'PERSONAL' }]"
+          @click="customerType = 'PERSONAL'"
+        >
+          👤 Bireysel
+        </button>
+        <button 
+          :class="['type-btn', { active: customerType === 'COMPANY' }]"
+          @click="customerType = 'COMPANY'"
+        >
+          🏢 Kurumsal
+        </button>
+      </div>
+
+      <form @submit.prevent="handleSubmit" class="main-form">
+        <!-- Personal Fields -->
+        <template v-if="customerType === 'PERSONAL'">
+          <section class="form-section">
+            <h3>Kişisel Bilgiler</h3>
+            <div class="form-grid">
+              <div class="form-group" :class="{ error: hasError('firstName') }">
+                <label>Ad <span class="required">*</span></label>
+                <input v-model="form.firstName" @blur="handleBlur('firstName')" type="text" placeholder="Ad" />
+                <span class="error-text">{{ getError('firstName') }}</span>
+              </div>
+              
+              <div class="form-group" :class="{ error: hasError('lastName') }">
+                <label>Soyad <span class="required">*</span></label>
+                <input v-model="form.lastName" @blur="handleBlur('lastName')" type="text" placeholder="Soyad" />
+                <span class="error-text">{{ getError('lastName') }}</span>
+              </div>
+
+              <div class="form-group" :class="{ error: hasError('nationalId') }">
+                <label>TC Kimlik No <span class="required">*</span></label>
+                <input v-model="form.nationalId" @blur="handleBlur('nationalId')" type="text" maxlength="11" placeholder="11 haneli TC No" />
+                <span class="error-text">{{ getError('nationalId') }}</span>
+              </div>
+
+              <div class="form-group" :class="{ error: hasError('birthDate') }">
+                <label>Doğum Tarihi <span class="required">*</span></label>
+                <input v-model="form.birthDate" @blur="handleBlur('birthDate')" type="date" />
+                <span class="error-text">{{ getError('birthDate') }}</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="form-section">
+            <h3>Ehliyet Bilgileri</h3>
+            <div class="form-grid">
+              <div class="form-group" :class="{ error: hasError('licenseNumber') }">
+                <label>Ehliyet No <span class="required">*</span></label>
+                <input v-model="form.licenseNumber" @blur="handleBlur('licenseNumber')" type="text" />
+                <span class="error-text">{{ getError('licenseNumber') }}</span>
+              </div>
+
+              <div class="form-group" :class="{ error: hasError('licenseClass') }">
+                <label>Sınıf <span class="required">*</span></label>
+                <input v-model="form.licenseClass" @blur="handleBlur('licenseClass')" type="text" placeholder="B, E..." />
+                <span class="error-text">{{ getError('licenseClass') }}</span>
+              </div>
+
+              <div class="form-group" :class="{ error: hasError('licenseExpiryDate') }">
+                <label>Geçerlilik Tarihi <span class="required">*</span></label>
+                <input v-model="form.licenseExpiryDate" @blur="handleBlur('licenseExpiryDate')" type="date" />
+                <span class="error-text">{{ getError('licenseExpiryDate') }}</span>
+              </div>
+            </div>
+          </section>
+        </template>
+
+        <!-- Company Fields -->
+        <template v-else>
+          <section class="form-section">
+            <h3>Şirket Bilgileri</h3>
+            <div class="form-grid">
+              <div class="form-group full" :class="{ error: hasError('companyName') }">
+                <label>Şirket Adı <span class="required">*</span></label>
+                <input v-model="form.companyName" @blur="handleBlur('companyName')" type="text" />
+                <span class="error-text">{{ getError('companyName') }}</span>
+              </div>
+
+              <div class="form-group" :class="{ error: hasError('taxNumber') }">
+                <label>Vergi No <span class="required">*</span></label>
+                <input v-model="form.taxNumber" @blur="handleBlur('taxNumber')" type="text" maxlength="11" />
+                <span class="error-text">{{ getError('taxNumber') }}</span>
+              </div>
+
+              <div class="form-group" :class="{ error: hasError('taxOffice') }">
+                <label>Vergi Dairesi <span class="required">*</span></label>
+                <input v-model="form.taxOffice" @blur="handleBlur('taxOffice')" type="text" />
+                <span class="error-text">{{ getError('taxOffice') }}</span>
+              </div>
+              
+               <div class="form-group">
+                <label>Ticaret Sicil No</label>
+                <input v-model="form.tradeRegistryNumber" type="text" />
+              </div>
+            </div>
+          </section>
+
+          <section class="form-section">
+            <h3>Yetkili Kişi</h3>
+            <div class="form-grid">
+               <div class="form-group" :class="{ error: hasError('contactPersonName') }">
+                <label>Ad Soyad <span class="required">*</span></label>
+                <input v-model="form.contactPersonName" @blur="handleBlur('contactPersonName')" type="text" />
+                <span class="error-text">{{ getError('contactPersonName') }}</span>
+              </div>
+
+               <div class="form-group" :class="{ error: hasError('contactPersonPhone') }">
+                <label>Telefon <span class="required">*</span></label>
+                <input v-model="form.contactPersonPhone" @blur="handleBlur('contactPersonPhone')" type="tel" placeholder="05XX..." />
+                <span class="error-text">{{ getError('contactPersonPhone') }}</span>
+              </div>
+            </div>
+          </section>
+        </template>
+
+        <!-- Common Contact Info -->
+        <section class="form-section">
+          <h3>İletişim Bilgileri</h3>
+          <div class="form-grid">
+            <div class="form-group" :class="{ error: hasError('phone') }">
+              <label>Telefon <span class="required">*</span></label>
+              <input v-model="form.phone" @blur="handleBlur('phone')" type="tel" placeholder="05XX..." />
+              <span class="error-text">{{ getError('phone') }}</span>
+            </div>
+
+            <div class="form-group" :class="{ error: hasError('email') }">
+              <label>E-posta <span class="required">*</span></label>
+              <input v-model="form.email" @blur="handleBlur('email')" type="email" />
+              <span class="error-text">{{ getError('email') }}</span>
+            </div>
+
+            <div class="form-group full" :class="{ error: hasError('address') }">
+              <label>Adres <span class="required">*</span></label>
+              <textarea v-model="form.address" @blur="handleBlur('address')" rows="3"></textarea>
+              <span class="error-text">{{ getError('address') }}</span>
+            </div>
+
+            <div class="form-group" :class="{ error: hasError('city') }">
+              <label>Şehir <span class="required">*</span></label>
+              <input v-model="form.city" @blur="handleBlur('city')" type="text" />
+              <span class="error-text">{{ getError('city') }}</span>
+            </div>
+          </div>
+        </section>
+
+        <div class="form-actions">
+          <button type="button" class="btn btn-outline" @click="router.back()">İptal</button>
+          <button type="submit" class="btn btn-primary" :disabled="loading">
+            {{ loading ? 'Kaydediliyor...' : 'Kaydet' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.customer-form-page {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.page-header {
+  margin-bottom: 24px;
+}
+
+.header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.back-btn {
+  background: none;
+  border: none;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0;
+  width: fit-content;
+}
+
+.page-header h1 {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.form-container {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.type-selector {
+  display: flex;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.type-btn {
+  flex: 1;
+  padding: 16px;
+  background: var(--color-bg-secondary);
+  border: none;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.type-btn:hover {
+  background: var(--color-border);
+}
+
+.type-btn.active {
+  background: var(--color-surface);
+  color: var(--color-primary);
+  border-bottom: 2px solid var(--color-primary);
+}
+
+.main-form {
+  padding: 32px;
+}
+
+.form-section {
+  margin-bottom: 32px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.form-section:last-of-type {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.form-section h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin: 0 0 20px 0;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-group.full {
+  grid-column: span 2;
+}
+
+.form-group label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+.required {
+  color: var(--color-danger);
+}
+
+.form-group input,
+.form-group textarea {
+  padding: 10px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 14px;
+  background: var(--color-bg-secondary);
+  transition: all 0.2s;
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  background: var(--color-surface);
+  box-shadow: 0 0 0 3px var(--color-primary-light);
+}
+
+.form-group.error input {
+  border-color: var(--color-danger);
+  background: #fff5f5;
+}
+
+.error-text {
+  font-size: 12px;
+  color: var(--color-danger);
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 32px;
+}
+
+.btn {
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: white;
+  border: none;
+}
+
+.btn-primary:active {
+  transform: translateY(1px);
+}
+
+.btn-primary:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.btn-outline {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+}
+
+.btn-outline:hover {
+  background: var(--color-bg-secondary);
+}
+
+@media (max-width: 640px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .form-group.full {
+    grid-column: span 1;
+  }
+}
+</style>
