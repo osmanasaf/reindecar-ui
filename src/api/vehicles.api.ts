@@ -6,7 +6,8 @@ import type {
     CreateVehicleForm,
     UpdateVehicleForm,
     UpdateVehicleStatusForm,
-    VehicleCategory
+    VehicleCategory,
+    VehicleHistory
 } from '@/types'
 
 class VehiclesApiService extends BaseApi {
@@ -51,6 +52,10 @@ class VehiclesApiService extends BaseApi {
 
     async deleteById(id: number): Promise<void> {
         return this.remove(`/${id}`)
+    }
+
+    async getHistory(id: number): Promise<VehicleHistory> {
+        return this.get(`/${id}/full-history`)
     }
 }
 

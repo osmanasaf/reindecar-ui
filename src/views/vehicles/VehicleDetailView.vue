@@ -5,6 +5,9 @@ import { vehiclesApi } from '@/api'
 import { useToast } from '@/composables'
 import type { Vehicle, VehicleStatus } from '@/types'
 import VehicleEditModal from '@/components/vehicles/VehicleEditModal.vue'
+import VehicleDamageMap from '@/components/vehicles/VehicleDamageMap.vue'
+import VehicleMaintenanceMap from '@/components/vehicles/VehicleMaintenanceMap.vue'
+import VehicleHistory from '@/components/vehicles/VehicleHistory.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -13,6 +16,7 @@ const toast = useToast()
 const vehicle = ref<Vehicle | null>(null)
 const loading = ref(true)
 const showEditModal = ref(false)
+const activeTab = ref<'info' | 'history' | 'damages' | 'maintenance'>('info')
 
 const vehicleId = computed(() => Number(route.params.id))
 
@@ -47,7 +51,7 @@ async function fetchVehicle() {
 function safeNumber(value: unknown, defaultValue = 0): number {
   if (value === null || value === undefined) return defaultValue
   const num = Number(value)
-  return isNaN(num) ? defaultValue : num
+  return Number.isNaN(num) ? defaultValue : num
 }
 
 function formatKm(km: unknown): string {
@@ -58,7 +62,7 @@ function formatKm(km: unknown): string {
 function formatDate(date: unknown): string {
   if (!date) return '-'
   const d = new Date(String(date))
-  if (isNaN(d.getTime())) return '-'
+  if (Number.isNaN(d.getTime())) return '-'
   return d.toLocaleDateString('tr-TR')
 }
 
@@ -95,100 +99,141 @@ onMounted(fetchVehicle)
         </div>
       </header>
 
-      <div class="detail-grid">
-        <section class="card info-card">
-          <h2>Araç Bilgileri</h2>
-          <div class="info-grid">
-            <div class="info-item">
-              <span class="label">Marka</span>
-              <span class="value">{{ vehicle.brand }}</span>
-            </div>
-            <div class="info-item">
-              <span class="label">Model</span>
-              <span class="value">{{ vehicle.model }}</span>
-            </div>
-            <div class="info-item">
-              <span class="label">Yıl</span>
-              <span class="value">{{ vehicle.year }}</span>
-            </div>
-            <div class="info-item">
-              <span class="label">Renk</span>
-              <span class="value">{{ vehicle.color }}</span>
-            </div>
-            <div class="info-item">
-              <span class="label">Yakıt Tipi</span>
-              <span class="value">{{ vehicle.fuelType }}</span>
-            </div>
-            <div class="info-item">
-              <span class="label">Vites</span>
-              <span class="value">{{ vehicle.transmission }}</span>
-            </div>
-            <div class="info-item">
-              <span class="label">Motor Hacmi</span>
-              <span class="value">{{ vehicle.engineCapacity }} cc</span>
-            </div>
-            <div class="info-item">
-              <span class="label">Koltuk Sayısı</span>
-              <span class="value">{{ vehicle.seatCount }}</span>
-            </div>
-          </div>
-        </section>
-
-        <section class="card status-card">
-          <h2>Durum Bilgileri</h2>
-          <div class="info-grid">
-            <div class="info-item">
-              <span class="label">Güncel KM</span>
-              <span class="value highlight">{{ formatKm(vehicle.currentKm) }}</span>
-            </div>
-            <div class="info-item">
-              <span class="label">Günlük Fiyat</span>
-              <span class="value highlight">{{ formatCurrency(vehicle.dailyPrice) }}</span>
-            </div>
-            <div class="info-item">
-              <span class="label">Şube</span>
-              <span class="value">{{ vehicle.branch?.name || '-' }}</span>
-            </div>
-            <div class="info-item">
-              <span class="label">Kategori</span>
-              <span class="value">{{ vehicle.category?.name || '-' }}</span>
-            </div>
-          </div>
-        </section>
-
-        <section class="card dates-card">
-          <h2>Tarihler</h2>
-          <div class="info-grid">
-            <div class="info-item">
-              <span class="label">Sigorta Bitiş</span>
-              <span class="value">{{ formatDate(vehicle.insuranceExpiryDate) }}</span>
-            </div>
-            <div class="info-item">
-              <span class="label">Muayene Bitiş</span>
-              <span class="value">{{ formatDate(vehicle.inspectionExpiryDate) }}</span>
-            </div>
-            <div class="info-item">
-              <span class="label">Tescil Tarihi</span>
-              <span class="value">{{ formatDate(vehicle.registrationDate) }}</span>
-            </div>
-          </div>
-        </section>
-
-        <section class="card id-card">
-          <h2>Kimlik Bilgileri</h2>
-          <div class="info-grid">
-            <div class="info-item full">
-              <span class="label">VIN Numarası</span>
-              <span class="value mono">{{ vehicle.vinNumber }}</span>
-            </div>
-          </div>
-        </section>
+      <div class="tabs">
+        <button
+          :class="['tab', { active: activeTab === 'info' }]"
+          @click="activeTab = 'info'"
+        >
+          Bilgiler
+        </button>
+        <button
+          :class="['tab', { active: activeTab === 'history' }]"
+          @click="activeTab = 'history'"
+        >
+          Araç Geçmişi
+        </button>
+        <button
+          :class="['tab', { active: activeTab === 'damages' }]"
+          @click="activeTab = 'damages'"
+        >
+          Hasar Haritası
+        </button>
+        <button
+          :class="['tab', { active: activeTab === 'maintenance' }]"
+          @click="activeTab = 'maintenance'"
+        >
+          Bakım Haritası
+        </button>
       </div>
 
-      <section class="card notes-card" v-if="vehicle.notes">
-        <h2>Notlar</h2>
-        <p>{{ vehicle.notes }}</p>
-      </section>
+      <div v-if="activeTab === 'info'" class="tab-content">
+        <div class="detail-grid">
+          <section class="card info-card">
+            <h2>Araç Bilgileri</h2>
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="label">Marka</span>
+                <span class="value">{{ vehicle.brand }}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">Model</span>
+                <span class="value">{{ vehicle.model }}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">Yıl</span>
+                <span class="value">{{ vehicle.year }}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">Renk</span>
+                <span class="value">{{ vehicle.color }}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">Yakıt Tipi</span>
+                <span class="value">{{ vehicle.fuelType }}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">Vites</span>
+                <span class="value">{{ vehicle.transmission }}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">Motor Hacmi</span>
+                <span class="value">{{ vehicle.engineCapacity }} cc</span>
+              </div>
+              <div class="info-item">
+                <span class="label">Koltuk Sayısı</span>
+                <span class="value">{{ vehicle.seatCount }}</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="card status-card">
+            <h2>Durum Bilgileri</h2>
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="label">Güncel KM</span>
+                <span class="value highlight">{{ formatKm(vehicle.currentKm) }}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">Günlük Fiyat</span>
+                <span class="value highlight">{{ formatCurrency(vehicle.dailyPrice) }}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">Şube</span>
+                <span class="value">{{ vehicle.branch?.name || '-' }}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">Kategori</span>
+                <span class="value">{{ vehicle.category?.name || '-' }}</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="card dates-card">
+            <h2>Tarihler</h2>
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="label">Sigorta Bitiş</span>
+                <span class="value">{{ formatDate(vehicle.insuranceExpiryDate) }}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">Muayene Bitiş</span>
+                <span class="value">{{ formatDate(vehicle.inspectionExpiryDate) }}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">Tescil Tarihi</span>
+                <span class="value">{{ formatDate(vehicle.registrationDate) }}</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="card id-card">
+            <h2>Kimlik Bilgileri</h2>
+            <div class="info-grid">
+              <div class="info-item full">
+                <span class="label">VIN Numarası</span>
+                <span class="value mono">{{ vehicle.vinNumber }}</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="card notes-card" v-if="vehicle.notes">
+            <h2>Notlar</h2>
+            <p>{{ vehicle.notes }}</p>
+          </section>
+        </div>
+      </div>
+
+      <div v-else-if="activeTab === 'history'" class="tab-content">
+        <VehicleHistory :vehicle-id="vehicleId" />
+      </div>
+
+      <div v-else-if="activeTab === 'damages'" class="tab-content">
+        <VehicleDamageMap :vehicle-id="vehicleId" />
+      </div>
+
+      <div v-else-if="activeTab === 'maintenance'" class="tab-content">
+        <VehicleMaintenanceMap :vehicle-id="vehicleId" />
+      </div>
 
       <VehicleEditModal
         :visible="showEditModal"
@@ -349,6 +394,50 @@ onMounted(fetchVehicle)
   margin: 0;
   color: var(--color-text-secondary);
   line-height: 1.6;
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  border-bottom: 2px solid var(--color-border);
+}
+
+.tab {
+  padding: 12px 24px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: -2px;
+}
+
+.tab:hover {
+  color: var(--color-text);
+}
+
+.tab.active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}
+
+.tab-content {
+  animation: fadeIn 0.2s;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @media (max-width: 768px) {

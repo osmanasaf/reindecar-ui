@@ -1,4 +1,4 @@
-import type { RentalType, PaymentMethod, KmRecordSource, DiscountType, CalculationType, CustomerType } from './enums'
+import type { RentalType, PaymentMethod, KmRecordSource, DiscountType, CalculationType, CustomerType, DamageType, DamageLocation, DamageSeverity, MaintenanceType } from './enums'
 
 // Auth Forms
 export interface LoginForm {
@@ -96,6 +96,7 @@ export interface CreateRentalForm {
     rentalType: RentalType
     startDate: string
     endDate: string
+    termMonths?: number
     kmPackageId?: number
     customIncludedKm?: number
     customExtraKmPrice?: number
@@ -103,12 +104,59 @@ export interface CreateRentalForm {
     primaryDriverId?: number
     contractSignerId?: number
     contractSignerName?: string
+    extraItems?: any[]
     notes?: string
 }
 
 export interface AddRentalDriverForm {
     driverId: number
     primary: boolean
+}
+
+export interface CreateDriverForm {
+    nationalId: string
+    firstName: string
+    lastName: string
+    licenseNumber: string
+    licenseExpiryDate: string
+    licenseClass?: string
+    phone?: string
+    customerId?: number
+    primary?: boolean
+}
+
+// Damage Management Forms
+export interface CreateDamageReportForm {
+    vehicleId: number
+    rentalId?: number
+    reportDate: string
+    damageType: DamageType
+    location: DamageLocation
+    severity: DamageSeverity
+    description: string
+    estimatedCostAmount?: number
+    estimatedCostCurrency?: string
+    reportedBy?: string
+}
+
+export interface MarkDamageRepairedForm {
+    repairedDate: string
+    repairCostAmount?: number
+    repairCostCurrency?: string
+}
+
+export interface CreateMaintenanceRecordForm {
+    vehicleId: number
+    maintenanceType: MaintenanceType
+    maintenanceDate: string
+    currentKm: number
+    costAmount?: number
+    costCurrency?: string
+    serviceProvider?: string
+    description?: string
+    affectedZones?: number[]
+    partsReplaced?: string[]
+    paintColor?: string
 }
 
 export interface CreateKmPackageForm {

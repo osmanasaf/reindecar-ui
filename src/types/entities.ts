@@ -387,3 +387,150 @@ export interface RentalDriver {
     primary: boolean
     addedAt: string
 }
+
+// Driver
+export interface Driver {
+    id: number
+    nationalId: string
+    firstName: string
+    lastName: string
+    fullName: string
+    licenseNumber: string
+    licenseExpiryDate: string
+    licenseClass?: string
+    phone?: string
+    customerId?: number
+    primary?: boolean
+    active: boolean
+    createdAt: string
+}
+
+// Damage Management
+export interface DamageReport {
+    id: number
+    vehicleId: number
+    vehiclePlate: string
+    rentalId: number | null
+    reportDate: string
+    damageType: DamageType
+    damageTypeDisplayName: string
+    location: DamageLocation
+    locationDisplayName: string
+    zoneId: number
+    severity: DamageSeverity
+    severityDisplayName: string
+    severityColorCode: string
+    description: string
+    estimatedCostAmount: number | null
+    estimatedCostCurrency: string | null
+    reportedBy: string | null
+    repaired: boolean
+    repairedDate: string | null
+    repairCostAmount: number | null
+    repairCostCurrency: string | null
+    createdAt: string
+    updatedAt: string
+}
+
+export interface MaintenanceRecord {
+    id: number
+    vehicleId: number
+    vehiclePlate: string
+    maintenanceType: MaintenanceType
+    maintenanceTypeDisplayName: string
+    maintenanceTypeColorCode: string
+    maintenanceDate: string
+    currentKm: number
+    costAmount: number | null
+    costCurrency: string | null
+    serviceProvider: string | null
+    description: string | null
+    affectedZones: number[]
+    partsReplaced: string[]
+    paintColor: string | null
+    createdAt: string
+    updatedAt: string
+}
+
+export interface ZoneDamageInfo {
+    zoneId: number
+    damageCount: number
+    maxSeverity: DamageSeverity | null
+    colorCode: string
+    damageIds: number[]
+}
+
+export interface ZoneMaintenanceInfo {
+    zoneId: number
+    maintenanceCount: number
+    lastMaintenanceType: MaintenanceType | null
+    lastMaintenanceDate: string | null
+    colorCode: string
+    maintenanceIds: number[]
+}
+
+export interface VehicleDamageMap {
+    vehicleId: number
+    vehiclePlate: string
+    totalActiveDamages: number
+    zones: Record<number, ZoneDamageInfo>
+    damages: DamageReport[]
+}
+
+export interface VehicleMaintenanceMap {
+    vehicleId: number
+    vehiclePlate: string
+    totalMaintenanceCount: number
+    zones: Record<number, ZoneMaintenanceInfo>
+    maintenances: MaintenanceRecord[]
+}
+
+// Vehicle History
+export interface RentalHistoryItem {
+    id: number
+    rentalCode: string
+    customerName: string
+    startDate: string
+    endDate: string
+    totalDays: number
+    totalAmount: number
+    status: string
+}
+
+export interface DamageHistoryItem {
+    id: number
+    reportDate: string
+    damageType: string
+    location: string
+    severity: string
+    repaired: boolean
+    repairedDate: string | null
+}
+
+export interface MaintenanceHistoryItem {
+    id: number
+    maintenanceDate: string
+    maintenanceType: string
+    currentKm: number
+    costAmount: number | null
+    serviceProvider: string | null
+}
+
+export interface StatusChangeItem {
+    id: number
+    changedAt: string
+    oldStatus: string
+    newStatus: string
+    changedBy: string | null
+    reason: string | null
+}
+
+export interface VehicleHistory {
+    vehicleId: number
+    vehiclePlate: string
+    vehicleName: string
+    rentals: RentalHistoryItem[]
+    maintenances: MaintenanceHistoryItem[]
+    damages: DamageHistoryItem[]
+    statusChanges: StatusChangeItem[]
+}

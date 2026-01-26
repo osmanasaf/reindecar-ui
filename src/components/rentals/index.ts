@@ -1,5 +1,6 @@
 export { default as VehicleSelector } from './VehicleSelector.vue'
 export { default as CustomerSelector } from './CustomerSelector.vue'
+export { default as DriverSelector } from './DriverSelector.vue'
 export { default as PricingCalculator } from './PricingCalculator.vue'
 export { default as RentalTypeSelector } from './RentalTypeSelector.vue'
 export { default as TermSelector } from './TermSelector.vue'

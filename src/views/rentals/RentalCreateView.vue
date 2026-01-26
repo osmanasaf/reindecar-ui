@@ -3,10 +3,12 @@ import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { rentalsApi } from '@/api'
 import { useToast, useValidation } from '@/composables'
-import type { RentalType, Customer, CreateRentalForm, RentalExtraItem } from '@/types'
+import { RentalType, CustomerType } from '@/types'
+import type { Customer, CreateRentalForm, RentalExtraItem } from '@/types'
 import type { PriceCalculationResponse } from '@/api'
 import VehicleSelector from '@/components/rentals/VehicleSelector.vue'
 import CustomerSelector from '@/components/rentals/CustomerSelector.vue'
+import DriverSelector from '@/components/rentals/DriverSelector.vue'
 import PricingCalculator from '@/components/rentals/PricingCalculator.vue'
 import QuickCustomerModal from '@/components/customers/QuickCustomerModal.vue'
 import RentalTypeSelector from '@/components/rentals/RentalTypeSelector.vue'
@@ -20,10 +22,12 @@ const currentStep = ref(1)
 const totalSteps = 6
 const submitting = ref(false)
 
-const rentalType = ref<RentalType>('DAILY')
+const rentalType = ref<RentalType>(RentalType.DAILY)
 const selectedVehicleId = ref<number | null>(null)
 const selectedCustomerId = ref<number | null>(null)
 const selectedVehicleCategoryId = ref<number | null>(null)
+const selectedDriverIds = ref<number[]>([])
+const primaryDriverId = ref<number | null>(null)
 const startDate = ref('')
 const endDate = ref('')
 const selectedTermMonths = ref<number>(12)
@@ -36,10 +40,10 @@ const showQuickCustomerModal = ref(false)
 const { getError, hasError, touch } = useValidation()
 
 const rentalTypes: { value: RentalType; label: string; description: string; minDays?: number }[] = [
-  { value: 'DAILY', label: 'Günlük Kiralama', description: '1-30 gün arası kısa süreli kiralama' },
-  { value: 'WEEKLY', label: 'Haftalık Kiralama', description: '7+ gün avantajlı fiyatlandırma' },
-  { value: 'MONTHLY', label: 'Aylık Kiralama', description: '1-12 ay arası orta süreli kiralama' },
-  { value: 'LEASING', label: 'Uzun Dönem Leasing', description: '12+ ay uzun dönem anlaşma', minDays: 365 }
+  { value: RentalType.DAILY, label: 'Günlük Kiralama', description: '1-30 gün arası kısa süreli kiralama' },
+  { value: RentalType.WEEKLY, label: 'Haftalık Kiralama', description: '7+ gün avantajlı fiyatlandırma' },
+  { value: RentalType.MONTHLY, label: 'Aylık Kiralama', description: '1-12 ay arası orta süreli kiralama' },
+  { value: RentalType.LEASING, label: 'Uzun Dönem Leasing', description: '12+ ay uzun dönem anlaşma', minDays: 365 }
 ]
 
 const stepTitles = computed(() => {
@@ -60,13 +64,15 @@ const canProceed = computed(() => {
 
 const isLastStep = computed(() => currentStep.value === totalSteps)
 
+const isLeasing = computed(() => rentalType.value === RentalType.LEASING)
+
 function validateDates(): boolean {
   if (!startDate.value || !endDate.value) return false
   const start = new Date(startDate.value)
   const end = new Date(endDate.value)
   if (end <= start) return false
   
-  if (rentalType.value === 'LEASING') {
+  if (rentalType.value === RentalType.LEASING) {
     const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
     if (days < 365) return false
   }
@@ -119,10 +125,6 @@ function handleLeasingPlanSelected(planId: number) {
   selectedLeasingPlanId.value = planId
 }
 
-function handleTermSelected(months: number) {
-  selectedTermMonths.value = months
-}
-
 function handleVehicleSelected(vehicleId: number, categoryId: number) {
   selectedVehicleId.value = vehicleId
   selectedVehicleCategoryId.value = categoryId
@@ -159,15 +161,15 @@ async function handleSubmit() {
       rentalType: rentalType.value,
       vehicleId: selectedVehicleId.value,
       customerId: selectedCustomerId.value,
-      customerType: 'PERSONAL',
-      driverIds: [selectedCustomerId.value],
-      primaryDriverId: selectedCustomerId.value,
+      customerType: CustomerType.PERSONAL,
+      driverIds: selectedDriverIds.value.length > 0 ? selectedDriverIds.value : undefined,
+      primaryDriverId: primaryDriverId.value || undefined,
       branchId: 1,
       returnBranchId: 1,
       startDate: startDate.value,
       endDate: endDate.value,
-      termMonths: rentalType.value === 'LEASING' ? selectedTermMonths.value : undefined,
-      kmPackageId: rentalType.value === 'LEASING' ? selectedLeasingPlanId.value || undefined : undefined,
+      termMonths: rentalType.value === RentalType.LEASING ? selectedTermMonths.value : undefined,
+      kmPackageId: rentalType.value === RentalType.LEASING ? selectedLeasingPlanId.value || undefined : undefined,
       extraItems: extraItems.value.length > 0 ? extraItems.value.map(item => ({
         itemTypeId: item.itemTypeId,
         customName: item.name,
@@ -193,6 +195,8 @@ watch(rentalType, () => {
     selectedVehicleId.value = null
     selectedCustomerId.value = null
     selectedVehicleCategoryId.value = null
+    selectedDriverIds.value = []
+    primaryDriverId.value = null
     startDate.value = ''
     endDate.value = ''
     selectedLeasingPlanId.value = null
@@ -266,7 +270,7 @@ watch(selectedVehicleId, (newId) => {
                 </div>
               </div>
 
-              <div v-if="rentalType === 'LEASING' && selectedVehicleCategoryId" class="term-section">
+              <div v-if="isLeasing && selectedVehicleCategoryId" class="term-section">
                 <h3>Vade Süresi</h3>
                 <TermSelector 
                   v-model="selectedTermMonths"
@@ -274,12 +278,12 @@ watch(selectedVehicleId, (newId) => {
                 />
               </div>
               
-              <div v-if="rentalType === 'LEASING' && !selectedVehicleCategoryId" class="term-notice">
+              <div v-if="isLeasing && !selectedVehicleCategoryId" class="term-notice">
                 <span>ℹ️</span>
                 <p>Vade seçimi için önce araç seçimi yapmanız gerekmektedir.</p>
               </div>
 
-              <div v-if="rentalType === 'LEASING'" class="leasing-notice">
+              <div v-if="isLeasing" class="leasing-notice">
                 <span class="notice-icon">ℹ️</span>
                 <p>Leasing için minimum süre <strong>12 ay (365 gün)</strong> olmalıdır.</p>
               </div>
@@ -288,7 +292,7 @@ watch(selectedVehicleId, (newId) => {
                 <div class="summary-item">
                   <span class="label">Toplam Süre</span>
                   <span class="value">
-                    {{ rentalType === 'LEASING' ? `${selectedTermMonths} Ay` : `${totalDays} Gün` }}
+                    {{ isLeasing ? `${selectedTermMonths} Ay` : `${totalDays} Gün` }}
                   </span>
                 </div>
               </div>
@@ -310,12 +314,24 @@ watch(selectedVehicleId, (newId) => {
         </div>
 
         <div v-else-if="currentStep === 4" key="step-4" class="step-content">
-          <h2>Müşteri Seçin</h2>
+          <h2>Müşteri ve Sürücü Seçin</h2>
           <CustomerSelector
             v-model="selectedCustomerId"
             :rental-end-date="endDate"
             @open-quick-create="showQuickCustomerModal = true"
           />
+
+          <div v-if="selectedCustomerId" class="driver-section">
+            <h3>Sürücüler</h3>
+            <p class="section-description">
+              Kiralama için sürücü seçin. Birden fazla sürücü ekleyebilirsiniz.
+            </p>
+            <DriverSelector
+              v-model="selectedDriverIds"
+              v-model:primary-driver-id="primaryDriverId"
+              :customer-id="selectedCustomerId"
+            />
+          </div>
         </div>
 
         <div v-else-if="currentStep === 5" key="step-5" class="step-content">
@@ -326,7 +342,7 @@ watch(selectedVehicleId, (newId) => {
           
           <ExtraItemsManager
             v-model="extraItems"
-            :term-months="rentalType === 'LEASING' ? selectedTermMonths : 1"
+            :term-months="isLeasing ? selectedTermMonths : 1"
             @total-changed="handleExtraItemsTotal"
           />
           
@@ -357,7 +373,7 @@ watch(selectedVehicleId, (newId) => {
                 <div class="summary-row">
                   <span>Toplam Süre</span>
                   <strong>
-                    {{ rentalType === 'LEASING' ? `${selectedTermMonths} Ay` : `${totalDays} Gün` }}
+                    {{ isLeasing ? `${selectedTermMonths} Ay` : `${totalDays} Gün` }}
                   </strong>
                 </div>
                 <div v-if="extraItems.length > 0" class="summary-row">
@@ -375,7 +391,7 @@ watch(selectedVehicleId, (newId) => {
                   :rental-type="rentalType"
                   :start-date="startDate"
                   :end-date="endDate"
-                  :term-months="rentalType === 'LEASING' ? selectedTermMonths : undefined"
+                  :term-months="isLeasing ? selectedTermMonths : undefined"
                   @calculated="handlePriceCalculated"
                   @leasing-plan-selected="handleLeasingPlanSelected"
                 />
@@ -808,6 +824,24 @@ watch(selectedVehicleId, (newId) => {
 
 .term-notice p {
   margin: 0;
+}
+
+.driver-section {
+  margin-top: 32px;
+  padding-top: 32px;
+  border-top: 1px solid var(--color-border);
+}
+
+.driver-section h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+}
+
+.section-description {
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  margin: 0 0 20px 0;
 }
 
 .skip-notice {
