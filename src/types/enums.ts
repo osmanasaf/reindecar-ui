@@ -113,3 +113,15 @@ export enum KmRecordSource {
     GPS = 'GPS',
     SERVICE = 'SERVICE'
 }
+
+// Pricing Types
+export enum DiscountType {
+    PERCENTAGE = 'PERCENTAGE',
+    FIXED_AMOUNT = 'FIXED_AMOUNT'
+}
+
+export enum CalculationType {
+    FIXED = 'FIXED',
+    PERCENTAGE = 'PERCENTAGE',
+    PER_MONTH = 'PER_MONTH'
+}

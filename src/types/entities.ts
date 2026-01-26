@@ -11,9 +11,10 @@ import type {
     PaymentStatus,
     Role,
     NotificationPriority,
-    FuelLevel,
     InvoiceStatus,
-    KmRecordSource
+    KmRecordSource,
+    DiscountType,
+    CalculationType
 } from './enums'
 
 // User
@@ -78,6 +79,8 @@ export interface Vehicle {
     inspectionExpiryDate: string
     registrationDate: string
     dailyPrice: number
+    weeklyPrice: number | null
+    monthlyPrice: number | null
     isInsuranceExpiringSoon: boolean
     isInspectionExpiringSoon: boolean
     notes?: string
@@ -131,21 +134,26 @@ export interface Rental {
     rentalType: RentalType
     status: RentalStatus
     vehicleId: number
+    vehicle?: Vehicle
     vehiclePlate?: string
     vehicleName?: string
     customerId: number
+    customer?: Customer
     customerName?: string
     driverId?: number
+    driver?: Customer
     branchId: number
+    branch?: Branch
     branchName?: string
     returnBranchId: number
+    returnBranch?: Branch
     returnBranchName?: string
     startDate: string
     endDate: string
     actualReturnDate?: string
     totalDays: number
-    startKm?: number
-    endKm?: number
+    startKm: number
+    endKm: number
     totalKm: number
     kmPackageId?: number
     dailyPrice: number
@@ -267,4 +275,115 @@ export interface AuthTokens {
     refreshToken: string
     tokenType: string
     expiresIn: number
+}
+
+// Pricing Entities
+export interface CategoryPricing {
+    id: number
+    categoryId: number
+    categoryName: string
+    dailyPrice: number
+    weeklyPrice: number
+    monthlyPrice: number
+    yearlyPrice: number
+    currency: string
+    validFrom: string | null
+    validTo: string | null
+    active: boolean
+    createdAt: string
+    updatedAt: string
+}
+
+export interface VehiclePricing {
+    id: number
+    vehicleId: number
+    vehicleName: string
+    categoryId: number
+    categoryName: string
+    dailyPrice: number | null
+    weeklyPrice: number | null
+    monthlyPrice: number | null
+    yearlyPrice: number | null
+    currency: string
+    validFrom: string | null
+    validTo: string | null
+    active: boolean
+    createdAt: string
+    updatedAt: string
+}
+
+export interface TermDiscount {
+    id: number
+    categoryId: number | null
+    categoryName: string | null
+    termMonths: number
+    discountType: DiscountType
+    discountValue: number
+    active: boolean
+    createdAt: string
+    updatedAt: string
+}
+
+export interface ExtraItemType {
+    id: number
+    code: string
+    name: string
+    description: string | null
+    defaultAmount: number | null
+    currency: string
+    calculationType: CalculationType
+    sortOrder: number
+    active: boolean
+    createdAt: string
+    updatedAt: string
+}
+
+export interface RentalExtraItem {
+    id: number
+    rentalId: number
+    itemTypeId: number | null
+    name: string
+    description: string | null
+    amount: number
+    currency: string
+    calculationType: CalculationType
+    calculatedTotal: number | null
+    createdAt: string
+}
+
+export interface PriceBreakdownItem {
+    description: string
+    amount: number
+}
+
+export interface KmPackageResponse {
+    id: number
+    name: string
+    includedKm: number
+    extraKmPrice: number
+    unlimited: boolean
+}
+
+export interface KmPackage {
+    id: number
+    name: string
+    includedKm: number
+    extraKmPrice: number
+    currency: string
+    applicableTypes: RentalType[]
+    unlimited: boolean
+    active: boolean
+    categoryId: number | null
+    categoryName: string | null
+    global: boolean
+}
+
+export interface RentalDriver {
+    id: number
+    rentalId: number
+    driverId: number
+    driverName: string
+    licenseNumber: string
+    primary: boolean
+    addedAt: string
 }

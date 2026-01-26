@@ -48,6 +48,8 @@ const form = ref<CreateVehicleForm>({
   inspectionExpiryDate: '',
   registrationDate: '',
   dailyPrice: 0,
+  weeklyPrice: undefined,
+  monthlyPrice: undefined,
   notes: ''
 })
 
@@ -103,6 +105,8 @@ async function fetchData() {
         inspectionExpiryDate: vehicle.inspectionExpiryDate?.split('T')[0] || '',
         registrationDate: vehicle.registrationDate?.split('T')[0] || '',
         dailyPrice: vehicle.dailyPrice || 0,
+        weeklyPrice: vehicle.weeklyPrice || undefined,
+        monthlyPrice: vehicle.monthlyPrice || undefined,
         notes: vehicle.notes || ''
       }
     }
@@ -319,7 +323,13 @@ onMounted(fetchData)
             </select>
             <span class="error-text">{{ getError('branchId') }}</span>
           </div>
+        </div>
+      </section>
 
+      <!-- Fiyatlandırma -->
+      <section class="form-section">
+        <h3>Fiyatlandırma</h3>
+        <div class="form-grid">
           <div class="form-group" :class="{ error: hasError('dailyPrice') }">
             <label>Günlük Fiyat (TL) <span class="required">*</span></label>
             <input 
@@ -327,9 +337,34 @@ onMounted(fetchData)
               type="number"
               min="0"
               step="0.01"
+              placeholder="1500.00"
               @blur="handleBlur('dailyPrice')"
             />
             <span class="error-text">{{ getError('dailyPrice') }}</span>
+          </div>
+
+          <div class="form-group">
+            <label>Haftalık Fiyat (TL)</label>
+            <input 
+              v-model.number="form.weeklyPrice" 
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="9000.00"
+            />
+            <span class="help-text">Boş bırakılırsa günlük fiyat × 7 kullanılır</span>
+          </div>
+
+          <div class="form-group">
+            <label>Aylık Fiyat (TL)</label>
+            <input 
+              v-model.number="form.monthlyPrice" 
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="30000.00"
+            />
+            <span class="help-text">Boş bırakılırsa günlük fiyat × 30 kullanılır</span>
           </div>
         </div>
       </section>
@@ -517,6 +552,12 @@ onMounted(fetchData)
   color: var(--color-danger);
   margin-top: 4px;
   min-height: 18px;
+}
+
+.help-text {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin-top: 4px;
 }
 
 .form-actions {

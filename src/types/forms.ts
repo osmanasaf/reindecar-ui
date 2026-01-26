@@ -1,4 +1,4 @@
-import type { RentalType, FuelLevel, PaymentMethod, KmRecordSource } from './enums'
+import type { RentalType, PaymentMethod, KmRecordSource, DiscountType, CalculationType, CustomerType } from './enums'
 
 // Auth Forms
 export interface LoginForm {
@@ -54,6 +54,8 @@ export interface CreateVehicleForm {
     inspectionExpiryDate: string
     registrationDate: string
     dailyPrice: number
+    weeklyPrice?: number
+    monthlyPrice?: number
     notes?: string
 }
 
@@ -79,39 +81,53 @@ export interface UpdateVehicleForm {
     insuranceExpiryDate: string
     inspectionExpiryDate: string
     dailyPrice: number
+    weeklyPrice?: number
+    monthlyPrice?: number
     notes?: string
 }
 
 // Rental Forms
 export interface CreateRentalForm {
-    rentalType: RentalType
     vehicleId: number
     customerId: number
-    customerType: string
-    contractSignerId?: number
-    contractSignerName?: string
-    driverIds: number[]
-    primaryDriverId: number
+    customerType: CustomerType
     branchId: number
     returnBranchId: number
+    rentalType: RentalType
     startDate: string
     endDate: string
     kmPackageId?: number
-    discountAmount?: number
+    customIncludedKm?: number
+    customExtraKmPrice?: number
+    driverIds?: number[]
+    primaryDriverId?: number
+    contractSignerId?: number
+    contractSignerName?: string
     notes?: string
+}
+
+export interface AddRentalDriverForm {
+    driverId: number
+    primary: boolean
+}
+
+export interface CreateKmPackageForm {
+    name: string
+    includedKm: number
+    extraKmPrice: number
+    applicableTypes: RentalType[]
+    unlimited?: boolean
+    categoryId?: number
 }
 
 export interface VehicleDeliveryForm {
     startKm: number
-    fuelLevel: FuelLevel
-    notes?: string
 }
 
 export interface VehicleReturnForm {
+    actualReturnDate: string
     endKm: number
-    fuelLevel: FuelLevel
-    damageNotes?: string
-    extraCharges?: number
+    notes?: string
 }
 
 // Payment Forms
@@ -179,4 +195,42 @@ export interface CalculatePriceForm {
     endDate: string
     kmPackageId?: number
     campaignCode?: string
+}
+
+// Pricing Forms
+export interface CategoryPricingForm {
+    categoryId: number | null
+    dailyPrice: number | null
+    weeklyPrice: number | null
+    monthlyPrice: number | null
+    yearlyPrice: number | null
+    currency: string
+    validFrom: string
+    validTo: string
+}
+
+export interface TermDiscountForm {
+    categoryId: number | null
+    termMonths: number | null
+    discountType: DiscountType
+    discountValue: number | null
+}
+
+export interface ExtraItemTypeForm {
+    code: string
+    name: string
+    description: string
+    defaultAmount: number | null
+    currency: string
+    calculationType: CalculationType
+    sortOrder: number
+}
+
+export interface RentalExtraItemForm {
+    itemTypeId: number | null
+    customName: string
+    description: string
+    amount: number | null
+    currency: string
+    calculationType: CalculationType
 }

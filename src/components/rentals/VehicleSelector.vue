@@ -14,6 +14,7 @@ const props = defineProps<Props>()
 
 const emit = defineEmits<{
   'update:modelValue': [value: number | null]
+  'vehicle-selected': [vehicleId: number, categoryId: number]
 }>()
 
 const loading = ref(false)
@@ -71,6 +72,7 @@ async function fetchCategories() {
 
 function selectVehicle(vehicle: Vehicle) {
   emit('update:modelValue', vehicle.id)
+  emit('vehicle-selected', vehicle.id, vehicle.categoryId)
 }
 
 function clearSelection() {
@@ -80,7 +82,7 @@ function clearSelection() {
 function safeNumber(value: unknown, defaultValue = 0): number {
   if (value === null || value === undefined) return defaultValue
   const num = Number(value)
-  return isNaN(num) ? defaultValue : num
+  return Number.isNaN(num) ? defaultValue : num
 }
 
 function formatCurrency(amount: unknown): string {
@@ -104,6 +106,32 @@ const fuelTypeLabels: Record<string, string> = {
 const transmissionLabels: Record<string, string> = {
   MANUAL: 'Manuel',
   AUTOMATIC: 'Otomatik'
+}
+
+const priceUnitLabel = computed(() => {
+  switch (props.rentalType) {
+    case 'LEASING':
+    case 'MONTHLY':
+      return '/ ay'
+    case 'WEEKLY':
+      return '/ hafta'
+    case 'DAILY':
+    default:
+      return '/ gün'
+  }
+})
+
+function getVehiclePrice(vehicle: Vehicle): number {
+  switch (props.rentalType) {
+    case 'LEASING':
+    case 'MONTHLY':
+      return vehicle.monthlyPrice ?? vehicle.dailyPrice * 30
+    case 'WEEKLY':
+      return vehicle.weeklyPrice ?? vehicle.dailyPrice * 7
+    case 'DAILY':
+    default:
+      return vehicle.dailyPrice
+  }
 }
 
 onMounted(() => {
@@ -155,8 +183,8 @@ watch([() => props.startDate, () => props.endDate], () => {
           </p>
         </div>
         <div class="selected-price">
-          <span class="price">{{ formatCurrency(selectedVehicle.dailyPrice) }}</span>
-          <span class="per-day">/ gün</span>
+          <span class="price">{{ formatCurrency(getVehiclePrice(selectedVehicle)) }}</span>
+          <span class="per-day">{{ priceUnitLabel }}</span>
         </div>
         <button class="clear-btn" @click="clearSelection">Değiştir</button>
       </div>
@@ -192,8 +220,8 @@ watch([() => props.startDate, () => props.endDate], () => {
             </div>
           </div>
           <div class="vehicle-price">
-            <span class="amount">{{ formatCurrency(vehicle.dailyPrice) }}</span>
-            <span class="unit">/ gün</span>
+            <span class="amount">{{ formatCurrency(getVehiclePrice(vehicle)) }}</span>
+            <span class="unit">{{ priceUnitLabel }}</span>
           </div>
           <button class="select-btn">Seç</button>
         </div>

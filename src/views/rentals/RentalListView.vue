@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
-import { rentalsApi } from '@/api'
+import { rentalsApi, vehiclesApi, customersApi } from '@/api'
 import { usePagination, useToast } from '@/composables'
-import type { Rental, RentalStatus, RentalType } from '@/types'
+import type { Rental, RentalStatus, RentalType, Vehicle, Customer } from '@/types'
 
 const rentals = ref<Rental[]>([])
+const vehicleMap = ref<Map<number, Vehicle>>(new Map())
+const customerMap = ref<Map<number, Customer>>(new Map())
 const loading = ref(true)
 const statusFilter = ref<RentalStatus | ''>('')
 const typeFilter = ref<RentalType | ''>('')
@@ -15,43 +17,56 @@ const toast = useToast()
 
 const statusOptions: { value: RentalStatus | '', label: string }[] = [
   { value: '', label: 'Tüm Durumlar' },
-  { value: 'PENDING', label: 'Beklemede' },
+  { value: 'DRAFT', label: 'Taslak' },
   { value: 'RESERVED', label: 'Rezerve' },
   { value: 'ACTIVE', label: 'Aktif' },
-  { value: 'RETURNING', label: 'İade Sürecinde' },
-  { value: 'COMPLETED', label: 'Tamamlandı' },
+  { value: 'RETURN_PENDING', label: 'İade Bekliyor' },
+  { value: 'OVERDUE', label: 'Gecikmiş' },
+  { value: 'CLOSED', label: 'Tamamlandı' },
   { value: 'CANCELLED', label: 'İptal' }
 ]
 
 const typeOptions: { value: RentalType | '', label: string }[] = [
   { value: '', label: 'Tüm Tipler' },
   { value: 'DAILY', label: 'Günlük' },
+  { value: 'WEEKLY', label: 'Haftalık' },
   { value: 'MONTHLY', label: 'Aylık' },
   { value: 'LEASING', label: 'Leasing' }
 ]
 
 const statusLabels: Record<RentalStatus, string> = {
-  PENDING: 'Beklemede',
+  DRAFT: 'Taslak',
   RESERVED: 'Rezerve',
   ACTIVE: 'Aktif',
-  RETURNING: 'İade Sürecinde',
-  COMPLETED: 'Tamamlandı',
+  RETURN_PENDING: 'İade Bekliyor',
+  OVERDUE: 'Gecikmiş',
+  CLOSED: 'Tamamlandı',
   CANCELLED: 'İptal'
 }
 
 const statusColors: Record<RentalStatus, string> = {
-  PENDING: 'warning',
+  DRAFT: 'secondary',
   RESERVED: 'info',
   ACTIVE: 'success',
-  RETURNING: 'primary',
-  COMPLETED: 'muted',
+  RETURN_PENDING: 'warning',
+  OVERDUE: 'danger',
+  CLOSED: 'muted',
   CANCELLED: 'danger'
 }
 
 const typeLabels: Record<RentalType, string> = {
   DAILY: 'Günlük',
+  WEEKLY: 'Haftalık',
   MONTHLY: 'Aylık',
   LEASING: 'Leasing'
+}
+
+function getVehicle(rental: Rental): Vehicle | undefined {
+  return rental.vehicle || vehicleMap.value.get(rental.vehicleId)
+}
+
+function getCustomer(rental: Rental): Customer | undefined {
+  return rental.customer || customerMap.value.get(rental.customerId)
 }
 
 const filteredRentals = computed(() => {
@@ -75,11 +90,37 @@ async function fetchRentals() {
     const response = await rentalsApi.getAll(params)
     rentals.value = response.content
     setTotal(response.totalElements, response.totalPages)
+    await fetchRelatedData()
   } catch {
     toast.error('Kiralamalar yüklenirken hata oluştu')
   } finally {
     loading.value = false
   }
+}
+
+async function fetchRelatedData() {
+  const vehicleIds = [...new Set(rentals.value.filter(r => r.vehicleId && !r.vehicle).map(r => r.vehicleId))]
+  const customerIds = [...new Set(rentals.value.filter(r => r.customerId && !r.customer).map(r => r.customerId))]
+
+  const promises: Promise<void>[] = []
+
+  for (const id of vehicleIds) {
+    promises.push(
+      vehiclesApi.getById(id)
+        .then(v => vehicleMap.value.set(id, v))
+        .catch(() => {})
+    )
+  }
+
+  for (const id of customerIds) {
+    promises.push(
+      customersApi.getById(id)
+        .then(c => customerMap.value.set(id, c))
+        .catch(() => {})
+    )
+  }
+
+  await Promise.all(promises)
 }
 
 function handlePageChange(newPage: number) {
@@ -91,7 +132,8 @@ function formatDate(date: string): string {
   return new Date(date).toLocaleDateString('tr-TR')
 }
 
-function formatCurrency(amount: number): string {
+function formatCurrency(amount: number | undefined | null): string {
+  if (amount === undefined || amount === null || Number.isNaN(amount)) return '-'
   return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(amount)
 }
 
@@ -148,21 +190,21 @@ onMounted(fetchRentals)
             :key="rental.id"
             @click="$router.push(`/rentals/${rental.id}`)"
           >
-            <td class="rental-id">#{{ rental.id }}</td>
+            <td class="rental-id">{{ rental.rentalNumber || `#${rental.id}` }}</td>
             <td>
               <div class="customer-cell">
-                <strong>{{ rental.customer?.displayName || '-' }}</strong>
-                <span class="customer-type">{{ rental.customer?.customerType === 'COMPANY' ? 'Kurumsal' : 'Bireysel' }}</span>
+                <strong>{{ getCustomer(rental)?.displayName || '-' }}</strong>
+                <span class="customer-type">{{ getCustomer(rental)?.customerType === 'COMPANY' ? 'Kurumsal' : 'Bireysel' }}</span>
               </div>
             </td>
             <td>
               <div class="vehicle-cell">
-                <strong>{{ rental.vehicle?.plateNumber }}</strong>
-                <span>{{ rental.vehicle?.brand }} {{ rental.vehicle?.model }}</span>
+                <strong>{{ getVehicle(rental)?.plateNumber || '-' }}</strong>
+                <span>{{ getVehicle(rental) ? `${getVehicle(rental)?.brand} ${getVehicle(rental)?.model}` : '-' }}</span>
               </div>
             </td>
             <td>
-              <span class="type-badge">{{ typeLabels[rental.rentalType] }}</span>
+              <span class="type-badge">{{ typeLabels[rental.rentalType] || rental.rentalType }}</span>
             </td>
             <td>
               <div class="date-range">
@@ -171,10 +213,10 @@ onMounted(fetchRentals)
                 <span>{{ formatDate(rental.endDate) }}</span>
               </div>
             </td>
-            <td class="amount">{{ formatCurrency(rental.totalAmount) }}</td>
+            <td class="amount">{{ formatCurrency(rental.grandTotal) }}</td>
             <td>
-              <span :class="['status-badge', statusColors[rental.status]]">
-                {{ statusLabels[rental.status] }}
+              <span :class="['status-badge', statusColors[rental.status] || 'muted']">
+                {{ statusLabels[rental.status] || rental.status }}
               </span>
             </td>
           </tr>
@@ -363,6 +405,7 @@ tbody tr:last-child td {
 .status-badge.primary { background: var(--color-primary-light); color: var(--color-primary); }
 .status-badge.danger { background: var(--color-danger-light); color: var(--color-danger); }
 .status-badge.muted { background: var(--color-bg-secondary); color: var(--color-text-muted); }
+.status-badge.secondary { background: #f3f4f6; color: #4b5563; }
 
 .pagination {
   display: flex;

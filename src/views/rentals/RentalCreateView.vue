@@ -3,26 +3,33 @@ import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { rentalsApi } from '@/api'
 import { useToast, useValidation } from '@/composables'
-import type { RentalType, Customer, CreateRentalForm } from '@/types'
+import type { RentalType, Customer, CreateRentalForm, RentalExtraItem } from '@/types'
 import type { PriceCalculationResponse } from '@/api'
 import VehicleSelector from '@/components/rentals/VehicleSelector.vue'
 import CustomerSelector from '@/components/rentals/CustomerSelector.vue'
 import PricingCalculator from '@/components/rentals/PricingCalculator.vue'
 import QuickCustomerModal from '@/components/customers/QuickCustomerModal.vue'
+import RentalTypeSelector from '@/components/rentals/RentalTypeSelector.vue'
+import TermSelector from '@/components/rentals/TermSelector.vue'
+import ExtraItemsManager from '@/components/rentals/ExtraItemsManager.vue'
 
 const router = useRouter()
 const toast = useToast()
 
 const currentStep = ref(1)
-const totalSteps = 5
+const totalSteps = 6
 const submitting = ref(false)
 
 const rentalType = ref<RentalType>('DAILY')
 const selectedVehicleId = ref<number | null>(null)
 const selectedCustomerId = ref<number | null>(null)
+const selectedVehicleCategoryId = ref<number | null>(null)
 const startDate = ref('')
 const endDate = ref('')
+const selectedTermMonths = ref<number>(12)
 const selectedLeasingPlanId = ref<number | null>(null)
+const extraItems = ref<RentalExtraItem[]>([])
+const extraItemsTotal = ref(0)
 const priceData = ref<PriceCalculationResponse | null>(null)
 const showQuickCustomerModal = ref(false)
 
@@ -36,13 +43,8 @@ const rentalTypes: { value: RentalType; label: string; description: string; minD
 ]
 
 const stepTitles = computed(() => {
-  const base = ['Tip', 'Tarih', 'Araç', 'Müşteri']
-  if (rentalType.value === 'LEASING') {
-    return [...base, 'Özet']
-  }
-  return [...base, 'Özet']
+  return ['Tip', 'Tarih', 'Araç', 'Müşteri', 'Ek Kalemler', 'Özet']
 })
-
 
 const canProceed = computed(() => {
   switch (currentStep.value) {
@@ -50,7 +52,8 @@ const canProceed = computed(() => {
     case 2: return !!startDate.value && !!endDate.value && validateDates()
     case 3: return !!selectedVehicleId.value
     case 4: return !!selectedCustomerId.value
-    case 5: return rentalType.value !== 'LEASING' || !!selectedLeasingPlanId.value || true
+    case 5: return true
+    case 6: return true
     default: return false
   }
 })
@@ -103,6 +106,7 @@ function isStepComplete(step: number): boolean {
     case 3: return !!selectedVehicleId.value
     case 4: return !!selectedCustomerId.value
     case 5: return true
+    case 6: return true
     default: return false
   }
 }
@@ -115,9 +119,35 @@ function handleLeasingPlanSelected(planId: number) {
   selectedLeasingPlanId.value = planId
 }
 
+function handleTermSelected(months: number) {
+  selectedTermMonths.value = months
+}
+
+function handleVehicleSelected(vehicleId: number, categoryId: number) {
+  selectedVehicleId.value = vehicleId
+  selectedVehicleCategoryId.value = categoryId
+}
+
+function handleExtraItemsTotal(total: number) {
+  extraItemsTotal.value = total
+}
+
 function handleCustomerCreated(customer: Customer) {
   selectedCustomerId.value = customer.id
   showQuickCustomerModal.value = false
+}
+
+const totalDays = computed(() => {
+  if (!startDate.value || !endDate.value) return 0
+  return Math.ceil((new Date(endDate.value).getTime() - new Date(startDate.value).getTime()) / (1000 * 60 * 60 * 24))
+})
+
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat('tr-TR', { 
+    style: 'currency', 
+    currency: 'TRY',
+    maximumFractionDigits: 0
+  }).format(amount)
 }
 
 async function handleSubmit() {
@@ -136,7 +166,16 @@ async function handleSubmit() {
       returnBranchId: 1,
       startDate: startDate.value,
       endDate: endDate.value,
-      kmPackageId: rentalType.value === 'LEASING' ? selectedLeasingPlanId.value || undefined : undefined
+      termMonths: rentalType.value === 'LEASING' ? selectedTermMonths.value : undefined,
+      kmPackageId: rentalType.value === 'LEASING' ? selectedLeasingPlanId.value || undefined : undefined,
+      extraItems: extraItems.value.length > 0 ? extraItems.value.map(item => ({
+        itemTypeId: item.itemTypeId,
+        customName: item.name,
+        description: item.description,
+        amount: item.amount,
+        currency: item.currency,
+        calculationType: item.calculationType
+      })) : undefined
     }
 
     const rental = await rentalsApi.create(payload)
@@ -153,9 +192,17 @@ watch(rentalType, () => {
   if (currentStep.value > 1) {
     selectedVehicleId.value = null
     selectedCustomerId.value = null
+    selectedVehicleCategoryId.value = null
     startDate.value = ''
     endDate.value = ''
     selectedLeasingPlanId.value = null
+    extraItems.value = []
+  }
+})
+
+watch(selectedVehicleId, (newId) => {
+  if (!newId) {
+    selectedVehicleCategoryId.value = null
   }
 })
 </script>
@@ -185,71 +232,70 @@ watch(rentalType, () => {
       </div>
 
       <div class="wizard-content">
-        <div v-if="currentStep === 1" class="step-content">
+        <div v-if="currentStep === 1" key="step-1" class="step-content">
           <h2>Kiralama Tipini Seçin</h2>
-          <div class="type-options">
-            <label 
-              v-for="type in rentalTypes" 
-              :key="type.value"
-              :class="['type-option', { selected: rentalType === type.value }]"
-            >
-              <input 
-                type="radio" 
-                :value="type.value" 
-                v-model="rentalType"
-                hidden
-              />
-              <div class="type-content">
-                <strong>{{ type.label }}</strong>
-                <span>{{ type.description }}</span>
-              </div>
-              <div v-if="rentalType === type.value" class="check-icon">✓</div>
-            </label>
-          </div>
+          <RentalTypeSelector v-model="rentalType" />
         </div>
 
-        <div v-if="currentStep === 2" class="step-content">
-          <h2>Tarih Aralığı Seçin</h2>
-          
-          <div class="date-section-full">
-            <div class="form-grid">
-              <div class="form-group" :class="{ error: hasError('startDate') }">
-                <label>Başlangıç Tarihi</label>
-                <input 
-                  type="date" 
-                  v-model="startDate"
-                  @blur="touch('startDate')"
-                  :min="new Date().toISOString().split('T')[0]"
-                />
-                <span class="error-text">{{ getError('startDate') }}</span>
+        <div v-else-if="currentStep === 2" key="step-2" class="step-content">
+          <h2>Tarih ve Süre Seçin</h2>
+            
+            <div class="date-section-full">
+              <div class="form-grid">
+                <div class="form-group" :class="{ error: hasError('startDate') }">
+                  <label for="start-date-input">Başlangıç Tarihi</label>
+                  <input 
+                    id="start-date-input"
+                    type="date" 
+                    v-model="startDate"
+                    @blur="touch('startDate')"
+                    :min="new Date().toISOString().split('T')[0]"
+                  />
+                  <span class="error-text">{{ getError('startDate') }}</span>
+                </div>
+                <div class="form-group" :class="{ error: hasError('endDate') }">
+                  <label for="end-date-input">Bitiş Tarihi</label>
+                  <input 
+                    id="end-date-input"
+                    type="date" 
+                    v-model="endDate"
+                    @blur="touch('endDate')"
+                    :min="startDate || new Date().toISOString().split('T')[0]"
+                  />
+                  <span class="error-text">{{ getError('endDate') }}</span>
+                </div>
               </div>
-              <div class="form-group" :class="{ error: hasError('endDate') }">
-                <label>Bitiş Tarihi</label>
-                <input 
-                  type="date" 
-                  v-model="endDate"
-                  @blur="touch('endDate')"
-                  :min="startDate || new Date().toISOString().split('T')[0]"
-                />
-                <span class="error-text">{{ getError('endDate') }}</span>
-              </div>
-            </div>
 
-            <div v-if="rentalType === 'LEASING'" class="leasing-notice">
-              <span class="notice-icon">ℹ️</span>
-              <p>Leasing için minimum süre <strong>12 ay (365 gün)</strong> olmalıdır.</p>
-            </div>
+              <div v-if="rentalType === 'LEASING' && selectedVehicleCategoryId" class="term-section">
+                <h3>Vade Süresi</h3>
+                <TermSelector 
+                  v-model="selectedTermMonths"
+                  :category-id="selectedVehicleCategoryId"
+                />
+              </div>
+              
+              <div v-if="rentalType === 'LEASING' && !selectedVehicleCategoryId" class="term-notice">
+                <span>ℹ️</span>
+                <p>Vade seçimi için önce araç seçimi yapmanız gerekmektedir.</p>
+              </div>
 
-            <div v-if="startDate && endDate && validateDates()" class="date-summary">
-              <div class="summary-item">
-                <span class="label">Toplam Süre</span>
-                <span class="value">{{ Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)) }} gün</span>
+              <div v-if="rentalType === 'LEASING'" class="leasing-notice">
+                <span class="notice-icon">ℹ️</span>
+                <p>Leasing için minimum süre <strong>12 ay (365 gün)</strong> olmalıdır.</p>
+              </div>
+
+              <div v-if="startDate && endDate && validateDates()" class="date-summary">
+                <div class="summary-item">
+                  <span class="label">Toplam Süre</span>
+                  <span class="value">
+                    {{ rentalType === 'LEASING' ? `${selectedTermMonths} Ay` : `${totalDays} Gün` }}
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
         </div>
 
-        <div v-if="currentStep === 3" class="step-content">
+        <div v-else-if="currentStep === 3" key="step-3" class="step-content">
           <h2>Araç Seçin</h2>
           <p class="step-description">
             {{ startDate }} - {{ endDate }} tarihleri arasında müsait araçlar listeleniyor.
@@ -259,10 +305,11 @@ watch(rentalType, () => {
             :start-date="startDate"
             :end-date="endDate"
             :rental-type="rentalType"
+            @vehicle-selected="handleVehicleSelected"
           />
         </div>
 
-        <div v-if="currentStep === 4" class="step-content">
+        <div v-else-if="currentStep === 4" key="step-4" class="step-content">
           <h2>Müşteri Seçin</h2>
           <CustomerSelector
             v-model="selectedCustomerId"
@@ -271,43 +318,80 @@ watch(rentalType, () => {
           />
         </div>
 
-        <div v-if="currentStep === 5" class="step-content">
-          <h2>Kiralama Özeti</h2>
+        <div v-else-if="currentStep === 5" key="step-5" class="step-content">
+          <h2>Ek Kalemler</h2>
+          <p class="step-description">
+            Kiralamaya bakım, sigorta veya diğer ek kalemleri ekleyebilirsiniz. Bu adım opsiyoneldir.
+          </p>
           
-          <div class="summary-grid">
-            <div class="summary-card">
-              <h4>Kiralama Detayları</h4>
-              <div class="summary-row">
-                <span>Kiralama Tipi</span>
-                <strong>{{ rentalTypes.find(t => t.value === rentalType)?.label }}</strong>
-              </div>
-              <div class="summary-row">
-                <span>Başlangıç</span>
-                <strong>{{ startDate }}</strong>
-              </div>
-              <div class="summary-row">
-                <span>Bitiş</span>
-                <strong>{{ endDate }}</strong>
-              </div>
-              <div class="summary-row">
-                <span>Toplam Süre</span>
-                <strong>{{ Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)) }} gün</strong>
-              </div>
-            </div>
-
-            <div class="summary-card">
-              <h4>Fiyat Bilgisi</h4>
-              <PricingCalculator
-                :vehicle-id="selectedVehicleId"
-                :customer-id="selectedCustomerId"
-                :rental-type="rentalType"
-                :start-date="startDate"
-                :end-date="endDate"
-                @calculated="handlePriceCalculated"
-                @leasing-plan-selected="handleLeasingPlanSelected"
-              />
-            </div>
+          <ExtraItemsManager
+            v-model="extraItems"
+            :term-months="rentalType === 'LEASING' ? selectedTermMonths : 1"
+            @total-changed="handleExtraItemsTotal"
+          />
+          
+          <div v-if="extraItems.length === 0" class="skip-notice">
+            <span>💡</span>
+            <p>Ek kalem eklemeden devam edebilirsiniz.</p>
           </div>
+        </div>
+
+        <div v-else-if="currentStep === 6" key="step-6" class="step-content">
+            <h2>Kiralama Özeti</h2>
+            
+            <div class="summary-grid">
+              <div class="summary-card">
+                <h4>Kiralama Detayları</h4>
+                <div class="summary-row">
+                  <span>Kiralama Tipi</span>
+                  <strong>{{ rentalTypes.find(t => t.value === rentalType)?.label }}</strong>
+                </div>
+                <div class="summary-row">
+                  <span>Başlangıç</span>
+                  <strong>{{ startDate }}</strong>
+                </div>
+                <div class="summary-row">
+                  <span>Bitiş</span>
+                  <strong>{{ endDate }}</strong>
+                </div>
+                <div class="summary-row">
+                  <span>Toplam Süre</span>
+                  <strong>
+                    {{ rentalType === 'LEASING' ? `${selectedTermMonths} Ay` : `${totalDays} Gün` }}
+                  </strong>
+                </div>
+                <div v-if="extraItems.length > 0" class="summary-row">
+                  <span>Ek Kalemler</span>
+                  <strong>{{ extraItems.length }} kalem</strong>
+                </div>
+              </div>
+
+              <div class="summary-card pricing-card">
+                <h4>Fiyat Bilgisi</h4>
+                <PricingCalculator
+                  v-if="selectedVehicleId && selectedCustomerId"
+                  :vehicle-id="selectedVehicleId"
+                  :customer-id="selectedCustomerId"
+                  :rental-type="rentalType"
+                  :start-date="startDate"
+                  :end-date="endDate"
+                  :term-months="rentalType === 'LEASING' ? selectedTermMonths : undefined"
+                  @calculated="handlePriceCalculated"
+                  @leasing-plan-selected="handleLeasingPlanSelected"
+                />
+                
+                <div v-if="extraItemsTotal > 0" class="extra-items-summary">
+                  <div class="summary-row">
+                    <span>Ek Kalemler Toplamı</span>
+                    <strong>{{ formatCurrency(extraItemsTotal) }}</strong>
+                  </div>
+                  <div class="summary-row total">
+                    <span>Genel Toplam</span>
+                    <strong>{{ formatCurrency((priceData?.finalTotal || 0) + extraItemsTotal) }}</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
         </div>
       </div>
 
@@ -692,6 +776,87 @@ watch(rentalType, () => {
 .btn-primary:hover:not(:disabled) { background: var(--color-primary-hover); }
 .btn-success:hover:not(:disabled) { background: #059669; }
 .btn-outline:hover:not(:disabled) { background: var(--color-bg-secondary); }
+
+.term-section {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--color-border);
+}
+
+.term-section h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 16px 0;
+  color: var(--color-text);
+}
+
+.term-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  background: var(--color-info-light);
+  border-radius: 10px;
+  margin-top: 20px;
+  font-size: 14px;
+  color: var(--color-info);
+}
+
+.term-notice span {
+  font-size: 20px;
+}
+
+.term-notice p {
+  margin: 0;
+}
+
+.skip-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  background: var(--color-bg-secondary);
+  border-radius: 10px;
+  margin-top: 20px;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+}
+
+.skip-notice span {
+  font-size: 20px;
+}
+
+.skip-notice p {
+  margin: 0;
+}
+
+.extra-items-summary {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+}
+
+.extra-items-summary .summary-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  font-size: 14px;
+}
+
+.extra-items-summary .summary-row span {
+  color: var(--color-text-secondary);
+}
+
+.extra-items-summary .summary-row.total {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--color-border);
+}
+
+.extra-items-summary .summary-row.total strong {
+  font-size: 18px;
+  color: var(--color-primary);
+}
 
 @media (max-width: 768px) {
   .date-price-grid {

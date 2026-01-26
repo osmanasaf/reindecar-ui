@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { pricingApi, leasingApi } from '@/api'
-import type { PriceCalculationResponse, LeasingPlan, PriceBreakdownItem } from '@/api'
+import type { PriceCalculationResponse, LeasingPlan } from '@/api'
 import type { RentalType } from '@/types'
 
 interface Props {
@@ -10,6 +10,8 @@ interface Props {
   rentalType: RentalType
   startDate: string
   endDate: string
+  termMonths?: number
+  kmPackageId?: number
 }
 
 const props = defineProps<Props>()
@@ -17,6 +19,7 @@ const props = defineProps<Props>()
 const emit = defineEmits<{
   calculated: [response: PriceCalculationResponse]
   leasingPlanSelected: [planId: number]
+  termSelected: [months: number]
 }>()
 
 const loading = ref(false)
@@ -29,6 +32,45 @@ const isLeasing = computed(() => props.rentalType === 'LEASING')
 
 const canCalculate = computed(() => {
   return props.vehicleId && props.startDate && props.endDate
+})
+
+const unitPriceLabel = computed(() => {
+  switch (props.rentalType) {
+    case 'LEASING':
+    case 'MONTHLY':
+      return 'Aylık Fiyat'
+    case 'WEEKLY':
+      return 'Haftalık Fiyat'
+    case 'DAILY':
+    default:
+      return 'Günlük Fiyat'
+  }
+})
+
+const unitPriceValue = computed(() => {
+  if (!priceData.value) return 0
+  return priceData.value.unitPrice || priceData.value.dailyPrice
+})
+
+const durationLabel = computed(() => {
+  if (!priceData.value) return ''
+  
+  switch (props.rentalType) {
+    case 'LEASING':
+    case 'MONTHLY':
+      return `${totalMonths.value} Ay`
+    case 'WEEKLY': {
+      const weeks = Math.floor(priceData.value.totalDays / 7)
+      const days = priceData.value.totalDays % 7
+      if (days > 0) {
+        return `${weeks} Hafta ${days} Gün`
+      }
+      return `${weeks} Hafta`
+    }
+    case 'DAILY':
+    default:
+      return `${priceData.value.totalDays} Gün`
+  }
 })
 
 const totalDays = computed(() => {
@@ -59,7 +101,9 @@ async function calculatePrice() {
       customerId: props.customerId || undefined,
       rentalType: props.rentalType,
       startDate: props.startDate,
-      endDate: props.endDate
+      endDate: props.endDate,
+      termMonths: props.termMonths,
+      kmPackageId: props.kmPackageId
     }
 
     const response = await pricingApi.calculate(request)
@@ -91,7 +135,7 @@ function selectLeasingPlan(planId: number) {
 function safeNumber(value: unknown, defaultValue = 0): number {
   if (value === null || value === undefined) return defaultValue
   const num = Number(value)
-  return isNaN(num) ? defaultValue : num
+  return Number.isNaN(num) ? defaultValue : num
 }
 
 function formatCurrency(amount: unknown): string {
@@ -99,24 +143,17 @@ function formatCurrency(amount: unknown): string {
   return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(num)
 }
 
-function getBreakdownIcon(type: PriceBreakdownItem['type']): string {
-  switch (type) {
-    case 'ADD': return '+'
-    case 'SUBTRACT': return '-'
-    case 'MULTIPLY': return '×'
-    default: return ''
-  }
+function isDiscountItem(description: string): boolean {
+  const lowerDesc = description.toLowerCase()
+  return lowerDesc.includes('iskonto') || lowerDesc.includes('indirim') || lowerDesc.includes('discount')
 }
 
-function getBreakdownClass(type: PriceBreakdownItem['type']): string {
-  switch (type) {
-    case 'SUBTRACT': return 'discount'
-    case 'MULTIPLY': return 'multiplier'
-    default: return ''
-  }
+function isTotalItem(description: string): boolean {
+  const lowerDesc = description.toLowerCase()
+  return lowerDesc.includes('toplam') || lowerDesc.includes('total')
 }
 
-watch([() => props.vehicleId, () => props.startDate, () => props.endDate, () => props.rentalType], () => {
+watch([() => props.vehicleId, () => props.startDate, () => props.endDate, () => props.rentalType, () => props.termMonths], () => {
   if (canCalculate.value) {
     calculatePrice()
   }
@@ -173,39 +210,28 @@ watch([() => props.vehicleId, () => props.startDate, () => props.endDate, () => 
         
         <div class="summary-header">
           <span class="vehicle-name">{{ priceData.vehicleName }}</span>
-          <span class="duration">
-            {{ isLeasing ? `${totalMonths} Ay` : `${totalDays} Gün` }}
-          </span>
+          <span class="duration">{{ durationLabel }}</span>
         </div>
 
         <div class="breakdown-list">
           <div class="breakdown-item base">
-            <span class="label">
-              {{ isLeasing ? 'Aylık Fiyat' : 'Günlük Fiyat' }}
-            </span>
-            <span class="value">{{ formatCurrency(priceData.dailyPrice) }}</span>
+            <span class="label">{{ unitPriceLabel }}</span>
+            <span class="value">{{ formatCurrency(unitPriceValue) }}</span>
           </div>
 
-          <div class="breakdown-item base">
-            <span class="label">Ara Toplam</span>
-            <span class="value">{{ formatCurrency(priceData.baseTotal) }}</span>
-          </div>
-
-          <template v-if="priceData.breakdown.length > 0">
+          <template v-if="priceData.breakdown && priceData.breakdown.length > 0">
             <div class="breakdown-divider"></div>
             <div 
               v-for="(item, index) in priceData.breakdown" 
               :key="index"
               class="breakdown-item"
-              :class="getBreakdownClass(item.type)"
+              :class="{
+                'discount': isDiscountItem(item.description),
+                'total-row': isTotalItem(item.description)
+              }"
             >
-              <span class="label">
-                <span class="icon">{{ getBreakdownIcon(item.type) }}</span>
-                {{ item.label }}
-              </span>
-              <span class="value">
-                {{ item.type === 'MULTIPLY' ? `×${item.amount}` : formatCurrency(item.amount) }}
-              </span>
+              <span class="label">{{ item.description }}</span>
+              <span class="value">{{ formatCurrency(item.amount) }}</span>
             </div>
           </template>
 
@@ -397,30 +423,6 @@ watch([() => props.vehicleId, () => props.startDate, () => props.endDate, () => 
 
 .breakdown-item .label {
   color: var(--color-text-secondary);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.breakdown-item .icon {
-  width: 16px;
-  height: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.breakdown-item.discount .icon {
-  background: var(--color-success-light);
-  color: var(--color-success);
-}
-
-.breakdown-item.multiplier .icon {
-  background: var(--color-warning-light);
-  color: var(--color-warning);
 }
 
 .breakdown-item .value {
@@ -428,8 +430,18 @@ watch([() => props.vehicleId, () => props.startDate, () => props.endDate, () => 
   color: var(--color-text);
 }
 
+.breakdown-item.discount .label,
 .breakdown-item.discount .value {
   color: var(--color-success);
+}
+
+.breakdown-item.total-row {
+  font-weight: 500;
+}
+
+.breakdown-item.total-row .label,
+.breakdown-item.total-row .value {
+  color: var(--color-text);
 }
 
 .breakdown-item.total {
