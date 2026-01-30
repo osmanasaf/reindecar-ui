@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import { rentalsApi, vehiclesApi, customersApi } from '@/api'
 import { usePagination, useToast } from '@/composables'
+import { CustomerType } from '@/types'
 import type { Rental, RentalStatus, RentalType, Vehicle, Customer } from '@/types'
 
 const rentals = ref<Rental[]>([])
@@ -11,6 +12,7 @@ const customerMap = ref<Map<number, Customer>>(new Map())
 const loading = ref(true)
 const statusFilter = ref<RentalStatus | ''>('')
 const typeFilter = ref<RentalType | ''>('')
+const customerTypeFilter = ref<CustomerType | ''>('')
 
 const { page, size, totalElements, setPage, setTotal, getParams } = usePagination()
 const toast = useToast()
@@ -32,6 +34,12 @@ const typeOptions: { value: RentalType | '', label: string }[] = [
   { value: 'WEEKLY', label: 'Haftalık' },
   { value: 'MONTHLY', label: 'Aylık' },
   { value: 'LEASING', label: 'Leasing' }
+]
+
+const customerTypeOptions: { value: CustomerType | '', label: string }[] = [
+  { value: '', label: 'Tüm Müşteriler' },
+  { value: CustomerType.PERSONAL, label: '👤 Bireysel' },
+  { value: CustomerType.COMPANY, label: '🏢 Kurumsal' }
 ]
 
 const statusLabels: Record<RentalStatus, string> = {
@@ -78,6 +86,13 @@ const filteredRentals = computed(() => {
 
   if (typeFilter.value) {
     result = result.filter(r => r.rentalType === typeFilter.value)
+  }
+
+  if (customerTypeFilter.value) {
+    result = result.filter(r => {
+      const customer = getCustomer(r)
+      return customer?.customerType === customerTypeFilter.value
+    })
   }
 
   return result
@@ -163,6 +178,11 @@ onMounted(fetchRentals)
           {{ opt.label }}
         </option>
       </select>
+      <select v-model="customerTypeFilter" class="filter-select">
+        <option v-for="opt in customerTypeOptions" :key="opt.value" :value="opt.value">
+          {{ opt.label }}
+        </option>
+      </select>
     </div>
 
     <div v-if="loading" class="loading">Yükleniyor...</div>
@@ -193,8 +213,14 @@ onMounted(fetchRentals)
             <td class="rental-id">{{ rental.rentalNumber || `#${rental.id}` }}</td>
             <td>
               <div class="customer-cell">
-                <strong>{{ getCustomer(rental)?.displayName || '-' }}</strong>
-                <span class="customer-type">{{ getCustomer(rental)?.customerType === 'COMPANY' ? 'Kurumsal' : 'Bireysel' }}</span>
+                <div class="customer-name">
+                  <span v-if="getCustomer(rental)?.customerType === 'COMPANY'" class="customer-icon">🏢</span>
+                  <span v-else class="customer-icon">👤</span>
+                  <strong>{{ getCustomer(rental)?.displayName || '-' }}</strong>
+                </div>
+                <span :class="['customer-type-badge', getCustomer(rental)?.customerType === 'COMPANY' ? 'company' : 'personal']">
+                  {{ getCustomer(rental)?.customerType === 'COMPANY' ? 'Kurumsal' : 'Bireysel' }}
+                </span>
               </div>
             </td>
             <td>
@@ -354,7 +380,17 @@ tbody tr:last-child td {
 .vehicle-cell {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
+}
+
+.customer-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.customer-icon {
+  font-size: 14px;
 }
 
 .customer-cell strong,
@@ -362,7 +398,28 @@ tbody tr:last-child td {
   font-weight: 500;
 }
 
-.customer-type,
+.customer-type-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.customer-type-badge.company {
+  background: var(--color-info-light);
+  color: var(--color-info);
+}
+
+.customer-type-badge.personal {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
+}
+
+.vehicle-cell {
+  gap: 2px;
+}
+
 .vehicle-cell span:last-child {
   font-size: 12px;
   color: var(--color-text-muted);

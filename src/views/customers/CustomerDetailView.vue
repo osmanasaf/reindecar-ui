@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { customersApi } from '@/api'
+import { customersApi, rentalsApi } from '@/api'
 import { useToast } from '@/composables'
-import type { Customer, CustomerType } from '@/types'
+import type { Customer, CustomerType, Rental } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -11,6 +11,8 @@ const toast = useToast()
 
 const customer = ref<Customer | null>(null)
 const loading = ref(true)
+const activeRentals = ref<Rental[]>([])
+const loadingRentals = ref(false)
 
 const customerId = computed(() => Number(route.params.id))
 
@@ -23,11 +25,25 @@ async function fetchCustomer() {
   loading.value = true
   try {
     customer.value = await customersApi.getById(customerId.value)
+    // Aktif kiralamaları da yükle
+    fetchActiveRentals()
   } catch {
     toast.error('Müşteri bilgileri yüklenemedi')
     router.push('/customers')
   } finally {
     loading.value = false
+  }
+}
+
+async function fetchActiveRentals() {
+  loadingRentals.value = true
+  try {
+    activeRentals.value = await rentalsApi.getCustomerActiveRentals(customerId.value)
+  } catch (error) {
+    console.warn('Aktif kiralamalar yüklenemedi:', error)
+    activeRentals.value = []
+  } finally {
+    loadingRentals.value = false
   }
 }
 
@@ -168,8 +184,25 @@ onMounted(fetchCustomer)
               <span class="stat-label">Toplam Kiralama</span>
             </div>
             <div class="stat">
-              <span class="stat-value">{{ customer.activeRentals || 0 }}</span>
+              <span class="stat-value">{{ activeRentals.length }}</span>
               <span class="stat-label">Aktif Kiralama</span>
+            </div>
+          </div>
+        </section>
+
+        <section v-if="activeRentals.length > 0" class="card rentals-card">
+          <h2>Aktif Kiralamalar</h2>
+          <div class="rentals-list">
+            <div v-for="rental in activeRentals" :key="rental.id" class="rental-item" @click="router.push(`/rentals/${rental.id}`)">
+              <div class="rental-info">
+                <span class="rental-number">Kiralama #{{ rental.rentalNumber || rental.id }}</span>
+                <span class="rental-status" :class="rental.status?.toLowerCase()">
+                  {{ rental.status === 'ACTIVE' ? 'Aktif' : rental.status === 'RESERVED' ? 'Rezerve' : rental.status === 'OVERDUE' ? 'Gecikmiş' : rental.status }}
+                </span>
+              </div>
+              <div class="rental-dates">
+                {{ formatDate(rental.startDate) }} - {{ formatDate(rental.endDate) }}
+              </div>
             </div>
           </div>
         </section>
@@ -364,6 +397,71 @@ onMounted(fetchCustomer)
   grid-column: span 2;
 }
 
+.rentals-card {
+  grid-column: span 2;
+}
+
+.rentals-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rental-item {
+  padding: 16px;
+  background: var(--color-bg-secondary);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.rental-item:hover {
+  background: var(--color-border);
+  transform: translateX(4px);
+}
+
+.rental-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.rental-number {
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.rental-status {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.rental-status.active {
+  background: var(--color-success-light);
+  color: var(--color-success);
+}
+
+.rental-status.reserved {
+  background: var(--color-info-light);
+  color: var(--color-info);
+}
+
+.rental-status.overdue {
+  background: var(--color-danger-light);
+  color: var(--color-danger);
+}
+
+.rental-dates {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
 .stats-grid {
   display: flex;
   gap: 48px;
@@ -391,7 +489,8 @@ onMounted(fetchCustomer)
     grid-template-columns: 1fr;
   }
   
-  .stats-card {
+  .stats-card,
+  .rentals-card {
     grid-column: span 1;
   }
 }

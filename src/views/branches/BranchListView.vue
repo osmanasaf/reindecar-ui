@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { branchesApi } from '@/api'
+import { branchesApi, vehiclesApi } from '@/api'
 import { useToast } from '@/composables'
 import type { Branch } from '@/types'
 
-const branches = ref<Branch[]>([])
+interface BranchWithCount extends Branch {
+  vehicleCount?: number
+}
+
+const branches = ref<BranchWithCount[]>([])
 const loading = ref(true)
 const showForm = ref(false)
 const editingBranch = ref<Branch | null>(null)
@@ -27,11 +31,27 @@ async function fetchBranches() {
   try {
     const response = await branchesApi.getAll()
     branches.value = response.content
+    
+    // Her şube için araç sayısını çek
+    await fetchVehicleCounts()
   } catch {
     toast.error('Şubeler yüklenirken hata oluştu')
   } finally {
     loading.value = false
   }
+}
+
+async function fetchVehicleCounts() {
+  const promises = branches.value.map(async (branch) => {
+    try {
+      const response = await vehiclesApi.getByBranch(branch.id)
+      branch.vehicleCount = response.totalElements
+    } catch {
+      branch.vehicleCount = 0
+    }
+  })
+  
+  await Promise.all(promises)
 }
 
 function openCreateForm() {

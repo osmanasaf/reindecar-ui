@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
-import { vehiclesApi, vehicleCategoriesApi } from '@/api'
-import type { Vehicle, VehicleCategory, RentalType } from '@/types'
+import { vehiclesApi, vehicleCategoriesApi, branchesApi } from '@/api'
+import type { Vehicle, VehicleCategory, RentalType, Branch } from '@/types'
 
 interface Props {
   startDate: string
@@ -20,8 +20,10 @@ const emit = defineEmits<{
 const loading = ref(false)
 const vehicles = ref<Vehicle[]>([])
 const categories = ref<VehicleCategory[]>([])
+const branches = ref<Branch[]>([])
 const searchQuery = ref('')
 const selectedCategoryId = ref<number | null>(null)
+const selectedBranchId = ref<number | null>(null)
 
 const filteredVehicles = computed(() => {
   let result = vehicles.value
@@ -50,9 +52,23 @@ const selectedVehicle = computed(() => {
 async function fetchVehicles() {
   loading.value = true
   try {
-    if (props.startDate && props.endDate) {
+    // Şube seçiliyse şubeye özel araçları getir
+    if (selectedBranchId.value) {
+      if (props.startDate && props.endDate) {
+        vehicles.value = await vehiclesApi.getByBranchForPeriod(
+          selectedBranchId.value,
+          props.startDate,
+          props.endDate
+        )
+      } else {
+        const response = await vehiclesApi.getByBranch(selectedBranchId.value)
+        vehicles.value = response.content
+      }
+    } else if (props.startDate && props.endDate) {
+      // Şube seçili değilse ama tarih varsa, tarihe göre müsait araçları getir
       vehicles.value = await vehiclesApi.getAvailableForPeriod(props.startDate, props.endDate)
     } else {
+      // Hiçbir filtre yoksa tüm müsait araçları getir
       vehicles.value = await vehiclesApi.getAvailable()
     }
   } catch {
@@ -67,6 +83,14 @@ async function fetchCategories() {
     categories.value = await vehicleCategoriesApi.getAll()
   } catch {
     categories.value = []
+  }
+}
+
+async function fetchBranches() {
+  try {
+    branches.value = await branchesApi.getActive()
+  } catch {
+    branches.value = []
   }
 }
 
@@ -136,6 +160,7 @@ function getVehiclePrice(vehicle: Vehicle): number {
 
 onMounted(() => {
   fetchCategories()
+  fetchBranches()
   fetchVehicles()
 })
 
@@ -143,6 +168,10 @@ watch([() => props.startDate, () => props.endDate], () => {
   if (props.startDate && props.endDate) {
     fetchVehicles()
   }
+})
+
+watch(selectedBranchId, () => {
+  fetchVehicles()
 })
 </script>
 
@@ -157,6 +186,12 @@ watch([() => props.startDate, () => props.endDate], () => {
             placeholder="Marka, model veya plaka ara..."
           />
         </div>
+        <select v-model="selectedBranchId" class="branch-filter">
+          <option :value="null">Tüm Şubeler</option>
+          <option v-for="branch in branches" :key="branch.id" :value="branch.id">
+            {{ branch.name }}
+          </option>
+        </select>
         <select v-model="selectedCategoryId" class="category-filter">
           <option :value="null">Tüm Kategoriler</option>
           <option v-for="cat in categories" :key="cat.id" :value="cat.id">
@@ -181,6 +216,7 @@ watch([() => props.startDate, () => props.endDate], () => {
           <p class="specs">
             {{ selectedVehicle.year }} · {{ fuelTypeLabels[selectedVehicle.fuelType] }} · {{ transmissionLabels[selectedVehicle.transmission] }}
           </p>
+          <p class="branch-info">📍 {{ selectedVehicle.branchName }}</p>
         </div>
         <div class="selected-price">
           <span class="price">{{ formatCurrency(getVehiclePrice(selectedVehicle)) }}</span>
@@ -216,7 +252,7 @@ watch([() => props.startDate, () => props.endDate], () => {
             </div>
             <div class="meta">
               <span class="km">{{ formatKm(vehicle.currentKm) }}</span>
-              <span class="category">{{ vehicle.categoryName }}</span>
+              <span class="branch-badge">📍 {{ vehicle.branchName }}</span>
             </div>
           </div>
           <div class="vehicle-price">
@@ -275,6 +311,7 @@ watch([() => props.startDate, () => props.endDate], () => {
   background: var(--color-surface);
 }
 
+.branch-filter,
 .category-filter {
   padding: 10px 14px;
   border: 1px solid var(--color-border);
@@ -282,6 +319,7 @@ watch([() => props.startDate, () => props.endDate], () => {
   font-size: 14px;
   background: var(--color-bg-secondary);
   min-width: 160px;
+  cursor: pointer;
 }
 
 .result-count {
@@ -349,6 +387,13 @@ watch([() => props.startDate, () => props.endDate], () => {
   font-size: 13px;
   color: var(--color-text-secondary);
   margin: 0;
+}
+
+.vehicle-details .branch-info {
+  font-size: 12px;
+  color: var(--color-info);
+  margin: 4px 0 0 0;
+  font-weight: 500;
 }
 
 .selected-price {
@@ -473,9 +518,15 @@ watch([() => props.startDate, () => props.endDate], () => {
 .vehicle-info .meta {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   font-size: 12px;
   color: var(--color-text-secondary);
   margin-top: 8px;
+}
+
+.branch-badge {
+  color: var(--color-info);
+  font-weight: 500;
 }
 
 .vehicle-price {
