@@ -4,8 +4,17 @@ import type {
     PaginationParams,
     Customer,
     CreatePersonalCustomerForm,
-    CreateCompanyCustomerForm
+    CreateCompanyCustomerForm,
+    Rental
 } from '@/types'
+
+interface CustomerRentalInfo {
+    customerId: number
+    customerType: 'PERSONAL' | 'COMPANY'
+    activeRentalCount: number
+    canCreateRental: boolean
+    reason?: string
+}
 
 class CustomersApiService extends BaseApi {
     protected readonly basePath = '/customers'

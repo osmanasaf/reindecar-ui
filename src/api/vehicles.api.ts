@@ -26,13 +26,8 @@ class VehiclesApiService extends BaseApi {
         return response.content
     }
 
-    async getByBranch(branchId: number, params?: PaginationParams): Promise<PaginatedResponse<Vehicle>> {
-        return this.getList<Vehicle>(`/branch/${branchId}`, params)
-    }
-
-    async getByBranchForPeriod(branchId: number, startDate: string, endDate: string): Promise<Vehicle[]> {
-        const response = await this.getList<Vehicle>(`/branch/${branchId}`, { startDate, endDate })
-        return response.content
+    async getByBranch(branchId: number): Promise<Vehicle[]> {
+        return this.get(`/branch/${branchId}`)
     }
 
     async getById(id: number): Promise<Vehicle> {

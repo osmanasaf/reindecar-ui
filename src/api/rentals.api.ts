@@ -13,8 +13,7 @@ import type {
     LeasingKmRecord,
     LeasingKmSummary,
     RecordKmForm,
-    RentalType,
-    Vehicle
+    RentalType
 } from '@/types'
 
 class RentalsApiService extends BaseApi {
@@ -74,28 +73,6 @@ class RentalsApiService extends BaseApi {
 
     async setPrimaryDriver(rentalId: number, driverId: number): Promise<RentalDriver> {
         return this.put(`/${rentalId}/drivers/${driverId}/primary`)
-    }
-
-    // Şirket kiralamaları
-    async getCompanyRentals(params?: PaginationParams): Promise<PaginatedResponse<Rental>> {
-        return this.getList<Rental>('/companies', params)
-    }
-
-    async getCompanyVehicles(companyId: number): Promise<Vehicle[]> {
-        return this.get(`/company/${companyId}/vehicles`)
-    }
-
-    // Müşteri kiralamaları
-    async getCustomerRentals(customerId: number): Promise<Rental[]> {
-        return this.get(`/customer/${customerId}`)
-    }
-
-    async getCustomerActiveRentals(customerId: number): Promise<Rental[]> {
-        return this.get(`/customer/${customerId}/active`)
-    }
-
-    async getCustomerVehicles(customerId: number): Promise<Vehicle[]> {
-        return this.get(`/customer/${customerId}/vehicles`)
     }
 }
 

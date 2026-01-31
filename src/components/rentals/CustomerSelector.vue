@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { customersApi, rentalsApi } from '@/api'
-import type { Customer, Rental } from '@/types'
+import { customersApi } from '@/api'
+import type { Customer } from '@/types'
 
 interface Props {
   modelValue: number | null
@@ -21,15 +21,9 @@ const customers = ref<Customer[]>([])
 const selectedCustomer = ref<Customer | null>(null)
 const showDropdown = ref(false)
 const debounceTimer = ref<number | null>(null)
-const activeRentals = ref<Rental[]>([])
 
 const hasBlacklistWarning = computed(() => {
   return selectedCustomer.value?.blacklisted === true
-})
-
-const hasRentalLimitWarning = computed(() => {
-  if (!selectedCustomer.value) return false
-  return selectedCustomer.value.customerType === 'PERSONAL' && activeRentals.value.length > 0
 })
 
 const hasLicenseWarning = computed(() => {
@@ -63,7 +57,7 @@ function handleSearchInput() {
   if (debounceTimer.value) {
     clearTimeout(debounceTimer.value)
   }
-  debounceTimer.value = globalThis.setTimeout(() => {
+  debounceTimer.value = window.setTimeout(() => {
     searchCustomers(searchQuery.value)
   }, 300)
 }
@@ -74,9 +68,6 @@ function selectCustomer(customer: Customer) {
   showDropdown.value = false
   searchQuery.value = ''
   customers.value = []
-  
-  // Aktif kiralama kontrolü yap
-  checkCustomerRentalEligibility(customer.id)
 }
 
 function clearSelection() {
@@ -103,18 +94,8 @@ async function fetchSelectedCustomer() {
   
   try {
     selectedCustomer.value = await customersApi.getById(props.modelValue)
-    checkCustomerRentalEligibility(props.modelValue)
   } catch {
     selectedCustomer.value = null
-  }
-}
-
-async function checkCustomerRentalEligibility(customerId: number) {
-  try {
-    activeRentals.value = await rentalsApi.getCustomerActiveRentals(customerId)
-  } catch (error) {
-    console.warn('Müşteri aktif kiralamaları kontrol edilemedi:', error)
-    activeRentals.value = []
   }
 }
 
@@ -147,9 +128,6 @@ watch(() => props.modelValue, (newVal) => {
           <span v-if="hasBlacklistWarning" class="badge danger">
             Kara Liste
           </span>
-          <span v-if="hasRentalLimitWarning" class="badge danger">
-            Aktif Kiralama
-          </span>
           <span v-if="hasLicenseWarning" class="badge warning">
             Ehliyet Uyarısı
           </span>
@@ -162,20 +140,6 @@ watch(() => props.modelValue, (newVal) => {
         <strong v-if="selectedCustomer.blacklistReason">
           Sebep: {{ selectedCustomer.blacklistReason }}
         </strong>
-      </div>
-
-      <div v-if="hasRentalLimitWarning" class="warning-message danger">
-        ⚠️ Bu bireysel müşterinin zaten <strong>{{ activeRentals.length }} aktif kiralaması</strong> var.
-        Bireysel müşteriler aynı anda sadece bir kiralama yapabilir.
-        <div v-if="activeRentals.length > 0" class="active-rentals-list">
-          <p><strong>Aktif Kiralamalar:</strong></p>
-          <ul>
-            <li v-for="rental in activeRentals" :key="rental.id">
-              Kiralama #{{ rental.rentalNumber || rental.id }} - 
-              {{ rental.status === 'ACTIVE' ? 'Aktif' : rental.status === 'RESERVED' ? 'Rezerve' : 'Gecikmiş' }}
-            </li>
-          </ul>
-        </div>
       </div>
 
       <div v-if="hasLicenseWarning" class="warning-message warning">
@@ -355,26 +319,6 @@ watch(() => props.modelValue, (newVal) => {
 .warning-message strong {
   display: block;
   margin-top: 4px;
-}
-
-.active-rentals-list {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px dashed currentColor;
-}
-
-.active-rentals-list p {
-  margin: 0 0 6px 0;
-  font-weight: 600;
-}
-
-.active-rentals-list ul {
-  margin: 0;
-  padding-left: 20px;
-}
-
-.active-rentals-list li {
-  margin: 4px 0;
 }
 
 .search-container {

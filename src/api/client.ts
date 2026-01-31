@@ -1,6 +1,7 @@
 import axios, { type AxiosInstance, type AxiosError, type InternalAxiosRequestConfig } from 'axios'
-import type { ApiError, ApiResponse, PaginatedResponse, PaginationParams } from '@/types'
+import type { ApiError, ApiResponse, PaginatedResponse, PaginationParams, ErrorResponse } from '@/types'
 import { isTokenExpired } from '@/utils/jwt'
+import { generateTraceId, isErrorResponse, isAuthError } from '@/utils/error'
 
 const API_URL = import.meta.env.VITE_API_URL || '/api/v1'
 
@@ -44,19 +45,84 @@ apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
     if (token && config.headers) {
         config.headers.Authorization = `Bearer ${token}`
     }
+    
+    // TraceId header ekleme (backend ile korelasyon için)
+    if (config.headers) {
+        config.headers['X-Trace-Id'] = generateTraceId()
+    }
+    
     return config
 })
 
 apiClient.interceptors.response.use(
     (response) => response,
-    async (error: AxiosError<ApiError>) => {
+    async (error: AxiosError<ErrorResponse | ApiError>) => {
         const originalRequest = error.config
 
-        if (error.response?.status === 401 && originalRequest) {
+        // ErrorResponse formatında mı kontrol et
+        const responseData = error.response?.data
+        const isBackendError = responseData && isErrorResponse(responseData)
+
+        // Auth error handling - backend ErrorResponse formatında
+        if (isBackendError && isAuthError(responseData)) {
+            const errorCode = responseData.code
+
+            // A003: Token expired - refresh token dene
+            if (errorCode === 'A003' && originalRequest) {
+                if (originalRequest.url?.includes('/auth/refresh')) {
+                    tokenStorage.clearTokens()
+                    globalThis.location.href = '/login?expired=true'
+                    throw error
+                }
+
+                if (isRefreshing) {
+                    return new Promise((resolve, reject) => {
+                        failedQueue.push({ resolve, reject })
+                    }).then(() => apiClient(originalRequest))
+                }
+
+                isRefreshing = true
+                const refreshToken = tokenStorage.getRefreshToken()
+
+                if (!refreshToken) {
+                    tokenStorage.clearTokens()
+                    globalThis.location.href = '/login?expired=true'
+                    throw error
+                }
+
+                try {
+                    const response = await axios.post(`${API_URL}/auth/refresh`, { refreshToken })
+                    const { accessToken, refreshToken: newRefreshToken } = response.data.data
+                    tokenStorage.setTokens(accessToken, newRefreshToken)
+                    processQueue(null)
+                    return apiClient(originalRequest)
+                } catch (refreshError) {
+                    processQueue(refreshError as AxiosError)
+                    tokenStorage.clearTokens()
+                    globalThis.location.href = '/login?expired=true'
+                    throw refreshError
+                } finally {
+                    isRefreshing = false
+                }
+            }
+
+            // A001: Unauthorized - login'e yönlendir
+            if (errorCode === 'A001') {
+                tokenStorage.clearTokens()
+                globalThis.location.href = '/login'
+                throw error
+            }
+
+            // A002: Access denied - sadece reject et (component'te handle edilecek)
+            // A004: Weak password - sadece reject et (component'te handle edilecek)
+        }
+
+        // Legacy 401 handling (backend ErrorResponse formatında değilse)
+        if (error.response?.status === 401 && originalRequest && !isBackendError) {
             if (originalRequest.url?.includes('/auth/refresh')) {
                 tokenStorage.clearTokens()
-                window.location.href = '/login'
-                return Promise.reject(error)
+                globalThis.location.href = '/login'
+                throw error
             }
 
             if (isRefreshing) {
@@ -70,8 +136,8 @@ apiClient.interceptors.response.use(
 
             if (!refreshToken) {
                 tokenStorage.clearTokens()
-                window.location.href = '/login'
-                return Promise.reject(error)
+                globalThis.location.href = '/login'
+                throw error
             }
 
             try {
@@ -83,20 +149,40 @@ apiClient.interceptors.response.use(
             } catch (refreshError) {
                 processQueue(refreshError as AxiosError)
                 tokenStorage.clearTokens()
-                window.location.href = '/login'
-                return Promise.reject(refreshError)
+                globalThis.location.href = '/login'
+                throw refreshError
             } finally {
                 isRefreshing = false
             }
         }
 
-        const apiError: ApiError = error.response?.data || {
+        // Network error handling (no response)
+        if (!error.response) {
+            console.error('[API Client] Network error: No response received')
+            const networkError: ErrorResponse = {
+                code: 'S003',
+                message: 'Bağlantı hatası. Lütfen internet bağlantınızı kontrol edin.',
+                timestamp: new Date().toISOString(),
+                path: originalRequest?.url || '',
+                traceId: 'network-error'
+            }
+            throw networkError
+        }
+
+        // Backend ErrorResponse formatında ise direkt reject et
+        if (isBackendError) {
+            console.error(`[${responseData.traceId}] Error ${responseData.code}: ${responseData.message}`)
+            throw responseData
+        }
+
+        // Legacy ApiError formatı için backward compatibility
+        const apiError: ApiError = responseData || {
             success: false,
             message: error.message || 'Network error',
             timestamp: new Date().toISOString()
         }
 
-        return Promise.reject(apiError)
+        throw apiError
     }
 )
 

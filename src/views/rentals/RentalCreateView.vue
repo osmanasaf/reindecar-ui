@@ -183,31 +183,10 @@ async function handleSubmit() {
     const rental = await rentalsApi.create(payload)
     toast.success(`Kiralama #${rental.rentalNumber} başarıyla oluşturuldu`)
     router.push(`/rentals/${rental.id}`)
-  } catch (error: any) {
-    // Backend'den gelen validasyon hatalarını yakala
-    const errorMessage = error?.response?.data?.message || error?.message || 'Kiralama oluşturulamadı'
-    const errorCode = error?.response?.data?.errorCode
-    
-    // Özel hata mesajları
-    if (errorCode === 'INVALID_OPERATION') {
-      handleValidationError(errorMessage)
-    } else {
-      toast.error(errorMessage)
-    }
+  } catch {
+    toast.error('Kiralama oluşturulamadı')
   } finally {
     submitting.value = false
-  }
-}
-
-function handleValidationError(errorMessage: string) {
-  if (errorMessage.includes('Sürücü zaten aktif bir kiralamada')) {
-    toast.error(`⚠️ ${errorMessage}`)
-    currentStep.value = 4
-  } else if (errorMessage.includes('Bireysel müşteri')) {
-    toast.error(`⚠️ ${errorMessage}`)
-    currentStep.value = 4
-  } else {
-    toast.error(errorMessage)
   }
 }
 
