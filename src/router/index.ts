@@ -89,12 +89,6 @@ const router = createRouter({
             meta: { requiresAuth: true, roles: ['ADMIN'] }
         },
         {
-            path: '/payments',
-            name: 'payments',
-            component: () => import('@/views/payments/PaymentListView.vue'),
-            meta: { requiresAuth: true }
-        },
-        {
             path: '/users',
             name: 'users',
             component: () => import('@/views/users/UserListView.vue'),
@@ -104,6 +98,55 @@ const router = createRouter({
             path: '/settings',
             name: 'settings',
             component: () => import('@/views/settings/SettingsView.vue'),
+            meta: { requiresAuth: true }
+        },
+        // Accounting routes
+        {
+            path: '/accounting/receivables',
+            name: 'receivables',
+            component: () => import('@/views/accounting/ReceivablesListView.vue'),
+            meta: { requiresAuth: true }
+        },
+        {
+            path: '/accounting/receivables/:id',
+            name: 'receivable-detail',
+            component: () => import('@/views/accounting/ReceivableDetailView.vue'),
+            meta: { requiresAuth: true }
+        },
+        {
+            path: '/accounting/payables',
+            name: 'payables',
+            component: () => import('@/views/accounting/PayablesListView.vue'),
+            meta: { requiresAuth: true }
+        },
+        {
+            path: '/accounting/payables/:id',
+            name: 'payable-detail',
+            component: () => import('@/views/accounting/PayableDetailView.vue'),
+            meta: { requiresAuth: true }
+        },
+        {
+            path: '/accounting/insurance-claims',
+            name: 'insurance-claims',
+            component: () => import('@/views/accounting/InsuranceClaimsListView.vue'),
+            meta: { requiresAuth: true }
+        },
+        {
+            path: '/accounting/insurance-claims/:id',
+            name: 'claim-detail',
+            component: () => import('@/views/accounting/InsuranceClaimDetailView.vue'),
+            meta: { requiresAuth: true }
+        },
+        {
+            path: '/accounting/service-providers',
+            name: 'service-providers',
+            component: () => import('@/views/accounting/ServiceProvidersListView.vue'),
+            meta: { requiresAuth: true }
+        },
+        {
+            path: '/accounting/service-providers/:id',
+            name: 'provider-detail',
+            component: () => import('@/views/accounting/ServiceProviderDetailView.vue'),
             meta: { requiresAuth: true }
         },
         // Fallback

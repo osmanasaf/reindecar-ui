@@ -83,8 +83,8 @@ async function handleSubmit() {
     }
     showForm.value = false
     fetchBranches()
-  } catch {
-    toast.error('İşlem başarısız')
+  } catch (err) {
+    toast.apiError(err, 'İşlem başarısız')
   }
 }
 
@@ -93,8 +93,8 @@ async function toggleStatus(branch: Branch) {
     await branchesApi.updateStatus(branch.id, !branch.active)
     toast.success(branch.active ? 'Şube pasifleştirildi' : 'Şube aktifleştirildi')
     fetchBranches()
-  } catch {
-    toast.error('İşlem başarısız')
+  } catch (err) {
+    toast.apiError(err, 'İşlem başarısız')
   }
 }
 

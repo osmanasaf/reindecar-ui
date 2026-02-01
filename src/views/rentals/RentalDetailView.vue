@@ -180,8 +180,8 @@ async function addDriver() {
     showDriverModal.value = false
     newDriverId.value = null
     fetchDrivers()
-  } catch {
-    toast.error('Sürücü eklenemedi')
+  } catch (err) {
+    toast.apiError(err, 'Sürücü eklenemedi')
   }
 }
 
@@ -192,8 +192,8 @@ async function removeDriver(driverId: number) {
     await rentalsApi.removeDriver(rental.value.id, driverId)
     toast.success('Sürücü kaldırıldı')
     fetchDrivers()
-  } catch {
-    toast.error('İşlem başarısız')
+  } catch (err) {
+    toast.apiError(err, 'İşlem başarısız')
   }
 }
 
@@ -203,8 +203,8 @@ async function setPrimaryDriver(driverId: number) {
     await rentalsApi.setPrimaryDriver(rental.value.id, driverId)
     toast.success('Ana sürücü güncellendi')
     fetchDrivers()
-  } catch {
-    toast.error('İşlem başarısız')
+  } catch (err) {
+    toast.apiError(err, 'İşlem başarısız')
   }
 }
 
@@ -214,8 +214,8 @@ async function handleReserve() {
     await rentalsApi.reserve(rental.value.id)
     toast.success('Kiralama rezerve edildi')
     fetchRental()
-  } catch {
-    toast.error('İşlem başarısız')
+  } catch (err) {
+    toast.apiError(err, 'İşlem başarısız')
   }
 }
 
@@ -227,8 +227,8 @@ async function handleActivate() {
     await rentalsApi.activate(rental.value.id, { startKm: Number(startKm) })
     toast.success('Araç teslim edildi')
     fetchRental()
-  } catch {
-    toast.error('İşlem başarısız')
+  } catch (err) {
+    toast.apiError(err, 'İşlem başarısız')
   }
 }
 
@@ -238,8 +238,8 @@ async function handleStartReturn() {
     await rentalsApi.startReturn(rental.value.id)
     toast.success('İade süreci başlatıldı')
     fetchRental()
-  } catch {
-    toast.error('İşlem başarısız')
+  } catch (err) {
+    toast.apiError(err, 'İşlem başarısız')
   }
 }
 
@@ -256,8 +256,8 @@ async function handleComplete() {
     })
     toast.success('Kiralama tamamlandı')
     fetchRental()
-  } catch {
-    toast.error('İşlem başarısız')
+  } catch (err) {
+    toast.apiError(err, 'İşlem başarısız')
   }
 }
 
@@ -268,8 +268,8 @@ async function handleCancel() {
     await rentalsApi.cancel(rental.value.id)
     toast.success('Kiralama iptal edildi')
     fetchRental()
-  } catch {
-    toast.error('İşlem başarısız')
+  } catch (err) {
+    toast.apiError(err, 'İşlem başarısız')
   }
 }
 
@@ -290,8 +290,8 @@ async function generatePdf() {
     }
     
     toast.success('PDF hazırlandı')
-  } catch {
-    toast.error('PDF oluşturulamadı')
+  } catch (err) {
+    toast.apiError(err, 'PDF oluşturulamadı')
   } finally {
     generatingPdf.value = false
   }

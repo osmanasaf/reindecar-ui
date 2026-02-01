@@ -80,13 +80,8 @@ async function handleSubmit() {
     toast.success('Müşteri başarıyla oluşturuldu')
     emit('created', customer)
     handleClose()
-  } catch (err: unknown) {
-    const error = err as { response?: { data?: { message?: string } } }
-    if (error.response?.data?.message) {
-      toast.error(error.response.data.message)
-    } else {
-      toast.error('Müşteri oluşturulamadı')
-    }
+  } catch (err) {
+    toast.apiError(err, 'Müşteri oluşturulamadı')
   } finally {
     saving.value = false
   }

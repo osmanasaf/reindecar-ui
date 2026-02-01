@@ -35,13 +35,23 @@ function formatCurrency(amount: number): string {
         <div class="modal-content" @click.stop>
           <div class="modal-header">
             <div>
-              <h2>{{ rental.rentalCode }}</h2>
-              <span class="rental-status">{{ rental.status }}</span>
+              <h2>{{ rental.rentalNumber }}</h2>
+              <div class="header-badges">
+                <span class="rental-type">{{ rental.rentalTypeDisplayName || rental.rentalType }}</span>
+                <span :class="['rental-status', rental.overdue ? 'overdue' : '']">
+                  {{ rental.statusDisplayName || rental.status }}
+                </span>
+              </div>
             </div>
             <button class="close-btn" @click="emit('close')">×</button>
           </div>
 
           <div class="modal-body">
+            <!-- Gecikme Uyarısı -->
+            <div v-if="rental.overdue" class="overdue-alert">
+              ⚠️ Bu kiralama {{ rental.overdueDays }} gün gecikmiş durumda!
+            </div>
+
             <div class="detail-section">
               <h3>Müşteri Bilgileri</h3>
               <div class="detail-grid">
@@ -49,29 +59,96 @@ function formatCurrency(amount: number): string {
                   <span class="label">Müşteri Adı</span>
                   <span class="value">{{ rental.customerName }}</span>
                 </div>
+                <div class="detail-item">
+                  <span class="label">Müşteri Tipi</span>
+                  <span class="value">{{ rental.customerType === 'PERSONAL' ? 'Bireysel' : 'Kurumsal' }}</span>
+                </div>
               </div>
             </div>
 
             <div class="detail-section">
-              <h3>Kiralama Detayları</h3>
+              <h3>Şube Bilgileri</h3>
+              <div class="detail-grid">
+                <div class="detail-item">
+                  <span class="label">Teslim Şubesi</span>
+                  <span class="value">{{ rental.branchName }}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="label">İade Şubesi</span>
+                  <span class="value">{{ rental.returnBranchName || rental.branchName }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="detail-section">
+              <h3>Tarih ve Süre</h3>
               <div class="detail-grid">
                 <div class="detail-item">
                   <span class="label">Başlangıç Tarihi</span>
                   <span class="value">{{ formatDate(rental.startDate) }}</span>
                 </div>
                 <div class="detail-item">
-                  <span class="label">Bitiş Tarihi</span>
+                  <span class="label">Planlanan Bitiş</span>
                   <span class="value">{{ formatDate(rental.endDate) }}</span>
                 </div>
                 <div class="detail-item">
-                  <span class="label">Toplam Gün</span>
-                  <span class="value highlight">{{ rental.totalDays }} gün</span>
+                  <span class="label">Gerçek İade Tarihi</span>
+                  <span class="value">{{ rental.actualReturnDate ? formatDate(rental.actualReturnDate) : '-' }}</span>
                 </div>
                 <div class="detail-item">
-                  <span class="label">Toplam Tutar</span>
-                  <span class="value highlight">{{ formatCurrency(rental.totalAmount) }}</span>
+                  <span class="label">Planlanan / Gerçekleşen</span>
+                  <span class="value highlight">{{ rental.plannedDays }} / {{ rental.actualDays ?? '-' }} gün</span>
                 </div>
               </div>
+            </div>
+
+            <div class="detail-section">
+              <h3>KM Bilgileri</h3>
+              <div class="detail-grid">
+                <div class="detail-item">
+                  <span class="label">Başlangıç KM</span>
+                  <span class="value">{{ rental.startKm?.toLocaleString('tr-TR') ?? '-' }} km</span>
+                </div>
+                <div class="detail-item">
+                  <span class="label">Bitiş KM</span>
+                  <span class="value">{{ rental.endKm?.toLocaleString('tr-TR') ?? '-' }} km</span>
+                </div>
+                <div class="detail-item">
+                  <span class="label">Toplam KM</span>
+                  <span class="value highlight">{{ rental.totalKm?.toLocaleString('tr-TR') ?? '-' }} km</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="detail-section">
+              <h3>Ücret Bilgileri</h3>
+              <div class="detail-grid">
+                <div class="detail-item">
+                  <span class="label">Günlük Ücret</span>
+                  <span class="value">{{ formatCurrency(rental.dailyPriceAmount) }}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="label">Toplam Ücret</span>
+                  <span class="value">{{ formatCurrency(rental.totalPriceAmount) }}</span>
+                </div>
+                <div v-if="rental.discountAmount > 0" class="detail-item">
+                  <span class="label">İndirim</span>
+                  <span class="value discount">-{{ formatCurrency(rental.discountAmount) }}</span>
+                </div>
+                <div v-if="rental.extraKmChargeAmount > 0" class="detail-item">
+                  <span class="label">Ekstra KM Ücreti</span>
+                  <span class="value extra">+{{ formatCurrency(rental.extraKmChargeAmount) }}</span>
+                </div>
+                <div class="detail-item full">
+                  <span class="label">Genel Toplam</span>
+                  <span class="value grand-total">{{ formatCurrency(rental.grandTotalAmount) }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="rental.notes" class="detail-section">
+              <h3>Notlar</h3>
+              <p class="notes">{{ rental.notes }}</p>
             </div>
           </div>
         </div>
@@ -119,6 +196,22 @@ function formatCurrency(amount: number): string {
   font-weight: 700;
 }
 
+.header-badges {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.rental-type {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
+}
+
 .rental-status {
   display: inline-block;
   padding: 4px 12px;
@@ -127,6 +220,19 @@ function formatCurrency(amount: number): string {
   font-weight: 500;
   background: var(--color-primary-light);
   color: var(--color-primary);
+}
+
+.rental-status.overdue {
+  background: var(--color-danger-light);
+  color: var(--color-danger);
+}
+
+.overdue-alert {
+  background: var(--color-danger-light);
+  color: var(--color-danger);
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-weight: 500;
 }
 
 .close-btn {
@@ -192,6 +298,37 @@ function formatCurrency(amount: number): string {
   font-size: 18px;
   color: var(--color-primary);
   font-weight: 700;
+}
+
+.detail-item .value.discount {
+  color: var(--color-success);
+}
+
+.detail-item .value.extra {
+  color: var(--color-warning);
+}
+
+.detail-item .value.grand-total {
+  font-size: 20px;
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+.detail-item.full {
+  grid-column: 1 / -1;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
+  margin-top: 8px;
+}
+
+.notes {
+  margin: 0;
+  padding: 12px 16px;
+  background: var(--color-bg-secondary);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  white-space: pre-wrap;
 }
 
 .modal-enter-active,

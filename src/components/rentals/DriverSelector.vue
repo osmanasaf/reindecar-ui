@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
-import { driversApi } from '@/api'
+import { ref, computed, watch } from 'vue'
+import { customersApi } from '@/api'
 import { useToast } from '@/composables'
 import type { Driver, CreateDriverForm } from '@/types'
 
 const props = defineProps<{
   modelValue: number[]
   primaryDriverId: number | null
-  customerId?: number
+  customerId: number
 }>()
 
 const emit = defineEmits<{
@@ -32,15 +32,21 @@ const newDriver = ref<CreateDriverForm>({
   customerId: props.customerId
 })
 
+function getDriverDisplayName(driver: Driver): string {
+  if (driver.fullName) return driver.fullName
+  return `${driver.firstName || ''} ${driver.lastName || ''}`.trim() || 'İsimsiz Sürücü'
+}
+
 const filteredDrivers = computed(() => {
   const query = searchQuery.value.toLowerCase()
   if (!query) return drivers.value
   
-  return drivers.value.filter(driver => 
-    driver.fullName.toLowerCase().includes(query) ||
-    driver.licenseNumber.toLowerCase().includes(query) ||
-    driver.nationalId.includes(query)
-  )
+  return drivers.value.filter(driver => {
+    const displayName = getDriverDisplayName(driver).toLowerCase()
+    return displayName.includes(query) ||
+      driver.licenseNumber?.toLowerCase().includes(query) ||
+      driver.nationalId?.includes(query)
+  })
 })
 
 const isDriverSelected = (driverId: number) => {
@@ -73,19 +79,27 @@ const setPrimaryDriver = (driverId: number) => {
 }
 
 async function fetchDrivers() {
+  if (!props.customerId) {
+    drivers.value = []
+    return
+  }
   loading.value = true
   try {
-    drivers.value = await driversApi.getAll({ active: true })
-  } catch {
-    toast.error('Sürücüler yüklenemedi')
+    drivers.value = await customersApi.getDrivers(props.customerId, true)
+  } catch (err) {
+    toast.apiError(err, 'Sürücüler yüklenemedi')
   } finally {
     loading.value = false
   }
 }
 
 async function createDriver() {
+  if (!props.customerId) {
+    toast.error('Önce müşteri seçmelisiniz')
+    return
+  }
   try {
-    const created = await driversApi.create(newDriver.value)
+    const created = await customersApi.createDriver(props.customerId, newDriver.value)
     toast.success('Sürücü başarıyla oluşturuldu')
     
     drivers.value.push(created)
@@ -93,8 +107,8 @@ async function createDriver() {
     
     resetForm()
     showNewDriverForm.value = false
-  } catch {
-    toast.error('Sürücü oluşturulamadı')
+  } catch (err) {
+    toast.apiError(err, 'Sürücü oluşturulamadı')
   }
 }
 
@@ -120,11 +134,13 @@ function toggleNewDriverForm() {
 
 watch(() => props.customerId, (newCustomerId) => {
   newDriver.value.customerId = newCustomerId
-})
-
-onMounted(() => {
-  fetchDrivers()
-})
+  // Müşteri değiştiğinde sürücüleri yeniden yükle
+  if (newCustomerId) {
+    fetchDrivers()
+  } else {
+    drivers.value = []
+  }
+}, { immediate: true })
 </script>
 
 <template>
@@ -205,12 +221,13 @@ onMounted(() => {
         </div>
         <div class="driver-info">
           <div class="driver-name">
-            {{ driver.fullName }}
+            {{ getDriverDisplayName(driver) }}
             <span v-if="driver.customerId === customerId" class="badge">Müşteriye Ait</span>
           </div>
           <div class="driver-details">
-            Ehliyet: {{ driver.licenseNumber }}
+            <span v-if="driver.licenseNumber">Ehliyet: {{ driver.licenseNumber }}</span>
             <span v-if="driver.licenseClass"> | Sınıf: {{ driver.licenseClass }}</span>
+            <span v-if="driver.nationalId"> | TC: {{ driver.nationalId.substring(0, 3) }}***</span>
           </div>
         </div>
         <div class="driver-actions">
@@ -233,7 +250,7 @@ onMounted(() => {
     <div v-if="modelValue.length > 0" class="selection-summary">
       <span>{{ modelValue.length }} sürücü seçildi</span>
       <span v-if="primaryDriverId" class="primary-info">
-        • Ana: {{ drivers.find(d => d.id === primaryDriverId)?.fullName }}
+        • Ana: {{ getDriverDisplayName(drivers.find(d => d.id === primaryDriverId)!) }}
       </span>
     </div>
   </div>

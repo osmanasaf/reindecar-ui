@@ -71,8 +71,10 @@ export interface Vehicle {
     seatCount: number
     categoryId: number
     categoryName: string
+    category?: VehicleCategory
     branchId: number
     branchName: string
+    branch?: Branch
     status: VehicleStatus
     currentKm: number
     insuranceExpiryDate: string
@@ -473,6 +475,7 @@ export interface VehicleDamageMap {
     vehicleId: number
     vehiclePlate: string
     totalActiveDamages: number
+    totalDamages: number
     zones: Record<number, ZoneDamageInfo>
     damages: DamageReport[]
 }
@@ -488,13 +491,36 @@ export interface VehicleMaintenanceMap {
 // Vehicle History
 export interface RentalHistoryItem {
     id: number
-    rentalCode: string
+    rentalNumber: string
+    rentalType: string
+    rentalTypeDisplayName: string
+    customerId: number
     customerName: string
+    customerType: 'PERSONAL' | 'COMPANY'
+    branchId: number
+    branchName: string
+    returnBranchId: number | null
+    returnBranchName: string | null
     startDate: string
     endDate: string
-    totalDays: number
-    totalAmount: number
+    actualReturnDate: string | null
     status: string
+    statusDisplayName: string
+    plannedDays: number
+    actualDays: number | null
+    startKm: number | null
+    endKm: number | null
+    totalKm: number | null
+    dailyPriceAmount: number
+    totalPriceAmount: number
+    discountAmount: number
+    extraKmChargeAmount: number
+    grandTotalAmount: number
+    currency: string
+    overdue: boolean
+    overdueDays: number
+    notes: string | null
+    createdAt: string
 }
 
 export interface DamageHistoryItem {

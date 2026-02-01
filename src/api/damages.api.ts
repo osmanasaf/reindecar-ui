@@ -29,8 +29,9 @@ class DamagesApiService extends BaseApi {
         return this.get(`/vehicle/${vehicleId}`)
     }
 
-    async getVehicleDamageMap(vehicleId: number): Promise<VehicleDamageMap> {
-        return this.get(`/vehicle/${vehicleId}/map`)
+    async getVehicleDamageMap(vehicleId: number, includeRepaired = false): Promise<VehicleDamageMap> {
+        const params = includeRepaired ? '?includeRepaired=true' : ''
+        return this.get(`/vehicle/${vehicleId}/map${params}`)
     }
 
     async getRentalDamages(rentalId: number): Promise<DamageReport[]> {

@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { rentalsApi } from '@/api'
+import { rentalsApi, branchesApi } from '@/api'
 import { useToast, useValidation } from '@/composables'
 import { RentalType, CustomerType } from '@/types'
-import type { Customer, CreateRentalForm, RentalExtraItem } from '@/types'
+import type { Customer, CreateRentalForm, RentalExtraItem, Branch } from '@/types'
 import type { PriceCalculationResponse } from '@/api'
 import VehicleSelector from '@/components/rentals/VehicleSelector.vue'
 import CustomerSelector from '@/components/rentals/CustomerSelector.vue'
@@ -21,6 +21,7 @@ const toast = useToast()
 const currentStep = ref(1)
 const totalSteps = 6
 const submitting = ref(false)
+const branches = ref<Branch[]>([])
 
 const rentalType = ref<RentalType>(RentalType.DAILY)
 const selectedVehicleId = ref<number | null>(null)
@@ -36,6 +37,8 @@ const extraItems = ref<RentalExtraItem[]>([])
 const extraItemsTotal = ref(0)
 const priceData = ref<PriceCalculationResponse | null>(null)
 const showQuickCustomerModal = ref(false)
+const selectedBranchId = ref<number | null>(null)
+const selectedReturnBranchId = ref<number | null>(null)
 
 const { getError, hasError, touch } = useValidation()
 
@@ -45,6 +48,20 @@ const rentalTypes: { value: RentalType; label: string; description: string; minD
   { value: RentalType.MONTHLY, label: 'Aylık Kiralama', description: '1-12 ay arası orta süreli kiralama' },
   { value: RentalType.LEASING, label: 'Uzun Dönem Leasing', description: '12+ ay uzun dönem anlaşma', minDays: 365 }
 ]
+
+async function fetchBranches() {
+  try {
+    branches.value = await branchesApi.getActive()
+    if (branches.value.length > 0) {
+      selectedBranchId.value = branches.value[0].id
+      selectedReturnBranchId.value = branches.value[0].id
+    } else {
+      toast.error('Aktif şube bulunamadı')
+    }
+  } catch (error) {
+    toast.error('Şubeler yüklenemedi')
+  }
+}
 
 const stepTitles = computed(() => {
   return ['Tip', 'Tarih', 'Araç', 'Müşteri', 'Ek Kalemler', 'Özet']
@@ -154,6 +171,11 @@ function formatCurrency(amount: number): string {
 
 async function handleSubmit() {
   if (!canProceed.value || !selectedVehicleId.value || !selectedCustomerId.value) return
+  
+  if (!selectedBranchId.value) {
+    toast.error('Lütfen teslim şubesi seçiniz')
+    return
+  }
 
   submitting.value = true
   try {
@@ -164,8 +186,8 @@ async function handleSubmit() {
       customerType: CustomerType.PERSONAL,
       driverIds: selectedDriverIds.value.length > 0 ? selectedDriverIds.value : undefined,
       primaryDriverId: primaryDriverId.value || undefined,
-      branchId: 1,
-      returnBranchId: 1,
+      branchId: selectedBranchId.value,
+      returnBranchId: selectedReturnBranchId.value || selectedBranchId.value,
       startDate: startDate.value,
       endDate: endDate.value,
       termMonths: rentalType.value === RentalType.LEASING ? selectedTermMonths.value : undefined,
@@ -183,8 +205,8 @@ async function handleSubmit() {
     const rental = await rentalsApi.create(payload)
     toast.success(`Kiralama #${rental.rentalNumber} başarıyla oluşturuldu`)
     router.push(`/rentals/${rental.id}`)
-  } catch {
-    toast.error('Kiralama oluşturulamadı')
+  } catch (err) {
+    toast.apiError(err, 'Kiralama oluşturulamadı')
   } finally {
     submitting.value = false
   }
@@ -208,6 +230,10 @@ watch(selectedVehicleId, (newId) => {
   if (!newId) {
     selectedVehicleCategoryId.value = null
   }
+})
+
+onMounted(() => {
+  fetchBranches()
 })
 </script>
 
@@ -375,6 +401,28 @@ watch(selectedVehicleId, (newId) => {
                   <strong>
                     {{ isLeasing ? `${selectedTermMonths} Ay` : `${totalDays} Gün` }}
                   </strong>
+                </div>
+                <div class="summary-row">
+                  <span>Teslim Şubesi</span>
+                  <div class="branch-selector-inline">
+                    <select v-model.number="selectedBranchId" class="branch-select">
+                      <option :value="null" disabled>Şube seçiniz</option>
+                      <option v-for="branch in branches" :key="branch.id" :value="branch.id">
+                        {{ branch.name }}
+                      </option>
+                    </select>
+                  </div>
+                </div>
+                <div class="summary-row">
+                  <span>İade Şubesi</span>
+                  <div class="branch-selector-inline">
+                    <select v-model.number="selectedReturnBranchId" class="branch-select">
+                      <option :value="null" disabled>Şube seçiniz</option>
+                      <option v-for="branch in branches" :key="branch.id" :value="branch.id">
+                        {{ branch.name }}
+                      </option>
+                    </select>
+                  </div>
                 </div>
                 <div v-if="extraItems.length > 0" class="summary-row">
                   <span>Ek Kalemler</span>
@@ -677,6 +725,27 @@ watch(selectedVehicleId, (newId) => {
 
 .summary-row span {
   color: var(--color-text-secondary);
+}
+
+.branch-selector-inline {
+  flex: 1;
+  text-align: right;
+}
+
+.branch-select {
+  padding: 6px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font-size: 13px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  min-width: 200px;
+}
+
+.branch-select:focus {
+  outline: none;
+  border-color: var(--color-primary);
 }
 
 .date-price-grid {

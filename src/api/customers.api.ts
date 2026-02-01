@@ -5,7 +5,8 @@ import type {
     Customer,
     CreatePersonalCustomerForm,
     CreateCompanyCustomerForm,
-    Rental
+    Driver,
+    CreateDriverForm
 } from '@/types'
 
 interface CustomerRentalInfo {
@@ -61,6 +62,21 @@ class CustomersApiService extends BaseApi {
 
     async deleteById(id: number): Promise<void> {
         return this.remove(`/${id}`)
+    }
+
+    // Driver endpoints
+    async getDrivers(customerId: number, active?: boolean): Promise<Driver[]> {
+        const params = active === undefined ? undefined : { active }
+        const response = await this.get<PaginatedResponse<Driver> | Driver[]>(`/${customerId}/drivers`, params)
+        if (response && typeof response === 'object' && 'content' in response) {
+            const paginated = response as PaginatedResponse<Driver>
+            return paginated.content
+        }
+        return Array.isArray(response) ? response : []
+    }
+
+    async createDriver(customerId: number, driver: CreateDriverForm): Promise<Driver> {
+        return this.post(`/${customerId}/drivers`, driver)
     }
 }
 

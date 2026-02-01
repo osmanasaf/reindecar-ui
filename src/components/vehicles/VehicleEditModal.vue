@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
-import { vehiclesApi, vehicleCategoriesApi } from '@/api'
+import { vehiclesApi, vehicleCategoriesApi, branchesApi } from '@/api'
 import { useValidation, rules, useToast } from '@/composables'
-import type { Vehicle, VehicleCategory, UpdateVehicleForm } from '@/types'
+import { formatPlateInput } from '@/utils'
+import type { Vehicle, VehicleCategory, Branch, UpdateVehicleForm } from '@/types'
 import { FuelType, Transmission } from '@/types'
 
 interface Props {
@@ -21,6 +22,7 @@ const toast = useToast()
 const loading = ref(false)
 const saving = ref(false)
 const categories = ref<VehicleCategory[]>([])
+const branches = ref<Branch[]>([])
 
 const form = ref<UpdateVehicleForm>({
   plateNumber: '',
@@ -54,7 +56,8 @@ const formRules = computed(() => ({
   color: { value: form.value.color, rules: [rules.required()] },
   currentKm: { value: form.value.currentKm, rules: [rules.minValue(0)] },
   dailyPrice: { value: form.value.dailyPrice, rules: [rules.required(), rules.positive()] },
-  categoryId: { value: form.value.categoryId, rules: [rules.required()] }
+  categoryId: { value: form.value.categoryId, rules: [rules.required()] },
+  branchId: { value: form.value.branchId, rules: [rules.required('Şube seçiniz')] }
 }))
 
 const fuelTypeOptions = [
@@ -111,6 +114,14 @@ async function fetchCategories() {
   }
 }
 
+async function fetchBranches() {
+  try {
+    branches.value = await branchesApi.getActive()
+  } catch {
+    toast.error('Şubeler yüklenemedi')
+  }
+}
+
 async function handleSubmit() {
   if (!validateForm(formRules.value)) {
     toast.error('Lütfen formdaki hataları düzeltin')
@@ -125,8 +136,8 @@ async function handleSubmit() {
     toast.success('Araç başarıyla güncellendi')
     emit('saved', updatedVehicle)
     emit('close')
-  } catch {
-    toast.error('Güncelleme işlemi başarısız')
+  } catch (err) {
+    toast.apiError(err, 'Güncelleme işlemi başarısız')
   } finally {
     saving.value = false
   }
@@ -145,6 +156,7 @@ watch(() => props.visible, (isVisible) => {
   if (isVisible) {
     reset()
     fetchCategories()
+    fetchBranches()
     fetchVehicle()
   }
 })
@@ -170,10 +182,12 @@ watch(() => props.visible, (isVisible) => {
               <div class="form-group" :class="{ error: hasError('plateNumber') }">
                 <label>Plaka <span class="required">*</span></label>
                 <input 
-                  v-model="form.plateNumber" 
-                  @blur="handleBlur('plateNumber')" 
-                  type="text" 
+                  :value="form.plateNumber"
+                  type="text"
                   placeholder="34 ABC 123"
+                  maxlength="12"
+                  @input="form.plateNumber = formatPlateInput(($event.target as HTMLInputElement).value)"
+                  @blur="handleBlur('plateNumber')"
                 />
                 <span class="error-text">{{ getError('plateNumber') }}</span>
               </div>
@@ -268,12 +282,23 @@ watch(() => props.visible, (isVisible) => {
               <div class="form-group" :class="{ error: hasError('categoryId') }">
                 <label>Kategori <span class="required">*</span></label>
                 <select v-model="form.categoryId" @blur="handleBlur('categoryId')">
-                  <option :value="0" disabled>Seçiniz</option>
+                  <option :value="0" disabled>Kategori seçiniz</option>
                   <option v-for="cat in categories" :key="cat.id" :value="cat.id">
                     {{ cat.name }}
                   </option>
                 </select>
                 <span class="error-text">{{ getError('categoryId') }}</span>
+              </div>
+
+              <div class="form-group" :class="{ error: hasError('branchId') }">
+                <label>Şube <span class="required">*</span></label>
+                <select v-model="form.branchId" @blur="handleBlur('branchId')">
+                  <option :value="0" disabled>Şube seçiniz</option>
+                  <option v-for="branch in branches" :key="branch.id" :value="branch.id">
+                    {{ branch.name }}
+                  </option>
+                </select>
+                <span class="error-text">{{ getError('branchId') }}</span>
               </div>
             </div>
           </section>

@@ -1,4 +1,17 @@
-import { DamageType, DamageSeverity, DamageLocation, MaintenanceType } from '@/types'
+import { 
+  DamageType, 
+  DamageSeverity, 
+  DamageLocation, 
+  MaintenanceType,
+  ReceivableType,
+  ReceivableStatus,
+  PayableType,
+  PayableStatus,
+  ClaimType,
+  ClaimStatus,
+  ServiceType,
+  VehicleStatus
+} from '@/types'
 
 export function useEnumTranslations() {
   const damageTypes: Record<DamageType, string> = {
@@ -61,6 +74,82 @@ export function useEnumTranslations() {
     [MaintenanceType.OTHER]: 'Diğer'
   }
 
+  // Accounting translations
+  const receivableTypes: Record<ReceivableType, string> = {
+    [ReceivableType.RENTAL_FEE]: 'Kiralama Ücreti',
+    [ReceivableType.EXTRA_KM_FEE]: 'Ekstra KM Ücreti',
+    [ReceivableType.LATE_RETURN_FEE]: 'Geç Teslim Ücreti',
+    [ReceivableType.DAMAGE_FEE]: 'Hasar Bedeli',
+    [ReceivableType.INSURANCE_CLAIM]: 'Sigorta Tazminatı',
+    [ReceivableType.OTHER]: 'Diğer'
+  }
+
+  const receivableStatuses: Record<ReceivableStatus, string> = {
+    [ReceivableStatus.PENDING]: 'Beklemede',
+    [ReceivableStatus.PARTIAL_PAID]: 'Kısmi Ödendi',
+    [ReceivableStatus.FULLY_PAID]: 'Tamamen Ödendi',
+    [ReceivableStatus.OVERDUE]: 'Vadesi Geçmiş',
+    [ReceivableStatus.CANCELLED]: 'İptal Edildi',
+    [ReceivableStatus.WRITTEN_OFF]: 'Şüpheli Alacak'
+  }
+
+  const payableTypes: Record<PayableType, string> = {
+    [PayableType.REPAIR_COST]: 'Onarım Maliyeti',
+    [PayableType.MAINTENANCE_COST]: 'Bakım Maliyeti',
+    [PayableType.PARTS_COST]: 'Parça Maliyeti',
+    [PayableType.SUPPLIER_COST]: 'Tedarikçi Maliyeti',
+    [PayableType.OTHER]: 'Diğer'
+  }
+
+  const payableStatuses: Record<PayableStatus, string> = {
+    [PayableStatus.PENDING]: 'Beklemede',
+    [PayableStatus.PARTIAL_PAID]: 'Kısmi Ödendi',
+    [PayableStatus.FULLY_PAID]: 'Tamamen Ödendi',
+    [PayableStatus.OVERDUE]: 'Vadesi Geçmiş',
+    [PayableStatus.CANCELLED]: 'İptal Edildi'
+  }
+
+  const claimTypes: Record<ClaimType, string> = {
+    [ClaimType.ACCIDENT]: 'Kaza',
+    [ClaimType.THEFT]: 'Hırsızlık',
+    [ClaimType.NATURAL_DISASTER]: 'Doğal Afet',
+    [ClaimType.VANDALISM]: 'Vandalizm',
+    [ClaimType.GLASS_DAMAGE]: 'Cam Hasarı',
+    [ClaimType.OTHER]: 'Diğer'
+  }
+
+  const claimStatuses: Record<ClaimStatus, string> = {
+    [ClaimStatus.DRAFT]: 'Taslak',
+    [ClaimStatus.SUBMITTED]: 'Gönderildi',
+    [ClaimStatus.UNDER_REVIEW]: 'İncelemede',
+    [ClaimStatus.APPROVED]: 'Onaylandı',
+    [ClaimStatus.REJECTED]: 'Reddedildi',
+    [ClaimStatus.PARTIAL_PAID]: 'Kısmi Ödendi',
+    [ClaimStatus.FULLY_PAID]: 'Tamamen Ödendi'
+  }
+
+  const serviceTypes: Record<ServiceType, string> = {
+    [ServiceType.REPAIR]: 'Onarım',
+    [ServiceType.PAINT]: 'Boya',
+    [ServiceType.BODY_WORK]: 'Kaporta',
+    [ServiceType.TIRE]: 'Lastik',
+    [ServiceType.OIL_CHANGE]: 'Yağ Değişimi',
+    [ServiceType.ELECTRICAL]: 'Elektrik',
+    [ServiceType.GLASS]: 'Cam',
+    [ServiceType.INSURANCE]: 'Sigorta',
+    [ServiceType.OTHER]: 'Diğer'
+  }
+
+  const vehicleStatuses: Record<VehicleStatus, string> = {
+    [VehicleStatus.AVAILABLE]: 'Müsait',
+    [VehicleStatus.RESERVED]: 'Rezerve',
+    [VehicleStatus.RENTED]: 'Kirada',
+    [VehicleStatus.MAINTENANCE]: 'Bakımda',
+    [VehicleStatus.DAMAGED]: 'Hasarlı',
+    [VehicleStatus.INACTIVE]: 'Pasif',
+    [VehicleStatus.SOLD]: 'Satıldı'
+  }
+
   const translateDamageType = (type: string): string => {
     return damageTypes[type as DamageType] || type
   }
@@ -77,14 +166,63 @@ export function useEnumTranslations() {
     return maintenanceTypes[type as MaintenanceType] || type
   }
 
+  const translateReceivableType = (type: string): string => {
+    return receivableTypes[type as ReceivableType] || type
+  }
+
+  const translateReceivableStatus = (status: string): string => {
+    return receivableStatuses[status as ReceivableStatus] || status
+  }
+
+  const translatePayableType = (type: string): string => {
+    return payableTypes[type as PayableType] || type
+  }
+
+  const translatePayableStatus = (status: string): string => {
+    return payableStatuses[status as PayableStatus] || status
+  }
+
+  const translateClaimType = (type: string): string => {
+    return claimTypes[type as ClaimType] || type
+  }
+
+  const translateClaimStatus = (status: string): string => {
+    return claimStatuses[status as ClaimStatus] || status
+  }
+
+  const translateServiceType = (type: string): string => {
+    return serviceTypes[type as ServiceType] || type
+  }
+
+  const translateVehicleStatus = (status: string | undefined | null): string => {
+    if (!status) return 'Bilinmiyor'
+    return vehicleStatuses[status as VehicleStatus] || status
+  }
+
   return {
     translateDamageType,
     translateSeverity,
     translateDamageLocation,
     translateMaintenanceType,
+    translateReceivableType,
+    translateReceivableStatus,
+    translatePayableType,
+    translatePayableStatus,
+    translateClaimType,
+    translateClaimStatus,
+    translateServiceType,
+    translateVehicleStatus,
     damageTypes,
     damageSeverities,
     damageLocations,
-    maintenanceTypes
+    maintenanceTypes,
+    receivableTypes,
+    receivableStatuses,
+    payableTypes,
+    payableStatuses,
+    claimTypes,
+    claimStatuses,
+    serviceTypes,
+    vehicleStatuses
   }
 }

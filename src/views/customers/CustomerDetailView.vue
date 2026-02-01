@@ -3,7 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { customersApi } from '@/api'
 import { useToast } from '@/composables'
-import type { Customer, CustomerType } from '@/types'
+import type { Customer, CustomerType, Driver, CreateDriverForm } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -11,6 +11,20 @@ const toast = useToast()
 
 const customer = ref<Customer | null>(null)
 const loading = ref(true)
+const drivers = ref<Driver[]>([])
+const loadingDrivers = ref(false)
+const showDriverForm = ref(false)
+const savingDriver = ref(false)
+
+const newDriver = ref<CreateDriverForm>({
+  nationalId: '',
+  firstName: '',
+  lastName: '',
+  licenseNumber: '',
+  licenseExpiryDate: '',
+  licenseClass: '',
+  phone: ''
+})
 
 const customerId = computed(() => Number(route.params.id))
 
@@ -23,12 +37,56 @@ async function fetchCustomer() {
   loading.value = true
   try {
     customer.value = await customersApi.getById(customerId.value)
+    fetchDrivers()
   } catch {
     toast.error('Müşteri bilgileri yüklenemedi')
     router.push('/customers')
   } finally {
     loading.value = false
   }
+}
+
+async function fetchDrivers() {
+  loadingDrivers.value = true
+  try {
+    drivers.value = await customersApi.getDrivers(customerId.value)
+  } catch (err) {
+    toast.apiError(err, 'Sürücüler yüklenemedi')
+  } finally {
+    loadingDrivers.value = false
+  }
+}
+
+async function createDriver() {
+  savingDriver.value = true
+  try {
+    const created = await customersApi.createDriver(customerId.value, newDriver.value)
+    toast.success('Sürücü başarıyla eklendi')
+    drivers.value.push(created)
+    resetDriverForm()
+    showDriverForm.value = false
+  } catch (err) {
+    toast.apiError(err, 'Sürücü eklenemedi')
+  } finally {
+    savingDriver.value = false
+  }
+}
+
+function resetDriverForm() {
+  newDriver.value = {
+    nationalId: '',
+    firstName: '',
+    lastName: '',
+    licenseNumber: '',
+    licenseExpiryDate: '',
+    licenseClass: '',
+    phone: ''
+  }
+}
+
+function getDriverDisplayName(driver: Driver): string {
+  if (driver.fullName) return driver.fullName
+  return `${driver.firstName || ''} ${driver.lastName || ''}`.trim() || 'İsimsiz Sürücü'
 }
 
 function formatPhone(phone: string): string {
@@ -170,6 +228,83 @@ onMounted(fetchCustomer)
             <div class="stat">
               <span class="stat-value">{{ customer.activeRentals || 0 }}</span>
               <span class="stat-label">Aktif Kiralama</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Sürücüler Bölümü -->
+        <section class="card drivers-card">
+          <div class="card-header">
+            <h2>Sürücüler</h2>
+            <button class="btn btn-primary btn-sm" @click="showDriverForm = !showDriverForm">
+              {{ showDriverForm ? '✕ İptal' : '+ Sürücü Ekle' }}
+            </button>
+          </div>
+
+          <!-- Yeni Sürücü Formu -->
+          <div v-if="showDriverForm" class="driver-form">
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Ad *</label>
+                <input v-model="newDriver.firstName" type="text" placeholder="Ad" />
+              </div>
+              <div class="form-group">
+                <label>Soyad *</label>
+                <input v-model="newDriver.lastName" type="text" placeholder="Soyad" />
+              </div>
+              <div class="form-group">
+                <label>TC Kimlik No *</label>
+                <input v-model="newDriver.nationalId" type="text" maxlength="11" placeholder="11 haneli TC No" />
+              </div>
+              <div class="form-group">
+                <label>Telefon</label>
+                <input v-model="newDriver.phone" type="tel" placeholder="05XX..." />
+              </div>
+              <div class="form-group">
+                <label>Ehliyet No *</label>
+                <input v-model="newDriver.licenseNumber" type="text" placeholder="Ehliyet numarası" />
+              </div>
+              <div class="form-group">
+                <label>Ehliyet Sınıfı</label>
+                <input v-model="newDriver.licenseClass" type="text" placeholder="B" />
+              </div>
+              <div class="form-group full">
+                <label>Ehliyet Geçerlilik Tarihi *</label>
+                <input v-model="newDriver.licenseExpiryDate" type="date" />
+              </div>
+            </div>
+            <div class="form-actions">
+              <button class="btn btn-outline" @click="showDriverForm = false; resetDriverForm()">İptal</button>
+              <button class="btn btn-primary" :disabled="savingDriver" @click="createDriver">
+                {{ savingDriver ? 'Kaydediliyor...' : 'Kaydet' }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Sürücü Listesi -->
+          <div v-if="loadingDrivers" class="loading-small">Yükleniyor...</div>
+          <div v-else-if="drivers.length === 0" class="empty-state">
+            Henüz kayıtlı sürücü yok
+          </div>
+          <div v-else class="drivers-list">
+            <div v-for="driver in drivers" :key="driver.id" class="driver-item">
+              <div class="driver-avatar">{{ driver.firstName?.charAt(0) || '?' }}</div>
+              <div class="driver-info">
+                <div class="driver-name">
+                  {{ getDriverDisplayName(driver) }}
+                  <span v-if="driver.primary" class="badge-primary">Ana Sürücü</span>
+                  <span v-if="!driver.active" class="badge-inactive">Pasif</span>
+                </div>
+                <div class="driver-details">
+                  TC: {{ driver.nationalId?.substring(0, 3) }}*** | 
+                  Ehliyet: {{ driver.licenseNumber || '-' }}
+                  <span v-if="driver.licenseClass"> | Sınıf: {{ driver.licenseClass }}</span>
+                </div>
+              </div>
+              <div class="driver-expiry">
+                <span class="label">Ehliyet Bitiş</span>
+                <span class="value">{{ driver.licenseExpiryDate ? formatDate(driver.licenseExpiryDate) : '-' }}</span>
+              </div>
             </div>
           </div>
         </section>
@@ -386,12 +521,194 @@ onMounted(fetchCustomer)
   color: var(--color-text-secondary);
 }
 
+/* Sürücüler */
+.drivers-card {
+  grid-column: span 2;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.card-header h2 {
+  margin: 0;
+}
+
+.btn-sm {
+  padding: 8px 16px;
+  font-size: 13px;
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: white;
+}
+
+.driver-form {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-group.full {
+  grid-column: span 2;
+}
+
+.form-group label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+.form-group input {
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 14px;
+  background: var(--color-surface);
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.loading-small {
+  padding: 20px;
+  text-align: center;
+  color: var(--color-text-secondary);
+}
+
+.empty-state {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-secondary);
+  border-radius: 8px;
+  border: 1px dashed var(--color-border);
+}
+
+.drivers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.driver-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.driver-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 18px;
+}
+
+.driver-info {
+  flex: 1;
+}
+
+.driver-name {
+  font-weight: 600;
+  font-size: 15px;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.driver-details {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.badge-primary {
+  padding: 2px 8px;
+  background: var(--color-success-light);
+  color: var(--color-success);
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 4px;
+}
+
+.badge-inactive {
+  padding: 2px 8px;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 4px;
+}
+
+.driver-expiry {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.driver-expiry .label {
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.driver-expiry .value {
+  font-size: 13px;
+  font-weight: 500;
+}
+
 @media (max-width: 768px) {
   .detail-grid {
     grid-template-columns: 1fr;
   }
   
-  .stats-card {
+  .stats-card,
+  .drivers-card {
+    grid-column: span 1;
+  }
+  
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .form-group.full {
     grid-column: span 1;
   }
 }

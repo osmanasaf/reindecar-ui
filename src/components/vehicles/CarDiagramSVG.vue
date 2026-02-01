@@ -2,6 +2,7 @@
 interface ZoneConfig {
   color: string
   onClick?: () => void
+  opacity?: number
 }
 
 interface Props {
@@ -22,7 +23,8 @@ const getZoneStyle = (zoneId: number) => {
     stroke: isSelected ? 'var(--color-primary, #2563eb)' : '#333',
     strokeWidth: isSelected ? '2.5' : '1',
     cursor: zone?.onClick ? 'pointer' : 'default',
-    transition: 'all 0.2s ease'
+    transition: 'all 0.2s ease',
+    opacity: zone?.opacity ?? 1
   }
 }
 

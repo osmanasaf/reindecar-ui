@@ -13,7 +13,12 @@ class BranchesApiService extends BaseApi {
     }
 
     async getActive(): Promise<Branch[]> {
-        return this.get('/active')
+        const response = await this.get<Branch[] | PaginatedResponse<Branch>>('/active')
+        if (response && typeof response === 'object' && 'content' in response) {
+            const paginated = response as PaginatedResponse<Branch>
+            return Array.isArray(paginated.content) ? paginated.content : []
+        }
+        return Array.isArray(response) ? response : []
     }
 
     async getById(id: number): Promise<Branch> {

@@ -85,8 +85,8 @@ async function handleSubmit() {
     await damagesApi.create(form.value)
     toast.success('Hasar raporu oluşturuldu')
     emit('created')
-  } catch {
-    toast.error('Hasar raporu oluşturulamadı')
+  } catch (err) {
+    toast.apiError(err, 'Hasar raporu oluşturulamadı')
   } finally {
     submitting.value = false
   }

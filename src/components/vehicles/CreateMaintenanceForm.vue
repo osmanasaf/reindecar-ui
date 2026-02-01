@@ -93,8 +93,8 @@ async function handleSubmit() {
     await maintenancesApi.create(form.value)
     toast.success('Bakım kaydı oluşturuldu')
     emit('created')
-  } catch {
-    toast.error('Bakım kaydı oluşturulamadı')
+  } catch (err) {
+    toast.apiError(err, 'Bakım kaydı oluşturulamadı')
   } finally {
     submitting.value = false
   }

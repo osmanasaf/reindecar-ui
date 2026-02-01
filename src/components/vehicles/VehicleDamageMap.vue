@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { damagesApi } from '@/api'
 import { useToast } from '@/composables'
-import type { VehicleDamageMap, DamageReport } from '@/types'
+import type { VehicleDamageMap } from '@/types'
 import { SEVERITY_COLORS, ZONE_NAMES } from '@/utils/vehicleZones'
 import CarDiagramSVG from './CarDiagramSVG.vue'
 import CreateDamageForm from './CreateDamageForm.vue'
@@ -16,18 +16,21 @@ const damageMap = ref<VehicleDamageMap | null>(null)
 const loading = ref(false)
 const selectedZone = ref<number | undefined>(undefined)
 const showCreateForm = ref(false)
+const includeRepaired = ref(false)
 
 const zoneConfigs = computed(() => {
   if (!damageMap.value) return {}
   
-  const configs: Record<number, { color: string; onClick: () => void }> = {}
+  const configs: Record<number, { color: string; onClick: () => void; opacity?: number }> = {}
   const allZones = [1, 2, 3, 4, 6, 7, 8, 9, 10, 12, 13]
   
   allZones.forEach(zoneId => {
     const zoneInfo = damageMap.value!.zones[zoneId]
+    const isRepairedOnly = zoneInfo && zoneInfo.maxSeverity === null
     configs[zoneId] = {
       color: zoneInfo?.colorCode || '#4CAF50',
-      onClick: () => selectZone(zoneId)
+      onClick: () => selectZone(zoneId),
+      opacity: isRepairedOnly ? 0.6 : 1
     }
   })
   
@@ -58,13 +61,17 @@ const totalRepairCost = computed(() => {
 async function fetchDamageMap() {
   loading.value = true
   try {
-    damageMap.value = await damagesApi.getVehicleDamageMap(props.vehicleId)
+    damageMap.value = await damagesApi.getVehicleDamageMap(props.vehicleId, includeRepaired.value)
   } catch {
     toast.error('Hasar haritası yüklenemedi')
   } finally {
     loading.value = false
   }
 }
+
+watch(includeRepaired, () => {
+  fetchDamageMap()
+})
 
 function selectZone(zoneId: number) {
   selectedZone.value = zoneId
@@ -81,8 +88,8 @@ async function handleMarkRepaired(damageId: number) {
     })
     toast.success('Hasar onarıldı olarak işaretlendi')
     fetchDamageMap()
-  } catch {
-    toast.error('İşlem başarısız')
+  } catch (err) {
+    toast.apiError(err, 'İşlem başarısız')
   }
 }
 
@@ -113,6 +120,10 @@ onMounted(() => {
     <div class="map-header">
       <h2>Hasar Haritası</h2>
       <div class="header-actions">
+        <label class="toggle-label">
+          <input type="checkbox" v-model="includeRepaired" />
+          <span>Onarılmış hasarları göster</span>
+        </label>
         <button class="btn btn-primary" @click="showCreateForm = true">
           + Hasar Ekle
         </button>
@@ -122,13 +133,19 @@ onMounted(() => {
     <div v-if="loading" class="loading">Yükleniyor...</div>
 
     <div v-else-if="damageMap" class="map-content">
-      <!-- Özet İstatistikler -->
       <div class="stats-summary">
         <div class="stat-card">
           <div class="stat-icon damage-icon">⚠️</div>
           <div class="stat-info">
             <span class="stat-value">{{ damageMap.totalActiveDamages }}</span>
             <span class="stat-label">Aktif Hasar</span>
+          </div>
+        </div>
+        <div v-if="includeRepaired" class="stat-card">
+          <div class="stat-icon total-icon">📊</div>
+          <div class="stat-info">
+            <span class="stat-value">{{ damageMap.totalDamages || damageMap.damages.length }}</span>
+            <span class="stat-label">Toplam Hasar</span>
           </div>
         </div>
         <div class="stat-card">
@@ -174,6 +191,10 @@ onMounted(() => {
             <div class="legend-item">
               <span class="legend-color" style="background-color: #4CAF50"></span>
               <span>Hasarsız</span>
+            </div>
+            <div v-if="includeRepaired" class="legend-item">
+              <span class="legend-color" style="background-color: #9E9E9E"></span>
+              <span>Onarılmış</span>
             </div>
           </div>
         </div>
@@ -274,6 +295,27 @@ onMounted(() => {
   font-weight: 600;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+}
+
+.toggle-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
 .loading {
   text-align: center;
   padding: 60px;
@@ -330,6 +372,10 @@ onMounted(() => {
 
 .repair-icon {
   background: #D4EDDA;
+}
+
+.total-icon {
+  background: #E3F2FD;
 }
 
 .stat-info {

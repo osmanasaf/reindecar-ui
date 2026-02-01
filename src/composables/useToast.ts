@@ -1,4 +1,5 @@
 import { ref, readonly } from 'vue'
+import { getApiErrorMessage } from '@/utils/error'
 
 export interface Toast {
     id: number
@@ -45,6 +46,11 @@ export function useToast() {
         return addToast('info', message, duration)
     }
 
+    function apiError(err: unknown, fallback = 'Bir hata oluştu', duration?: number) {
+        const message = getApiErrorMessage(err, fallback)
+        return addToast('error', message, duration)
+    }
+
     function clear() {
         toasts.value = []
     }
@@ -55,6 +61,7 @@ export function useToast() {
         error,
         warning,
         info,
+        apiError,
         removeToast,
         clear
     }

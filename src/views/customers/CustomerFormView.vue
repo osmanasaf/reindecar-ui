@@ -3,7 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { customersApi } from '@/api'
 import { useValidation, rules, useToast } from '@/composables'
-import type { CustomerType, CreatePersonalCustomerRequest, CreateCompanyCustomerRequest } from '@/types'
+import type { CustomerType, CreatePersonalCustomerForm, CreateCompanyCustomerForm, AuthorizedPerson } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -37,10 +37,28 @@ const form = ref({
   companyName: '',
   taxNumber: '',
   taxOffice: '',
-  contactPersonName: '',
-  contactPersonPhone: '',
-  tradeRegistryNumber: ''
+  tradeRegistryNumber: '',
+  invoiceAddress: ''
 })
+
+const authorizedPersons = ref<AuthorizedPerson[]>([{ firstName: '', lastName: '', nationalId: '', phone: '', email: '', title: '' }])
+const sameAsAddress = ref(true)
+
+function addAuthorizedPerson() {
+  authorizedPersons.value.push({ firstName: '', lastName: '', nationalId: '', phone: '', email: '', title: '' })
+}
+
+function removeAuthorizedPerson(index: number) {
+  if (authorizedPersons.value.length > 1) {
+    authorizedPersons.value.splice(index, 1)
+  }
+}
+
+function syncInvoiceAddress() {
+  if (sameAsAddress.value) {
+    form.value.invoiceAddress = form.value.address
+  }
+}
 
 const { validateForm, getError, hasError, touch, reset, isValid } = useValidation()
 
@@ -65,14 +83,22 @@ const formRules = computed(() => {
       licenseExpiryDate: { value: form.value.licenseExpiryDate, rules: [rules.required('Ehliyet geçerlilik tarihi zorunludur'), rules.futureDate('Ehliyet süresi dolmuş')] }
     }
   } else {
-    return {
+    const companyRules: Record<string, { value: unknown; rules: unknown[] }> = {
       ...common,
       companyName: { value: form.value.companyName, rules: [rules.required()] },
       taxNumber: { value: form.value.taxNumber, rules: [rules.required(), rules.taxNumber()] },
-      taxOffice: { value: form.value.taxOffice, rules: [rules.required()] },
-      contactPersonName: { value: form.value.contactPersonName, rules: [rules.required()] },
-      contactPersonPhone: { value: form.value.contactPersonPhone, rules: [rules.required(), rules.phone()] }
+      taxOffice: { value: form.value.taxOffice, rules: [rules.required()] }
     }
+    if (!sameAsAddress.value) {
+      companyRules.invoiceAddress = { value: form.value.invoiceAddress, rules: [rules.required('Fatura adresi zorunludur')] }
+    }
+    authorizedPersons.value.forEach((person, index) => {
+      companyRules[`authorizedPerson${index}FirstName`] = { value: person.firstName, rules: [rules.required('Ad zorunludur')] }
+      companyRules[`authorizedPerson${index}LastName`] = { value: person.lastName, rules: [rules.required('Soyad zorunludur')] }
+      companyRules[`authorizedPerson${index}NationalId`] = { value: person.nationalId, rules: [rules.required('TC Kimlik No zorunludur'), rules.tckn()] }
+      companyRules[`authorizedPerson${index}Phone`] = { value: person.phone, rules: [rules.required('Telefon zorunludur'), rules.phone()] }
+    })
+    return companyRules
   }
 })
 
@@ -124,7 +150,7 @@ async function handleSubmit() {
   loading.value = true
   try {
     if (customerType.value === 'PERSONAL') {
-      const payload: CreatePersonalCustomerRequest = {
+      const payload: CreatePersonalCustomerForm = {
         firstName: form.value.firstName,
         lastName: form.value.lastName,
         nationalId: form.value.nationalId,
@@ -137,31 +163,43 @@ async function handleSubmit() {
         licenseClass: form.value.licenseClass,
         licenseExpiryDate: form.value.licenseExpiryDate
       }
-      // Edit mode logic here if API supports update
-      await customersApi.createPersonal(payload)
+      
+      if (isEditMode.value) {
+        await customersApi.update(Number(route.params.id), payload)
+        toast.success('Müşteri başarıyla güncellendi')
+      } else {
+        await customersApi.createPersonal(payload)
+        toast.success('Müşteri başarıyla oluşturuldu')
+      }
     } else {
-      const payload: CreateCompanyCustomerRequest = {
+      if (sameAsAddress.value) {
+        form.value.invoiceAddress = form.value.address
+      }
+      const payload: CreateCompanyCustomerForm = {
         companyName: form.value.companyName,
         taxNumber: form.value.taxNumber,
+        taxOffice: form.value.taxOffice,
         phone: form.value.phone,
         email: form.value.email,
         address: form.value.address,
         city: form.value.city,
-        authorizedPersonName: form.value.contactPersonName,
-        authorizedPersonPhone: form.value.contactPersonPhone,
-        tradeRegistryNumber: form.value.tradeRegistryNumber
+        invoiceAddress: form.value.invoiceAddress,
+        tradeRegistryNumber: form.value.tradeRegistryNumber,
+        authorizedPersons: authorizedPersons.value.filter(p => p.firstName && p.lastName && p.nationalId && p.phone)
       }
-      await customersApi.createCompany(payload)
+      
+      if (isEditMode.value) {
+        await customersApi.update(Number(route.params.id), payload)
+        toast.success('Müşteri başarıyla güncellendi')
+      } else {
+        await customersApi.createCompany(payload)
+        toast.success('Müşteri başarıyla oluşturuldu')
+      }
     }
     
-    toast.success('Müşteri başarıyla kaydedildi')
     router.push('/customers')
-  } catch (err: any) {
-    if (err.response?.data?.message) {
-      toast.error(err.response.data.message)
-    } else {
-      toast.error('Kaydetme işlemi başarısız')
-    }
+  } catch (err) {
+    toast.apiError(err, isEditMode.value ? 'Güncelleme işlemi başarısız' : 'Kaydetme işlemi başarısız')
   } finally {
     loading.value = false
   }
@@ -290,18 +328,49 @@ watch(customerType, () => reset())
           </section>
 
           <section class="form-section">
-            <h3>Yetkili Kişi</h3>
-            <div class="form-grid">
-               <div class="form-group" :class="{ error: hasError('contactPersonName') }">
-                <label>Ad Soyad <span class="required">*</span></label>
-                <input v-model="form.contactPersonName" @blur="handleBlur('contactPersonName')" type="text" />
-                <span class="error-text">{{ getError('contactPersonName') }}</span>
+            <div class="section-header">
+              <h3>Yetkili Kişiler</h3>
+              <button type="button" class="btn-add" @click="addAuthorizedPerson">+ Yetkili Ekle</button>
+            </div>
+            <div v-for="(person, index) in authorizedPersons" :key="index" class="authorized-person-card">
+              <div class="person-header">
+                <span class="person-number">Yetkili {{ index + 1 }}</span>
+                <button 
+                  v-if="authorizedPersons.length > 1" 
+                  type="button" 
+                  class="btn-remove" 
+                  @click="removeAuthorizedPerson(index)"
+                >×</button>
               </div>
-
-               <div class="form-group" :class="{ error: hasError('contactPersonPhone') }">
-                <label>Telefon <span class="required">*</span></label>
-                <input v-model="form.contactPersonPhone" @blur="handleBlur('contactPersonPhone')" type="tel" placeholder="05XX..." />
-                <span class="error-text">{{ getError('contactPersonPhone') }}</span>
+              <div class="form-grid">
+                <div class="form-group" :class="{ error: hasError(`authorizedPerson${index}FirstName`) }">
+                  <label>Ad <span class="required">*</span></label>
+                  <input v-model="person.firstName" @blur="handleBlur(`authorizedPerson${index}FirstName`)" type="text" />
+                  <span class="error-text">{{ getError(`authorizedPerson${index}FirstName`) }}</span>
+                </div>
+                <div class="form-group" :class="{ error: hasError(`authorizedPerson${index}LastName`) }">
+                  <label>Soyad <span class="required">*</span></label>
+                  <input v-model="person.lastName" @blur="handleBlur(`authorizedPerson${index}LastName`)" type="text" />
+                  <span class="error-text">{{ getError(`authorizedPerson${index}LastName`) }}</span>
+                </div>
+                <div class="form-group" :class="{ error: hasError(`authorizedPerson${index}NationalId`) }">
+                  <label>TC Kimlik No <span class="required">*</span></label>
+                  <input v-model="person.nationalId" @blur="handleBlur(`authorizedPerson${index}NationalId`)" type="text" maxlength="11" placeholder="11 haneli TC No" />
+                  <span class="error-text">{{ getError(`authorizedPerson${index}NationalId`) }}</span>
+                </div>
+                <div class="form-group" :class="{ error: hasError(`authorizedPerson${index}Phone`) }">
+                  <label>Telefon <span class="required">*</span></label>
+                  <input v-model="person.phone" @blur="handleBlur(`authorizedPerson${index}Phone`)" type="tel" placeholder="05XX..." />
+                  <span class="error-text">{{ getError(`authorizedPerson${index}Phone`) }}</span>
+                </div>
+                <div class="form-group">
+                  <label>E-posta</label>
+                  <input v-model="person.email" type="email" />
+                </div>
+                <div class="form-group">
+                  <label>Ünvan</label>
+                  <input v-model="person.title" type="text" placeholder="Genel Müdür, Müdür..." />
+                </div>
               </div>
             </div>
           </section>
@@ -325,7 +394,7 @@ watch(customerType, () => reset())
 
             <div class="form-group full" :class="{ error: hasError('address') }">
               <label>Adres <span class="required">*</span></label>
-              <textarea v-model="form.address" @blur="handleBlur('address')" rows="3"></textarea>
+              <textarea v-model="form.address" @blur="handleBlur('address')" @input="syncInvoiceAddress" rows="3"></textarea>
               <span class="error-text">{{ getError('address') }}</span>
             </div>
 
@@ -333,6 +402,23 @@ watch(customerType, () => reset())
               <label>Şehir <span class="required">*</span></label>
               <input v-model="form.city" @blur="handleBlur('city')" type="text" />
               <span class="error-text">{{ getError('city') }}</span>
+            </div>
+          </div>
+        </section>
+
+        <section v-if="customerType === 'COMPANY'" class="form-section">
+          <h3>Fatura Adresi</h3>
+          <div class="checkbox-group">
+            <label class="checkbox-label">
+              <input type="checkbox" v-model="sameAsAddress" @change="syncInvoiceAddress" />
+              <span>Müşteri adresi ile aynı</span>
+            </label>
+          </div>
+          <div v-if="!sameAsAddress" class="form-grid">
+            <div class="form-group full" :class="{ error: hasError('invoiceAddress') }">
+              <label>Fatura Adresi <span class="required">*</span></label>
+              <textarea v-model="form.invoiceAddress" @blur="handleBlur('invoiceAddress')" rows="3"></textarea>
+              <span class="error-text">{{ getError('invoiceAddress') }}</span>
             </div>
           </div>
         </section>
@@ -529,6 +615,96 @@ watch(customerType, () => reset())
 
 .btn-outline:hover {
   background: var(--color-bg-secondary);
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.section-header h3 {
+  margin: 0;
+}
+
+.btn-add {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-add:hover {
+  background: var(--color-primary);
+  color: white;
+}
+
+.authorized-person-card {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.authorized-person-card:last-child {
+  margin-bottom: 0;
+}
+
+.person-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.person-number {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.btn-remove {
+  background: none;
+  border: none;
+  color: var(--color-danger);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.btn-remove:hover {
+  background: var(--color-danger-light);
+}
+
+.checkbox-group {
+  margin-bottom: 16px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
 }
 
 @media (max-width: 640px) {

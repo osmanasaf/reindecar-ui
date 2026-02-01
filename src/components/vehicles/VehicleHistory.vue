@@ -23,7 +23,7 @@ const props = defineProps<{
 }>()
 
 const toast = useToast()
-const { translateDamageType, translateSeverity, translateMaintenanceType } = useEnumTranslations()
+const { translateDamageType, translateSeverity, translateMaintenanceType, translateVehicleStatus } = useEnumTranslations()
 
 const history = ref<VehicleHistory | null>(null)
 const loading = ref(false)
@@ -44,9 +44,9 @@ const allEvents = computed(() => {
       type: 'rental',
       date: r.startDate,
       icon: '🚗',
-      color: '#2196F3',
-      title: r.rentalCode,
-      subtitle: r.customerName,
+      color: r.overdue ? '#F44336' : '#2196F3',
+      title: `${r.rentalNumber} - ${r.rentalTypeDisplayName || r.rentalType}`,
+      subtitle: `${r.customerName} | ${r.statusDisplayName || r.status}`,
       data: r
     })
   })
@@ -87,7 +87,7 @@ const allEvents = computed(() => {
       date: s.changedAt,
       icon: '🔄',
       color: '#607D8B',
-      title: `${s.oldStatus} → ${s.newStatus}`,
+      title: `${translateVehicleStatus(s.oldStatus)} → ${translateVehicleStatus(s.newStatus)}`,
       subtitle: s.changedBy || 'Sistem',
       data: s
     })

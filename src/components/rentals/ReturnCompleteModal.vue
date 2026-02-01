@@ -80,8 +80,8 @@ async function startReturn() {
     await rentalsApi.startReturn(props.rentalId)
     step.value = 'form'
     toast.info('İade süreci başlatıldı')
-  } catch {
-    toast.error('İade başlatılamadı')
+  } catch (err) {
+    toast.apiError(err, 'İade başlatılamadı')
   } finally {
     saving.value = false
   }
@@ -101,8 +101,8 @@ async function completeReturn() {
     toast.success('Kiralama başarıyla tamamlandı')
     emit('completed', updatedRental)
     handleClose()
-  } catch {
-    toast.error('İade tamamlanamadı')
+  } catch (err) {
+    toast.apiError(err, 'İade tamamlanamadı')
   } finally {
     saving.value = false
   }

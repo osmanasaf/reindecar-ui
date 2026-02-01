@@ -23,16 +23,26 @@ export interface CreatePersonalCustomerForm {
     creditScore?: number
 }
 
+export interface AuthorizedPerson {
+    firstName: string
+    lastName: string
+    nationalId: string
+    phone: string
+    email?: string
+    title?: string
+}
+
 export interface CreateCompanyCustomerForm {
     taxNumber: string
     companyName: string
+    taxOffice: string
     tradeRegistryNumber: string
     phone: string
     email: string
     address: string
     city: string
-    authorizedPersonName: string
-    authorizedPersonPhone: string
+    invoiceAddress: string
+    authorizedPersons: AuthorizedPerson[]
 }
 
 // Vehicle Forms

@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { pricingApi, leasingApi } from '@/api'
+import { useToast } from '@/composables'
 import type { PriceCalculationResponse, LeasingPlan } from '@/api'
 import type { RentalType } from '@/types'
+
+const toast = useToast()
 
 interface Props {
   vehicleId: number | null
@@ -33,6 +36,7 @@ const isLeasing = computed(() => props.rentalType === 'LEASING')
 const canCalculate = computed(() => {
   return props.vehicleId && props.startDate && props.endDate
 })
+
 
 const unitPriceLabel = computed(() => {
   switch (props.rentalType) {
@@ -78,7 +82,9 @@ const totalDays = computed(() => {
   const start = new Date(props.startDate)
   const end = new Date(props.endDate)
   const diff = end.getTime() - start.getTime()
-  return Math.ceil(diff / (1000 * 60 * 60 * 24))
+  // Math.ceil yerine Math.round kullanarak daha doğru hesaplama
+  // Başlangıç günü dahil, bitiş günü hariç olmak üzere
+  return Math.max(1, Math.floor(diff / (1000 * 60 * 60 * 24)))
 })
 
 const totalMonths = computed(() => {
@@ -109,7 +115,8 @@ async function calculatePrice() {
     const response = await pricingApi.calculate(request)
     priceData.value = response
     emit('calculated', response)
-  } catch {
+  } catch (err) {
+    toast.apiError(err, 'Fiyat hesaplanamadı')
     error.value = 'Fiyat hesaplanamadı'
     priceData.value = null
   } finally {
@@ -122,7 +129,8 @@ async function fetchLeasingPlans() {
   
   try {
     leasingPlans.value = await leasingApi.getPlans()
-  } catch {
+  } catch (err) {
+    toast.apiError(err, 'Leasing planları yüklenemedi')
     leasingPlans.value = []
   }
 }
@@ -153,13 +161,21 @@ function isTotalItem(description: string): boolean {
   return lowerDesc.includes('toplam') || lowerDesc.includes('total')
 }
 
+let calculateTimeout: ReturnType<typeof setTimeout> | null = null
+
 watch([() => props.vehicleId, () => props.startDate, () => props.endDate, () => props.rentalType, () => props.termMonths], () => {
-  if (canCalculate.value) {
-    calculatePrice()
+  // Debounce - çoklu tetiklenmeleri önle
+  if (calculateTimeout) {
+    clearTimeout(calculateTimeout)
   }
-  if (isLeasing.value) {
-    fetchLeasingPlans()
-  }
+  calculateTimeout = setTimeout(() => {
+    if (canCalculate.value) {
+      calculatePrice()
+    }
+    if (isLeasing.value) {
+      fetchLeasingPlans()
+    }
+  }, 300)
 }, { immediate: true })
 </script>
 
@@ -180,7 +196,7 @@ watch([() => props.vehicleId, () => props.startDate, () => props.endDate, () => 
     </div>
 
     <template v-else>
-      <div v-if="isLeasing && leasingPlans.length > 0" class="leasing-plans">
+      <div v-if="isLeasing && leasingPlans && leasingPlans.length > 0" class="leasing-plans">
         <h4>Leasing Planları</h4>
         <div class="plans-grid">
           <div 

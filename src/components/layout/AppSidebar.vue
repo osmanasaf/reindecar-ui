@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
 
 defineProps<{
@@ -20,15 +20,49 @@ const navItems: NavItem[] = [
   { name: 'vehicles', label: 'Araçlar', icon: '🚗' },
   { name: 'customers', label: 'Müşteriler', icon: '👥' },
   { name: 'rentals', label: 'Kiralamalar', icon: '📋' },
+  { 
+    name: 'accounting',
+    label: 'Finans', 
+    icon: '💰',
+    children: [
+      { name: 'receivables', label: 'Alacaklar', icon: '📥' },
+      { name: 'payables', label: 'Verecekler', icon: '📤' },
+      { name: 'insurance-claims', label: 'Sigorta Başvuruları', icon: '🛡️' },
+      { name: 'service-providers', label: 'Servis Sağlayıcılar', icon: '🔧' }
+    ]
+  },
   { name: 'branches', label: 'Şubeler', icon: '🏢' },
-  { name: 'payments', label: 'Ödemeler', icon: '💳' },
   { name: 'users', label: 'Kullanıcılar', icon: '👤' },
   { name: 'settings', label: 'Ayarlar', icon: '⚙️' }
 ]
 
+const expandedMenus = ref<Set<string>>(new Set())
+
 const isActive = (name: string) => computed(() => {
+  if (name === 'accounting') {
+    return route.path.startsWith('/accounting')
+  }
   return route.name === name || route.path.startsWith(`/${name}`)
 })
+
+const isExpanded = (name: string) => {
+  return expandedMenus.value.has(name) || isActive(name).value
+}
+
+const toggleMenu = (name: string) => {
+  if (expandedMenus.value.has(name)) {
+    expandedMenus.value.delete(name)
+  } else {
+    expandedMenus.value.add(name)
+  }
+}
+
+// Sayfa accounting altındaysa menüyü otomatik aç
+watch(() => route.path, (newPath) => {
+  if (newPath.startsWith('/accounting')) {
+    expandedMenus.value.add('accounting')
+  }
+}, { immediate: true })
 </script>
 
 <template>
@@ -41,17 +75,44 @@ const isActive = (name: string) => computed(() => {
     </div>
 
     <nav class="sidebar-nav">
-      <RouterLink
-        v-for="item in navItems"
-        :key="item.name"
-        :to="{ name: item.name }"
-        class="nav-item"
-        :class="{ active: isActive(item.name).value }"
-        :title="collapsed ? item.label : undefined"
-      >
-        <span class="nav-icon">{{ item.icon }}</span>
-        <span v-if="!collapsed" class="nav-label">{{ item.label }}</span>
-      </RouterLink>
+      <template v-for="item in navItems" :key="item.name">
+        <!-- Parent items with children -->
+        <div v-if="item.children" class="nav-group">
+          <div 
+            class="nav-item nav-parent" 
+            :class="{ active: isActive(item.name).value, expanded: isExpanded(item.name) }"
+            @click="toggleMenu(item.name)"
+          >
+            <span class="nav-icon">{{ item.icon }}</span>
+            <span v-if="!collapsed" class="nav-label">{{ item.label }}</span>
+            <span v-if="!collapsed" class="nav-arrow">{{ isExpanded(item.name) ? '▼' : '▶' }}</span>
+          </div>
+          <div v-if="!collapsed && isExpanded(item.name)" class="nav-children">
+            <RouterLink
+              v-for="child in item.children"
+              :key="child.name"
+              :to="{ name: child.name }"
+              class="nav-item nav-child"
+              :class="{ active: isActive(child.name).value }"
+            >
+              <span class="nav-icon">{{ child.icon }}</span>
+              <span class="nav-label">{{ child.label }}</span>
+            </RouterLink>
+          </div>
+        </div>
+
+        <!-- Regular items -->
+        <RouterLink
+          v-else
+          :to="{ name: item.name }"
+          class="nav-item"
+          :class="{ active: isActive(item.name).value }"
+          :title="collapsed ? item.label : undefined"
+        >
+          <span class="nav-icon">{{ item.icon }}</span>
+          <span v-if="!collapsed" class="nav-label">{{ item.label }}</span>
+        </RouterLink>
+      </template>
     </nav>
 
     <div class="sidebar-footer">
@@ -142,6 +203,37 @@ const isActive = (name: string) => computed(() => {
 
 .nav-label {
   white-space: nowrap;
+}
+
+.nav-group {
+  margin-bottom: var(--spacing-xs);
+}
+
+.nav-parent {
+  cursor: pointer;
+  font-weight: 500;
+  justify-content: flex-start;
+}
+
+.nav-arrow {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--color-text-muted);
+  transition: transform 0.2s;
+}
+
+.nav-parent.expanded .nav-arrow {
+  color: var(--color-primary);
+}
+
+.nav-children {
+  margin-left: calc(24px + var(--spacing-md));
+  margin-top: var(--spacing-xs);
+}
+
+.nav-child {
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: 0.875rem;
 }
 
 .sidebar.collapsed .nav-item {

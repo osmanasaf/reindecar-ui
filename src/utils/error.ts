@@ -172,3 +172,36 @@ export function getErrorSeverity(code: string): 'error' | 'warning' | 'info' {
     }
     return 'info'
 }
+
+export function getApiErrorMessage(err: unknown, fallback = 'Bir hata oluştu'): string {
+    if (!err) return fallback
+    if (typeof err === 'string') return err
+    if (typeof err === 'object') {
+        // Backend ErrorResponse formatı (apiClient doğrudan bu objeyi fırlatır)
+        if (isErrorResponse(err)) {
+            // Validasyon hatası ise detayları göster
+            if (err.code === 'E004' && err.details) {
+                const details = Object.values(err.details)
+                if (details.length > 0) {
+                    return details.slice(0, 3).join(', ') + (details.length > 3 ? '...' : '')
+                }
+            }
+            // Kullanıcı dostu mesaj varsa kullan
+            return errorMessageMap[err.code] || err.message
+        }
+        // Axios wrapper formatı (err.response.data)
+        const e = err as { message?: string; response?: { data?: unknown } }
+        if (e.response?.data && isErrorResponse(e.response.data)) {
+            const errData = e.response.data
+            if (errData.code === 'E004' && errData.details) {
+                const details = Object.values(errData.details)
+                if (details.length > 0) {
+                    return details.slice(0, 3).join(', ') + (details.length > 3 ? '...' : '')
+                }
+            }
+            return errorMessageMap[errData.code] || errData.message
+        }
+        if (e.message) return e.message
+    }
+    return fallback
+}

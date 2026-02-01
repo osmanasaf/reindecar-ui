@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { vehiclesApi } from '@/api'
+import { vehiclesApi, branchesApi, vehicleCategoriesApi } from '@/api'
 import { useToast } from '@/composables'
 import type { Vehicle, VehicleStatus } from '@/types'
 import VehicleEditModal from '@/components/vehicles/VehicleEditModal.vue'
@@ -17,8 +17,22 @@ const vehicle = ref<Vehicle | null>(null)
 const loading = ref(true)
 const showEditModal = ref(false)
 const activeTab = ref<'info' | 'history' | 'damages' | 'maintenance'>('info')
+const branchName = ref<string | null>(null)
+const categoryName = ref<string | null>(null)
 
 const vehicleId = computed(() => Number(route.params.id))
+
+const displayBranchName = computed(() => {
+  const v = vehicle.value
+  if (!v) return '-'
+  return v.branch?.name || v.branchName || branchName.value || '-'
+})
+
+const displayCategoryName = computed(() => {
+  const v = vehicle.value
+  if (!v) return '-'
+  return v.category?.name || v.categoryName || categoryName.value || '-'
+})
 
 const statusLabels: Record<VehicleStatus, string> = {
   AVAILABLE: 'Müsait',
@@ -38,8 +52,26 @@ const statusColors: Record<VehicleStatus, string> = {
 
 async function fetchVehicle() {
   loading.value = true
+  branchName.value = null
+  categoryName.value = null
   try {
     vehicle.value = await vehiclesApi.getById(vehicleId.value)
+    const v = vehicle.value
+    if (!v) return
+
+    const needsBranch = v.branchId && !v.branch?.name && !v.branchName
+    const needsCategory = v.categoryId && !v.category?.name && !v.categoryName
+
+    if (needsBranch) {
+      branchesApi.getById(v.branchId)
+        .then((b) => { branchName.value = b.name })
+        .catch(() => { branchName.value = null })
+    }
+    if (needsCategory) {
+      vehicleCategoriesApi.getById(v.categoryId)
+        .then((c) => { categoryName.value = c.name })
+        .catch(() => { categoryName.value = null })
+    }
   } catch {
     toast.error('Araç bilgileri yüklenemedi')
     router.push('/vehicles')
@@ -179,11 +211,11 @@ onMounted(fetchVehicle)
               </div>
               <div class="info-item">
                 <span class="label">Şube</span>
-                <span class="value">{{ vehicle.branch?.name || '-' }}</span>
+                <span class="value">{{ displayBranchName }}</span>
               </div>
               <div class="info-item">
                 <span class="label">Kategori</span>
-                <span class="value">{{ vehicle.category?.name || '-' }}</span>
+                <span class="value">{{ displayCategoryName }}</span>
               </div>
             </div>
           </section>

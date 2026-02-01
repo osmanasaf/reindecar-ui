@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { vehiclesApi, vehicleCategoriesApi, branchesApi } from '@/api'
 import { useValidation, rules, useToast } from '@/composables'
+import { formatPlateInput } from '@/utils'
 import type { CreateVehicleForm, VehicleCategory, Branch } from '@/types'
 
 const route = useRoute()
@@ -65,10 +66,10 @@ const formRules = computed(() => ({
   fuelType: { value: form.value.fuelType, rules: [rules.required()] },
   transmission: { value: form.value.transmission, rules: [rules.required()] },
   engineCapacity: { value: form.value.engineCapacity, rules: [rules.required(), rules.positive()] },
-  seatCount: { value: form.value.seatCount, rules: [rules.required(), rules.min(1), rules.max(50)] },
+  seatCount: { value: form.value.seatCount, rules: [rules.required(), rules.minValue(1), rules.maxValue(50)] },
   categoryId: { value: form.value.categoryId, rules: [rules.required('Kategori seçiniz')] },
   branchId: { value: form.value.branchId, rules: [rules.required('Şube seçiniz')] },
-  currentKm: { value: form.value.currentKm, rules: [rules.required(), rules.min(0)] },
+  currentKm: { value: form.value.currentKm, rules: [rules.required(), rules.minValue(0)] },
   insuranceExpiryDate: { value: form.value.insuranceExpiryDate, rules: [rules.required()] },
   inspectionExpiryDate: { value: form.value.inspectionExpiryDate, rules: [rules.required()] },
   registrationDate: { value: form.value.registrationDate, rules: [rules.required()] },
@@ -84,6 +85,10 @@ async function fetchData() {
     ])
     categories.value = categoriesData
     branches.value = branchesData
+    
+    if (!branchesData || branchesData.length === 0) {
+      toast.error('Aktif şube bulunamadı. Lütfen önce şube ekleyin.')
+    }
 
     if (isEditMode.value) {
       const vehicle = await vehiclesApi.getById(Number(route.params.id))
@@ -110,8 +115,14 @@ async function fetchData() {
         notes: vehicle.notes || ''
       }
     }
-  } catch {
-    toast.error('Veriler yüklenirken hata oluştu')
+  } catch (error: any) {
+    if (error.response?.status === 404) {
+      toast.error('Kayıt bulunamadı')
+    } else if (error.response?.status === 401) {
+      toast.error('Oturum süresi doldu. Lütfen tekrar giriş yapın.')
+    } else {
+      toast.error('Veriler yüklenirken hata oluştu')
+    }
   } finally {
     loading.value = false
   }
@@ -133,13 +144,8 @@ async function handleSubmit() {
       toast.success('Araç başarıyla eklendi')
     }
     router.push('/vehicles')
-  } catch (err: unknown) {
-    const error = err as { response?: { data?: { message?: string } } }
-    if (error.response?.data?.message) {
-      toast.error(error.response.data.message)
-    } else {
-      toast.error('Kaydetme işlemi başarısız')
-    }
+  } catch (err) {
+    toast.apiError(err, 'Kaydetme işlemi başarısız')
   } finally {
     loading.value = false
   }
@@ -171,9 +177,11 @@ onMounted(fetchData)
           <div class="form-group" :class="{ error: hasError('plateNumber') }">
             <label>Plaka <span class="required">*</span></label>
             <input 
-              v-model="form.plateNumber" 
-              type="text" 
+              :value="form.plateNumber"
+              type="text"
               placeholder="34 ABC 123"
+              maxlength="12"
+              @input="form.plateNumber = formatPlateInput(($event.target as HTMLInputElement).value)"
               @blur="handleBlur('plateNumber')"
             />
             <span class="error-text">{{ getError('plateNumber') }}</span>

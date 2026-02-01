@@ -70,14 +70,33 @@ function openEditForm(user: User) {
 }
 
 async function handleSubmit() {
-  toast.success(editingUser.value ? 'Kullanıcı güncellendi' : 'Kullanıcı oluşturuldu')
-  showForm.value = false
-  fetchUsers()
+  try {
+    if (editingUser.value) {
+      await usersApi.update(editingUser.value.id, {
+        fullName: formData.value.fullName,
+        email: formData.value.email,
+        role: formData.value.role
+      })
+      toast.success('Kullanıcı güncellendi')
+    } else {
+      await usersApi.create(formData.value)
+      toast.success('Kullanıcı oluşturuldu')
+    }
+    showForm.value = false
+    fetchUsers()
+  } catch (err) {
+    toast.apiError(err, 'İşlem başarısız')
+  }
 }
 
 async function toggleStatus(user: User) {
-  toast.success(user.active ? 'Kullanıcı devre dışı bırakıldı' : 'Kullanıcı aktifleştirildi')
-  user.active = !user.active
+  try {
+    await usersApi.toggleStatus(user.id)
+    toast.success(user.active ? 'Kullanıcı devre dışı bırakıldı' : 'Kullanıcı aktifleştirildi')
+    fetchUsers()
+  } catch (err) {
+    toast.apiError(err, 'İşlem başarısız')
+  }
 }
 
 function formatDate(date: string): string {
