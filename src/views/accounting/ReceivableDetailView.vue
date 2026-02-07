@@ -4,6 +4,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAccountingStore } from '@/stores'
 import { useToast } from '@/composables'
 import { ReceivableStatusBadge, PaymentModal } from '@/components/accounting'
+import PaymentProgress from '@/components/accounting/PaymentProgress.vue'
+import DueStatusBadge from '@/components/accounting/DueStatusBadge.vue'
 import { formatCurrency, formatDate } from '@/utils/format'
 import { useEnumTranslations } from '@/composables'
 import type { RecordPaymentRequest } from '@/types'
@@ -18,6 +20,24 @@ const showPaymentModal = ref(false)
 
 const receivable = computed(() => accountingStore.selectedReceivable)
 const loading = computed(() => accountingStore.receivablesLoading)
+
+const canMakePayment = computed(() => {
+  return receivable.value && 
+    receivable.value.status !== 'FULLY_PAID' && 
+    receivable.value.status !== 'CANCELLED' &&
+    receivable.value.status !== 'WRITTEN_OFF'
+})
+
+const canWriteOff = computed(() => {
+  return receivable.value && 
+    receivable.value.status === 'OVERDUE' &&
+    receivable.value.remainingAmount > 0
+})
+
+const canCancel = computed(() => {
+  return receivable.value && 
+    receivable.value.status === 'PENDING'
+})
 
 onMounted(() => {
   const id = Number(route.params.id)
@@ -35,6 +55,30 @@ const submitPayment = async (data: RecordPaymentRequest) => {
     showPaymentModal.value = false
   } catch (error: any) {
     toast.error(error.message || 'Ödeme kaydedilemedi')
+  }
+}
+
+const handleWriteOff = async () => {
+  if (!receivable.value) return
+  if (!confirm('Bu alacağı şüpheli alacak olarak işaretlemek istediğinize emin misiniz? Bu işlem geri alınamaz.')) return
+  
+  try {
+    await accountingStore.writeOffReceivable(receivable.value.id)
+    toast.success('Alacak şüpheli alacak olarak işaretlendi')
+  } catch (error: any) {
+    toast.error(error.message || 'İşlem başarısız oldu')
+  }
+}
+
+const handleCancel = async () => {
+  if (!receivable.value) return
+  if (!confirm('Bu alacağı iptal etmek istediğinize emin misiniz?')) return
+  
+  try {
+    await accountingStore.cancelReceivable(receivable.value.id)
+    toast.success('Alacak iptal edildi')
+  } catch (error: any) {
+    toast.error(error.message || 'İptal işlemi başarısız oldu')
   }
 }
 
@@ -57,7 +101,34 @@ const goBack = () => {
           <h1 class="detail-title">{{ receivable.receivableNumber }}</h1>
           <p class="detail-subtitle">{{ translateReceivableType(receivable.type) }}</p>
         </div>
-        <ReceivableStatusBadge :status="receivable.status" size="lg" />
+        <div class="header-actions">
+          <DueStatusBadge :due-date="receivable.dueDate" :status="receivable.status" />
+          <ReceivableStatusBadge :status="receivable.status" size="lg" />
+        </div>
+      </div>
+
+      <div class="action-buttons">
+        <button
+          v-if="canMakePayment"
+          class="btn btn-primary"
+          @click="showPaymentModal = true"
+        >
+          Ödeme Al
+        </button>
+        <button
+          v-if="canWriteOff"
+          class="btn btn-warning"
+          @click="handleWriteOff"
+        >
+          Şüpheli Alacak İşaretle
+        </button>
+        <button
+          v-if="canCancel"
+          class="btn btn-danger"
+          @click="handleCancel"
+        >
+          İptal Et
+        </button>
       </div>
 
       <div class="detail-grid">
@@ -80,6 +151,10 @@ const goBack = () => {
               <span class="label">Oluşturulma:</span>
               <span class="value">{{ formatDate(receivable.createdAt) }}</span>
             </div>
+            <div class="info-item">
+              <span class="label">Oluşturan:</span>
+              <span class="value">{{ receivable.createdBy }}</span>
+            </div>
           </div>
         </div>
 
@@ -88,25 +163,23 @@ const goBack = () => {
           <div class="amounts">
             <div class="amount-row">
               <span class="label">Toplam Tutar:</span>
-              <span class="value total">{{ formatCurrency(receivable.amount) }}</span>
+              <span class="value total">{{ formatCurrency(receivable.amount, receivable.currency) }}</span>
             </div>
             <div class="amount-row">
               <span class="label">Ödenen Tutar:</span>
-              <span class="value paid">{{ formatCurrency(receivable.paidAmount) }}</span>
+              <span class="value paid">{{ formatCurrency(receivable.paidAmount, receivable.currency) }}</span>
             </div>
             <div class="amount-row highlight">
               <span class="label">Kalan Tutar:</span>
-              <span class="value remaining">{{ formatCurrency(receivable.remainingAmount) }}</span>
+              <span class="value remaining">{{ formatCurrency(receivable.remainingAmount, receivable.currency) }}</span>
             </div>
           </div>
 
-          <button
-            v-if="receivable.status !== 'FULLY_PAID' && receivable.status !== 'CANCELLED'"
-            class="btn btn-primary"
-            @click="showPaymentModal = true"
-          >
-            Ödeme Al
-          </button>
+          <PaymentProgress 
+            :amount="receivable.amount"
+            :paid-amount="receivable.paidAmount"
+            :currency="receivable.currency"
+          />
         </div>
       </div>
     </div>
@@ -159,6 +232,18 @@ const goBack = () => {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+}
+
+.header-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
 .detail-title {
@@ -271,5 +356,34 @@ const goBack = () => {
 
 .btn-primary:hover {
   background: var(--color-primary-dark, #1d4ed8);
+}
+
+.btn-warning {
+  background: #f59e0b;
+  color: white;
+}
+
+.btn-warning:hover {
+  background: #d97706;
+}
+
+.btn-danger {
+  background: #ef4444;
+  color: white;
+}
+
+.btn-danger:hover {
+  background: #dc2626;
+}
+
+@media (max-width: 768px) {
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .header-actions {
+    flex-direction: column;
+    align-items: flex-end;
+  }
 }
 </style>

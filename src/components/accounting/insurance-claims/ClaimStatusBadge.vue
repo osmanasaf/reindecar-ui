@@ -2,7 +2,6 @@
 import { computed } from 'vue'
 import type { ClaimStatus } from '@/types'
 import { useEnumTranslations } from '@/composables'
-import { getClaimStatusColor } from '@/utils/accounting'
 
 interface Props {
   status: ClaimStatus
@@ -15,12 +14,59 @@ const props = withDefaults(defineProps<Props>(), {
 
 const { translateClaimStatus } = useEnumTranslations()
 
-const badgeColor = computed(() => getClaimStatusColor(props.status))
 const statusText = computed(() => translateClaimStatus(props.status))
+
+const statusColors = computed(() => {
+  const colors: Record<ClaimStatus, { bg: string; text: string; border: string }> = {
+    DRAFT: {
+      bg: '#F5F5F5',
+      text: '#757575',
+      border: '#BDBDBD'
+    },
+    SUBMITTED: {
+      bg: '#E3F2FD',
+      text: '#1565C0',
+      border: '#64B5F6'
+    },
+    UNDER_REVIEW: {
+      bg: '#FFF3E0',
+      text: '#E65100',
+      border: '#FFB74D'
+    },
+    APPROVED: {
+      bg: '#E8F5E9',
+      text: '#2E7D32',
+      border: '#81C784'
+    },
+    REJECTED: {
+      bg: '#FFEBEE',
+      text: '#C62828',
+      border: '#E57373'
+    },
+    PARTIAL_PAID: {
+      bg: '#E0F7FA',
+      text: '#00838F',
+      border: '#4DD0E1'
+    },
+    FULLY_PAID: {
+      bg: '#E8F5E9',
+      text: '#1B5E20',
+      border: '#4CAF50'
+    }
+  }
+  return colors[props.status] || colors.DRAFT
+})
 </script>
 
 <template>
-  <span :class="['badge', `badge-${size}`, `badge-${badgeColor}`]">
+  <span 
+    :class="['badge', `badge-${size}`]"
+    :style="{
+      backgroundColor: statusColors.bg,
+      color: statusColors.text,
+      borderColor: statusColors.border
+    }"
+  >
     {{ statusText }}
   </span>
 </template>
@@ -35,6 +81,7 @@ const statusText = computed(() => translateClaimStatus(props.status))
   font-size: 0.875rem;
   line-height: 1.25rem;
   white-space: nowrap;
+  border: 1px solid;
 }
 
 .badge-sm {
@@ -45,47 +92,5 @@ const statusText = computed(() => translateClaimStatus(props.status))
 .badge-lg {
   padding: 0.375rem 1rem;
   font-size: 1rem;
-}
-
-.badge-gray {
-  background-color: #f9fafb;
-  color: #374151;
-  border: 1px solid #e5e7eb;
-}
-
-.badge-blue {
-  background-color: #eff6ff;
-  color: #1e40af;
-  border: 1px solid #bfdbfe;
-}
-
-.badge-orange {
-  background-color: #fff7ed;
-  color: #c2410c;
-  border: 1px solid #fed7aa;
-}
-
-.badge-green {
-  background-color: #f0fdf4;
-  color: #15803d;
-  border: 1px solid #bbf7d0;
-}
-
-.badge-red {
-  background-color: #fef2f2;
-  color: #b91c1c;
-  border: 1px solid #fecaca;
-}
-
-.badge-teal {
-  background-color: #f0fdfa;
-  color: #115e59;
-  border: 1px solid #99f6e4;
-}
-
-.badge-darkgreen {
-  background-color: #f0fdf4;
-  color: #14532d;
-  border: 1px solid #bbf7d0;
 }
 </style>

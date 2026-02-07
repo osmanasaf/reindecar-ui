@@ -14,29 +14,47 @@ const emit = defineEmits<{
   edit: [id: number]
 }>()
 
-const { translateServiceType } = useEnumTranslations()
+const { translateServiceType, translateProviderType } = useEnumTranslations()
 
-const serviceTypesList = computed(() => 
-  props.provider.serviceTypes.map(t => translateServiceType(t)).join(', ')
-)
+const serviceTypesList = computed(() => {
+  if (!props.provider.serviceTypes || props.provider.serviceTypes.length === 0) {
+    return '-'
+  }
+  return props.provider.serviceTypes.map(t => translateServiceType(t)).join(', ')
+})
+
+const location = computed(() => {
+  const parts = [props.provider.district, props.provider.city].filter(Boolean)
+  return parts.length > 0 ? parts.join(', ') : null
+})
 </script>
 
 <template>
-  <div class="provider-card" @click="emit('click', provider.id)">
+  <div 
+    class="provider-card" 
+    :class="{ 'inactive': !provider.active }"
+    @click="emit('click', provider.id)"
+  >
     <div class="card-header">
       <div class="card-header-left">
         <h3 class="card-title">{{ provider.name }}</h3>
         <span class="card-code">{{ provider.code }}</span>
       </div>
-      <span :class="['status-badge', provider.active ? 'active' : 'inactive']">
-        {{ provider.active ? 'Aktif' : 'Pasif' }}
-      </span>
+      <div class="card-badges">
+        <span :class="['status-badge', provider.active ? 'active' : 'inactive']">
+          {{ provider.active ? 'Aktif' : 'Pasif' }}
+        </span>
+      </div>
+    </div>
+
+    <div class="type-row">
+      <span class="type-badge">{{ translateProviderType(provider.type) }}</span>
     </div>
 
     <div class="card-body">
-      <div class="info-row">
-        <span class="label">Hizmet Türleri:</span>
-        <span class="value">{{ serviceTypesList }}</span>
+      <div v-if="location" class="info-row">
+        <span class="label">Konum:</span>
+        <span class="value">{{ location }}</span>
       </div>
 
       <div v-if="provider.phone" class="info-row">
@@ -54,9 +72,9 @@ const serviceTypesList = computed(() =>
         <span class="value">{{ provider.contactPerson }}</span>
       </div>
 
-      <div v-if="provider.address" class="info-row">
-        <span class="label">Adres:</span>
-        <span class="value">{{ provider.address }}</span>
+      <div class="info-row services-row">
+        <span class="label">Hizmetler:</span>
+        <span class="value services">{{ serviceTypesList }}</span>
       </div>
     </div>
 
@@ -66,6 +84,12 @@ const serviceTypesList = computed(() =>
         @click.stop="emit('edit', provider.id)"
       >
         Düzenle
+      </button>
+      <button 
+        class="btn btn-primary" 
+        @click.stop="emit('click', provider.id)"
+      >
+        Detay
       </button>
     </div>
   </div>
@@ -86,11 +110,16 @@ const serviceTypesList = computed(() =>
   border-color: var(--color-primary, #2563eb);
 }
 
+.provider-card.inactive {
+  opacity: 0.7;
+  background: #f9fafb;
+}
+
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 1rem;
+  margin-bottom: 0.75rem;
 }
 
 .card-header-left {
@@ -107,15 +136,20 @@ const serviceTypesList = computed(() =>
 }
 
 .card-code {
-  font-size: 0.875rem;
+  font-size: 0.75rem;
   color: var(--color-text-secondary, #6b7280);
   font-family: monospace;
+}
+
+.card-badges {
+  display: flex;
+  gap: 0.5rem;
 }
 
 .status-badge {
   padding: 0.25rem 0.75rem;
   border-radius: 0.375rem;
-  font-size: 0.875rem;
+  font-size: 0.75rem;
   font-weight: 500;
 }
 
@@ -131,10 +165,25 @@ const serviceTypesList = computed(() =>
   border: 1px solid #e5e7eb;
 }
 
+.type-row {
+  margin-bottom: 1rem;
+}
+
+.type-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  background: #eff6ff;
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
+  border-radius: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
 .card-body {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.5rem;
 }
 
 .info-row {
@@ -155,13 +204,31 @@ const serviceTypesList = computed(() =>
   text-align: right;
 }
 
+.services-row {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--color-border, #e5e7eb);
+}
+
+.services-row .value.services {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary, #6b7280);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .card-footer {
   margin-top: 1rem;
   padding-top: 1rem;
   border-top: 1px solid var(--color-border, #e5e7eb);
+  display: flex;
+  gap: 0.75rem;
 }
 
 .btn {
+  flex: 1;
   padding: 0.5rem 1rem;
   border-radius: 0.375rem;
   font-size: 0.875rem;
@@ -179,5 +246,14 @@ const serviceTypesList = computed(() =>
 
 .btn-secondary:hover {
   background: var(--color-background-hover, #e5e7eb);
+}
+
+.btn-primary {
+  background: var(--color-primary, #2563eb);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: var(--color-primary-dark, #1d4ed8);
 }
 </style>

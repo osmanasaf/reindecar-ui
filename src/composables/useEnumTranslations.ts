@@ -1,7 +1,7 @@
-import { 
-  DamageType, 
-  DamageSeverity, 
-  DamageLocation, 
+import {
+  DamageType,
+  DamageSeverity,
+  DamageLocation,
   MaintenanceType,
   ReceivableType,
   ReceivableStatus,
@@ -9,8 +9,14 @@ import {
   PayableStatus,
   ClaimType,
   ClaimStatus,
+  ClaimDocumentType,
+  InsuranceType,
   ServiceType,
-  VehicleStatus
+  ProviderType,
+  VehicleStatus,
+  ViolationType,
+  PenaltyStatus,
+  PaymentMethod
 } from '@/types'
 
 export function useEnumTranslations() {
@@ -74,13 +80,14 @@ export function useEnumTranslations() {
     [MaintenanceType.OTHER]: 'Diğer'
   }
 
-  // Accounting translations
+
   const receivableTypes: Record<ReceivableType, string> = {
     [ReceivableType.RENTAL_FEE]: 'Kiralama Ücreti',
     [ReceivableType.EXTRA_KM_FEE]: 'Ekstra KM Ücreti',
     [ReceivableType.LATE_RETURN_FEE]: 'Geç Teslim Ücreti',
     [ReceivableType.DAMAGE_FEE]: 'Hasar Bedeli',
     [ReceivableType.INSURANCE_CLAIM]: 'Sigorta Tazminatı',
+    [ReceivableType.TRAFFIC_PENALTY]: 'Trafik Cezası',
     [ReceivableType.OTHER]: 'Diğer'
   }
 
@@ -140,6 +147,64 @@ export function useEnumTranslations() {
     [ServiceType.OTHER]: 'Diğer'
   }
 
+  const providerTypes: Record<ProviderType, string> = {
+    [ProviderType.REPAIR_SHOP]: 'Tamir Servisi',
+    [ProviderType.MAINTENANCE_CENTER]: 'Bakım Merkezi',
+    [ProviderType.PARTS_SUPPLIER]: 'Yedek Parça Tedarikçisi',
+    [ProviderType.INSURANCE_COMPANY]: 'Sigorta Şirketi',
+    [ProviderType.TOWING_SERVICE]: 'Çekici Hizmeti',
+    [ProviderType.CLEANING_SERVICE]: 'Temizlik Hizmeti',
+    [ProviderType.INSPECTION_CENTER]: 'Muayene İstasyonu',
+    [ProviderType.OTHER]: 'Diğer'
+  }
+
+  const insuranceTypes: Record<InsuranceType, string> = {
+    [InsuranceType.KASKO]: 'Kasko',
+    [InsuranceType.TRAFFIC]: 'Trafik Sigortası',
+    [InsuranceType.THIRD_PARTY]: 'İhtiyari Mali Mesuliyet',
+    [InsuranceType.OCCUPANT]: 'Ferdi Kaza / Yolcu',
+    [InsuranceType.OTHER]: 'Diğer'
+  }
+
+  const documentTypes: Record<ClaimDocumentType, string> = {
+    [ClaimDocumentType.DAMAGE_PHOTO]: 'Hasar Fotoğrafı',
+    [ClaimDocumentType.ACCIDENT_REPORT]: 'Kaza Raporu',
+    [ClaimDocumentType.POLICE_REPORT]: 'Polis Raporu',
+    [ClaimDocumentType.REPAIR_ESTIMATE]: 'Tamir Teklifi',
+    [ClaimDocumentType.INVOICE]: 'Fatura',
+    [ClaimDocumentType.OTHER]: 'Diğer'
+  }
+
+  const violationTypes: Record<ViolationType, string> = {
+    [ViolationType.SPEED]: 'Hız İhlali',
+    [ViolationType.RED_LIGHT]: 'Kırmızı Işık',
+    [ViolationType.PARKING]: 'Park İhlali',
+    [ViolationType.SEAT_BELT]: 'Emniyet Kemeri',
+    [ViolationType.PHONE_USAGE]: 'Telefon Kullanımı',
+    [ViolationType.HGS_OGS]: 'HGS/OGS Geçiş',
+    [ViolationType.BRIDGE_TOLL]: 'Köprü Geçiş Ücreti',
+    [ViolationType.HIGHWAY_TOLL]: 'Otoyol Geçiş Ücreti',
+    [ViolationType.OTHER]: 'Diğer'
+  }
+
+  const penaltyStatuses: Record<PenaltyStatus, string> = {
+    [PenaltyStatus.PENDING]: 'Beklemede',
+    [PenaltyStatus.NOTIFIED]: 'Müşteriye Bildirildi',
+    [PenaltyStatus.DISPUTED]: 'İtiraz Edildi',
+    [PenaltyStatus.PAID_BY_CUSTOMER]: 'Müşteri Ödedi',
+    [PenaltyStatus.PAID_BY_COMPANY]: 'Şirket Ödedi',
+    [PenaltyStatus.CANCELLED]: 'İptal Edildi',
+    [PenaltyStatus.WRITTEN_OFF]: 'Tahsil Edilemedi'
+  }
+
+  const paymentMethods: Record<PaymentMethod, string> = {
+    [PaymentMethod.CASH]: 'Nakit',
+    [PaymentMethod.CREDIT_CARD]: 'Kredi Kartı',
+    [PaymentMethod.BANK_TRANSFER]: 'Havale/EFT',
+    [PaymentMethod.DEBIT_CARD]: 'Banka Kartı',
+    [PaymentMethod.ONLINE]: 'Online Ödeme'
+  }
+
   const vehicleStatuses: Record<VehicleStatus, string> = {
     [VehicleStatus.AVAILABLE]: 'Müsait',
     [VehicleStatus.RESERVED]: 'Rezerve',
@@ -194,9 +259,33 @@ export function useEnumTranslations() {
     return serviceTypes[type as ServiceType] || type
   }
 
+  const translateProviderType = (type: string): string => {
+    return providerTypes[type as ProviderType] || type
+  }
+
   const translateVehicleStatus = (status: string | undefined | null): string => {
     if (!status) return 'Bilinmiyor'
     return vehicleStatuses[status as VehicleStatus] || status
+  }
+
+  const translateInsuranceType = (type: string): string => {
+    return insuranceTypes[type as InsuranceType] || type
+  }
+
+  const translateDocumentType = (type: string): string => {
+    return documentTypes[type as ClaimDocumentType] || type
+  }
+
+  const translateViolationType = (type: string): string => {
+    return violationTypes[type as ViolationType] || type
+  }
+
+  const translatePenaltyStatus = (status: string): string => {
+    return penaltyStatuses[status as PenaltyStatus] || status
+  }
+
+  const translatePaymentMethod = (method: string): string => {
+    return paymentMethods[method as PaymentMethod] || method
   }
 
   return {
@@ -211,7 +300,13 @@ export function useEnumTranslations() {
     translateClaimType,
     translateClaimStatus,
     translateServiceType,
+    translateProviderType,
     translateVehicleStatus,
+    translateInsuranceType,
+    translateDocumentType,
+    translateViolationType,
+    translatePenaltyStatus,
+    translatePaymentMethod,
     damageTypes,
     damageSeverities,
     damageLocations,
@@ -223,6 +318,12 @@ export function useEnumTranslations() {
     claimTypes,
     claimStatuses,
     serviceTypes,
+    providerTypes,
+    insuranceTypes,
+    documentTypes,
+    violationTypes,
+    penaltyStatuses,
+    paymentMethods,
     vehicleStatuses
   }
 }

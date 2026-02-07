@@ -16,7 +16,6 @@ async function handleExtend() {
     
     if (success) {
         dismissed.value = true
-        // 1 dakika sonra tekrar göster
         setTimeout(() => {
             dismissed.value = false
         }, 60000)
@@ -142,7 +141,7 @@ function handleLogout() {
     cursor: not-allowed;
 }
 
-/* Transition */
+
 .slide-down-enter-active,
 .slide-down-leave-active {
     transition: all 0.3s ease;

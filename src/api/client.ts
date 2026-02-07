@@ -2,6 +2,7 @@ import axios, { type AxiosInstance, type AxiosError, type InternalAxiosRequestCo
 import type { ApiError, ApiResponse, PaginatedResponse, PaginationParams, ErrorResponse } from '@/types'
 import { isTokenExpired } from '@/utils/jwt'
 import { generateTraceId, isErrorResponse, isAuthError } from '@/utils/error'
+import { useToast } from '@/composables/useToast'
 
 const API_URL = import.meta.env.VITE_API_URL || '/api/v1'
 
@@ -45,12 +46,11 @@ apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
     if (token && config.headers) {
         config.headers.Authorization = `Bearer ${token}`
     }
-    
-    // TraceId header ekleme (backend ile korelasyon için)
+
     if (config.headers) {
         config.headers['X-Trace-Id'] = generateTraceId()
     }
-    
+
     return config
 })
 
@@ -59,15 +59,12 @@ apiClient.interceptors.response.use(
     async (error: AxiosError<ErrorResponse | ApiError>) => {
         const originalRequest = error.config
 
-        // ErrorResponse formatında mı kontrol et
         const responseData = error.response?.data
         const isBackendError = responseData && isErrorResponse(responseData)
 
-        // Auth error handling - backend ErrorResponse formatında
         if (isBackendError && isAuthError(responseData)) {
             const errorCode = responseData.code
 
-            // A003: Token expired - refresh token dene
             if (errorCode === 'A003' && originalRequest) {
                 if (originalRequest.url?.includes('/auth/refresh')) {
                     tokenStorage.clearTokens()
@@ -106,18 +103,14 @@ apiClient.interceptors.response.use(
                 }
             }
 
-            // A001: Unauthorized - login'e yönlendir
             if (errorCode === 'A001') {
                 tokenStorage.clearTokens()
                 globalThis.location.href = '/login'
                 throw error
             }
 
-            // A002: Access denied - sadece reject et (component'te handle edilecek)
-            // A004: Weak password - sadece reject et (component'te handle edilecek)
         }
 
-        // Legacy 401 handling (backend ErrorResponse formatında değilse)
         if (error.response?.status === 401 && originalRequest && !isBackendError) {
             if (originalRequest.url?.includes('/auth/refresh')) {
                 tokenStorage.clearTokens()
@@ -156,7 +149,6 @@ apiClient.interceptors.response.use(
             }
         }
 
-        // Network error handling (no response)
         if (!error.response) {
             console.error('[API Client] Network error: No response received')
             const networkError: ErrorResponse = {
@@ -166,21 +158,28 @@ apiClient.interceptors.response.use(
                 path: originalRequest?.url || '',
                 traceId: 'network-error'
             }
+            const toast = useToast()
+            toast.error(networkError.message)
             throw networkError
         }
 
-        // Backend ErrorResponse formatında ise direkt reject et
         if (isBackendError) {
             console.error(`[${responseData.traceId}] Error ${responseData.code}: ${responseData.message}`)
+            if (!isAuthError(responseData)) {
+                const toast = useToast()
+                toast.error(responseData.message)
+            }
             throw responseData
         }
 
-        // Legacy ApiError formatı için backward compatibility
         const apiError: ApiError = responseData || {
             success: false,
             message: error.message || 'Network error',
             timestamp: new Date().toISOString()
         }
+
+        const toast = useToast()
+        toast.error(apiError.message || 'Bir hata oluştu')
 
         throw apiError
     }
@@ -201,6 +200,13 @@ export abstract class BaseApi {
 
     protected async post<T>(path = '', body?: unknown): Promise<T> {
         const { data } = await apiClient.post<ApiResponse<T>>(this.buildUrl(path), body)
+        return data.data
+    }
+
+    protected async postFormData<T>(formData: FormData, path = ''): Promise<T> {
+        const { data } = await apiClient.post<ApiResponse<T>>(this.buildUrl(path), formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        })
         return data.data
     }
 

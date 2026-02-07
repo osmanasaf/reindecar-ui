@@ -5,21 +5,23 @@ import type {
   ReceivableResponse,
   PayableResponse,
   InsuranceClaimResponse,
+  VehicleInsuranceResponse,
+  ClaimDocumentResponse,
   ServiceProviderResponse,
   RecordPaymentRequest,
   CreatePayableRequest,
   UpdatePayableRequest,
   CreateClaimRequest,
+  CreateVehicleInsuranceRequest,
   ApproveClaimRequest,
   RejectClaimRequest,
   CreateServiceProviderRequest,
   UpdateServiceProviderRequest,
   ReceivableFilters,
   PayableFilters,
-  ClaimFilters
+  ClaimFilters,
+  ClaimDocumentType
 } from '@/types'
-
-// ==================== Receivables API ====================
 
 class ReceivablesApiService extends BaseApi {
   protected readonly basePath = '/receivables'
@@ -57,8 +59,6 @@ class ReceivablesApiService extends BaseApi {
     return this.put(`/${id}/cancel`)
   }
 }
-
-// ==================== Payables API ====================
 
 class PayablesApiService extends BaseApi {
   protected readonly basePath = '/payables'
@@ -100,8 +100,6 @@ class PayablesApiService extends BaseApi {
     return this.put(`/${id}/cancel`)
   }
 }
-
-// ==================== Insurance Claims API ====================
 
 class InsuranceClaimsApiService extends BaseApi {
   protected readonly basePath = '/insurance-claims'
@@ -146,9 +144,30 @@ class InsuranceClaimsApiService extends BaseApi {
   async recordPayment(id: number, amount: number): Promise<InsuranceClaimResponse> {
     return this.post(`/${id}/payment`, { amount })
   }
-}
 
-// ==================== Service Providers API ====================
+  async uploadDocument(claimId: number, file: File, documentType: ClaimDocumentType): Promise<ClaimDocumentResponse> {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('documentType', documentType)
+    return this.postFormData(formData, `/${claimId}/documents`)
+  }
+
+  async getDocuments(claimId: number): Promise<ClaimDocumentResponse[]> {
+    return this.get(`/${claimId}/documents`)
+  }
+
+  async deleteDocument(claimId: number, documentId: number): Promise<void> {
+    return this.remove(`/${claimId}/documents/${documentId}`)
+  }
+
+  async downloadDocument(claimId: number, documentId: number): Promise<Blob> {
+    const response = await fetch(
+      `/api/v1/insurance-claims/${claimId}/documents/${documentId}/download`,
+      { headers: { 'Authorization': `Bearer ${localStorage.getItem('reindecar_access_token')}` } }
+    )
+    return response.blob()
+  }
+}
 
 class ServiceProvidersApiService extends BaseApi {
   protected readonly basePath = '/service-providers'
@@ -162,11 +181,15 @@ class ServiceProvidersApiService extends BaseApi {
   }
 
   async getAll(activeOnly = true): Promise<ServiceProviderResponse[]> {
-    return this.get('', { active: activeOnly })
+    return this.get(activeOnly ? '/active' : '')
   }
 
-  async getByType(serviceType: string): Promise<ServiceProviderResponse[]> {
-    return this.get(`/by-type/${serviceType}`)
+  async getByType(providerType: string): Promise<ServiceProviderResponse[]> {
+    return this.get(`/type/${providerType}`)
+  }
+
+  async search(query: string): Promise<ServiceProviderResponse[]> {
+    return this.get('/search', { q: query })
   }
 
   async update(id: number, request: UpdateServiceProviderRequest): Promise<ServiceProviderResponse> {
@@ -174,7 +197,7 @@ class ServiceProvidersApiService extends BaseApi {
   }
 
   async deactivate(id: number): Promise<void> {
-    return this.remove(`/${id}`)
+    return this.put(`/${id}/deactivate`)
   }
 
   async activate(id: number): Promise<ServiceProviderResponse> {
@@ -182,9 +205,28 @@ class ServiceProvidersApiService extends BaseApi {
   }
 }
 
-// ==================== Exports ====================
+class VehicleInsurancesApiService extends BaseApi {
+  protected readonly basePath = '/vehicle-insurances'
+
+  async getByVehicle(vehicleId: number): Promise<VehicleInsuranceResponse[]> {
+    return this.get(`/vehicle/${vehicleId}`)
+  }
+
+  async getAllByVehicle(vehicleId: number): Promise<VehicleInsuranceResponse[]> {
+    return this.get(`/vehicle/${vehicleId}/all`)
+  }
+
+  async create(request: CreateVehicleInsuranceRequest): Promise<VehicleInsuranceResponse> {
+    return this.post('', request)
+  }
+
+  async deactivate(id: number): Promise<void> {
+    return this.remove(`/${id}`)
+  }
+}
 
 export const receivablesApi = new ReceivablesApiService()
 export const payablesApi = new PayablesApiService()
 export const insuranceClaimsApi = new InsuranceClaimsApiService()
 export const serviceProvidersApi = new ServiceProvidersApiService()
+export const vehicleInsurancesApi = new VehicleInsurancesApiService()

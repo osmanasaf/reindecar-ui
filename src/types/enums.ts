@@ -1,4 +1,4 @@
-// Customer Types
+
 export enum CustomerType {
     PERSONAL = 'PERSONAL',
     COMPANY = 'COMPANY'
@@ -18,7 +18,7 @@ export enum CreditRating {
     BAD = 'BAD'
 }
 
-// Vehicle Types
+
 export enum VehicleStatus {
     AVAILABLE = 'AVAILABLE',
     RESERVED = 'RESERVED',
@@ -42,7 +42,7 @@ export enum Transmission {
     AUTOMATIC = 'AUTOMATIC'
 }
 
-// Rental Types
+
 export enum RentalStatus {
     DRAFT = 'DRAFT',
     RESERVED = 'RESERVED',
@@ -60,7 +60,7 @@ export enum RentalType {
     LEASING = 'LEASING'
 }
 
-// Payment Types
+
 export enum PaymentMethod {
     CASH = 'CASH',
     CREDIT_CARD = 'CREDIT_CARD',
@@ -76,13 +76,13 @@ export enum PaymentStatus {
     REFUNDED = 'REFUNDED'
 }
 
-// User Types
+
 export enum Role {
     ADMIN = 'ADMIN',
     OPERATOR = 'OPERATOR'
 }
 
-// Notification Types
+
 export enum NotificationPriority {
     LOW = 'LOW',
     MEDIUM = 'MEDIUM',
@@ -90,7 +90,7 @@ export enum NotificationPriority {
     URGENT = 'URGENT'
 }
 
-// Fuel Level
+
 export enum FuelLevel {
     EMPTY = 'EMPTY',
     QUARTER = 'QUARTER',
@@ -99,7 +99,7 @@ export enum FuelLevel {
     FULL = 'FULL'
 }
 
-// Invoice Status
+
 export enum InvoiceStatus {
     DRAFT = 'DRAFT',
     SENT = 'SENT',
@@ -108,14 +108,14 @@ export enum InvoiceStatus {
     CANCELLED = 'CANCELLED'
 }
 
-// KM Record Source
+
 export enum KmRecordSource {
     MANUAL = 'MANUAL',
     GPS = 'GPS',
     SERVICE = 'SERVICE'
 }
 
-// Pricing Types
+
 export enum DiscountType {
     PERCENTAGE = 'PERCENTAGE',
     FIXED_AMOUNT = 'FIXED_AMOUNT'
@@ -127,7 +127,7 @@ export enum CalculationType {
     PER_MONTH = 'PER_MONTH'
 }
 
-// Damage Types
+
 export enum DamageLocation {
     FRONT_BUMPER = 'FRONT_BUMPER',
     REAR_BUMPER = 'REAR_BUMPER',
@@ -186,4 +186,38 @@ export enum MaintenanceType {
     ELECTRICAL_REPAIR = 'ELECTRICAL_REPAIR',
     BODY_WORK = 'BODY_WORK',
     OTHER = 'OTHER'
+}
+
+
+export enum ViolationType {
+    SPEED = 'SPEED',
+    RED_LIGHT = 'RED_LIGHT',
+    PARKING = 'PARKING',
+    SEAT_BELT = 'SEAT_BELT',
+    PHONE_USAGE = 'PHONE_USAGE',
+    HGS_OGS = 'HGS_OGS',
+    BRIDGE_TOLL = 'BRIDGE_TOLL',
+    HIGHWAY_TOLL = 'HIGHWAY_TOLL',
+    OTHER = 'OTHER'
+}
+
+export enum PenaltyStatus {
+    PENDING = 'PENDING',
+    NOTIFIED = 'NOTIFIED',
+    DISPUTED = 'DISPUTED',
+    PAID_BY_CUSTOMER = 'PAID_BY_CUSTOMER',
+    PAID_BY_COMPANY = 'PAID_BY_COMPANY',
+    CANCELLED = 'CANCELLED',
+    WRITTEN_OFF = 'WRITTEN_OFF'
+}
+
+export enum PenaltySource {
+    MANUAL = 'MANUAL',
+    EXTERNAL = 'EXTERNAL'
+}
+
+export enum InstallmentPaymentStatus {
+    PENDING = 'PENDING',
+    PAID = 'PAID',
+    OVERDUE = 'OVERDUE'
 }

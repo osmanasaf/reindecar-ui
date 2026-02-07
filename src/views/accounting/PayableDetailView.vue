@@ -1,21 +1,64 @@
 <script setup lang="ts">
-import { onMounted, computed } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAccountingStore } from '@/stores'
-import { PayableStatusBadge } from '@/components/accounting'
+import { useToast, useEnumTranslations } from '@/composables'
+import { PayableStatusBadge, PaymentModal } from '@/components/accounting'
+import PaymentProgress from '@/components/accounting/PaymentProgress.vue'
+import DueStatusBadge from '@/components/accounting/DueStatusBadge.vue'
 import { formatCurrency, formatDate } from '@/utils/format'
+import type { RecordPaymentRequest } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
 const accountingStore = useAccountingStore()
+const toast = useToast()
+const { translatePayableType } = useEnumTranslations()
+
+const showPaymentModal = ref(false)
 
 const payable = computed(() => accountingStore.selectedPayable)
 const loading = computed(() => accountingStore.payablesLoading)
+
+const canMakePayment = computed(() => {
+  return payable.value && 
+    payable.value.status !== 'FULLY_PAID' && 
+    payable.value.status !== 'CANCELLED'
+})
+
+const canCancel = computed(() => {
+  return payable.value && 
+    payable.value.status === 'PENDING'
+})
 
 onMounted(() => {
   const id = Number(route.params.id)
   if (id) accountingStore.fetchPayableById(id)
 })
+
+const submitPayment = async (data: RecordPaymentRequest) => {
+  if (!payable.value) return
+  
+  try {
+    await accountingStore.recordPayablePayment(payable.value.id, data)
+    toast.success('Ödeme başarıyla kaydedildi')
+    showPaymentModal.value = false
+  } catch (error: any) {
+    toast.error(error.message || 'Ödeme kaydedilemedi')
+  }
+}
+
+const handleCancel = async () => {
+  if (!payable.value) return
+  if (!confirm('Bu borcun ödemesini iptal etmek istediğinize emin misiniz?')) return
+  
+  try {
+    await accountingStore.cancelPayable(payable.value.id)
+    toast.success('Borç iptal edildi')
+  } catch (error: any) {
+    toast.error(error.message || 'İptal işlemi başarısız oldu')
+  }
+}
 </script>
 
 <template>
@@ -29,9 +72,29 @@ onMounted(() => {
       <div class="detail-header">
         <div>
           <h1 class="detail-title">{{ payable.payableNumber }}</h1>
-          <p class="detail-subtitle">{{ payable.serviceProviderName }}</p>
+          <p class="detail-subtitle">{{ payable.serviceProviderName }} - {{ translatePayableType(payable.type) }}</p>
         </div>
-        <PayableStatusBadge :status="payable.status" size="lg" />
+        <div class="header-actions">
+          <DueStatusBadge :due-date="payable.dueDate" :status="payable.status" />
+          <PayableStatusBadge :status="payable.status" size="lg" />
+        </div>
+      </div>
+
+      <div class="action-buttons">
+        <button
+          v-if="canMakePayment"
+          class="btn btn-primary"
+          @click="showPaymentModal = true"
+        >
+          Ödeme Yap
+        </button>
+        <button
+          v-if="canCancel"
+          class="btn btn-danger"
+          @click="handleCancel"
+        >
+          İptal Et
+        </button>
       </div>
 
       <div class="detail-grid">
@@ -42,13 +105,25 @@ onMounted(() => {
               <span class="label">Açıklama:</span>
               <span class="value">{{ payable.description }}</span>
             </div>
-            <div class="info-item">
+            <div v-if="payable.invoiceNumber" class="info-item">
               <span class="label">Fatura No:</span>
-              <span class="value">{{ payable.invoiceNumber || '-' }}</span>
+              <span class="value">{{ payable.invoiceNumber }}</span>
+            </div>
+            <div v-if="payable.invoiceDate" class="info-item">
+              <span class="label">Fatura Tarihi:</span>
+              <span class="value">{{ formatDate(payable.invoiceDate) }}</span>
             </div>
             <div class="info-item">
               <span class="label">Vade Tarihi:</span>
               <span class="value">{{ formatDate(payable.dueDate) }}</span>
+            </div>
+            <div class="info-item">
+              <span class="label">Oluşturan:</span>
+              <span class="value">{{ payable.createdBy }}</span>
+            </div>
+            <div class="info-item">
+              <span class="label">Oluşturulma:</span>
+              <span class="value">{{ formatDate(payable.createdAt) }}</span>
             </div>
           </div>
         </div>
@@ -57,21 +132,36 @@ onMounted(() => {
           <h3 class="card-title">Tutar Bilgileri</h3>
           <div class="amounts">
             <div class="amount-row">
-              <span class="label">Toplam:</span>
-              <span class="value">{{ formatCurrency(payable.amount) }}</span>
+              <span class="label">Toplam Tutar:</span>
+              <span class="value total">{{ formatCurrency(payable.amount, payable.currency) }}</span>
             </div>
             <div class="amount-row">
-              <span class="label">Ödenen:</span>
-              <span class="value paid">{{ formatCurrency(payable.paidAmount) }}</span>
+              <span class="label">Ödenen Tutar:</span>
+              <span class="value paid">{{ formatCurrency(payable.paidAmount, payable.currency) }}</span>
             </div>
             <div class="amount-row highlight">
-              <span class="label">Kalan:</span>
-              <span class="value remaining">{{ formatCurrency(payable.remainingAmount) }}</span>
+              <span class="label">Kalan Tutar:</span>
+              <span class="value remaining">{{ formatCurrency(payable.remainingAmount, payable.currency) }}</span>
             </div>
           </div>
+
+          <PaymentProgress 
+            :amount="payable.amount"
+            :paid-amount="payable.paidAmount"
+            :currency="payable.currency"
+          />
         </div>
       </div>
     </div>
+
+    <PaymentModal
+      v-if="payable"
+      :show="showPaymentModal"
+      :remaining-amount="payable.remainingAmount"
+      :receivable-number="payable.payableNumber"
+      @close="showPaymentModal = false"
+      @submit="submitPayment"
+    />
   </div>
 </template>
 
@@ -101,6 +191,19 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+  margin-bottom: 2rem;
+}
+
+.header-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
   margin-bottom: 2rem;
 }
 
@@ -179,5 +282,44 @@ onMounted(() => {
   font-weight: 700;
   font-size: 1.125rem;
   color: #c2410c;
+}
+
+.btn {
+  padding: 0.75rem 1.25rem;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+}
+
+.btn-primary {
+  background: var(--color-primary, #2563eb);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: var(--color-primary-dark, #1d4ed8);
+}
+
+.btn-danger {
+  background: #ef4444;
+  color: white;
+}
+
+.btn-danger:hover {
+  background: #dc2626;
+}
+
+@media (max-width: 768px) {
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .header-actions {
+    flex-direction: column;
+    align-items: flex-end;
+  }
 }
 </style>

@@ -37,7 +37,7 @@ const allEvents = computed(() => {
   
   const events: TimelineEvent[] = []
   
-  // Rentals
+
   history.value.rentals.forEach(r => {
     events.push({
       id: `rental-${r.id}`,
@@ -51,7 +51,7 @@ const allEvents = computed(() => {
     })
   })
   
-  // Damages
+
   history.value.damages.forEach(d => {
     events.push({
       id: `damage-${d.id}`,
@@ -65,7 +65,7 @@ const allEvents = computed(() => {
     })
   })
   
-  // Maintenances
+
   history.value.maintenances.forEach(m => {
     events.push({
       id: `maintenance-${m.id}`,
@@ -79,7 +79,7 @@ const allEvents = computed(() => {
     })
   })
   
-  // Status Changes
+
   history.value.statusChanges.forEach(s => {
     events.push({
       id: `status-${s.id}`,

@@ -1,34 +1,31 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { tokenManager } from '@/services/tokenManager'
 
-/**
- * Token durumunu takip eden composable
- * UI'da session timeout uyarısı göstermek için kullanılabilir
- */
+
 export function useTokenStatus() {
     const timeToExpiry = ref(0)
     const isExpiringSoon = ref(false)
     const updateInterval = ref<ReturnType<typeof setInterval> | null>(null)
 
-    // 5 dakikadan az kaldıysa uyarı göster
+
     const WARNING_THRESHOLD = 300
 
     const formattedTimeToExpiry = computed(() => {
         if (timeToExpiry.value <= 0) return 'Oturum süresi doldu'
-        
+
         const minutes = Math.floor(timeToExpiry.value / 60)
         const seconds = timeToExpiry.value % 60
-        
+
         if (minutes > 60) {
             const hours = Math.floor(minutes / 60)
             const remainingMinutes = minutes % 60
             return `${hours} saat ${remainingMinutes} dakika`
         }
-        
+
         if (minutes > 0) {
             return `${minutes} dakika ${seconds} saniye`
         }
-        
+
         return `${seconds} saniye`
     })
 
@@ -48,7 +45,7 @@ export function useTokenStatus() {
 
     onMounted(() => {
         updateStatus()
-        // Her saniye güncelle
+
         updateInterval.value = setInterval(updateStatus, 1000)
     })
 

@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { branchesApi, vehiclesApi } from '@/api'
 import { useToast } from '@/composables'
+import { validators, validate, formatPhoneInput } from '@/utils/validation'
 import type { Branch } from '@/types'
 
 interface BranchWithCount extends Branch {
@@ -16,12 +17,17 @@ const editingBranch = ref<Branch | null>(null)
 const toast = useToast()
 
 const formData = ref({
+  code: '',
+  branchCode: '',
   name: '',
   address: '',
   city: '',
   phone: '',
   active: true
 })
+
+const formErrors = ref<Record<string, string>>({})
+const touchedFields = ref<Set<string>>(new Set())
 
 const activeBranches = computed(() => branches.value.filter(b => b.active))
 const inactiveBranches = computed(() => branches.value.filter(b => !b.active))
@@ -32,7 +38,7 @@ async function fetchBranches() {
     const response = await branchesApi.getAll()
     branches.value = response.content
     
-    // Her şube için araç sayısını çek
+    
     await fetchVehicleCounts()
   } catch {
     toast.error('Şubeler yüklenirken hata oluştu')
@@ -45,7 +51,7 @@ async function fetchVehicleCounts() {
   const promises = branches.value.map(async (branch) => {
     try {
       const response = await vehiclesApi.getByBranch(branch.id)
-      branch.vehicleCount = response.totalElements
+      branch.vehicleCount = Array.isArray(response) ? response.length : 0
     } catch {
       branch.vehicleCount = 0
     }
@@ -56,23 +62,98 @@ async function fetchVehicleCounts() {
 
 function openCreateForm() {
   editingBranch.value = null
-  formData.value = { name: '', address: '', city: '', phone: '', active: true }
+  formData.value = { code: '', branchCode: '', name: '', address: '', city: '', phone: '', active: true }
+  formErrors.value = {}
+  touchedFields.value = new Set()
   showForm.value = true
 }
 
 function openEditForm(branch: Branch) {
   editingBranch.value = branch
   formData.value = {
+    code: branch.code,
+    branchCode: branch.branchCode ?? '',
     name: branch.name,
     address: branch.address,
     city: branch.city,
     phone: branch.phone,
     active: branch.active
   }
+  formErrors.value = {}
+  touchedFields.value = new Set()
   showForm.value = true
 }
 
+function validateField(field: keyof typeof formData.value) {
+  const value = formData.value[field]
+  let rules: any[] = []
+
+  switch (field) {
+    case 'branchCode':
+      rules = [
+        validators.required('Şube kodu zorunludur'),
+        validators.alphanumeric('Sadece harf ve rakam kullanılabilir'),
+        validators.minLength(2, 'En az 2 karakter olmalıdır'),
+        validators.maxLength(10, 'En fazla 10 karakter olmalıdır')
+      ]
+      break
+    case 'name':
+      rules = [
+        validators.required('Şube adı zorunludur'),
+        validators.minLength(3, 'En az 3 karakter olmalıdır')
+      ]
+      break
+    case 'address':
+      rules = [validators.required('Adres zorunludur')]
+      break
+    case 'city':
+      rules = [validators.required('Şehir zorunludur')]
+      break
+    case 'phone':
+      rules = [
+        validators.required('Telefon zorunludur'),
+        validators.phone()
+      ]
+      break
+  }
+
+  const result = validate(value, rules)
+  if (result.valid) {
+    delete formErrors.value[field]
+  } else {
+    formErrors.value[field] = result.errors[0]
+  }
+}
+
+function handleBlur(field: keyof typeof formData.value) {
+  touchedFields.value.add(field)
+  validateField(field)
+}
+
+function handlePhoneInput(event: Event) {
+  const input = event.target as HTMLInputElement
+  const formatted = formatPhoneInput(input.value)
+  formData.value.phone = formatted
+  if (touchedFields.value.has('phone')) {
+    validateField('phone')
+  }
+}
+
+function validateForm(): boolean {
+  const fields: Array<keyof typeof formData.value> = ['branchCode', 'name', 'address', 'city', 'phone']
+  fields.forEach(field => {
+    touchedFields.value.add(field)
+    validateField(field)
+  })
+  return Object.keys(formErrors.value).length === 0
+}
+
 async function handleSubmit() {
+  if (!validateForm()) {
+    toast.error('Lütfen tüm alanları doğru doldurun')
+    return
+  }
+
   try {
     if (editingBranch.value) {
       await branchesApi.update(editingBranch.value.id, formData.value)
@@ -169,23 +250,78 @@ onMounted(fetchBranches)
         
         <form @submit.prevent="handleSubmit">
           <div class="form-group">
-            <label>Şube Adı</label>
-            <input v-model="formData.name" type="text" required />
+            <label>Şube Kodu <span class="required">*</span></label>
+            <input 
+              v-model="formData.branchCode" 
+              type="text" 
+              :class="{ 'error': touchedFields.has('branchCode') && formErrors.branchCode }"
+              @blur="handleBlur('branchCode')"
+              @input="touchedFields.has('branchCode') && validateField('branchCode')"
+              placeholder="Örn: IST01"
+            />
+            <span v-if="touchedFields.has('branchCode') && formErrors.branchCode" class="error-message">
+              {{ formErrors.branchCode }}
+            </span>
+          </div>
+
+          <div class="form-group">
+            <label>Şube Adı <span class="required">*</span></label>
+            <input 
+              v-model="formData.name" 
+              type="text" 
+              :class="{ 'error': touchedFields.has('name') && formErrors.name }"
+              @blur="handleBlur('name')"
+              @input="touchedFields.has('name') && validateField('name')"
+              placeholder="Örn: İstanbul Merkez"
+            />
+            <span v-if="touchedFields.has('name') && formErrors.name" class="error-message">
+              {{ formErrors.name }}
+            </span>
           </div>
           
           <div class="form-group">
-            <label>Adres</label>
-            <input v-model="formData.address" type="text" required />
+            <label>Adres <span class="required">*</span></label>
+            <input 
+              v-model="formData.address" 
+              type="text" 
+              :class="{ 'error': touchedFields.has('address') && formErrors.address }"
+              @blur="handleBlur('address')"
+              @input="touchedFields.has('address') && validateField('address')"
+              placeholder="Tam adres"
+            />
+            <span v-if="touchedFields.has('address') && formErrors.address" class="error-message">
+              {{ formErrors.address }}
+            </span>
           </div>
           
           <div class="form-group">
-            <label>Şehir</label>
-            <input v-model="formData.city" type="text" required />
+            <label>Şehir <span class="required">*</span></label>
+            <input 
+              v-model="formData.city" 
+              type="text" 
+              :class="{ 'error': touchedFields.has('city') && formErrors.city }"
+              @blur="handleBlur('city')"
+              @input="touchedFields.has('city') && validateField('city')"
+              placeholder="Örn: İstanbul"
+            />
+            <span v-if="touchedFields.has('city') && formErrors.city" class="error-message">
+              {{ formErrors.city }}
+            </span>
           </div>
           
           <div class="form-group">
-            <label>Telefon</label>
-            <input v-model="formData.phone" type="tel" required />
+            <label>Telefon <span class="required">*</span></label>
+            <input 
+              v-model="formData.phone" 
+              type="tel" 
+              :class="{ 'error': touchedFields.has('phone') && formErrors.phone }"
+              @blur="handleBlur('phone')"
+              @input="handlePhoneInput"
+              placeholder="(555) 123 45 67"
+            />
+            <span v-if="touchedFields.has('phone') && formErrors.phone" class="error-message">
+              {{ formErrors.phone }}
+            </span>
           </div>
 
           <div class="form-actions">
@@ -398,6 +534,28 @@ onMounted(fetchBranches)
   border: 1px solid var(--color-border);
   border-radius: 8px;
   font-size: 14px;
+  transition: border-color 0.2s;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.form-group input.error {
+  border-color: var(--color-danger);
+  background: var(--color-danger-light);
+}
+
+.required {
+  color: var(--color-danger);
+}
+
+.error-message {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--color-danger);
 }
 
 .form-actions {

@@ -232,7 +232,6 @@ onMounted(fetchCustomer)
           </div>
         </section>
 
-        <!-- Sürücüler Bölümü -->
         <section class="card drivers-card">
           <div class="card-header">
             <h2>Sürücüler</h2>
@@ -241,7 +240,6 @@ onMounted(fetchCustomer)
             </button>
           </div>
 
-          <!-- Yeni Sürücü Formu -->
           <div v-if="showDriverForm" class="driver-form">
             <div class="form-grid">
               <div class="form-group">
@@ -281,7 +279,6 @@ onMounted(fetchCustomer)
             </div>
           </div>
 
-          <!-- Sürücü Listesi -->
           <div v-if="loadingDrivers" class="loading-small">Yükleniyor...</div>
           <div v-else-if="drivers.length === 0" class="empty-state">
             Henüz kayıtlı sürücü yok
@@ -521,7 +518,6 @@ onMounted(fetchCustomer)
   color: var(--color-text-secondary);
 }
 
-/* Sürücüler */
 .drivers-card {
   grid-column: span 2;
 }

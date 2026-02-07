@@ -14,10 +14,14 @@ import type {
     InvoiceStatus,
     KmRecordSource,
     DiscountType,
-    CalculationType
+    CalculationType,
+    DamageType,
+    DamageLocation,
+    DamageSeverity,
+    MaintenanceType
 } from './enums'
 
-// User
+
 export interface User {
     id: number
     username: string
@@ -30,10 +34,11 @@ export interface User {
     createdAt: string
 }
 
-// Branch
+
 export interface Branch {
     id: number
     code: string
+    branchCode?: string
     name: string
     address: string
     city: string
@@ -43,11 +48,11 @@ export interface Branch {
     latitude?: number
     longitude?: number
     active: boolean
-    vehicleCount: number
+    vehicleCount?: number
     createdAt: string
 }
 
-// Vehicle Category
+
 export interface VehicleCategory {
     id: number
     name: string
@@ -56,7 +61,7 @@ export interface VehicleCategory {
     active: boolean
 }
 
-// Vehicle
+
 export interface Vehicle {
     id: number
     plateNumber: string
@@ -89,7 +94,7 @@ export interface Vehicle {
     createdAt: string
 }
 
-// Customer - Personal Info
+
 export interface PersonalInfo {
     nationalId: string
     firstName: string
@@ -100,7 +105,7 @@ export interface PersonalInfo {
     licenseExpiryDate: string
 }
 
-// Customer - Company Info
+
 export interface CompanyInfo {
     taxNumber: string
     companyName: string
@@ -109,7 +114,7 @@ export interface CompanyInfo {
     authorizedPersonPhone: string
 }
 
-// Customer
+
 export interface Customer {
     id: number
     publicId: string
@@ -126,10 +131,21 @@ export interface Customer {
     creditRating: CreditRating
     personalInfo?: PersonalInfo
     companyInfo?: CompanyInfo
+    nationalId?: string
+    birthDate?: string
+    licenseNumber?: string
+    licenseClass?: string
+    licenseExpiryDate?: string
+    taxNumber?: string
+    tradeRegistryNumber?: string
+    authorizedPersonName?: string
+    authorizedPersonPhone?: string
+    totalRentals?: number
+    activeRentals?: number
     createdAt: string
 }
 
-// Rental
+
 export interface Rental {
     id: number
     rentalNumber: string
@@ -170,7 +186,7 @@ export interface Rental {
     createdAt: string
 }
 
-// Payment
+
 export interface Payment {
     id: number
     rentalId: number
@@ -185,7 +201,7 @@ export interface Payment {
     createdAt: string
 }
 
-// Contract
+
 export interface Contract {
     id: number
     rentalId: number
@@ -196,7 +212,7 @@ export interface Contract {
     createdAt: string
 }
 
-// Notification
+
 export interface Notification {
     id: number
     userId: number
@@ -209,7 +225,7 @@ export interface Notification {
     createdAt: string
 }
 
-// Campaign
+
 export interface Campaign {
     id: number
     name: string
@@ -223,7 +239,7 @@ export interface Campaign {
     createdAt: string
 }
 
-// Season
+
 export interface Season {
     id: number
     name: string
@@ -233,7 +249,7 @@ export interface Season {
     active: boolean
 }
 
-// Leasing KM Record
+
 export interface LeasingKmRecord {
     id: number
     rentalId: number
@@ -244,7 +260,7 @@ export interface LeasingKmRecord {
     createdAt: string
 }
 
-// Leasing KM Summary
+
 export interface LeasingKmSummary {
     rentalId: number
     totalKmLimit: number
@@ -254,7 +270,7 @@ export interface LeasingKmSummary {
     projectedEndKm: number
 }
 
-// Leasing Invoice
+
 export interface LeasingInvoice {
     id: number
     invoiceNumber: string
@@ -271,7 +287,7 @@ export interface LeasingInvoice {
     createdAt: string
 }
 
-// Auth
+
 export interface AuthTokens {
     accessToken: string
     refreshToken: string
@@ -279,7 +295,7 @@ export interface AuthTokens {
     expiresIn: number
 }
 
-// Pricing Entities
+
 export interface CategoryPricing {
     id: number
     categoryId: number
@@ -390,7 +406,7 @@ export interface RentalDriver {
     addedAt: string
 }
 
-// Driver
+
 export interface Driver {
     id: number
     nationalId: string
@@ -407,7 +423,7 @@ export interface Driver {
     createdAt: string
 }
 
-// Damage Management
+
 export interface DamageReport {
     id: number
     vehicleId: number
@@ -488,7 +504,7 @@ export interface VehicleMaintenanceMap {
     maintenances: MaintenanceRecord[]
 }
 
-// Vehicle History
+
 export interface RentalHistoryItem {
     id: number
     rentalNumber: string

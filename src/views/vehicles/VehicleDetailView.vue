@@ -8,6 +8,9 @@ import VehicleEditModal from '@/components/vehicles/VehicleEditModal.vue'
 import VehicleDamageMap from '@/components/vehicles/VehicleDamageMap.vue'
 import VehicleMaintenanceMap from '@/components/vehicles/VehicleMaintenanceMap.vue'
 import VehicleHistory from '@/components/vehicles/VehicleHistory.vue'
+import VehicleInsuranceList from '@/components/vehicles/insurance/VehicleInsuranceList.vue'
+import CreateInsuranceModal from '@/components/vehicles/insurance/CreateInsuranceModal.vue'
+import VehiclePaymentDetails from '@/components/installments/VehiclePaymentDetails.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -16,9 +19,11 @@ const toast = useToast()
 const vehicle = ref<Vehicle | null>(null)
 const loading = ref(true)
 const showEditModal = ref(false)
-const activeTab = ref<'info' | 'history' | 'damages' | 'maintenance'>('info')
+const showCreateInsuranceModal = ref(false)
+const activeTab = ref<'info' | 'history' | 'damages' | 'maintenance' | 'insurance' | 'installments'>('info')
 const branchName = ref<string | null>(null)
 const categoryName = ref<string | null>(null)
+const insuranceListRef = ref<InstanceType<typeof VehicleInsuranceList> | null>(null)
 
 const vehicleId = computed(() => Number(route.params.id))
 
@@ -108,6 +113,12 @@ function handleVehicleSaved(updatedVehicle: Vehicle) {
   toast.success('Araç güncellendi')
 }
 
+const handleInsuranceCreated = () => {
+  showCreateInsuranceModal.value = false
+  insuranceListRef.value?.refresh()
+  toast.success('Sigorta poliçesi eklendi')
+}
+
 onMounted(fetchVehicle)
 </script>
 
@@ -155,6 +166,18 @@ onMounted(fetchVehicle)
           @click="activeTab = 'maintenance'"
         >
           Bakım Haritası
+        </button>
+        <button
+          :class="['tab', { active: activeTab === 'insurance' }]"
+          @click="activeTab = 'insurance'"
+        >
+          Sigorta Poliçeleri
+        </button>
+        <button
+          :class="['tab', { active: activeTab === 'installments' }]"
+          @click="activeTab = 'installments'"
+        >
+          Taksit Yönetimi
         </button>
       </div>
 
@@ -267,11 +290,30 @@ onMounted(fetchVehicle)
         <VehicleMaintenanceMap :vehicle-id="vehicleId" />
       </div>
 
+      <div v-else-if="activeTab === 'insurance'" class="tab-content">
+        <VehicleInsuranceList 
+          ref="insuranceListRef"
+          :vehicle-id="vehicleId" 
+          @create-new="showCreateInsuranceModal = true"
+        />
+      </div>
+
+      <div v-else-if="activeTab === 'installments'" class="tab-content">
+        <VehiclePaymentDetails :vehicle-id="vehicleId" />
+      </div>
+
       <VehicleEditModal
         :visible="showEditModal"
         :vehicle-id="vehicleId"
         @close="showEditModal = false"
         @saved="handleVehicleSaved"
+      />
+
+      <CreateInsuranceModal
+        :show="showCreateInsuranceModal"
+        :vehicle-id="vehicleId"
+        @close="showCreateInsuranceModal = false"
+        @success="handleInsuranceCreated"
       />
     </template>
   </div>

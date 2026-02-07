@@ -14,7 +14,7 @@ export const useAuthStore = defineStore('auth', () => {
     const isAdmin = computed(() => user.value?.role === 'ADMIN' as Role)
     const userFullName = computed(() => user.value?.fullName ?? '')
 
-    // Token event listeners
+
     function setupTokenListeners(): void {
         tokenManager.on('token:expired', handleTokenExpired)
         tokenManager.on('token:refreshed', handleTokenRefreshed)
@@ -30,7 +30,7 @@ export const useAuthStore = defineStore('auth', () => {
     function handleTokenExpired(): void {
         user.value = null
         tokenStatus.value = { isValid: false, timeToExpiry: -1 }
-        // Router redirect login sayfasına yönlendirecek
+
     }
 
     function handleTokenRefreshed(): void {
@@ -38,7 +38,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     function handleRefreshFailed(): void {
-        // Refresh başarısız olursa logout yap
+
         logout()
     }
 
@@ -54,12 +54,12 @@ export const useAuthStore = defineStore('auth', () => {
         try {
             const tokens = await authApi.login(credentials)
             tokenStorage.setTokens(tokens.accessToken, tokens.refreshToken)
-            
-            // Token manager'ı başlat
+
+
             setupTokenListeners()
             tokenManager.start()
             updateTokenStatus()
-            
+
             await fetchUser()
             return true
         } catch (e) {
@@ -96,15 +96,15 @@ export const useAuthStore = defineStore('auth', () => {
         }
 
         try {
-            // Token manager'ı başlat
+
             setupTokenListeners()
             tokenManager.start()
             updateTokenStatus()
 
-            // Token geçerli mi kontrol et
+
             const status = tokenManager.checkTokenStatus()
             if (!status.isValid) {
-                // Token expired, refresh dene
+
                 const refreshed = await tokenManager.refreshToken()
                 if (!refreshed) {
                     tokenStorage.clearTokens()
@@ -122,9 +122,7 @@ export const useAuthStore = defineStore('auth', () => {
         }
     }
 
-    /**
-     * Kullanıcı aktivitesi bildir - API çağrılarında kullanılabilir
-     */
+
     function notifyActivity(): void {
         tokenManager.notifyActivity()
     }
@@ -133,9 +131,7 @@ export const useAuthStore = defineStore('auth', () => {
         error.value = null
     }
 
-    /**
-     * Token'ın ne kadar süre sonra expire olacağını döner (saniye)
-     */
+
     function getTimeToExpiry(): number {
         return tokenStatus.value.timeToExpiry
     }

@@ -2,7 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { maintenancesApi } from '@/api'
 import { useToast } from '@/composables'
-import type { VehicleMaintenanceMap, MaintenanceRecord } from '@/types'
+import type { VehicleMaintenanceMap } from '@/types'
 import { MAINTENANCE_COLORS, ZONE_NAMES } from '@/utils/vehicleZones'
 import CarDiagramSVG from './CarDiagramSVG.vue'
 import CreateMaintenanceForm from './CreateMaintenanceForm.vue'
@@ -52,7 +52,7 @@ const lastMaintenanceDate = computed(() => {
   const sorted = [...maintenanceMap.value.maintenances].sort((a, b) => 
     new Date(b.maintenanceDate).getTime() - new Date(a.maintenanceDate).getTime()
   )
-  return sorted[0].maintenanceDate
+  return sorted[0]?.maintenanceDate || null
 })
 
 async function fetchMaintenanceMap() {
@@ -114,7 +114,7 @@ onMounted(() => {
     <div v-if="loading" class="loading">Yükleniyor...</div>
 
     <div v-else-if="maintenanceMap" class="map-content">
-      <!-- Özet İstatistikler -->
+
       <div class="stats-summary">
         <div class="stat-card">
           <div class="stat-icon maintenance-icon">🔧</div>

@@ -170,7 +170,6 @@ onMounted(fetchData)
     <div v-if="loading && !form.plateNumber" class="loading">Yükleniyor...</div>
 
     <form v-else class="form-container" @submit.prevent="handleSubmit">
-      <!-- Temel Bilgiler -->
       <section class="form-section">
         <h3>Temel Bilgiler</h3>
         <div class="form-grid">
@@ -245,8 +244,6 @@ onMounted(fetchData)
           </div>
         </div>
       </section>
-
-      <!-- Teknik Bilgiler -->
       <section class="form-section">
         <h3>Teknik Bilgiler</h3>
         <div class="form-grid">
@@ -305,8 +302,6 @@ onMounted(fetchData)
           </div>
         </div>
       </section>
-
-      <!-- Kategori ve Şube -->
       <section class="form-section">
         <h3>Kategori ve Şube</h3>
         <div class="form-grid">
@@ -333,8 +328,6 @@ onMounted(fetchData)
           </div>
         </div>
       </section>
-
-      <!-- Fiyatlandırma -->
       <section class="form-section">
         <h3>Fiyatlandırma</h3>
         <div class="form-grid">
@@ -376,8 +369,6 @@ onMounted(fetchData)
           </div>
         </div>
       </section>
-
-      <!-- Tarihler -->
       <section class="form-section">
         <h3>Tarihler</h3>
         <div class="form-grid">
@@ -412,8 +403,6 @@ onMounted(fetchData)
           </div>
         </div>
       </section>
-
-      <!-- Notlar -->
       <section class="form-section">
         <h3>Ek Bilgiler</h3>
         <div class="form-group full-width">
@@ -425,8 +414,6 @@ onMounted(fetchData)
           ></textarea>
         </div>
       </section>
-
-      <!-- Actions -->
       <div class="form-actions">
         <button type="button" class="btn btn-secondary" @click="router.back()">
           İptal

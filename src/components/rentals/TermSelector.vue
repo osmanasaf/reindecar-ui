@@ -54,6 +54,7 @@ function selectTerm(months: number) {
 }
 
 function getDiscountForTerm(months: number): TermDiscount | undefined {
+  if (!discounts.value || !Array.isArray(discounts.value)) return undefined
   return discounts.value.find(d => d.termMonths === months)
 }
 

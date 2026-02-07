@@ -100,7 +100,7 @@ const router = createRouter({
             component: () => import('@/views/settings/SettingsView.vue'),
             meta: { requiresAuth: true }
         },
-        // Accounting routes
+
         {
             path: '/accounting/receivables',
             name: 'receivables',
@@ -149,7 +149,24 @@ const router = createRouter({
             component: () => import('@/views/accounting/ServiceProviderDetailView.vue'),
             meta: { requiresAuth: true }
         },
-        // Fallback
+        {
+            path: '/installments/dashboard',
+            name: 'installments-dashboard',
+            component: () => import('@/views/installments/PaymentDashboardView.vue'),
+            meta: { requiresAuth: true }
+        },
+        {
+            path: '/penalties',
+            name: 'penalties',
+            component: () => import('@/views/penalties/PenaltyListView.vue'),
+            meta: { requiresAuth: true }
+        },
+        {
+            path: '/penalties/:id',
+            name: 'penalty-detail',
+            component: () => import('@/views/penalties/PenaltyDetailView.vue'),
+            meta: { requiresAuth: true }
+        },
         {
             path: '/:pathMatch(.*)*',
             redirect: '/'

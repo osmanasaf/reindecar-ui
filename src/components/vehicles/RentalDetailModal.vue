@@ -47,7 +47,7 @@ function formatCurrency(amount: number): string {
           </div>
 
           <div class="modal-body">
-            <!-- Gecikme Uyarısı -->
+
             <div v-if="rental.overdue" class="overdue-alert">
               ⚠️ Bu kiralama {{ rental.overdueDays }} gün gecikmiş durumda!
             </div>

@@ -11,36 +11,36 @@ const activeTab = ref('profile')
 const loading = ref(false)
 const settingsLoading = ref(false)
 
-// Profil formu - fullName'i firstName ve lastName'e ayır
+
 const profileForm = ref({
   firstName: '',
   lastName: '',
   email: authStore.user?.email || ''
 })
 
-// Şifre formu
+
 const passwordForm = ref({
   currentPassword: '',
   newPassword: '',
   confirmPassword: ''
 })
 
-// Bildirim ayarları
+
 const notificationSettings = ref({
   emailNotifications: true,
   smsNotifications: false,
   pushNotifications: false
 })
 
-// Sayfa yüklendiğinde mevcut ayarları çek
+
 onMounted(async () => {
-  // fullName'i firstName ve lastName'e ayır
+
   const fullName = authStore.user?.fullName || ''
   const nameParts = fullName.split(' ')
   profileForm.value.firstName = nameParts[0] || ''
   profileForm.value.lastName = nameParts.slice(1).join(' ') || ''
   
-  // Bildirim ayarlarını çek
+
   await fetchSettings()
 })
 
@@ -54,7 +54,7 @@ async function fetchSettings() {
       pushNotifications: settings.pushNotifications
     }
   } catch {
-    // Ayarlar yüklenemezse varsayılan değerlerle devam et
+
   } finally {
     settingsLoading.value = false
   }
@@ -69,7 +69,7 @@ async function handleProfileSave() {
       lastName: profileForm.value.lastName
     })
     
-    // Auth store'daki kullanıcı bilgisini güncelle
+
     await authStore.fetchUser()
     
     toast.success('Profil başarıyla güncellendi')

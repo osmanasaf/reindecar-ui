@@ -64,7 +64,6 @@ class CustomersApiService extends BaseApi {
         return this.remove(`/${id}`)
     }
 
-    // Driver endpoints
     async getDrivers(customerId: number, active?: boolean): Promise<Driver[]> {
         const params = active === undefined ? undefined : { active }
         const response = await this.get<PaginatedResponse<Driver> | Driver[]>(`/${customerId}/drivers`, params)

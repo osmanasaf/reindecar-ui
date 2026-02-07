@@ -1,18 +1,15 @@
 import { PaymentMethod } from './enums'
 
-// ==================== Enums ====================
-
-// Alacak Türleri
 export enum ReceivableType {
   RENTAL_FEE = 'RENTAL_FEE',
   EXTRA_KM_FEE = 'EXTRA_KM_FEE',
   LATE_RETURN_FEE = 'LATE_RETURN_FEE',
   DAMAGE_FEE = 'DAMAGE_FEE',
   INSURANCE_CLAIM = 'INSURANCE_CLAIM',
+  TRAFFIC_PENALTY = 'TRAFFIC_PENALTY',
   OTHER = 'OTHER'
 }
 
-// Alacak Durumları
 export enum ReceivableStatus {
   PENDING = 'PENDING',
   PARTIAL_PAID = 'PARTIAL_PAID',
@@ -22,7 +19,6 @@ export enum ReceivableStatus {
   WRITTEN_OFF = 'WRITTEN_OFF'
 }
 
-// Verecek Türleri
 export enum PayableType {
   REPAIR_COST = 'REPAIR_COST',
   MAINTENANCE_COST = 'MAINTENANCE_COST',
@@ -31,7 +27,6 @@ export enum PayableType {
   OTHER = 'OTHER'
 }
 
-// Verecek Durumları
 export enum PayableStatus {
   PENDING = 'PENDING',
   PARTIAL_PAID = 'PARTIAL_PAID',
@@ -40,7 +35,14 @@ export enum PayableStatus {
   CANCELLED = 'CANCELLED'
 }
 
-// Sigorta Başvuru Türleri
+export enum InsuranceType {
+  KASKO = 'KASKO',
+  TRAFFIC = 'TRAFFIC',
+  THIRD_PARTY = 'THIRD_PARTY',
+  OCCUPANT = 'OCCUPANT',
+  OTHER = 'OTHER'
+}
+
 export enum ClaimType {
   ACCIDENT = 'ACCIDENT',
   THEFT = 'THEFT',
@@ -50,7 +52,6 @@ export enum ClaimType {
   OTHER = 'OTHER'
 }
 
-// Sigorta Başvuru Durumları
 export enum ClaimStatus {
   DRAFT = 'DRAFT',
   SUBMITTED = 'SUBMITTED',
@@ -61,7 +62,6 @@ export enum ClaimStatus {
   FULLY_PAID = 'FULLY_PAID'
 }
 
-// Servis Türleri
 export enum ServiceType {
   REPAIR = 'REPAIR',
   PAINT = 'PAINT',
@@ -74,9 +74,26 @@ export enum ServiceType {
   OTHER = 'OTHER'
 }
 
-// ==================== Interfaces ====================
+export enum ProviderType {
+  REPAIR_SHOP = 'REPAIR_SHOP',
+  MAINTENANCE_CENTER = 'MAINTENANCE_CENTER',
+  PARTS_SUPPLIER = 'PARTS_SUPPLIER',
+  INSURANCE_COMPANY = 'INSURANCE_COMPANY',
+  TOWING_SERVICE = 'TOWING_SERVICE',
+  CLEANING_SERVICE = 'CLEANING_SERVICE',
+  INSPECTION_CENTER = 'INSPECTION_CENTER',
+  OTHER = 'OTHER'
+}
 
-// Alacak Response
+export enum ClaimDocumentType {
+  DAMAGE_PHOTO = 'DAMAGE_PHOTO',
+  ACCIDENT_REPORT = 'ACCIDENT_REPORT',
+  POLICE_REPORT = 'POLICE_REPORT',
+  REPAIR_ESTIMATE = 'REPAIR_ESTIMATE',
+  INVOICE = 'INVOICE',
+  OTHER = 'OTHER'
+}
+
 export interface ReceivableResponse {
   id: number
   receivableNumber: string
@@ -97,7 +114,6 @@ export interface ReceivableResponse {
   updatedAt: string
 }
 
-// Verecek Response
 export interface PayableResponse {
   id: number
   payableNumber: string
@@ -120,7 +136,6 @@ export interface PayableResponse {
   updatedAt: string
 }
 
-// Sigorta Tazminat Başvurusu Response
 export interface InsuranceClaimResponse {
   id: number
   claimNumber: string
@@ -145,27 +160,59 @@ export interface InsuranceClaimResponse {
   updatedAt: string
 }
 
-// Servis Sağlayıcı Response
+export interface VehicleInsuranceResponse {
+  id: number
+  vehicleId: number
+  insuranceType: InsuranceType
+  policyNumber: string | null
+  company: string | null
+  startDate: string
+  endDate: string
+  premium: number | null
+  premiumCurrency: string | null
+  coverage: number | null
+  coverageCurrency: string | null
+  contactPhone: string | null
+  notes: string | null
+  active: boolean
+  isExpired: boolean
+  isExpiringSoon: boolean
+  isValid: boolean
+  createdAt: string
+}
+
+export interface ClaimDocumentResponse {
+  id: number
+  claimId: number
+  documentType: ClaimDocumentType
+  fileName: string
+  filePath: string
+  uploadedAt: string
+  uploadedBy: string
+}
+
 export interface ServiceProviderResponse {
   id: number
   code: string
   name: string
+  type: ProviderType
   taxNumber?: string
   taxOffice?: string
   address?: string
+  city?: string
+  district?: string
   phone?: string
   email?: string
   contactPerson?: string
+  contactPhone?: string
   serviceTypes: ServiceType[]
   active: boolean
   notes?: string
+  createdBy: string
   createdAt: string
   updatedAt: string
 }
 
-// ==================== Form Types ====================
-
-// Ödeme Kaydetme Request
 export interface RecordPaymentRequest {
   amount: number
   paymentMethod: PaymentMethod
@@ -173,7 +220,6 @@ export interface RecordPaymentRequest {
   notes?: string
 }
 
-// Verecek Oluşturma Request
 export interface CreatePayableRequest {
   type: PayableType
   serviceProviderId: number
@@ -184,7 +230,6 @@ export interface CreatePayableRequest {
   dueDate?: string
 }
 
-// Verecek Güncelleme Request
 export interface UpdatePayableRequest {
   description?: string
   amount?: number
@@ -193,7 +238,6 @@ export interface UpdatePayableRequest {
   dueDate?: string
 }
 
-// Sigorta Başvurusu Oluşturma Request
 export interface CreateClaimRequest {
   vehicleInsuranceId: number
   damageReportId: number
@@ -205,45 +249,58 @@ export interface CreateClaimRequest {
   notes?: string
 }
 
-// Sigorta Başvurusu Onaylama Request
+export interface CreateVehicleInsuranceRequest {
+  vehicleId: number
+  insuranceType: InsuranceType
+  policyNumber?: string
+  company?: string
+  startDate: string
+  endDate: string
+  premium?: number
+  coverage?: number
+  contactPhone?: string
+  notes?: string
+}
+
 export interface ApproveClaimRequest {
   approvedAmount: number
 }
 
-// Sigorta Başvurusu Reddetme Request
 export interface RejectClaimRequest {
   reason: string
 }
 
-// Servis Sağlayıcı Oluşturma Request
 export interface CreateServiceProviderRequest {
-  code: string
   name: string
+  type: ProviderType
   taxNumber?: string
   taxOffice?: string
   address?: string
+  city?: string
+  district?: string
   phone?: string
   email?: string
   contactPerson?: string
-  serviceTypes: ServiceType[]
-  notes?: string
-}
-
-// Servis Sağlayıcı Güncelleme Request
-export interface UpdateServiceProviderRequest {
-  name?: string
-  taxNumber?: string
-  taxOffice?: string
-  address?: string
-  phone?: string
-  email?: string
-  contactPerson?: string
+  contactPhone?: string
   serviceTypes?: ServiceType[]
   notes?: string
-  active?: boolean
 }
 
-// ==================== Filter Types ====================
+export interface UpdateServiceProviderRequest {
+  name?: string
+  type?: ProviderType
+  taxNumber?: string
+  taxOffice?: string
+  address?: string
+  city?: string
+  district?: string
+  phone?: string
+  email?: string
+  contactPerson?: string
+  contactPhone?: string
+  serviceTypes?: ServiceType[]
+  notes?: string
+}
 
 export interface ReceivableFilters {
   customerId?: number

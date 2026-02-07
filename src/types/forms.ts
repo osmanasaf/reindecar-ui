@@ -1,13 +1,13 @@
 import type { RentalType, PaymentMethod, KmRecordSource, DiscountType, CalculationType, CustomerType, DamageType, DamageLocation, DamageSeverity, MaintenanceType } from './enums'
 
-// Auth Forms
+
 export interface LoginForm {
     username: string
     password: string
     remember?: boolean
 }
 
-// Customer Forms
+
 export interface CreatePersonalCustomerForm {
     nationalId: string
     firstName: string
@@ -45,7 +45,7 @@ export interface CreateCompanyCustomerForm {
     authorizedPersons: AuthorizedPerson[]
 }
 
-// Vehicle Forms
+
 export interface CreateVehicleForm {
     plateNumber: string
     vinNumber: string
@@ -96,7 +96,7 @@ export interface UpdateVehicleForm {
     notes?: string
 }
 
-// Rental Forms
+
 export interface CreateRentalForm {
     vehicleId: number
     customerId: number
@@ -135,7 +135,7 @@ export interface CreateDriverForm {
     primary?: boolean
 }
 
-// Damage Management Forms
+
 export interface CreateDamageReportForm {
     vehicleId: number
     rentalId?: number
@@ -188,7 +188,7 @@ export interface VehicleReturnForm {
     notes?: string
 }
 
-// Payment Forms
+
 export interface RecordPaymentForm {
     amount: number
     currency: string
@@ -197,20 +197,22 @@ export interface RecordPaymentForm {
     invoiceRef?: string
 }
 
-// Branch Forms
+
 export interface CreateBranchForm {
     code: string
+    branchCode?: string
     name: string
     address: string
     city: string
-    district: string
+    district?: string
     phone: string
-    email: string
+    email?: string
     latitude?: number
     longitude?: number
+    active?: boolean
 }
 
-// Campaign Forms
+
 export interface CreateCampaignForm {
     name: string
     description?: string
@@ -221,7 +223,7 @@ export interface CreateCampaignForm {
     categoryIds: number[]
 }
 
-// User Forms
+
 export interface CreateUserForm {
     username: string
     email: string
@@ -237,7 +239,7 @@ export interface ChangePasswordForm {
     confirmPassword: string
 }
 
-// Leasing Forms
+
 export interface RecordKmForm {
     currentKm: number
     recordDate: string
@@ -245,7 +247,7 @@ export interface RecordKmForm {
     notes?: string
 }
 
-// Price Calculation
+
 export interface CalculatePriceForm {
     vehicleId: number
     rentalType: RentalType
@@ -255,7 +257,7 @@ export interface CalculatePriceForm {
     campaignCode?: string
 }
 
-// Pricing Forms
+
 export interface CategoryPricingForm {
     categoryId: number | null
     dailyPrice: number | null

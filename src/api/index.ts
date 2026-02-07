@@ -8,23 +8,23 @@ export { damagesApi } from './damages.api'
 export { maintenancesApi } from './maintenances.api'
 export { rentalsApi, kmPackagesApi, leasingKmApi } from './rentals.api'
 export { branchesApi } from './branches.api'
-export { 
-    pricingApi, 
+export {
+    pricingApi,
     categoryPricingApi,
     vehiclePricingApi,
     termDiscountApi,
     extraItemTypeApi,
     rentalExtraItemApi,
-    leasingApi 
+    leasingApi
 } from './pricing.api'
-export type { 
+export type {
     PriceCalculationRequest,
     CategoryPricingRequest,
     VehiclePricingRequest,
     TermDiscountRequest,
     ExtraItemTypeRequest,
     RentalExtraItemRequest,
-    PriceCalculationResponse, 
+    PriceCalculationResponse,
     LeasingPlan,
     PriceBreakdownItem,
     KmPackageInfo
@@ -33,9 +33,12 @@ export { dashboardApi } from './dashboard.api'
 export type { DashboardStats, RevenueData, VehicleStatusData, UpcomingReturn, DashboardResponse } from './dashboard.api'
 export { usersApi } from './users.api'
 export type { UpdateProfileRequest, ChangePasswordRequest, UserSettings, UserResponse } from './users.api'
-export { 
+export {
     receivablesApi,
     payablesApi,
     insuranceClaimsApi,
-    serviceProvidersApi
+    serviceProvidersApi,
+    vehicleInsurancesApi
 } from './accounting.api'
+export { penaltiesApi } from './penalties.api'
+export { installmentsApi } from './installments.api'

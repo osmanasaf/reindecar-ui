@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useRoute, RouterView } from 'vue-router'
 import { AppLayout } from '@/components/layout'
 import SessionTimeoutWarning from '@/components/base/SessionTimeoutWarning.vue'
+import ToastContainer from '@/components/common/ToastContainer.vue'
 
 const route = useRoute()
 
@@ -12,6 +13,7 @@ const showLayout = computed(() => {
 </script>
 
 <template>
+  <ToastContainer />
   <SessionTimeoutWarning v-if="showLayout" />
   <AppLayout v-if="showLayout">
     <RouterView />

@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import type { CreateClaimRequest, ClaimType } from '@/types'
+import { ref, computed, watch } from 'vue'
+import { vehicleInsurancesApi } from '@/api'
+import type { CreateClaimRequest, ClaimType, VehicleInsuranceResponse } from '@/types'
 import { useForm, useToast } from '@/composables'
 
 interface Props {
@@ -19,6 +20,9 @@ const emit = defineEmits<{
 }>()
 
 const toast = useToast()
+
+const insurances = ref<VehicleInsuranceResponse[]>([])
+const loadingInsurances = ref(false)
 
 const claimTypes: { value: ClaimType; label: string }[] = [
   { value: 'ACCIDENT', label: 'Kaza' },
@@ -70,6 +74,28 @@ const { values, errors, touched, handleSubmit, validateField, reset } = useForm(
 
 const isSubmitting = ref(false)
 
+const selectedInsurance = computed(() => {
+  return insurances.value.find(ins => ins.id === values.vehicleInsuranceId)
+})
+
+const loadInsurances = async () => {
+  loadingInsurances.value = true
+  try {
+    const allInsurances = await vehicleInsurancesApi.getByVehicle(props.vehicleId)
+    insurances.value = allInsurances.filter(
+      ins => ins.insuranceType === 'KASKO' && ins.isValid
+    )
+    
+    if (insurances.value.length === 1 && !values.vehicleInsuranceId) {
+      values.vehicleInsuranceId = insurances.value[0].id
+    }
+  } catch (error: any) {
+    toast.error(error.message || 'Sigorta poliçeleri yüklenemedi')
+  } finally {
+    loadingInsurances.value = false
+  }
+}
+
 const onSubmit = handleSubmit(async (data) => {
   isSubmitting.value = true
   try {
@@ -86,6 +112,17 @@ const handleClose = () => {
   reset()
   emit('close')
 }
+
+watch(() => props.show, (newVal) => {
+  if (newVal) {
+    values.vehicleId = props.vehicleId
+    values.damageReportId = props.damageReportId
+    if (props.defaultAmount) {
+      values.claimedAmount = props.defaultAmount
+    }
+    loadInsurances()
+  }
+})
 </script>
 
 <template>
@@ -102,110 +139,132 @@ const handleClose = () => {
             Bu hasar için sigorta şirketine tazminat başvurusu yapabilirsiniz.
           </div>
 
-          <div class="form-group">
-            <label class="form-label">
-              Sigorta Poliçesi <span class="required">*</span>
-            </label>
-            <select
-              v-model.number="values.vehicleInsuranceId"
-              class="form-input"
-              :class="{ 'error': touched.vehicleInsuranceId && errors.vehicleInsuranceId }"
-              @blur="validateField('vehicleInsuranceId')"
-            >
-              <option :value="0">Seçiniz</option>
-              <!-- Insurance policies would be loaded here -->
-            </select>
-            <span v-if="touched.vehicleInsuranceId && errors.vehicleInsuranceId" class="error-text">
-              {{ errors.vehicleInsuranceId }}
-            </span>
+          <div v-if="loadingInsurances" class="loading-insurances">
+            Poliçeler yükleniyor...
           </div>
 
-          <div class="form-group">
-            <label class="form-label">
-              Başvuru Türü <span class="required">*</span>
-            </label>
-            <select
-              v-model="values.claimType"
-              class="form-input"
-              :class="{ 'error': touched.claimType && errors.claimType }"
-              @blur="validateField('claimType')"
-            >
-              <option value="">Seçiniz</option>
-              <option v-for="type in claimTypes" :key="type.value" :value="type.value">
-                {{ type.label }}
-              </option>
-            </select>
-            <span v-if="touched.claimType && errors.claimType" class="error-text">
-              {{ errors.claimType }}
-            </span>
+          <div v-else-if="insurances.length === 0" class="alert alert-warning">
+            Bu araç için aktif kasko poliçesi bulunamadı. Lütfen önce bir kasko poliçesi ekleyin.
           </div>
 
-          <div class="form-group">
-            <label class="form-label">
-              Olay Tarihi <span class="required">*</span>
-            </label>
-            <input
-              v-model="values.incidentDate"
-              type="date"
-              class="form-input"
-              :class="{ 'error': touched.incidentDate && errors.incidentDate }"
-              :max="new Date().toISOString().split('T')[0]"
-              @blur="validateField('incidentDate')"
-            />
-            <span v-if="touched.incidentDate && errors.incidentDate" class="error-text">
-              {{ errors.incidentDate }}
-            </span>
-          </div>
+          <template v-else>
+            <div class="form-group">
+              <label class="form-label">
+                Sigorta Poliçesi <span class="required">*</span>
+              </label>
+              <select
+                v-model.number="values.vehicleInsuranceId"
+                class="form-input"
+                :class="{ 'error': touched.vehicleInsuranceId && errors.vehicleInsuranceId }"
+                @blur="validateField('vehicleInsuranceId')"
+              >
+                <option :value="0">Seçiniz</option>
+                <option 
+                  v-for="insurance in insurances" 
+                  :key="insurance.id" 
+                  :value="insurance.id"
+                >
+                  {{ insurance.company }} - {{ insurance.policyNumber }}
+                  <template v-if="insurance.coverage">
+                    (Teminat: {{ insurance.coverage.toLocaleString('tr-TR') }} {{ insurance.coverageCurrency }})
+                  </template>
+                </option>
+              </select>
+              <span v-if="touched.vehicleInsuranceId && errors.vehicleInsuranceId" class="error-text">
+                {{ errors.vehicleInsuranceId }}
+              </span>
+              <span v-if="selectedInsurance && selectedInsurance.coverage" class="help-text">
+                Teminat Tutarı: {{ selectedInsurance.coverage.toLocaleString('tr-TR') }} {{ selectedInsurance.coverageCurrency }}
+              </span>
+            </div>
 
-          <div class="form-group">
-            <label class="form-label">
-              Talep Edilen Tutar (TL) <span class="required">*</span>
-            </label>
-            <input
-              v-model.number="values.claimedAmount"
-              type="number"
-              step="0.01"
-              class="form-input"
-              :class="{ 'error': touched.claimedAmount && errors.claimedAmount }"
-              placeholder="0.00"
-              @blur="validateField('claimedAmount')"
-            />
-            <span v-if="touched.claimedAmount && errors.claimedAmount" class="error-text">
-              {{ errors.claimedAmount }}
-            </span>
-          </div>
+            <div class="form-group">
+              <label class="form-label">
+                Başvuru Türü <span class="required">*</span>
+              </label>
+              <select
+                v-model="values.claimType"
+                class="form-input"
+                :class="{ 'error': touched.claimType && errors.claimType }"
+                @blur="validateField('claimType')"
+              >
+                <option value="">Seçiniz</option>
+                <option v-for="type in claimTypes" :key="type.value" :value="type.value">
+                  {{ type.label }}
+                </option>
+              </select>
+              <span v-if="touched.claimType && errors.claimType" class="error-text">
+                {{ errors.claimType }}
+              </span>
+            </div>
 
-          <div class="form-group">
-            <label class="form-label">Açıklama</label>
-            <textarea
-              v-model="values.description"
-              class="form-input"
-              :class="{ 'error': touched.description && errors.description }"
-              placeholder="Hasar detayları ve olay bilgileri"
-              rows="4"
-              maxlength="1000"
-              @blur="validateField('description')"
-            ></textarea>
-            <span v-if="touched.description && errors.description" class="error-text">
-              {{ errors.description }}
-            </span>
-          </div>
+            <div class="form-group">
+              <label class="form-label">
+                Olay Tarihi <span class="required">*</span>
+              </label>
+              <input
+                v-model="values.incidentDate"
+                type="date"
+                class="form-input"
+                :class="{ 'error': touched.incidentDate && errors.incidentDate }"
+                :max="new Date().toISOString().split('T')[0]"
+                @blur="validateField('incidentDate')"
+              />
+              <span v-if="touched.incidentDate && errors.incidentDate" class="error-text">
+                {{ errors.incidentDate }}
+              </span>
+            </div>
 
-          <div class="form-group">
-            <label class="form-label">Notlar</label>
-            <textarea
-              v-model="values.notes"
-              class="form-input"
-              :class="{ 'error': touched.notes && errors.notes }"
-              placeholder="Ek notlar"
-              rows="3"
-              maxlength="500"
-              @blur="validateField('notes')"
-            ></textarea>
-            <span v-if="touched.notes && errors.notes" class="error-text">
-              {{ errors.notes }}
-            </span>
-          </div>
+            <div class="form-group">
+              <label class="form-label">
+                Talep Edilen Tutar (TL) <span class="required">*</span>
+              </label>
+              <input
+                v-model.number="values.claimedAmount"
+                type="number"
+                step="0.01"
+                class="form-input"
+                :class="{ 'error': touched.claimedAmount && errors.claimedAmount }"
+                placeholder="0.00"
+                @blur="validateField('claimedAmount')"
+              />
+              <span v-if="touched.claimedAmount && errors.claimedAmount" class="error-text">
+                {{ errors.claimedAmount }}
+              </span>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Açıklama</label>
+              <textarea
+                v-model="values.description"
+                class="form-input"
+                :class="{ 'error': touched.description && errors.description }"
+                placeholder="Hasar detayları ve olay bilgileri"
+                rows="4"
+                maxlength="1000"
+                @blur="validateField('description')"
+              ></textarea>
+              <span v-if="touched.description && errors.description" class="error-text">
+                {{ errors.description }}
+              </span>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Notlar</label>
+              <textarea
+                v-model="values.notes"
+                class="form-input"
+                :class="{ 'error': touched.notes && errors.notes }"
+                placeholder="Ek notlar"
+                rows="3"
+                maxlength="500"
+                @blur="validateField('notes')"
+              ></textarea>
+              <span v-if="touched.notes && errors.notes" class="error-text">
+                {{ errors.notes }}
+              </span>
+            </div>
+          </template>
         </div>
 
         <div class="modal-footer">
@@ -299,6 +358,25 @@ const handleClose = () => {
   background: #eff6ff;
   color: #1e40af;
   border: 1px solid #bfdbfe;
+}
+
+.alert-warning {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+}
+
+.loading-insurances {
+  text-align: center;
+  padding: 1rem;
+  color: var(--color-text-secondary, #6b7280);
+  font-size: 0.875rem;
+}
+
+.help-text {
+  font-size: 0.75rem;
+  color: var(--color-primary, #2563eb);
+  font-weight: 500;
 }
 
 .form-group {

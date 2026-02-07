@@ -21,7 +21,7 @@ export function usePagination(options: PaginationOptions = {}) {
 
     function setSize(newSize: number) {
         size.value = newSize
-        page.value = 0 // Reset to first page
+        page.value = 0
     }
 
     function setSort(field: string, dir: 'asc' | 'desc' = 'asc') {

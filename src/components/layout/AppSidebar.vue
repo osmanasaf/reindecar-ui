@@ -31,6 +31,7 @@ const navItems: NavItem[] = [
       { name: 'service-providers', label: 'Servis Sağlayıcılar', icon: '🔧' }
     ]
   },
+  { name: 'installments-dashboard', label: 'Taksit Yönetimi', icon: '💳' },
   { name: 'branches', label: 'Şubeler', icon: '🏢' },
   { name: 'users', label: 'Kullanıcılar', icon: '👤' },
   { name: 'settings', label: 'Ayarlar', icon: '⚙️' }
@@ -57,7 +58,7 @@ const toggleMenu = (name: string) => {
   }
 }
 
-// Sayfa accounting altındaysa menüyü otomatik aç
+
 watch(() => route.path, (newPath) => {
   if (newPath.startsWith('/accounting')) {
     expandedMenus.value.add('accounting')
@@ -76,7 +77,7 @@ watch(() => route.path, (newPath) => {
 
     <nav class="sidebar-nav">
       <template v-for="item in navItems" :key="item.name">
-        <!-- Parent items with children -->
+
         <div v-if="item.children" class="nav-group">
           <div 
             class="nav-item nav-parent" 
@@ -101,7 +102,7 @@ watch(() => route.path, (newPath) => {
           </div>
         </div>
 
-        <!-- Regular items -->
+
         <RouterLink
           v-else
           :to="{ name: item.name }"

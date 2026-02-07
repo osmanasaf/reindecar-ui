@@ -77,15 +77,6 @@ const durationLabel = computed(() => {
   }
 })
 
-const totalDays = computed(() => {
-  if (!props.startDate || !props.endDate) return 0
-  const start = new Date(props.startDate)
-  const end = new Date(props.endDate)
-  const diff = end.getTime() - start.getTime()
-  // Math.ceil yerine Math.round kullanarak daha doğru hesaplama
-  // Başlangıç günü dahil, bitiş günü hariç olmak üzere
-  return Math.max(1, Math.floor(diff / (1000 * 60 * 60 * 24)))
-})
 
 const totalMonths = computed(() => {
   if (!props.startDate || !props.endDate) return 0
@@ -164,7 +155,7 @@ function isTotalItem(description: string): boolean {
 let calculateTimeout: ReturnType<typeof setTimeout> | null = null
 
 watch([() => props.vehicleId, () => props.startDate, () => props.endDate, () => props.rentalType, () => props.termMonths], () => {
-  // Debounce - çoklu tetiklenmeleri önle
+
   if (calculateTimeout) {
     clearTimeout(calculateTimeout)
   }

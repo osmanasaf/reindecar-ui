@@ -2,7 +2,6 @@
 import { computed } from 'vue'
 import type { PayableStatus } from '@/types'
 import { useEnumTranslations } from '@/composables'
-import { getPayableStatusColor } from '@/utils/accounting'
 
 interface Props {
   status: PayableStatus
@@ -15,12 +14,28 @@ const props = withDefaults(defineProps<Props>(), {
 
 const { translatePayableStatus } = useEnumTranslations()
 
-const badgeColor = computed(() => getPayableStatusColor(props.status))
 const statusText = computed(() => translatePayableStatus(props.status))
+
+const statusColors = computed(() => {
+  const colors: Record<PayableStatus, { bg: string; text: string }> = {
+    PENDING: { bg: '#fef3c7', text: '#92400e' },
+    PARTIAL_PAID: { bg: '#dbeafe', text: '#1e40af' },
+    FULLY_PAID: { bg: '#d1fae5', text: '#065f46' },
+    OVERDUE: { bg: '#fee2e2', text: '#991b1b' },
+    CANCELLED: { bg: '#f3f4f6', text: '#1f2937' }
+  }
+  return colors[props.status] || colors.PENDING
+})
 </script>
 
 <template>
-  <span :class="['badge', `badge-${size}`, `badge-${badgeColor}`]">
+  <span 
+    :class="['badge', `badge-${size}`]"
+    :style="{
+      backgroundColor: statusColors.bg,
+      color: statusColors.text
+    }"
+  >
     {{ statusText }}
   </span>
 </template>
@@ -45,35 +60,5 @@ const statusText = computed(() => translatePayableStatus(props.status))
 .badge-lg {
   padding: 0.375rem 1rem;
   font-size: 1rem;
-}
-
-.badge-orange {
-  background-color: #fff7ed;
-  color: #c2410c;
-  border: 1px solid #fed7aa;
-}
-
-.badge-blue {
-  background-color: #eff6ff;
-  color: #1e40af;
-  border: 1px solid #bfdbfe;
-}
-
-.badge-green {
-  background-color: #f0fdf4;
-  color: #15803d;
-  border: 1px solid #bbf7d0;
-}
-
-.badge-red {
-  background-color: #fef2f2;
-  color: #b91c1c;
-  border: 1px solid #fecaca;
-}
-
-.badge-gray {
-  background-color: #f9fafb;
-  color: #374151;
-  border: 1px solid #e5e7eb;
 }
 </style>

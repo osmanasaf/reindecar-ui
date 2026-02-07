@@ -16,15 +16,15 @@ const customerType = ref<CustomerType>(
 
 const loading = ref(false)
 
-// Form State
+
 const form = ref({
-  // Common
+
   phone: '',
   email: '',
   address: '',
   city: '',
   
-  // Personal
+
   firstName: '',
   lastName: '',
   nationalId: '',
@@ -33,7 +33,7 @@ const form = ref({
   licenseClass: '',
   licenseExpiryDate: '',
   
-  // Company
+
   companyName: '',
   taxNumber: '',
   taxOffice: '',
@@ -62,7 +62,7 @@ function syncInvoiceAddress() {
 
 const { validateForm, getError, hasError, touch, reset, isValid } = useValidation()
 
-// Dynamic Validation Rules
+
 const formRules = computed(() => {
   const common = {
     phone: { value: form.value.phone, rules: [rules.required(), rules.phone()] },
@@ -110,7 +110,7 @@ async function fetchCustomer() {
     const data = await customersApi.getById(Number(route.params.id))
     customerType.value = data.customerType
     
-    // Map API data to form
+
     const [first, ...last] = (data.displayName || '').split(' ')
     form.value = {
       phone: data.phone,
@@ -128,7 +128,7 @@ async function fetchCustomer() {
       
       companyName: data.displayName || '',
       taxNumber: data.taxNumber || '',
-      taxOffice: '', // API'de yoksa boş
+      taxOffice: '', 
       contactPersonName: data.authorizedPersonName || '',
       contactPersonPhone: data.authorizedPersonPhone || '',
       tradeRegistryNumber: data.tradeRegistryNumber || ''
@@ -207,7 +207,6 @@ async function handleSubmit() {
 
 function handleBlur(field: string) {
   touch(field)
-  // Re-validate single field logic could be added here if needed
 }
 
 onMounted(fetchCustomer)
@@ -225,7 +224,7 @@ watch(customerType, () => reset())
     </header>
 
     <div class="form-container">
-      <!-- Type Selection (Only in Create Mode) -->
+
       <div v-if="!isEditMode" class="type-selector">
         <button 
           :class="['type-btn', { active: customerType === 'PERSONAL' }]"
@@ -242,7 +241,7 @@ watch(customerType, () => reset())
       </div>
 
       <form @submit.prevent="handleSubmit" class="main-form">
-        <!-- Personal Fields -->
+
         <template v-if="customerType === 'PERSONAL'">
           <section class="form-section">
             <h3>Kişisel Bilgiler</h3>
@@ -297,7 +296,7 @@ watch(customerType, () => reset())
           </section>
         </template>
 
-        <!-- Company Fields -->
+
         <template v-else>
           <section class="form-section">
             <h3>Şirket Bilgileri</h3>
@@ -376,7 +375,7 @@ watch(customerType, () => reset())
           </section>
         </template>
 
-        <!-- Common Contact Info -->
+
         <section class="form-section">
           <h3>İletişim Bilgileri</h3>
           <div class="form-grid">
