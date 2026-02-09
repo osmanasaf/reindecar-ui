@@ -1,17 +1,15 @@
 import { BaseApi } from './client'
-import type {
-    CreateVehicleInstallmentRequest,
-    VehicleInstallmentResponse,
-    InstallmentPaymentResponse,
-    PaymentDashboardResponse,
-    VehiclePaymentDetailsResponse
-} from '@/types'
+import type { VehicleInstallmentResponse, CreateVehicleInstallmentRequest, CloseInstallmentEarlyForm } from '@/types'
 
 class InstallmentsApiService extends BaseApi {
     protected readonly basePath = '/vehicle-installments'
 
-    async createInstallment(vehicleId: number, data: CreateVehicleInstallmentRequest): Promise<VehicleInstallmentResponse> {
-        return this.post(`?vehicleId=${vehicleId}`, data)
+    async create(vehicleId: number, form: CreateVehicleInstallmentRequest): Promise<VehicleInstallmentResponse> {
+        return this.post(`?vehicleId=${vehicleId}`, form)
+    }
+
+    async createInstallment(vehicleId: number, form: CreateVehicleInstallmentRequest): Promise<VehicleInstallmentResponse> {
+        return this.create(vehicleId, form)
     }
 
     async getById(id: number): Promise<VehicleInstallmentResponse> {
@@ -22,19 +20,23 @@ class InstallmentsApiService extends BaseApi {
         return this.get(`/vehicle/${vehicleId}`)
     }
 
-    async deleteInstallment(id: number): Promise<void> {
+    async delete(id: number): Promise<void> {
         return this.remove(`/${id}`)
     }
 
-    async recordPayment(installmentId: number, paymentId: number): Promise<InstallmentPaymentResponse> {
+    async recordPayment(installmentId: number, paymentId: number): Promise<any> {
         return this.post(`/${installmentId}/payments/${paymentId}/record`)
     }
 
-    async getDashboard(): Promise<PaymentDashboardResponse> {
+    async closeEarly(id: number, form: CloseInstallmentEarlyForm): Promise<VehicleInstallmentResponse> {
+        return this.post(`/${id}/close-early`, form)
+    }
+
+    async getDashboard(): Promise<any> {
         return this.get('/dashboard')
     }
 
-    async getVehicleDetails(vehicleId: number): Promise<VehiclePaymentDetailsResponse> {
+    async getVehicleDetails(vehicleId: number): Promise<any> {
         return this.get(`/vehicles/${vehicleId}/details`)
     }
 }

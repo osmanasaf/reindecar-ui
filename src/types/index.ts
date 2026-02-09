@@ -17,3 +17,5 @@ export * from './accounting'
 export * from './penalties'
 
 export * from './installment'
+
+export * from './installment-early-close'

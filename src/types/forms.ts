@@ -115,6 +115,8 @@ export interface CreateRentalForm {
     contractSignerId?: number
     contractSignerName?: string
     extraItems?: any[]
+    discountAmount?: number
+    discountReason?: string
     notes?: string
 }
 
@@ -124,17 +126,27 @@ export interface AddRentalDriverForm {
 }
 
 export interface CreateDriverForm {
+    customerId?: number
     nationalId: string
     firstName: string
     lastName: string
+    phone: string
     licenseNumber: string
+    licenseClass: string
     licenseExpiryDate: string
-    licenseClass?: string
-    phone?: string
-    customerId?: number
     primary?: boolean
 }
 
+export interface UpdateDriverForm {
+    nationalId?: string
+    firstName?: string
+    lastName?: string
+    phone?: string
+    licenseNumber?: string
+    licenseClass?: string
+    licenseExpiryDate?: string
+    active?: boolean
+}
 
 export interface CreateDamageReportForm {
     vehicleId: number
@@ -151,8 +163,26 @@ export interface CreateDamageReportForm {
 
 export interface MarkDamageRepairedForm {
     repairedDate: string
-    repairCostAmount?: number
+    repairCostAmount: number
     repairCostCurrency?: string
+    // Service provider fields for payable creation
+    serviceProviderId?: number
+    invoiceNumber?: string
+    invoiceDate?: string
+    paymentDueDate?: string
+    // Customer charge field for receivable creation
+    chargeCustomer: boolean
+}
+
+export interface CompleteMaintenanceForm {
+    completionDate: string
+    costAmount: number
+    costCurrency?: string
+    // Service provider is required for maintenance
+    serviceProviderId: number
+    invoiceNumber?: string
+    invoiceDate?: string
+    paymentDueDate?: string
 }
 
 export interface CreateMaintenanceRecordForm {
@@ -175,6 +205,16 @@ export interface CreateKmPackageForm {
     extraKmPrice: number
     applicableTypes: RentalType[]
     unlimited?: boolean
+    categoryId?: number
+}
+
+export interface UpdateKmPackageForm {
+    name?: string
+    includedKm?: number
+    extraKmPrice?: number
+    applicableTypes?: RentalType[]
+    unlimited?: boolean
+    active?: boolean
     categoryId?: number
 }
 

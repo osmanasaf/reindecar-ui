@@ -156,6 +156,18 @@ const router = createRouter({
             meta: { requiresAuth: true }
         },
         {
+            path: '/installments/:id',
+            name: 'installment-detail',
+            component: () => import('@/views/installments/InstallmentDetailView.vue'),
+            meta: { requiresAuth: true }
+        },
+        {
+            path: '/km-packages',
+            name: 'km-packages',
+            component: () => import('@/views/pricing/KmPackageListView.vue'),
+            meta: { requiresAuth: true }
+        },
+        {
             path: '/penalties',
             name: 'penalties',
             component: () => import('@/views/penalties/PenaltyListView.vue'),

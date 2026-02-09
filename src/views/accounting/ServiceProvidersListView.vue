@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useAccountingStore } from '@/stores'
 import { useToast, useEnumTranslations } from '@/composables'
 import { ProviderType } from '@/types'
@@ -8,6 +8,7 @@ import type { ServiceProviderResponse, CreateServiceProviderRequest, UpdateServi
 import { ProviderCard, CreateProviderModal, EditProviderModal } from '@/components/accounting'
 
 const router = useRouter()
+const route = useRoute()
 const accountingStore = useAccountingStore()
 const toast = useToast()
 const { translateProviderType } = useEnumTranslations()
@@ -72,8 +73,11 @@ const stats = computed(() => {
   }
 })
 
-onMounted(() => {
-  loadProviders()
+onMounted(async () => {
+  await loadProviders()
+  if (route.query.create === '1') {
+    showCreateModal.value = true
+  }
 })
 
 const loadProviders = async () => {

@@ -4,6 +4,7 @@ import { useInstallmentStore } from '@/stores/installment.store'
 import { formatCurrency, calculateProgress } from '@/utils/installmentHelpers'
 import PaymentScheduleTable from './PaymentScheduleTable.vue'
 import InstallmentForm from './InstallmentForm.vue'
+import CloseInstallmentEarlyModal from './CloseInstallmentEarlyModal.vue'
 
 interface Props {
   vehicleId: number
@@ -14,6 +15,7 @@ const props = defineProps<Props>()
 const installmentStore = useInstallmentStore()
 const details = ref<any>(null)
 const showForm = ref(false)
+const showCloseModal = ref(false)
 
 const hasInstallment = computed(() => details.value?.hasInstallment ?? false)
 const installment = computed(() => details.value?.installment)
@@ -36,6 +38,11 @@ function handleFormSuccess(): void {
   showForm.value = false
   loadDetails()
 }
+
+function handleCloseSuccess(): void {
+  showCloseModal.value = false
+  loadDetails()
+}
 </script>
 
 <template>
@@ -49,7 +56,16 @@ function handleFormSuccess(): void {
 
     <template v-else-if="installment">
       <div class="installment-summary">
-        <h3>Taksit Özeti</h3>
+        <div class="header-row">
+            <h3>Taksit Özeti</h3>
+            <button 
+                v-if="installment.outstandingBalance > 0"
+                class="btn btn-outline-danger btn-sm"
+                @click="showCloseModal = true"
+            >
+                Erken Kapat
+            </button>
+        </div>
         <div class="summary-grid">
           <div class="summary-item">
             <span class="label">Toplam Tutar</span>
@@ -97,6 +113,14 @@ function handleFormSuccess(): void {
         <InstallmentForm :vehicle-id="vehicleId" @success="handleFormSuccess" @cancel="showForm = false" />
       </div>
     </div>
+
+    <CloseInstallmentEarlyModal
+        v-if="installment"
+        :installment="installment"
+        :visible="showCloseModal"
+        @close="showCloseModal = false"
+        @success="handleCloseSuccess"
+    />
   </div>
 </template>
 
@@ -128,9 +152,31 @@ function handleFormSuccess(): void {
 }
 
 .installment-summary h3 {
-  margin: 0 0 20px 0;
+  margin: 0;
   font-size: 16px;
   font-weight: 600;
+}
+
+.header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.btn-outline-danger {
+    background: transparent;
+    border: 1px solid var(--color-danger);
+    color: var(--color-danger);
+}
+
+.btn-outline-danger:hover {
+    background: var(--color-danger-light);
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 12px;
 }
 
 .summary-grid {

@@ -15,6 +15,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
   paymentRecorded: [paymentId: number]
+  viewInstallment: [installmentId: number]
 }>()
 
 const sortedPayments = computed(() => {
@@ -48,12 +49,22 @@ const sortedPayments = computed(() => {
             </td>
             <td>{{ formatDate(payment.paidDate) }}</td>
             <td>
-              <RecordPaymentButton
-                v-if="payment.status === 'PENDING'"
-                :installment-id="payment.installmentId"
-                :payment-id="payment.id"
-                @success="emit('paymentRecorded', payment.id)"
-              />
+              <div class="actions">
+                <button
+                  v-if="showVehicleInfo"
+                  type="button"
+                  class="btn-link"
+                  @click="emit('viewInstallment', payment.installmentId)"
+                >
+                  Detay
+                </button>
+                <RecordPaymentButton
+                  v-if="payment.status === 'PENDING'"
+                  :installment-id="payment.installmentId"
+                  :payment-id="payment.id"
+                  @success="emit('paymentRecorded', payment.id)"
+                />
+              </div>
             </td>
           </tr>
         </tbody>
@@ -135,6 +146,27 @@ const sortedPayments = computed(() => {
 .status-danger {
   background: var(--color-danger-light);
   color: var(--color-danger);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-link {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-primary);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.btn-link:hover {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
 }
 
 .empty-state {

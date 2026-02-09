@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { rentalsApi, vehiclesApi, customersApi, branchesApi } from '@/api'
+import { rentalsApi, vehiclesApi, customersApi, branchesApi, kmPackagesApi } from '@/api'
 import { useToast } from '@/composables'
-import type { Rental, RentalStatus, RentalType, Vehicle, Customer, Branch, RentalDriver } from '@/types'
+import type { Rental, RentalStatus, RentalType, Vehicle, Customer, Branch, RentalDriver, KmPackage } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -14,6 +14,8 @@ const vehicle = ref<Vehicle | null>(null)
 const customer = ref<Customer | null>(null)
 const branch = ref<Branch | null>(null)
 const returnBranch = ref<Branch | null>(null)
+
+const kmPackage = ref<KmPackage | null>(null)
 const drivers = ref<RentalDriver[]>([])
 const loading = ref(true)
 const generatingPdf = ref(false)
@@ -158,6 +160,14 @@ async function fetchRelatedData() {
     )
   } else if (rental.value.returnBranch) {
     returnBranch.value = rental.value.returnBranch
+  }
+
+  if (rental.value.kmPackageId) {
+    promises.push(
+      kmPackagesApi.getById(rental.value.kmPackageId)
+        .then(p => { kmPackage.value = p })
+        .catch(() => { kmPackage.value = null })
+    )
   }
 
   await Promise.all(promises)
@@ -659,6 +669,33 @@ onMounted(fetchRental)
                 <span class="value">{{ formatKm(rental.totalKm) }}</span>
               </div>
             </div>
+
+            <!-- KM Package Info -->
+            <div v-if="kmPackage || rental.customIncludedKm" class="km-package-info">
+                <div class="package-header">
+                    <h4>KM Paketi: {{ kmPackage?.name || 'Özel Paket' }}</h4>
+                </div>
+                <div class="package-details-grid">
+                    <div class="detail-item">
+                        <span class="label">Dahil Olan</span>
+                        <span class="value">{{ formatKm(rental.customIncludedKm || kmPackage?.includedKm || 0) }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="label">Aşım Ücreti</span>
+                        <span class="value">{{ formatCurrency(rental.customExtraKmPrice || kmPackage?.extraKmPrice || 0) }} / km</span>
+                    </div>
+                     <div class="detail-item">
+                        <span class="label">Kullanılan</span>
+                        <span class="value" :class="{ 'text-danger': (rental.totalKm > (rental.customIncludedKm || kmPackage?.includedKm || 0)) }">
+                            {{ formatKm(rental.totalKm) }}
+                        </span>
+                    </div>
+                     <div class="detail-item" v-if="rental.extraKmCharge > 0">
+                        <span class="label">Ceza Tutar</span>
+                        <span class="value text-danger">{{ formatCurrency(rental.extraKmCharge) }}</span>
+                    </div>
+                </div>
+            </div>
           </div>
 
           <div class="card">
@@ -798,8 +835,47 @@ onMounted(fetchRental)
 
 <style scoped>
 .rental-detail {
-  max-width: 1400px;
-  margin: 0 auto;
+    padding-bottom: 40px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.km-package-info {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid var(--color-border);
+}
+
+.package-header h4 {
+    margin: 0 0 10px 0;
+    font-size: 14px;
+    color: var(--color-primary);
+}
+
+.package-details-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+}
+
+.detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.detail-item .label {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+}
+
+.detail-item .value {
+    font-weight: 500;
+    font-size: 14px;
+}
+
+.text-danger {
+    color: #ef4444;
 }
 
 .loading-state {

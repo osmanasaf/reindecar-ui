@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { customersApi } from '@/api'
 import { useValidation, rules, useToast } from '@/composables'
+import { SearchableSelect } from '@/components/common'
 import type { CustomerType, CreatePersonalCustomerForm, CreateCompanyCustomerForm, AuthorizedPerson } from '@/types'
 
 const route = useRoute()
@@ -43,6 +44,16 @@ const form = ref({
 
 const authorizedPersons = ref<AuthorizedPerson[]>([{ firstName: '', lastName: '', nationalId: '', phone: '', email: '', title: '' }])
 const sameAsAddress = ref(true)
+
+const commonTitles = [
+  { value: 'Genel Müdür', label: 'Genel Müdür' },
+  { value: 'Müdür', label: 'Müdür' },
+  { value: 'Yönetici', label: 'Yönetici' },
+  { value: 'Mali Müşavir', label: 'Mali Müşavir' },
+  { value: 'İmza Yetkilisi', label: 'İmza Yetkilisi' },
+  { value: 'Muhasebe Müdürü', label: 'Muhasebe Müdürü' },
+  { value: 'İnsan Kaynakları Müdürü', label: 'İnsan Kaynakları Müdürü' }
+]
 
 function addAuthorizedPerson() {
   authorizedPersons.value.push({ firstName: '', lastName: '', nationalId: '', phone: '', email: '', title: '' })
@@ -368,7 +379,16 @@ watch(customerType, () => reset())
                 </div>
                 <div class="form-group">
                   <label>Ünvan</label>
-                  <input v-model="person.title" type="text" placeholder="Genel Müdür, Müdür..." />
+                  <SearchableSelect
+                    :model-value="person.title || null"
+                    :options="commonTitles"
+                    placeholder="Ünvan seçin veya yazın"
+                    search-placeholder="Ünvan ara..."
+                    createable
+                    clearable
+                    @update:model-value="(value) => person.title = value || ''"
+                    @create="(value) => person.title = value"
+                  />
                 </div>
               </div>
             </div>

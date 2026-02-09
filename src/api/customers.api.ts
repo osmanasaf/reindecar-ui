@@ -52,6 +52,10 @@ class CustomersApiService extends BaseApi {
         return this.post('/company', customer)
     }
 
+    async update(id: number, customer: CreatePersonalCustomerForm | CreateCompanyCustomerForm): Promise<Customer> {
+        return this.put(`/${id}`, customer)
+    }
+
     async addToBlacklist(id: number, reason: string): Promise<Customer> {
         return this.patch(`/${id}/blacklist`, { reason })
     }

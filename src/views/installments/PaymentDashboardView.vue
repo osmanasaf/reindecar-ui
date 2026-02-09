@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { onMounted, computed } from 'vue'
+import { onMounted, onBeforeUnmount, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { useInstallmentStore } from '@/stores/installment.store'
 import { formatCurrency } from '@/utils/installmentHelpers'
 import PaymentScheduleTable from '@/components/installments/PaymentScheduleTable.vue'
 
 const installmentStore = useInstallmentStore()
+const router = useRouter()
 
 onMounted(async () => {
   await installmentStore.fetchDashboard()
@@ -29,6 +31,10 @@ const upcomingPayments = computed(() => installmentStore.upcomingPayments)
 
 async function handlePaymentRecorded(): Promise<void> {
   await installmentStore.fetchDashboard()
+}
+
+function handleViewInstallment(installmentId: number): void {
+  router.push({ name: 'installment-detail', params: { id: installmentId } })
 }
 </script>
 
@@ -81,16 +87,16 @@ async function handlePaymentRecorded(): Promise<void> {
 
       <div class="upcoming-payments">
         <h2>Yaklaşan Ödemeler</h2>
-        <PaymentScheduleTable :payments="upcomingPayments" show-vehicle-info @payment-recorded="handlePaymentRecorded" />
+        <PaymentScheduleTable
+          :payments="upcomingPayments"
+          show-vehicle-info
+          @payment-recorded="handlePaymentRecorded"
+          @view-installment="handleViewInstallment"
+        />
       </div>
     </template>
   </div>
 </template>
-
-<script lang="ts">
-import { onBeforeUnmount } from 'vue'
-export default { name: 'PaymentDashboardView' }
-</script>
 
 <style scoped>
 .payment-dashboard {

@@ -227,31 +227,14 @@ watch(() => props.customerId, (newCustomerId) => {
           <div class="driver-details">
             <span v-if="driver.licenseNumber">Ehliyet: {{ driver.licenseNumber }}</span>
             <span v-if="driver.licenseClass"> | Sınıf: {{ driver.licenseClass }}</span>
-            <span v-if="driver.nationalId"> | TC: {{ driver.nationalId.substring(0, 3) }}***</span>
+          <span v-if="driver.nationalId"> | TC: {{ driver.nationalId.substring(0, 3) }}***</span>
           </div>
-        </div>
-        <div class="driver-actions">
-          <label
-            v-if="isDriverSelected(driver.id)"
-            class="primary-radio"
-            @click.stop
-          >
-            <input
-              type="radio"
-              :checked="primaryDriverId === driver.id"
-              @change="setPrimaryDriver(driver.id)"
-            />
-            <span>Ana Sürücü</span>
-          </label>
         </div>
       </div>
     </div>
 
     <div v-if="modelValue.length > 0" class="selection-summary">
       <span>{{ modelValue.length }} sürücü seçildi</span>
-      <span v-if="primaryDriverId" class="primary-info">
-        • Ana: {{ getDriverDisplayName(drivers.find(d => d.id === primaryDriverId)!) }}
-      </span>
     </div>
   </div>
 </template>

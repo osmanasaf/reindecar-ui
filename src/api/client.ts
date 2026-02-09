@@ -158,29 +158,26 @@ apiClient.interceptors.response.use(
                 path: originalRequest?.url || '',
                 traceId: 'network-error'
             }
+            // Only show toast for network errors (critical)
             const toast = useToast()
             toast.error(networkError.message)
             throw networkError
         }
 
+        // Backend error - log but don't show toast (components will handle)
         if (isBackendError) {
             console.error(`[${responseData.traceId}] Error ${responseData.code}: ${responseData.message}`)
-            if (!isAuthError(responseData)) {
-                const toast = useToast()
-                toast.error(responseData.message)
-            }
             throw responseData
         }
 
+        // Generic API error - log but don't show toast
         const apiError: ApiError = responseData || {
             success: false,
             message: error.message || 'Network error',
             timestamp: new Date().toISOString()
         }
 
-        const toast = useToast()
-        toast.error(apiError.message || 'Bir hata oluştu')
-
+        console.error('[API Client] Generic error:', apiError.message)
         throw apiError
     }
 )

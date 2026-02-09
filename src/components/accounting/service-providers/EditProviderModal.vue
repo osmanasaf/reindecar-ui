@@ -44,45 +44,49 @@ const getInitialValues = (): UpdateServiceProviderRequest => ({
   notes: props.provider?.notes || ''
 })
 
-const validationRules = {
-  name: (value: string | undefined) => {
-    if (!value) return 'Firma adı zorunludur'
-    if (value.length > 200) return 'Firma adı 200 karakterden uzun olamaz'
-    return ''
-  },
-  type: (value: string | undefined) => !value ? 'Sağlayıcı tipi zorunludur' : '',
-  taxNumber: (value: string | undefined) => {
-    if (value && value.length > 11) return 'Vergi numarası 11 karakterden uzun olamaz'
-    return ''
-  },
-  email: (value: string | undefined) => {
-    if (value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return 'Geçerli bir e-posta adresi giriniz'
-    return ''
-  }
-}
-
-const { values, errors, touched, handleSubmit, validateField, reset } = useForm(
-  getInitialValues(),
-  validationRules
-)
-
-const isSubmitting = ref(false)
 const selectedServiceTypes = ref<ServiceType[]>(props.provider?.serviceTypes || [])
 
-const onSubmit = handleSubmit(async (data) => {
-  if (!props.provider) return
+const validate = (data: UpdateServiceProviderRequest) => {
+  const formErrors: Partial<Record<keyof UpdateServiceProviderRequest, string>> = {}
 
-  isSubmitting.value = true
-  try {
+  if (!data.name) {
+    formErrors.name = 'Firma adi zorunludur'
+  } else if (data.name.length > 200) {
+    formErrors.name = 'Firma adi 200 karakterden uzun olamaz'
+  }
+
+  if (!data.type) {
+    formErrors.type = 'Saglayici tipi zorunludur'
+  }
+
+  if (data.taxNumber && data.taxNumber.length > 11) {
+    formErrors.taxNumber = 'Vergi numarasi 11 karakterden uzun olamaz'
+  }
+
+  if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+    formErrors.email = 'Gecerli bir e-posta adresi giriniz'
+  }
+
+  return formErrors
+}
+
+const { values, errors, touched, handleSubmit, validateField, reset, isSubmitting } = useForm<UpdateServiceProviderRequest>({
+  initialValues: getInitialValues(),
+  validate,
+  onSubmit: async (data) => {
+    if (!props.provider) return
+
     const request: UpdateServiceProviderRequest = {
       ...data,
       serviceTypes: selectedServiceTypes.value.length > 0 ? selectedServiceTypes.value : undefined
     }
     emit('submit', props.provider.id, request)
-  } finally {
-    isSubmitting.value = false
   }
 })
+
+const onSubmit = async () => {
+  await handleSubmit()
+}
 
 const handleClose = () => {
   reset()
@@ -540,3 +544,4 @@ textarea.form-input {
   }
 }
 </style>
+

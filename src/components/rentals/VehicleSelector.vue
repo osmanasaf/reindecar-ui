@@ -14,7 +14,7 @@ const props = defineProps<Props>()
 
 const emit = defineEmits<{
   'update:modelValue': [value: number | null]
-  'vehicle-selected': [vehicleId: number, categoryId: number]
+  'vehicle-selected': [vehicleId: number, categoryId: number, vehicle: Vehicle]
 }>()
 
 const loading = ref(false)
@@ -72,7 +72,7 @@ async function fetchCategories() {
 
 function selectVehicle(vehicle: Vehicle) {
   emit('update:modelValue', vehicle.id)
-  emit('vehicle-selected', vehicle.id, vehicle.categoryId)
+  emit('vehicle-selected', vehicle.id, vehicle.categoryId, vehicle)
 }
 
 function clearSelection() {

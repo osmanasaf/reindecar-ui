@@ -15,7 +15,7 @@ const emit = defineEmits<{
   submit: [data: CreateServiceProviderRequest]
 }>()
 
-const { providerTypes, serviceTypes, translateProviderType, translateServiceType } = useEnumTranslations()
+const { translateProviderType, translateServiceType } = useEnumTranslations()
 
 const providerTypeOptions = Object.values(ProviderType).map(value => ({
   value,
@@ -43,38 +43,40 @@ const initialValues: CreateServiceProviderRequest = {
   notes: ''
 }
 
-const validationRules = {
-  name: (value: string) => {
-    if (!value) return 'Firma adı zorunludur'
-    if (value.length > 200) return 'Firma adı 200 karakterden uzun olamaz'
-    return ''
-  },
-  type: (value: string) => !value ? 'Sağlayıcı tipi zorunludur' : '',
-  taxNumber: (value: string) => {
-    if (value && value.length > 11) return 'Vergi numarası 11 karakterden uzun olamaz'
-    return ''
-  },
-  email: (value: string) => {
-    if (value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return 'Geçerli bir e-posta adresi giriniz'
-    return ''
-  },
-  phone: (value: string) => {
-    if (value && value.length > 20) return 'Telefon numarası 20 karakterden uzun olamaz'
-    return ''
-  }
-}
-
-const { values, errors, touched, handleSubmit, validateField, reset } = useForm(
-  initialValues,
-  validationRules
-)
-
-const isSubmitting = ref(false)
 const selectedServiceTypes = ref<ServiceType[]>([])
 
-const onSubmit = handleSubmit(async (data) => {
-  isSubmitting.value = true
-  try {
+const validate = (data: CreateServiceProviderRequest) => {
+  const formErrors: Partial<Record<keyof CreateServiceProviderRequest, string>> = {}
+
+  if (!data.name) {
+    formErrors.name = 'Firma adi zorunludur'
+  } else if (data.name.length > 200) {
+    formErrors.name = 'Firma adi 200 karakterden uzun olamaz'
+  }
+
+  if (!data.type) {
+    formErrors.type = 'Saglayici tipi zorunludur'
+  }
+
+  if (data.taxNumber && data.taxNumber.length > 11) {
+    formErrors.taxNumber = 'Vergi numarasi 11 karakterden uzun olamaz'
+  }
+
+  if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+    formErrors.email = 'Gecerli bir e-posta adresi giriniz'
+  }
+
+  if (data.phone && data.phone.length > 20) {
+    formErrors.phone = 'Telefon numarasi 20 karakterden uzun olamaz'
+  }
+
+  return formErrors
+}
+
+const { values, errors, touched, handleSubmit, validateField, reset, isSubmitting } = useForm<CreateServiceProviderRequest>({
+  initialValues,
+  validate,
+  onSubmit: async (data) => {
     const request: CreateServiceProviderRequest = {
       ...data,
       serviceTypes: selectedServiceTypes.value.length > 0 ? selectedServiceTypes.value : undefined
@@ -82,10 +84,12 @@ const onSubmit = handleSubmit(async (data) => {
     emit('submit', request)
     reset()
     selectedServiceTypes.value = []
-  } finally {
-    isSubmitting.value = false
   }
 })
+
+const onSubmit = async () => {
+  await handleSubmit()
+}
 
 const handleClose = () => {
   reset()
@@ -538,3 +542,4 @@ textarea.form-input {
   }
 }
 </style>
+

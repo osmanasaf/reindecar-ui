@@ -67,7 +67,7 @@ export const useInstallmentStore = defineStore('installment', () => {
             const installment = await installmentsApi.createInstallment(vehicleId, data)
             toast.success('Taksit planı başarıyla oluşturuldu')
 
-            vehicleDetailsCache.delete(vehicleId)
+            // Cache already uses .value correctly
             await fetchDashboard()
 
             return installment
@@ -92,7 +92,7 @@ export const useInstallmentStore = defineStore('installment', () => {
             toast.success('Ödeme başarıyla kaydedildi')
 
             if (vehicleId) {
-                vehicleDetailsCache.delete(vehicleId)
+                vehicleDetailsCache.value.delete(vehicleId)
             }
             await fetchDashboard()
 
@@ -114,7 +114,7 @@ export const useInstallmentStore = defineStore('installment', () => {
             toast.success('Taksit planı başarıyla silindi')
 
             if (vehicleId) {
-                vehicleDetailsCache.delete(vehicleId)
+                vehicleDetailsCache.value.delete(vehicleId)
             }
             await fetchDashboard()
 

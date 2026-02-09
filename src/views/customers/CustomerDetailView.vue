@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { customersApi } from '@/api'
+import { customersApi, driversApi } from '@/api'
 import { useToast } from '@/composables'
-import type { Customer, CustomerType, Driver, CreateDriverForm } from '@/types'
+import type { Customer, CustomerType, Driver, CreateDriverForm, UpdateDriverForm } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -15,6 +15,9 @@ const drivers = ref<Driver[]>([])
 const loadingDrivers = ref(false)
 const showDriverForm = ref(false)
 const savingDriver = ref(false)
+const editingDriver = ref<Driver | null>(null)
+const showEditModal = ref(false)
+const updatingDriver = ref(false)
 
 const newDriver = ref<CreateDriverForm>({
   nationalId: '',
@@ -25,6 +28,8 @@ const newDriver = ref<CreateDriverForm>({
   licenseClass: '',
   phone: ''
 })
+
+const editDriverForm = ref<UpdateDriverForm>({})
 
 const customerId = computed(() => Number(route.params.id))
 
@@ -108,6 +113,110 @@ function maskId(id: string): string {
   return '***'
 }
 
+const showBlacklistModal = ref(false)
+const blacklistReason = ref('')
+const processingBlacklist = ref(false)
+
+async function handleBlacklist() {
+  showBlacklistModal.value = true
+  blacklistReason.value = ''
+}
+
+async function confirmBlacklist() {
+  if (!blacklistReason.value.trim()) {
+    toast.error('Lütfen kara listeye ekleme sebebini giriniz')
+    return
+  }
+
+  processingBlacklist.value = true
+  try {
+    await customersApi.addToBlacklist(customerId.value, blacklistReason.value)
+    toast.success('Müşteri kara listeye eklendi')
+    showBlacklistModal.value = false
+    await fetchCustomer()
+  } catch (err) {
+    toast.apiError(err, 'Kara listeye eklenemedi')
+  } finally {
+    processingBlacklist.value = false
+  }
+}
+
+async function handleUnblacklist() {
+  if (!confirm('Bu müşteriyi kara listeden çıkarmak istediğinize emin misiniz?')) {
+    return
+  }
+
+  processingBlacklist.value = true
+  try {
+    await customersApi.removeFromBlacklist(customerId.value)
+    toast.success('Müşteri kara listeden çıkarıldı')
+    await fetchCustomer()
+  } catch (err) {
+    toast.apiError(err, 'Kara listeden çıkarılamadı')
+  } finally {
+    processingBlacklist.value = false
+  }
+}
+
+function openEditModal(driver: Driver) {
+  editingDriver.value = driver
+  editDriverForm.value = {
+    firstName: driver.firstName,
+    lastName: driver.lastName,
+    nationalId: driver.nationalId,
+    phone: driver.phone,
+    licenseNumber: driver.licenseNumber,
+    licenseClass: driver.licenseClass,
+    licenseExpiryDate: driver.licenseExpiryDate,
+    active: driver.active
+  }
+  showEditModal.value = true
+}
+
+function closeEditModal() {
+  showEditModal.value = false
+  editingDriver.value = null
+  editDriverForm.value = {}
+}
+
+async function updateDriver() {
+  if (!editingDriver.value) return
+  
+  updatingDriver.value = true
+  try {
+    const updated = await driversApi.update(editingDriver.value.id, editDriverForm.value)
+    toast.success('Sürücü başarıyla güncellendi')
+    
+    // Update in list
+    const index = drivers.value.findIndex(d => d.id === editingDriver.value!.id)
+    if (index !== -1) {
+      drivers.value[index] = updated
+    }
+    
+    closeEditModal()
+  } catch (err) {
+    toast.apiError(err, 'Sürücü güncellenemedi')
+  } finally {
+    updatingDriver.value = false
+  }
+}
+
+async function confirmDeleteDriver(driver: Driver) {
+  if (!confirm(`${getDriverDisplayName(driver)} adlı sürücüyü silmek istediğinize emin misiniz?`)) {
+    return
+  }
+  
+  try {
+    await driversApi.delete(driver.id)
+    toast.success('Sürücü başarıyla silindi')
+    
+    // Remove from list
+    drivers.value = drivers.value.filter(d => d.id !== driver.id)
+  } catch (err) {
+    toast.apiError(err, 'Sürücü silinemedi')
+  }
+}
+
 onMounted(fetchCustomer)
 </script>
 
@@ -133,10 +242,20 @@ onMounted(fetchCustomer)
           </div>
         </div>
         <div class="header-actions">
-          <button v-if="customer.blacklisted" class="btn btn-success">
+          <button 
+            v-if="customer.blacklisted" 
+            class="btn btn-success"
+            :disabled="processingBlacklist"
+            @click="handleUnblacklist"
+          >
             ✓ Kara Listeden Çıkar
           </button>
-          <button v-else class="btn btn-danger">
+          <button 
+            v-else 
+            class="btn btn-danger"
+            :disabled="processingBlacklist"
+            @click="handleBlacklist"
+          >
             ⚠️ Kara Listeye Ekle
           </button>
           <button class="btn btn-outline" @click="router.push(`/customers/${customer.id}/edit`)">✏️ Düzenle</button>
@@ -293,20 +412,112 @@ onMounted(fetchCustomer)
                   <span v-if="!driver.active" class="badge-inactive">Pasif</span>
                 </div>
                 <div class="driver-details">
-                  TC: {{ driver.nationalId?.substring(0, 3) }}*** | 
-                  Ehliyet: {{ driver.licenseNumber || '-' }}
-                  <span v-if="driver.licenseClass"> | Sınıf: {{ driver.licenseClass }}</span>
+                  📞 {{ formatPhone(driver.phone || '') }} | 
+                  🪪 {{ driver.licenseNumber }} | 
+                  📅 {{ formatDate(driver.licenseExpiryDate) }}
                 </div>
               </div>
-              <div class="driver-expiry">
-                <span class="label">Ehliyet Bitiş</span>
-                <span class="value">{{ driver.licenseExpiryDate ? formatDate(driver.licenseExpiryDate) : '-' }}</span>
+              <div class="driver-actions">
+                <button class="btn-icon" @click="openEditModal(driver)" title="Düzenle">
+                  ✏️
+                </button>
+                <button class="btn-icon btn-danger" @click="confirmDeleteDriver(driver)" title="Sil">
+                  🗑️
+                </button>
               </div>
             </div>
           </div>
         </section>
+
+        <!-- Edit Driver Modal -->
+        <div v-if="showEditModal" class="modal-overlay" @click.self="closeEditModal">
+          <div class="modal">
+            <div class="modal-header">
+              <h3>Sürücü Düzenle</h3>
+              <button class="close-btn" @click="closeEditModal">×</button>
+            </div>
+            <div class="modal-body">
+              <div class="form-grid">
+                <div class="form-group">
+                  <label>Ad *</label>
+                  <input v-model="editDriverForm.firstName" type="text" placeholder="Ad" />
+                </div>
+                <div class="form-group">
+                  <label>Soyad *</label>
+                  <input v-model="editDriverForm.lastName" type="text" placeholder="Soyad" />
+                </div>
+                <div class="form-group">
+                  <label>TC Kimlik No *</label>
+                  <input v-model="editDriverForm.nationalId" type="text" maxlength="11" placeholder="11 haneli TC No" />
+                </div>
+                <div class="form-group">
+                  <label>Telefon</label>
+                  <input v-model="editDriverForm.phone" type="tel" placeholder="05XX..." />
+                </div>
+                <div class="form-group">
+                  <label>Ehliyet No *</label>
+                  <input v-model="editDriverForm.licenseNumber" type="text" placeholder="Ehliyet numarası" />
+                </div>
+                <div class="form-group">
+                  <label>Ehliyet Sınıfı</label>
+                  <input v-model="editDriverForm.licenseClass" type="text" placeholder="B" />
+                </div>
+                <div class="form-group full">
+                  <label>Ehliyet Geçerlilik Tarihi *</label>
+                  <input v-model="editDriverForm.licenseExpiryDate" type="date" />
+                </div>
+                <div class="form-group full">
+                  <label class="checkbox-label">
+                    <input v-model="editDriverForm.active" type="checkbox" />
+                    <span>Aktif</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div class="form-actions">
+              <button class="btn btn-outline" @click="closeEditModal">İptal</button>
+              <button class="btn btn-primary" :disabled="updatingDriver" @click="updateDriver">
+                {{ updatingDriver ? 'Güncelleniyor...' : 'Güncelle' }}
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </template>
+
+    <!-- Blacklist Modal -->
+    <div v-if="showBlacklistModal" class="modal-overlay" @click.self="showBlacklistModal = false">
+      <div class="modal">
+        <div class="modal-header">
+          <h3>Kara Listeye Ekle</h3>
+          <button class="close-btn" @click="showBlacklistModal = false">✕</button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-description">
+            <strong>{{ customer?.displayName }}</strong> adlı müşteriyi kara listeye eklemek istediğinize emin misiniz?
+          </p>
+          <div class="form-group">
+            <label>Sebep *</label>
+            <textarea 
+              v-model="blacklistReason" 
+              rows="4" 
+              placeholder="Kara listeye ekleme sebebini yazınız..."
+              autofocus
+            ></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" @click="showBlacklistModal = false">İptal</button>
+          <button 
+            class="btn btn-danger" 
+            :disabled="processingBlacklist || !blacklistReason.trim()"
+            @click="confirmBlacklist"
+          >
+            {{ processingBlacklist ? 'İşleniyor...' : 'Kara Listeye Ekle' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -653,6 +864,35 @@ onMounted(fetchCustomer)
 .driver-details {
   font-size: 13px;
   color: var(--color-text-secondary);
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.driver-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+.btn-icon {
+  background: none;
+  border: 1px solid var(--color-border);
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s;
+}
+
+.btn-icon:hover {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-primary);
+}
+
+.btn-icon.btn-danger:hover {
+  background: #fee;
+  border-color: var(--color-danger);
 }
 
 .badge-primary {
@@ -688,6 +928,88 @@ onMounted(fetchCustomer)
 .driver-expiry .value {
   font-size: 13px;
   font-weight: 500;
+}
+
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modal {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  max-width: 600px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 28px;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.close-btn:hover {
+  background: var(--color-bg-secondary);
+  color: var(--color-text);
+}
+
+.modal-body {
+  padding: 24px;
+}
+
+.modal-description {
+  margin: 0 0 20px 0;
+  color: var(--color-text-secondary);
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: auto;
+  cursor: pointer;
 }
 
 @media (max-width: 768px) {

@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { damagesApi } from '@/api'
+import { damagesApi, serviceProvidersApi } from '@/api'
 import { useToast } from '@/composables'
-import type { VehicleDamageMap } from '@/types'
+import type { VehicleDamageMap, DamageReport, MarkDamageRepairedForm } from '@/types'
 import { SEVERITY_COLORS, ZONE_NAMES } from '@/utils/vehicleZones'
 import CarDiagramSVG from './CarDiagramSVG.vue'
 import CreateDamageForm from './CreateDamageForm.vue'
+import CompletionModal from '@/components/CompletionModal.vue'
 
 const props = defineProps<{
   vehicleId: number
@@ -17,6 +18,9 @@ const loading = ref(false)
 const selectedZone = ref<number | undefined>(undefined)
 const showCreateForm = ref(false)
 const includeRepaired = ref(false)
+const showRepairModal = ref(false)
+const selectedDamage = ref<DamageReport | null>(null)
+const serviceProviders = ref<Array<{ id: number; name: string }>>([])
 
 const zoneConfigs = computed(() => {
   if (!damageMap.value) return {}
@@ -81,16 +85,46 @@ function clearSelection() {
   selectedZone.value = undefined
 }
 
-async function handleMarkRepaired(damageId: number) {
+async function openRepairModal(damage: DamageReport) {
+  selectedDamage.value = damage
+  showRepairModal.value = true
+  await fetchServiceProviders()
+}
+
+async function fetchServiceProviders() {
   try {
-    await damagesApi.markRepaired(damageId, {
-      repairedDate: new Date().toISOString().split('T')[0]
-    })
+    const providers = await serviceProvidersApi.getAll(true)
+    serviceProviders.value = providers.map(provider => ({
+      id: provider.id,
+      name: provider.name
+    }))
+  } catch (err) {
+    toast.apiError(err, 'Servis sağlayıcı listesi yüklenemedi')
+  }
+}
+
+function closeRepairModal() {
+  showRepairModal.value = false
+  selectedDamage.value = null
+}
+
+async function handleRepairSubmit(form: MarkDamageRepairedForm) {
+  if (!selectedDamage.value) return
+
+  try {
+    await damagesApi.markAsRepaired(selectedDamage.value.id, form)
     toast.success('Hasar onarıldı olarak işaretlendi')
-    fetchDamageMap()
+    closeRepairModal()
+    await fetchDamageMap()
   } catch (err) {
     toast.apiError(err, 'İşlem başarısız')
   }
+}
+
+async function handleMarkRepaired(damageId: number) {
+  const targetDamage = damageMap.value?.damages.find(d => d.id === damageId)
+  if (!targetDamage) return
+  await openRepairModal(targetDamage)
 }
 
 function handleDamageCreated() {
@@ -273,6 +307,19 @@ onMounted(() => {
       @close="showCreateForm = false"
       @created="handleDamageCreated"
     />
+
+    <teleport to="body">
+      <CompletionModal
+        :show="showRepairModal"
+        type="damage"
+        title="Hasar Onarımını Tamamla"
+        :estimated-cost="selectedDamage?.estimatedCostAmount ?? undefined"
+        :has-rental="Boolean(selectedDamage?.rentalId)"
+        :service-providers="serviceProviders"
+        @close="closeRepairModal"
+        @submit="handleRepairSubmit"
+      />
+    </teleport>
   </div>
 </template>
 
@@ -627,3 +674,4 @@ onMounted(() => {
   }
 }
 </style>
+

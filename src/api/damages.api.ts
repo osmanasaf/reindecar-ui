@@ -21,8 +21,12 @@ class DamagesApiService extends BaseApi {
         return this.put(`/${id}`, form)
     }
 
-    async markRepaired(id: number, form: MarkDamageRepairedForm): Promise<DamageReport> {
+    async markAsRepaired(id: number, form: MarkDamageRepairedForm): Promise<DamageReport> {
         return this.patch(`/${id}/repair`, form)
+    }
+
+    async markRepaired(id: number, form: MarkDamageRepairedForm): Promise<DamageReport> {
+        return this.markAsRepaired(id, form)
     }
 
     async getVehicleDamages(vehicleId: number): Promise<DamageReport[]> {

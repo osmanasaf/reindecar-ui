@@ -174,6 +174,8 @@ export interface Rental {
     endKm: number
     totalKm: number
     kmPackageId?: number
+    customIncludedKm?: number
+    customExtraKmPrice?: number
     dailyPrice: number
     totalPrice: number
     discountAmount: number

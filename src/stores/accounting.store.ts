@@ -97,8 +97,18 @@ export const useAccountingStore = defineStore('accounting', () => {
 
 
   const activeProviders = computed(() =>
-    serviceProviders.value.filter(p => p.active)
+    (Array.isArray(serviceProviders.value) ? serviceProviders.value : []).filter(p => p.active)
   )
+
+  function normalizeProviders(data: unknown): ServiceProviderResponse[] {
+    if (Array.isArray(data)) {
+      return data as ServiceProviderResponse[]
+    }
+    if (data && typeof data === 'object' && Array.isArray((data as any).content)) {
+      return (data as any).content as ServiceProviderResponse[]
+    }
+    return []
+  }
 
 
 
@@ -527,8 +537,9 @@ export const useAccountingStore = defineStore('accounting', () => {
     providersError.value = null
     try {
       const data = await serviceProvidersApi.getAll(activeOnly)
-      serviceProviders.value = data
-      return data
+      const normalized = normalizeProviders(data)
+      serviceProviders.value = normalized
+      return normalized
     } catch (error: any) {
       providersError.value = error.message || 'Servis sağlayıcılar yüklenirken hata oluştu'
       throw error
@@ -557,8 +568,9 @@ export const useAccountingStore = defineStore('accounting', () => {
     providersError.value = null
     try {
       const data = await serviceProvidersApi.getByType(providerType)
-      serviceProviders.value = data
-      return data
+      const normalized = normalizeProviders(data)
+      serviceProviders.value = normalized
+      return normalized
     } catch (error: any) {
       providersError.value = error.message || 'Servis sağlayıcılar yüklenirken hata oluştu'
       throw error
@@ -572,8 +584,9 @@ export const useAccountingStore = defineStore('accounting', () => {
     providersError.value = null
     try {
       const data = await serviceProvidersApi.search(query)
-      serviceProviders.value = data
-      return data
+      const normalized = normalizeProviders(data)
+      serviceProviders.value = normalized
+      return normalized
     } catch (error: any) {
       providersError.value = error.message || 'Servis sağlayıcılar aranırken hata oluştu'
       throw error
@@ -587,7 +600,8 @@ export const useAccountingStore = defineStore('accounting', () => {
     providersError.value = null
     try {
       const created = await serviceProvidersApi.create(request)
-      serviceProviders.value.unshift(created)
+      const currentProviders = normalizeProviders(serviceProviders.value)
+      serviceProviders.value = [created, ...currentProviders]
       return created
     } catch (error: any) {
       providersError.value = error.message || 'Servis sağlayıcı oluşturulurken hata oluştu'
@@ -602,11 +616,13 @@ export const useAccountingStore = defineStore('accounting', () => {
     providersError.value = null
     try {
       const updated = await serviceProvidersApi.update(id, request)
+      const currentProviders = normalizeProviders(serviceProviders.value)
 
-      const index = serviceProviders.value.findIndex(p => p.id === id)
+      const index = currentProviders.findIndex(p => p.id === id)
       if (index !== -1) {
-        serviceProviders.value[index] = updated
+        currentProviders[index] = updated
       }
+      serviceProviders.value = currentProviders
 
       if (selectedProvider.value?.id === id) {
         selectedProvider.value = updated
@@ -626,11 +642,13 @@ export const useAccountingStore = defineStore('accounting', () => {
     providersError.value = null
     try {
       await serviceProvidersApi.deactivate(id)
+      const currentProviders = normalizeProviders(serviceProviders.value)
 
-      const index = serviceProviders.value.findIndex(p => p.id === id)
+      const index = currentProviders.findIndex(p => p.id === id)
       if (index !== -1) {
-        serviceProviders.value[index].active = false
+        currentProviders[index].active = false
       }
+      serviceProviders.value = currentProviders
 
       if (selectedProvider.value?.id === id) {
         selectedProvider.value.active = false
@@ -648,11 +666,13 @@ export const useAccountingStore = defineStore('accounting', () => {
     providersError.value = null
     try {
       const updated = await serviceProvidersApi.activate(id)
+      const currentProviders = normalizeProviders(serviceProviders.value)
 
-      const index = serviceProviders.value.findIndex(p => p.id === id)
+      const index = currentProviders.findIndex(p => p.id === id)
       if (index !== -1) {
-        serviceProviders.value[index] = updated
+        currentProviders[index] = updated
       }
+      serviceProviders.value = currentProviders
 
       if (selectedProvider.value?.id === id) {
         selectedProvider.value = updated

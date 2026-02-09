@@ -1,10 +1,11 @@
+```
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { rentalsApi, branchesApi } from '@/api'
+import { rentalsApi, branchesApi, kmPackagesApi } from '@/api'
 import { useToast, useValidation } from '@/composables'
 import { RentalType, CustomerType } from '@/types'
-import type { Customer, CreateRentalForm, RentalExtraItem, Branch } from '@/types'
+import type { Customer, CreateRentalForm, RentalExtraItem, Branch, KmPackage, Vehicle } from '@/types'
 import type { PriceCalculationResponse } from '@/api'
 import VehicleSelector from '@/components/rentals/VehicleSelector.vue'
 import CustomerSelector from '@/components/rentals/CustomerSelector.vue'
@@ -22,6 +23,7 @@ const currentStep = ref(1)
 const totalSteps = 6
 const submitting = ref(false)
 const branches = ref<Branch[]>([])
+const kmPackages = ref<KmPackage[]>([])
 
 const rentalType = ref<RentalType>(RentalType.DAILY)
 const selectedVehicleId = ref<number | null>(null)
@@ -33,8 +35,11 @@ const startDate = ref('')
 const endDate = ref('')
 const selectedTermMonths = ref<number>(12)
 const selectedLeasingPlanId = ref<number | null>(null)
+const selectedKmPackageId = ref<number | null>(null)
 const extraItems = ref<RentalExtraItem[]>([])
 const extraItemsTotal = ref(0)
+const discountAmount = ref(0)
+const discountReason = ref('')
 const priceData = ref<PriceCalculationResponse | null>(null)
 const showQuickCustomerModal = ref(false)
 const selectedBranchId = ref<number | null>(null)
@@ -52,9 +57,12 @@ const rentalTypes: { value: RentalType; label: string; description: string; minD
 async function fetchBranches() {
   try {
     branches.value = await branchesApi.getActive()
-    if (branches.value.length > 0) {
-      selectedBranchId.value = branches.value[0].id
-      selectedReturnBranchId.value = branches.value[0].id
+    if (branches.value && branches.value.length > 0) {
+      const firstBranch = branches.value[0]
+      if (firstBranch) {
+        selectedBranchId.value = firstBranch.id
+        selectedReturnBranchId.value = firstBranch.id
+      }
     } else {
       toast.error('Aktif şube bulunamadı')
     }
@@ -142,9 +150,15 @@ function handleLeasingPlanSelected(planId: number) {
   selectedLeasingPlanId.value = planId
 }
 
-function handleVehicleSelected(vehicleId: number, categoryId: number) {
+function handleVehicleSelected(vehicleId: number, categoryId: number, vehicle?: Vehicle) {
   selectedVehicleId.value = vehicleId
   selectedVehicleCategoryId.value = categoryId
+  
+  if (vehicle && vehicle.branchId) {
+    selectedBranchId.value = vehicle.branchId
+    selectedReturnBranchId.value = vehicle.branchId
+    toast.info('Teslim ve iade şubesi aracın bulunduğu şube olarak ayarlandı')
+  }
 }
 
 function handleExtraItemsTotal(total: number) {
@@ -159,6 +173,24 @@ function handleCustomerCreated(customer: Customer) {
 const totalDays = computed(() => {
   if (!startDate.value || !endDate.value) return 0
   return Math.ceil((new Date(endDate.value).getTime() - new Date(startDate.value).getTime()) / (1000 * 60 * 60 * 24))
+})
+
+async function fetchKmPackages() {
+  try {
+    kmPackages.value = await kmPackagesApi.getByRentalType(rentalType.value)
+    // Auto-select first package if available
+    // Auto-select first package if available
+    if (kmPackages.value && kmPackages.value.length > 0 && !selectedKmPackageId.value) {
+      selectedKmPackageId.value = kmPackages.value[0]?.id ?? null
+    }
+  } catch (err) {
+    toast.apiError(err, 'KM paketleri yüklenemedi')
+    kmPackages.value = []
+  }
+}
+
+watch(rentalType, () => {
+  fetchKmPackages()
 })
 
 function formatCurrency(amount: number): string {
@@ -191,7 +223,7 @@ async function handleSubmit() {
       startDate: startDate.value,
       endDate: endDate.value,
       termMonths: rentalType.value === RentalType.LEASING ? selectedTermMonths.value : undefined,
-      kmPackageId: rentalType.value === RentalType.LEASING ? selectedLeasingPlanId.value || undefined : undefined,
+      kmPackageId: selectedKmPackageId.value || undefined,
       extraItems: extraItems.value.length > 0 ? extraItems.value.map(item => ({
         itemTypeId: item.itemTypeId,
         customName: item.name,
@@ -199,7 +231,9 @@ async function handleSubmit() {
         amount: item.amount,
         currency: item.currency,
         calculationType: item.calculationType
-      })) : undefined
+      })) : undefined,
+      discountAmount: discountAmount.value > 0 ? discountAmount.value : undefined,
+      discountReason: discountAmount.value > 0 ? discountReason.value : undefined
     }
 
     const rental = await rentalsApi.create(payload)
@@ -322,6 +356,35 @@ onMounted(() => {
                   </span>
                 </div>
               </div>
+
+              <!-- KM Package Selection -->
+              <div v-if="kmPackages.length > 0" class="km-package-section">
+                <h3>KM Paketi Seçimi</h3>
+                <p class="section-description">Kiralama için uygun KM paketini seçiniz</p>
+                <div class="package-grid">
+                  <div 
+                    v-for="pkg in kmPackages" 
+                    :key="pkg.id"
+                    :class="['package-card', { selected: selectedKmPackageId === pkg.id }]"
+                    @click="selectedKmPackageId = pkg.id"
+                  >
+                    <div class="package-header">
+                      <h4>{{ pkg.name }}</h4>
+                      <span v-if="selectedKmPackageId === pkg.id" class="check-icon">✓</span>
+                    </div>
+                    <div class="package-body">
+                      <div class="package-km">
+                        <span class="km-value">{{ pkg.includedKm?.toLocaleString() }}</span>
+                        <span class="km-label">KM</span>
+                      </div>
+                      <div class="package-price">
+                        <span class="price-label">Fazla KM:</span>
+                        <span class="price-value">{{ pkg.extraKmPrice }} ₺/KM</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
         </div>
 
@@ -375,6 +438,36 @@ onMounted(() => {
           <div v-if="extraItems.length === 0" class="skip-notice">
             <span>💡</span>
             <p>Ek kalem eklemeden devam edebilirsiniz.</p>
+          </div>
+
+          <!-- Discount Section -->
+          <div class="discount-section">
+            <h3>İndirim (Opsiyonel)</h3>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>İndirim Tutarı (₺)</label>
+                <input 
+                  v-model.number="discountAmount" 
+                  type="number" 
+                  min="0" 
+                  step="0.01"
+                  placeholder="0.00"
+                />
+              </div>
+              <div class="form-group">
+                <label>İndirim Sebebi</label>
+                <input 
+                  v-model="discountReason" 
+                  type="text" 
+                  placeholder="Örn: Sadık müşteri indirimi"
+                  :disabled="discountAmount <= 0"
+                />
+              </div>
+            </div>
+            <div v-if="discountAmount > 0" class="discount-preview">
+              <span class="discount-icon">🎉</span>
+              <span class="discount-text">{{ formatCurrency(discountAmount) }} indirim uygulanacak</span>
+            </div>
           </div>
         </div>
 
@@ -452,6 +545,18 @@ onMounted(() => {
                   <div class="summary-row total">
                     <span>Genel Toplam</span>
                     <strong>{{ formatCurrency((priceData?.finalTotal || 0) + extraItemsTotal) }}</strong>
+                  </div>
+                </div>
+
+                <div v-if="discountAmount > 0" class="discount-summary">
+                  <div class="summary-row discount-row">
+                    <span>🎉 İndirim</span>
+                    <strong class="discount-value">-{{ formatCurrency(discountAmount) }}</strong>
+                  </div>
+                  <div v-if="discountReason" class="discount-reason">{{ discountReason }}</div>
+                  <div class="summary-row final-total">
+                    <span>İndirimli Toplam</span>
+                    <strong>{{ formatCurrency(Math.max(0, (priceData?.finalTotal || 0) + extraItemsTotal - discountAmount)) }}</strong>
                   </div>
                 </div>
               </div>

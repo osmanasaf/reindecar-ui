@@ -1,8 +1,9 @@
 import { BaseApi } from './client'
-import type { 
-    MaintenanceRecord, 
+import type {
+    MaintenanceRecord,
     VehicleMaintenanceMap,
-    CreateMaintenanceRecordForm 
+    CreateMaintenanceRecordForm,
+    CompleteMaintenanceForm
 } from '@/types'
 
 class MaintenancesApiService extends BaseApi {
@@ -18,6 +19,10 @@ class MaintenancesApiService extends BaseApi {
 
     async update(id: number, form: CreateMaintenanceRecordForm): Promise<MaintenanceRecord> {
         return this.put(`/${id}`, form)
+    }
+
+    async markAsCompleted(id: number, form: CompleteMaintenanceForm): Promise<MaintenanceRecord> {
+        return this.patch(`/${id}/complete`, form)
     }
 
     async getVehicleMaintenances(vehicleId: number): Promise<MaintenanceRecord[]> {
