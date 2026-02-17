@@ -68,7 +68,13 @@ export interface UpcomingReturnApiResponse {
     rentalId: number
     rentalNumber: string
     vehicleId: number
+    plateNumber: string
     customerId: number
+    customerName: string
+    customerPhone: string | null
+    primaryDriverId: number | null
+    primaryDriverName: string | null
+    primaryDriverPhone: string | null
     endDate: string
     status: string
     daysUntilReturn: number
@@ -78,12 +84,14 @@ export interface UpcomingReturn {
     rentalId: number
     rentalNumber: string
     vehicleId: number
-    vehiclePlate: string
-    vehicleName: string
+    plateNumber: string
     customerId: number
     customerName: string
-    expectedDate: string
-    expectedTime?: string
+    customerPhone: string | null
+    primaryDriverId: number | null
+    primaryDriverName: string | null
+    primaryDriverPhone: string | null
+    endDate: string
     daysUntilReturn: number
     isOverdue: boolean
     overdueDays?: number
@@ -120,12 +128,12 @@ class DashboardApiService extends BaseApi {
     }
 
     async getUpcomingReturnsRaw(days: number): Promise<UpcomingReturnApiResponse[]> {
-        const response = await this.get<{ data: UpcomingReturnApiResponse[] }>('/upcoming-returns', { days })
+        const response = await this.get<{ data: UpcomingReturnApiResponse[] }>(`/upcoming-returns?days=${days}`)
         return (response as unknown as { data: UpcomingReturnApiResponse[] }).data || response as unknown as UpcomingReturnApiResponse[]
     }
 
     async getRevenueRaw(months: number): Promise<RevenueByMonthApiResponse[]> {
-        const response = await this.get<{ data: RevenueByMonthApiResponse[] }>('/revenue', { months })
+        const response = await this.get<{ data: RevenueByMonthApiResponse[] }>(`/revenue?months=${months}`)
         return (response as unknown as { data: RevenueByMonthApiResponse[] }).data || response as unknown as RevenueByMonthApiResponse[]
     }
 
@@ -171,11 +179,14 @@ class DashboardApiService extends BaseApi {
                 rentalId: item.rentalId,
                 rentalNumber: item.rentalNumber,
                 vehicleId: item.vehicleId,
-                vehiclePlate: '-',
-                vehicleName: '-',
+                plateNumber: item.plateNumber,
                 customerId: item.customerId,
-                customerName: '-',
-                expectedDate: item.endDate,
+                customerName: item.customerName,
+                customerPhone: item.customerPhone,
+                primaryDriverId: item.primaryDriverId,
+                primaryDriverName: item.primaryDriverName,
+                primaryDriverPhone: item.primaryDriverPhone,
+                endDate: item.endDate,
                 daysUntilReturn: item.daysUntilReturn,
                 isOverdue: item.daysUntilReturn < 0,
                 overdueDays: item.daysUntilReturn < 0 ? Math.abs(item.daysUntilReturn) : undefined,
@@ -216,9 +227,10 @@ class DashboardApiService extends BaseApi {
     }
 
     private formatMonthLabel(monthStr: string): string {
-        const [year, month] = monthStr.split('-')
+        const [year = '', month = '1'] = monthStr.split('-')
         const monthNames = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara']
         const monthIndex = Number.parseInt(month, 10) - 1
+        if (monthIndex < 0 || monthIndex >= monthNames.length) return monthStr
         return `${monthNames[monthIndex]} ${year.slice(2)}`
     }
 

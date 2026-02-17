@@ -155,17 +155,13 @@ function formatCurrency(amount: unknown): string {
 }
 
 function formatReturnTime(item: UpcomingReturn): string {
-  const date = new Date(item.expectedDate)
-  const today = new Date()
-  const tomorrow = new Date()
-  tomorrow.setDate(tomorrow.getDate() + 1)
+  if (item.daysUntilReturn === 0) return 'Bugün'
+  if (item.daysUntilReturn === 1) return 'Yarın'
+  if (item.daysUntilReturn < 0) return `${Math.abs(item.daysUntilReturn)} gün gecikti`
 
-  if (date.toDateString() === today.toDateString()) {
-    return item.expectedTime ? `Bugün ${item.expectedTime}` : 'Bugün'
-  } else if (date.toDateString() === tomorrow.toDateString()) {
-    return item.expectedTime ? `Yarın ${item.expectedTime}` : 'Yarın'
-  }
-  return date.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })
+  const [year, month, day] = item.endDate.split('-')
+  if (year && month && day) return `${day}.${month}`
+  return item.endDate
 }
 
 function openReturnModal(rental: UpcomingReturn) {
@@ -289,8 +285,16 @@ onMounted(() => {
               </thead>
               <tbody>
                 <tr v-for="item in upcomingReturns" :key="item.rentalId">
-                  <td class="font-medium">{{ item.vehiclePlate }}</td>
-                  <td>{{ item.customerName }}</td>
+                  <td class="font-medium">{{ item.plateNumber }}</td>
+                  <td>
+                    <div class="person-cell">
+                      <span>{{ item.customerName }}</span>
+                      <small v-if="item.customerPhone" class="person-sub">{{ item.customerPhone }}</small>
+                      <small v-if="item.primaryDriverName" class="person-sub">
+                        Sürücü: {{ item.primaryDriverName }}<span v-if="item.primaryDriverPhone"> ({{ item.primaryDriverPhone }})</span>
+                      </small>
+                    </div>
+                  </td>
                   <td>{{ formatReturnTime(item) }}</td>
                   <td>
                     <span :class="['status-dot', item.isOverdue ? 'danger' : 'success']"></span>
@@ -535,6 +539,17 @@ onMounted(() => {
 
 .font-medium {
   font-weight: 500;
+}
+
+.person-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.person-sub {
+  color: var(--color-text-secondary);
+  font-size: 12px;
 }
 
 .status-dot {
