@@ -4,6 +4,7 @@ import type {
     Branch,
     CreateBranchForm
 } from '@/types'
+import { normalizePhoneDigits } from '@/utils/phone'
 
 class BranchesApiService extends BaseApi {
     protected readonly basePath = '/branches'
@@ -26,11 +27,18 @@ class BranchesApiService extends BaseApi {
     }
 
     async create(branch: CreateBranchForm): Promise<Branch> {
-        return this.post('', branch)
+        return this.post('', {
+            ...branch,
+            phone: normalizePhoneDigits(branch.phone)
+        })
     }
 
     async update(id: number, branch: Partial<CreateBranchForm>): Promise<Branch> {
-        return this.put(`/${id}`, branch)
+        const payload = { ...branch }
+        if (typeof payload.phone === 'string') {
+            payload.phone = normalizePhoneDigits(payload.phone)
+        }
+        return this.put(`/${id}`, payload)
     }
 
     async updateStatus(id: number, active: boolean): Promise<Branch> {

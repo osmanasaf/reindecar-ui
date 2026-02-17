@@ -1,10 +1,18 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { customersApi } from '@/api'
 import { useValidation, rules, useToast } from '@/composables'
 import { SearchableSelect } from '@/components/common'
-import type { CustomerType, CreatePersonalCustomerForm, CreateCompanyCustomerForm, AuthorizedPerson } from '@/types'
+import { formatPhoneInput } from '@/utils/phone'
+import type { ValidationRule } from '@/composables/useValidation'
+import type {
+  CustomerType,
+  CreatePersonalCustomerForm,
+  CreateCompanyCustomerForm,
+  UpdateCompanyCustomerForm,
+  AuthorizedPerson
+} from '@/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -38,11 +46,16 @@ const form = ref({
   companyName: '',
   taxNumber: '',
   taxOffice: '',
-  tradeRegistryNumber: '',
-  invoiceAddress: ''
+  tradeRegisterNo: '',
+  invoiceAddress: '',
+  sector: '',
+  employeeCount: '',
+  creditScore: ''
 })
 
-const authorizedPersons = ref<AuthorizedPerson[]>([{ firstName: '', lastName: '', nationalId: '', phone: '', email: '', title: '' }])
+const authorizedPersons = ref<AuthorizedPerson[]>([
+  { firstName: '', lastName: '', nationalId: '', phone: '', email: '', title: '', isPrimary: true }
+])
 const sameAsAddress = ref(true)
 
 const commonTitles = [
@@ -56,13 +69,24 @@ const commonTitles = [
 ]
 
 function addAuthorizedPerson() {
-  authorizedPersons.value.push({ firstName: '', lastName: '', nationalId: '', phone: '', email: '', title: '' })
+  authorizedPersons.value.push({ firstName: '', lastName: '', nationalId: '', phone: '', email: '', title: '', isPrimary: false })
 }
 
 function removeAuthorizedPerson(index: number) {
   if (authorizedPersons.value.length > 1) {
+    const removed = authorizedPersons.value[index]
     authorizedPersons.value.splice(index, 1)
+    if (removed?.isPrimary) {
+      const first = authorizedPersons.value[0]
+      if (first) first.isPrimary = true
+    }
   }
+}
+
+function setPrimaryAuthorizedPerson(index: number) {
+  authorizedPersons.value.forEach((person, currentIndex) => {
+    person.isPrimary = currentIndex === index
+  })
 }
 
 function syncInvoiceAddress() {
@@ -71,7 +95,54 @@ function syncInvoiceAddress() {
   }
 }
 
-const { validateForm, getError, hasError, touch, reset, isValid } = useValidation()
+function toOptionalNumber(value: unknown): number | undefined {
+  const raw = typeof value === 'string' ? value : value === null || value === undefined ? '' : String(value)
+  const trimmed = raw.trim()
+  if (!trimmed) return undefined
+  const parsed = Number(trimmed)
+  return Number.isFinite(parsed) ? parsed : undefined
+}
+
+function toOptionalTrimmedString(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const trimmed = value.trim()
+  return trimmed ? trimmed : undefined
+}
+
+function normalizeAuthorizedPerson(person: AuthorizedPerson): AuthorizedPerson {
+  return {
+    firstName: String(person.firstName ?? '').trim(),
+    lastName: String(person.lastName ?? '').trim(),
+    nationalId: String(person.nationalId ?? '').trim(),
+    phone: person.phone,
+    email: toOptionalTrimmedString(person.email),
+    title: toOptionalTrimmedString(person.title),
+    isPrimary: person.isPrimary
+  }
+}
+
+function validateCompanyAuthorizedPersons(list: AuthorizedPerson[]): boolean {
+  if (list.length === 0) {
+    toast.error('En az bir yetkili kişi eklenmelidir')
+    return false
+  }
+
+  const uniqueNationalIds = new Set(list.map(person => person.nationalId))
+  if (uniqueNationalIds.size !== list.length) {
+    toast.error('Yetkili kişilerde TC Kimlik No benzersiz olmalıdır')
+    return false
+  }
+
+  const primaryCount = list.filter(person => person.isPrimary).length
+  if (primaryCount !== 1) {
+    toast.error('Yetkili kişiler içinde tam 1 adet ana yetkili olmalıdır')
+    return false
+  }
+
+  return true
+}
+
+const { validateForm, getError, hasError, touch, reset } = useValidation()
 
 
 const formRules = computed(() => {
@@ -94,7 +165,7 @@ const formRules = computed(() => {
       licenseExpiryDate: { value: form.value.licenseExpiryDate, rules: [rules.required('Ehliyet geçerlilik tarihi zorunludur'), rules.futureDate('Ehliyet süresi dolmuş')] }
     }
   } else {
-    const companyRules: Record<string, { value: unknown; rules: unknown[] }> = {
+    const companyRules: Record<string, { value: unknown; rules: ValidationRule[] }> = {
       ...common,
       companyName: { value: form.value.companyName, rules: [rules.required()] },
       taxNumber: { value: form.value.taxNumber, rules: [rules.required(), rules.taxNumber()] },
@@ -103,12 +174,14 @@ const formRules = computed(() => {
     if (!sameAsAddress.value) {
       companyRules.invoiceAddress = { value: form.value.invoiceAddress, rules: [rules.required('Fatura adresi zorunludur')] }
     }
-    authorizedPersons.value.forEach((person, index) => {
-      companyRules[`authorizedPerson${index}FirstName`] = { value: person.firstName, rules: [rules.required('Ad zorunludur')] }
-      companyRules[`authorizedPerson${index}LastName`] = { value: person.lastName, rules: [rules.required('Soyad zorunludur')] }
-      companyRules[`authorizedPerson${index}NationalId`] = { value: person.nationalId, rules: [rules.required('TC Kimlik No zorunludur'), rules.tckn()] }
-      companyRules[`authorizedPerson${index}Phone`] = { value: person.phone, rules: [rules.required('Telefon zorunludur'), rules.phone()] }
-    })
+    if (!isEditMode.value) {
+      authorizedPersons.value.forEach((person, index) => {
+        companyRules[`authorizedPerson${index}FirstName`] = { value: person.firstName, rules: [rules.required('Ad zorunludur')] }
+        companyRules[`authorizedPerson${index}LastName`] = { value: person.lastName, rules: [rules.required('Soyad zorunludur')] }
+        companyRules[`authorizedPerson${index}NationalId`] = { value: person.nationalId, rules: [rules.required('TC Kimlik No zorunludur'), rules.tckn()] }
+        companyRules[`authorizedPerson${index}Phone`] = { value: person.phone, rules: [rules.required('Telefon zorunludur'), rules.phone()] }
+      })
+    }
     return companyRules
   }
 })
@@ -123,8 +196,11 @@ async function fetchCustomer() {
     
 
     const [first, ...last] = (data.displayName || '').split(' ')
+    const invoiceAddress = data.invoiceAddress || data.address || ''
+    sameAsAddress.value = customerType.value !== 'COMPANY' || invoiceAddress === (data.address || '')
+
     form.value = {
-      phone: data.phone,
+      phone: formatPhoneInput(data.phone),
       email: data.email,
       address: data.address,
       city: data.city,
@@ -132,17 +208,19 @@ async function fetchCustomer() {
       firstName: first || '',
       lastName: last.join(' ') || '',
       nationalId: data.nationalId || '',
-      birthDate: data.birthDate ? data.birthDate.split('T')[0] : '',
+      birthDate: data.birthDate ? (data.birthDate.split('T')[0] ?? '') : '',
       licenseNumber: data.licenseNumber || '',
       licenseClass: data.licenseClass || '',
-      licenseExpiryDate: data.licenseExpiryDate ? data.licenseExpiryDate.split('T')[0] : '',
+      licenseExpiryDate: data.licenseExpiryDate ? (data.licenseExpiryDate.split('T')[0] ?? '') : '',
       
       companyName: data.displayName || '',
       taxNumber: data.taxNumber || '',
-      taxOffice: '', 
-      contactPersonName: data.authorizedPersonName || '',
-      contactPersonPhone: data.authorizedPersonPhone || '',
-      tradeRegistryNumber: data.tradeRegistryNumber || ''
+      taxOffice: data.taxOffice || '',
+      tradeRegisterNo: data.tradeRegisterNo || data.tradeRegistryNumber || '',
+      invoiceAddress,
+      sector: data.sector || '',
+      employeeCount: typeof data.employeeCount === 'number' ? String(data.employeeCount) : '',
+      creditScore: typeof data.creditScore === 'number' ? String(data.creditScore) : ''
     }
   } catch {
     toast.error('Müşteri bilgileri yüklenemedi')
@@ -174,7 +252,7 @@ async function handleSubmit() {
         licenseClass: form.value.licenseClass,
         licenseExpiryDate: form.value.licenseExpiryDate
       }
-      
+
       if (isEditMode.value) {
         await customersApi.update(Number(route.params.id), payload)
         toast.success('Müşteri başarıyla güncellendi')
@@ -186,7 +264,8 @@ async function handleSubmit() {
       if (sameAsAddress.value) {
         form.value.invoiceAddress = form.value.address
       }
-      const payload: CreateCompanyCustomerForm = {
+
+      const basePayload: UpdateCompanyCustomerForm = {
         companyName: form.value.companyName,
         taxNumber: form.value.taxNumber,
         taxOffice: form.value.taxOffice,
@@ -195,19 +274,32 @@ async function handleSubmit() {
         address: form.value.address,
         city: form.value.city,
         invoiceAddress: form.value.invoiceAddress,
-        tradeRegistryNumber: form.value.tradeRegistryNumber,
-        authorizedPersons: authorizedPersons.value.filter(p => p.firstName && p.lastName && p.nationalId && p.phone)
+        tradeRegisterNo: form.value.tradeRegisterNo || undefined,
+        sector: form.value.sector || undefined,
+        employeeCount: toOptionalNumber(form.value.employeeCount),
+        creditScore: toOptionalNumber(form.value.creditScore)
       }
-      
+
       if (isEditMode.value) {
-        await customersApi.update(Number(route.params.id), payload)
+        await customersApi.update(Number(route.params.id), basePayload)
         toast.success('Müşteri başarıyla güncellendi')
       } else {
+        const normalizedAuthorizedPersons = authorizedPersons.value.map(normalizeAuthorizedPerson)
+        if (!validateCompanyAuthorizedPersons(normalizedAuthorizedPersons)) {
+          loading.value = false
+          return
+        }
+
+        const payload: CreateCompanyCustomerForm = {
+          ...basePayload,
+          authorizedPersons: normalizedAuthorizedPersons
+        }
+
         await customersApi.createCompany(payload)
         toast.success('Müşteri başarıyla oluşturuldu')
       }
     }
-    
+
     router.push('/customers')
   } catch (err) {
     toast.apiError(err, isEditMode.value ? 'Güncelleme işlemi başarısız' : 'Kaydetme işlemi başarısız')
@@ -218,6 +310,18 @@ async function handleSubmit() {
 
 function handleBlur(field: string) {
   touch(field)
+}
+
+function handlePhoneInput(event: Event) {
+  const target = event.target as HTMLInputElement
+  form.value.phone = formatPhoneInput(target.value)
+}
+
+function handleAuthorizedPhoneInput(index: number, event: Event) {
+  const target = event.target as HTMLInputElement
+  const person = authorizedPersons.value[index]
+  if (!person) return
+  person.phone = formatPhoneInput(target.value)
 }
 
 onMounted(fetchCustomer)
@@ -330,14 +434,29 @@ watch(customerType, () => reset())
                 <span class="error-text">{{ getError('taxOffice') }}</span>
               </div>
               
-               <div class="form-group">
+              <div class="form-group">
                 <label>Ticaret Sicil No</label>
-                <input v-model="form.tradeRegistryNumber" type="text" />
+                <input v-model="form.tradeRegisterNo" type="text" />
+              </div>
+
+              <div class="form-group">
+                <label>Sektör</label>
+                <input v-model="form.sector" type="text" />
+              </div>
+
+              <div class="form-group">
+                <label>Çalışan Sayısı</label>
+                <input v-model="form.employeeCount" type="number" min="0" />
+              </div>
+
+              <div class="form-group">
+                <label>Kredi Skoru</label>
+                <input v-model="form.creditScore" type="number" min="0" max="2000" />
               </div>
             </div>
           </section>
 
-          <section class="form-section">
+          <section v-if="!isEditMode" class="form-section">
             <div class="section-header">
               <h3>Yetkili Kişiler</h3>
               <button type="button" class="btn-add" @click="addAuthorizedPerson">+ Yetkili Ekle</button>
@@ -370,7 +489,15 @@ watch(customerType, () => reset())
                 </div>
                 <div class="form-group" :class="{ error: hasError(`authorizedPerson${index}Phone`) }">
                   <label>Telefon <span class="required">*</span></label>
-                  <input v-model="person.phone" @blur="handleBlur(`authorizedPerson${index}Phone`)" type="tel" placeholder="05XX..." />
+                  <input
+                    v-model="person.phone"
+                    @blur="handleBlur(`authorizedPerson${index}Phone`)"
+                    @input="handleAuthorizedPhoneInput(index, $event)"
+                    type="tel"
+                    inputmode="numeric"
+                    maxlength="13"
+                    placeholder="555 111 11 11"
+                  />
                   <span class="error-text">{{ getError(`authorizedPerson${index}Phone`) }}</span>
                 </div>
                 <div class="form-group">
@@ -390,6 +517,17 @@ watch(customerType, () => reset())
                     @create="(value) => person.title = value"
                   />
                 </div>
+                <div class="form-group full">
+                  <label class="checkbox-label">
+                    <input
+                      :checked="person.isPrimary"
+                      type="radio"
+                      name="primaryAuthorizedPerson"
+                      @change="setPrimaryAuthorizedPerson(index)"
+                    />
+                    <span>Ana yetkili</span>
+                  </label>
+                </div>
               </div>
             </div>
           </section>
@@ -401,7 +539,15 @@ watch(customerType, () => reset())
           <div class="form-grid">
             <div class="form-group" :class="{ error: hasError('phone') }">
               <label>Telefon <span class="required">*</span></label>
-              <input v-model="form.phone" @blur="handleBlur('phone')" type="tel" placeholder="05XX..." />
+              <input
+                v-model="form.phone"
+                @blur="handleBlur('phone')"
+                @input="handlePhoneInput"
+                type="tel"
+                inputmode="numeric"
+                maxlength="13"
+                placeholder="555 111 11 11"
+              />
               <span class="error-text">{{ getError('phone') }}</span>
             </div>
 
@@ -721,6 +867,12 @@ watch(customerType, () => reset())
 }
 
 .checkbox-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.checkbox-label input[type="radio"] {
   width: 18px;
   height: 18px;
   cursor: pointer;

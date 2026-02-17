@@ -1,5 +1,6 @@
 import { BaseApi } from './client'
 import type { Driver, CreateDriverForm, UpdateDriverForm } from '@/types'
+import { normalizePhoneDigits } from '@/utils/phone'
 
 class DriversApiService extends BaseApi {
     protected readonly basePath = '/drivers'
@@ -16,11 +17,18 @@ class DriversApiService extends BaseApi {
     }
 
     async create(form: CreateDriverForm): Promise<Driver> {
-        return this.post('', form)
+        return this.post('', {
+            ...form,
+            phone: normalizePhoneDigits(form.phone)
+        })
     }
 
     async update(id: number, form: UpdateDriverForm): Promise<Driver> {
-        return this.put(`/${id}`, form)
+        const payload = { ...form }
+        if (typeof payload.phone === 'string') {
+            payload.phone = normalizePhoneDigits(payload.phone)
+        }
+        return this.put(`/${id}`, payload)
     }
 
     async delete(id: number): Promise<void> {

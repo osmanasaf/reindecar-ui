@@ -68,7 +68,7 @@ class RentalsApiService extends BaseApi {
     }
 
     async removeDriver(rentalId: number, driverId: number): Promise<void> {
-        return this.delete(`/${rentalId}/drivers/${driverId}`)
+        return this.remove(`/${rentalId}/drivers/${driverId}`)
     }
 
     async setPrimaryDriver(rentalId: number, driverId: number): Promise<RentalDriver> {
@@ -92,11 +92,15 @@ class KmPackagesApiService extends BaseApi {
     }
 
     async getByCategory(categoryId: number): Promise<KmPackage[]> {
-        return this.get(`/by-category/${categoryId}`)
+        return this.get(`/category/${categoryId}`)
     }
 
     async getGlobal(): Promise<KmPackage[]> {
         return this.get('/global')
+    }
+
+    async getAvailableForCategory(categoryId: number): Promise<KmPackage[]> {
+        return this.get(`/available/${categoryId}`)
     }
 
     async getById(id: number): Promise<KmPackage> {

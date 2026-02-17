@@ -1,3 +1,5 @@
+import { formatPhoneInput, normalizePhoneDigits } from './phone'
+
 export function safeNumber(value: unknown, defaultValue = 0): number {
     if (value === null || value === undefined) return defaultValue
     const num = Number(value)
@@ -14,17 +16,12 @@ export function formatCurrency(amount: unknown, currency = 'TRY'): string {
 }
 
 export function formatPhone(phone: string): string {
-    const digits = phone.replace(/\D/g, '')
-
-    if (digits.length === 10) {
-        return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)} ${digits.slice(6, 8)} ${digits.slice(8)}`
-    }
-
-    return phone
+    const formatted = formatPhoneInput(phone)
+    return formatted || phone
 }
 
 export function maskPhone(phone: string): string {
-    const digits = phone.replace(/\D/g, '')
+    const digits = normalizePhoneDigits(phone)
     if (digits.length >= 10) {
         return `(${digits.slice(0, 3)}) *** ** ${digits.slice(-2)}`
     }

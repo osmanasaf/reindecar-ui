@@ -1,10 +1,35 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { vehiclesApi, vehicleCategoriesApi, branchesApi } from '@/api'
 import { useValidation, rules, useToast } from '@/composables'
 import { formatPlateInput } from '@/utils'
-import type { CreateVehicleForm, VehicleCategory, Branch } from '@/types'
+import { isErrorResponse } from '@/utils/error'
+import { FuelType, Transmission } from '@/types'
+import type { CreateVehicleForm, UpdateVehicleForm, VehicleCategory, Branch, Vehicle } from '@/types'
+
+interface VehicleFormModel {
+  plateNumber: string
+  vinNumber: string
+  brand: string
+  model: string
+  year: number
+  color: string
+  fuelType: FuelType
+  transmission: Transmission
+  engineCapacity: number
+  seatCount: number
+  categoryId: number
+  branchId: number
+  currentKm: number
+  insuranceExpiryDate: string
+  inspectionExpiryDate: string
+  registrationDate: string
+  dailyPrice: number
+  weeklyPrice: number | null
+  monthlyPrice: number | null
+  notes: string
+}
 
 const route = useRoute()
 const router = useRouter()
@@ -14,32 +39,37 @@ const isEditMode = computed(() => route.params.id !== undefined)
 const loading = ref(false)
 const categories = ref<VehicleCategory[]>([])
 const branches = ref<Branch[]>([])
+const originalVehicle = ref<Vehicle | null>(null)
 
 const currentYear = new Date().getFullYear()
 
-const fuelTypes = [
-  { value: 'GASOLINE', label: 'Benzin' },
-  { value: 'DIESEL', label: 'Dizel' },
-  { value: 'HYBRID', label: 'Hibrit' },
-  { value: 'ELECTRIC', label: 'Elektrik' },
-  { value: 'LPG', label: 'LPG' }
+const minimumEditableKm = computed(() => {
+  if (!isEditMode.value) return 0
+  return originalVehicle.value?.currentKm ?? 0
+})
+
+const fuelTypes: Array<{ value: FuelType; label: string }> = [
+  { value: FuelType.GASOLINE, label: 'Benzin' },
+  { value: FuelType.DIESEL, label: 'Dizel' },
+  { value: FuelType.HYBRID, label: 'Hibrit' },
+  { value: FuelType.ELECTRIC, label: 'Elektrik' },
+  { value: FuelType.LPG, label: 'LPG' }
 ]
 
-const transmissionTypes = [
-  { value: 'MANUAL', label: 'Manuel' },
-  { value: 'AUTOMATIC', label: 'Otomatik' },
-  { value: 'SEMI_AUTOMATIC', label: 'Yarı Otomatik' }
+const transmissionTypes: Array<{ value: Transmission; label: string }> = [
+  { value: Transmission.MANUAL, label: 'Manuel' },
+  { value: Transmission.AUTOMATIC, label: 'Otomatik' }
 ]
 
-const form = ref<CreateVehicleForm>({
+const form = ref<VehicleFormModel>({
   plateNumber: '',
   vinNumber: '',
   brand: '',
   model: '',
   year: currentYear,
   color: '',
-  fuelType: 'GASOLINE',
-  transmission: 'MANUAL',
+  fuelType: FuelType.GASOLINE,
+  transmission: Transmission.MANUAL,
   engineCapacity: 1600,
   seatCount: 5,
   categoryId: 0,
@@ -49,8 +79,8 @@ const form = ref<CreateVehicleForm>({
   inspectionExpiryDate: '',
   registrationDate: '',
   dailyPrice: 0,
-  weeklyPrice: undefined,
-  monthlyPrice: undefined,
+  weeklyPrice: null,
+  monthlyPrice: null,
   notes: ''
 })
 
@@ -69,12 +99,98 @@ const formRules = computed(() => ({
   seatCount: { value: form.value.seatCount, rules: [rules.required(), rules.minValue(1), rules.maxValue(50)] },
   categoryId: { value: form.value.categoryId, rules: [rules.required('Kategori seçiniz')] },
   branchId: { value: form.value.branchId, rules: [rules.required('Şube seçiniz')] },
-  currentKm: { value: form.value.currentKm, rules: [rules.required(), rules.minValue(0)] },
+  currentKm: {
+    value: form.value.currentKm,
+    rules: [rules.required(), rules.minValue(minimumEditableKm.value, `KM cannot be lower than ${minimumEditableKm.value}`)]
+  },
   insuranceExpiryDate: { value: form.value.insuranceExpiryDate, rules: [rules.required()] },
   inspectionExpiryDate: { value: form.value.inspectionExpiryDate, rules: [rules.required()] },
   registrationDate: { value: form.value.registrationDate, rules: [rules.required()] },
   dailyPrice: { value: form.value.dailyPrice, rules: [rules.required(), rules.positive()] }
 }))
+
+function normalizeOptionalNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null
+  const parsed = Number(value)
+  return Number.isNaN(parsed) ? null : parsed
+}
+
+function buildCreatePayload(): CreateVehicleForm {
+  const weeklyPrice = normalizeOptionalNumber(form.value.weeklyPrice)
+  const monthlyPrice = normalizeOptionalNumber(form.value.monthlyPrice)
+
+  return {
+    plateNumber: form.value.plateNumber,
+    vinNumber: form.value.vinNumber,
+    brand: form.value.brand,
+    model: form.value.model,
+    year: form.value.year,
+    color: form.value.color,
+    fuelType: form.value.fuelType,
+    transmission: form.value.transmission,
+    engineCapacity: form.value.engineCapacity,
+    seatCount: form.value.seatCount,
+    categoryId: form.value.categoryId,
+    branchId: form.value.branchId,
+    currentKm: form.value.currentKm,
+    insuranceExpiryDate: form.value.insuranceExpiryDate,
+    inspectionExpiryDate: form.value.inspectionExpiryDate,
+    registrationDate: form.value.registrationDate,
+    dailyPrice: form.value.dailyPrice,
+    weeklyPrice: weeklyPrice ?? undefined,
+    monthlyPrice: monthlyPrice ?? undefined,
+    notes: form.value.notes.trim() || undefined
+  }
+}
+
+function buildUpdatePayload(): UpdateVehicleForm {
+  return {
+    plateNumber: form.value.plateNumber,
+    vinNumber: form.value.vinNumber,
+    brand: form.value.brand,
+    model: form.value.model,
+    year: form.value.year,
+    color: form.value.color.trim() || null,
+    fuelType: form.value.fuelType,
+    transmission: form.value.transmission,
+    engineCapacity: form.value.engineCapacity,
+    seatCount: form.value.seatCount,
+    categoryId: form.value.categoryId,
+    branchId: form.value.branchId,
+    currentKm: form.value.currentKm,
+    insuranceExpiryDate: form.value.insuranceExpiryDate || null,
+    inspectionExpiryDate: form.value.inspectionExpiryDate || null,
+    registrationDate: form.value.registrationDate || null,
+    dailyPrice: normalizeOptionalNumber(form.value.dailyPrice),
+    weeklyPrice: normalizeOptionalNumber(form.value.weeklyPrice),
+    monthlyPrice: normalizeOptionalNumber(form.value.monthlyPrice),
+    notes: form.value.notes.trim() || null
+  }
+}
+
+function isBranchAvailabilityError(error: unknown): boolean {
+  const matchesMessage = (message: string): boolean => {
+    const normalized = message.toLowerCase()
+    return (
+      (normalized.includes('branch') && normalized.includes('available')) ||
+      (normalized.includes('sube') && normalized.includes('musait')) ||
+      (normalized.includes('şube') && normalized.includes('müsait'))
+    )
+  }
+
+  if (isErrorResponse(error)) {
+    return matchesMessage(error.message) || error.code === 'V004'
+  }
+
+  if (typeof error === 'object' && error !== null && 'response' in error) {
+    const responseData = (error as { response?: { data?: unknown } }).response?.data
+    if (isErrorResponse(responseData)) {
+      return matchesMessage(responseData.message) || responseData.code === 'V004'
+    }
+  }
+
+  return false
+}
 
 async function fetchData() {
   loading.value = true
@@ -85,41 +201,49 @@ async function fetchData() {
     ])
     categories.value = categoriesData
     branches.value = branchesData
-    
+
     if (!branchesData || branchesData.length === 0) {
       toast.error('Aktif şube bulunamadı. Lütfen önce şube ekleyin.')
     }
 
     if (isEditMode.value) {
       const vehicle = await vehiclesApi.getById(Number(route.params.id))
+      originalVehicle.value = vehicle
       form.value = {
         plateNumber: vehicle.plateNumber,
         vinNumber: vehicle.vinNumber,
         brand: vehicle.brand,
         model: vehicle.model,
         year: vehicle.year,
-        color: vehicle.color,
+        color: vehicle.color ?? '',
         fuelType: vehicle.fuelType,
         transmission: vehicle.transmission,
         engineCapacity: vehicle.engineCapacity,
         seatCount: vehicle.seatCount,
-        categoryId: vehicle.category?.id || 0,
-        branchId: vehicle.branch?.id || 0,
+        categoryId: vehicle.categoryId,
+        branchId: vehicle.branchId,
         currentKm: vehicle.currentKm,
         insuranceExpiryDate: vehicle.insuranceExpiryDate?.split('T')[0] || '',
         inspectionExpiryDate: vehicle.inspectionExpiryDate?.split('T')[0] || '',
         registrationDate: vehicle.registrationDate?.split('T')[0] || '',
-        dailyPrice: vehicle.dailyPrice || 0,
-        weeklyPrice: vehicle.weeklyPrice || undefined,
-        monthlyPrice: vehicle.monthlyPrice || undefined,
-        notes: vehicle.notes || ''
+        dailyPrice: vehicle.dailyPrice ?? 0,
+        weeklyPrice: vehicle.weeklyPrice ?? null,
+        monthlyPrice: vehicle.monthlyPrice ?? null,
+        notes: vehicle.notes ?? ''
       }
+    } else {
+      originalVehicle.value = null
     }
-  } catch (error: any) {
-    if (error.response?.status === 404) {
-      toast.error('Kayıt bulunamadı')
-    } else if (error.response?.status === 401) {
-      toast.error('Oturum süresi doldu. Lütfen tekrar giriş yapın.')
+  } catch (error: unknown) {
+    if (typeof error === 'object' && error !== null && 'response' in error) {
+      const status = (error as { response?: { status?: number } }).response?.status
+      if (status === 404) {
+        toast.error('Kayıt bulunamadı')
+      } else if (status === 401) {
+        toast.error('Oturum süresi doldu. Lütfen tekrar giriş yapın.')
+      } else {
+        toast.error('Veriler yüklenirken hata oluştu')
+      }
     } else {
       toast.error('Veriler yüklenirken hata oluştu')
     }
@@ -135,17 +259,23 @@ async function handleSubmit() {
   }
 
   loading.value = true
+  let branchChanged = false
   try {
     if (isEditMode.value) {
-      await vehiclesApi.update(Number(route.params.id), form.value)
+      branchChanged = originalVehicle.value !== null && form.value.branchId !== originalVehicle.value.branchId
+      await vehiclesApi.patchById(Number(route.params.id), buildUpdatePayload())
       toast.success('Araç başarıyla güncellendi')
     } else {
-      await vehiclesApi.create(form.value)
+      await vehiclesApi.create(buildCreatePayload())
       toast.success('Araç başarıyla eklendi')
     }
     router.push('/vehicles')
-  } catch (err) {
-    toast.apiError(err, 'Kaydetme işlemi başarısız')
+  } catch (err: unknown) {
+    if (branchChanged && isBranchAvailabilityError(err)) {
+      toast.error('Branch can only be changed when vehicle is AVAILABLE')
+    } else {
+      toast.apiError(err, 'Kaydetme işlemi başarısız')
+    }
   } finally {
     loading.value = false
   }
@@ -295,7 +425,7 @@ onMounted(fetchData)
             <input 
               v-model.number="form.currentKm" 
               type="number"
-              min="0"
+              :min="minimumEditableKm"
               @blur="handleBlur('currentKm')"
             />
             <span class="error-text">{{ getError('currentKm') }}</span>
@@ -607,3 +737,6 @@ textarea {
   min-height: 100px;
 }
 </style>
+
+
+

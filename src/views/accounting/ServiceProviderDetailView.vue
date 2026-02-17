@@ -3,6 +3,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAccountingStore } from '@/stores'
 import { useEnumTranslations, useToast } from '@/composables'
+import { formatPhoneInput, normalizePhoneDigits } from '@/utils/phone'
 import type { UpdateServiceProviderRequest } from '@/types'
 import { EditProviderModal } from '@/components/accounting'
 
@@ -63,6 +64,16 @@ const formatDate = (dateString: string) => {
     minute: '2-digit'
   })
 }
+
+const formatPhone = (phone?: string | null) => {
+  return phone ? formatPhoneInput(phone) : ''
+}
+
+const toTelHref = (phone?: string | null) => {
+  if (!phone) return 'tel:'
+  const digits = normalizePhoneDigits(phone)
+  return digits ? `tel:+90${digits}` : `tel:${phone}`
+}
 </script>
 
 <template>
@@ -111,7 +122,7 @@ const formatDate = (dateString: string) => {
             <div class="info-item" v-if="provider.phone">
               <span class="info-label">Telefon</span>
               <span class="info-value">
-                <a :href="`tel:${provider.phone}`">{{ provider.phone }}</a>
+                <a :href="toTelHref(provider.phone)">{{ formatPhone(provider.phone) }}</a>
               </span>
             </div>
             <div class="info-item" v-if="provider.email">
@@ -127,7 +138,7 @@ const formatDate = (dateString: string) => {
             <div class="info-item" v-if="provider.contactPhone">
               <span class="info-label">İletişim Telefonu</span>
               <span class="info-value">
-                <a :href="`tel:${provider.contactPhone}`">{{ provider.contactPhone }}</a>
+                <a :href="toTelHref(provider.contactPhone)">{{ formatPhone(provider.contactPhone) }}</a>
               </span>
             </div>
             <div v-if="!provider.phone && !provider.email && !provider.contactPerson" class="empty-info">

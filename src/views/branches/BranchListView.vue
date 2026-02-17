@@ -1,5 +1,5 @@
-<script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+﻿<script setup lang="ts">
+import { ref, onMounted } from 'vue'
 import { branchesApi, vehiclesApi } from '@/api'
 import { useToast } from '@/composables'
 import { validators, validate, formatPhoneInput } from '@/utils/validation'
@@ -29,14 +29,18 @@ const formData = ref({
 const formErrors = ref<Record<string, string>>({})
 const touchedFields = ref<Set<string>>(new Set())
 
-const activeBranches = computed(() => branches.value.filter(b => b.active))
-const inactiveBranches = computed(() => branches.value.filter(b => !b.active))
-
 async function fetchBranches() {
   loading.value = true
   try {
     const response = await branchesApi.getAll()
-    branches.value = response.content
+    const content = Array.isArray(response?.content) ? response.content : []
+    branches.value = content.map(branch => ({
+      ...branch,
+      branchCode: branch.branchCode ?? branch.code ?? '',
+      address: branch.address ?? '',
+      city: branch.city ?? '',
+      phone: typeof branch.phone === 'string' ? formatPhoneInput(branch.phone) : ''
+    }))
     
     
     await fetchVehicleCounts()
@@ -49,9 +53,30 @@ async function fetchBranches() {
 
 async function fetchVehicleCounts() {
   const promises = branches.value.map(async (branch) => {
+    if (typeof branch.vehicleCount === 'number') {
+      return
+    }
+
     try {
       const response = await vehiclesApi.getByBranch(branch.id)
-      branch.vehicleCount = Array.isArray(response) ? response.length : 0
+      if (Array.isArray(response)) {
+        branch.vehicleCount = response.length
+        return
+      }
+
+      if (response && typeof response === 'object' && 'content' in response) {
+        const paginated = response as { content?: unknown; totalElements?: unknown }
+        if (Array.isArray(paginated.content)) {
+          branch.vehicleCount = paginated.content.length
+          return
+        }
+        if (typeof paginated.totalElements === 'number') {
+          branch.vehicleCount = paginated.totalElements
+          return
+        }
+      }
+
+      branch.vehicleCount = 0
     } catch {
       branch.vehicleCount = 0
     }
@@ -72,11 +97,11 @@ function openEditForm(branch: Branch) {
   editingBranch.value = branch
   formData.value = {
     code: branch.code,
-    branchCode: branch.branchCode ?? '',
+    branchCode: branch.branchCode ?? branch.code ?? '',
     name: branch.name,
-    address: branch.address,
-    city: branch.city,
-    phone: branch.phone,
+    address: branch.address ?? '',
+    city: branch.city ?? '',
+    phone: branch.phone ?? '',
     active: branch.active
   }
   formErrors.value = {}
@@ -121,7 +146,7 @@ function validateField(field: keyof typeof formData.value) {
   if (result.valid) {
     delete formErrors.value[field]
   } else {
-    formErrors.value[field] = result.errors[0]
+    formErrors.value[field] = result.errors[0] ?? 'Geçersiz değer'
   }
 }
 
@@ -154,12 +179,19 @@ async function handleSubmit() {
     return
   }
 
+  const normalizedCode = formData.value.branchCode.trim()
+  const payload = {
+    ...formData.value,
+    code: normalizedCode,
+    branchCode: normalizedCode
+  }
+
   try {
     if (editingBranch.value) {
-      await branchesApi.update(editingBranch.value.id, formData.value)
+      await branchesApi.update(editingBranch.value.id, payload)
       toast.success('Şube güncellendi')
     } else {
-      await branchesApi.create(formData.value)
+      await branchesApi.create(payload)
       toast.success('Şube oluşturuldu')
     }
     showForm.value = false
@@ -190,7 +222,7 @@ onMounted(fetchBranches)
         <span class="count">{{ branches.length }} şube</span>
       </div>
       <button class="btn btn-primary" @click="openCreateForm">
-        ➕ Yeni Şube
+        Yeni Şube
       </button>
     </header>
 
@@ -227,13 +259,13 @@ onMounted(fetchBranches)
 
           <div class="card-footer">
             <button class="btn-action" @click="openEditForm(branch)">
-              ✏️ Düzenle
+              Düzenle
             </button>
             <button 
               :class="['btn-action', branch.active ? 'danger' : 'success']"
               @click="toggleStatus(branch)"
             >
-              {{ branch.active ? '⏸️ Pasifleştir' : '▶️ Aktifleştir' }}
+              {{ branch.active ? 'Pasifleştir' : 'Aktifleştir' }}
             </button>
           </div>
         </div>
@@ -314,10 +346,12 @@ onMounted(fetchBranches)
             <input 
               v-model="formData.phone" 
               type="tel" 
+              inputmode="numeric"
+              maxlength="13"
               :class="{ 'error': touchedFields.has('phone') && formErrors.phone }"
               @blur="handleBlur('phone')"
               @input="handlePhoneInput"
-              placeholder="(555) 123 45 67"
+              placeholder="555 111 11 11"
             />
             <span v-if="touchedFields.has('phone') && formErrors.phone" class="error-message">
               {{ formErrors.phone }}
@@ -568,3 +602,4 @@ onMounted(fetchBranches)
   flex: 1;
 }
 </style>
+

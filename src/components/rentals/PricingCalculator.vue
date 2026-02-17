@@ -154,7 +154,7 @@ function isTotalItem(description: string): boolean {
 
 let calculateTimeout: ReturnType<typeof setTimeout> | null = null
 
-watch([() => props.vehicleId, () => props.startDate, () => props.endDate, () => props.rentalType, () => props.termMonths], () => {
+watch([() => props.vehicleId, () => props.startDate, () => props.endDate, () => props.rentalType, () => props.termMonths, () => props.kmPackageId], () => {
 
   if (calculateTimeout) {
     clearTimeout(calculateTimeout)

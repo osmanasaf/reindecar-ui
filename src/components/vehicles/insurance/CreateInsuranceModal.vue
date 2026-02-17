@@ -2,6 +2,7 @@
 import { ref, watch } from 'vue'
 import { vehicleInsurancesApi } from '@/api'
 import { useForm, useToast, useEnumTranslations } from '@/composables'
+import { formatPhoneInput, isValidPhoneNumber, normalizePhoneDigits } from '@/utils/phone'
 import type { CreateVehicleInsuranceRequest, InsuranceType } from '@/types'
 
 interface Props {
@@ -51,7 +52,7 @@ const validationRules = {
     return ''
   },
   contactPhone: (value?: string) => {
-    if (value && value.length > 20) return 'Telefon en fazla 20 karakter olabilir'
+    if (value && !isValidPhoneNumber(value)) return 'Telefon 10 haneli olmalidir'
     return ''
   },
   notes: (value?: string) => {
@@ -70,7 +71,10 @@ const isSubmitting = ref(false)
 const onSubmit = handleSubmit(async (data) => {
   isSubmitting.value = true
   try {
-    await vehicleInsurancesApi.create(data)
+    await vehicleInsurancesApi.create({
+      ...data,
+      contactPhone: data.contactPhone ? normalizePhoneDigits(data.contactPhone) : ''
+    })
     toast.success('Sigorta poliçesi başarıyla eklendi')
     emit('success')
     emit('close')
@@ -85,6 +89,11 @@ const onSubmit = handleSubmit(async (data) => {
 const handleClose = () => {
   reset()
   emit('close')
+}
+
+function handleContactPhoneInput(event: Event) {
+  const target = event.target as HTMLInputElement
+  values.contactPhone = formatPhoneInput(target.value)
 }
 
 watch(() => props.show, (newVal) => {
@@ -224,11 +233,13 @@ watch(() => props.show, (newVal) => {
             <label class="form-label">İletişim Telefonu</label>
             <input
               v-model="values.contactPhone"
-              type="text"
+              type="tel"
+              inputmode="numeric"
               class="form-input"
               :class="{ 'error': touched.contactPhone && errors.contactPhone }"
-              maxlength="20"
-              placeholder="0555 123 45 67"
+              maxlength="13"
+              placeholder="555 111 11 11"
+              @input="handleContactPhoneInput"
               @blur="validateField('contactPhone')"
             />
             <span v-if="touched.contactPhone && errors.contactPhone" class="error-text">

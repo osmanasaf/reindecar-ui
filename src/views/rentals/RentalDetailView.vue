@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { rentalsApi, vehiclesApi, customersApi, branchesApi, kmPackagesApi } from '@/api'
 import { useToast } from '@/composables'
-import type { Rental, RentalStatus, RentalType, Vehicle, Customer, Branch, RentalDriver, KmPackage } from '@/types'
+import type { Rental, RentalStatus, RentalType, Vehicle, Customer, Branch, RentalDriver, KmPackage, Driver } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -21,6 +21,11 @@ const loading = ref(true)
 const generatingPdf = ref(false)
 const showDriverModal = ref(false)
 const newDriverId = ref<number | null>(null)
+
+const customerDrivers = ref<Driver[]>([])
+const loadingDrivers = ref(false)
+const driverSearch = ref('')
+const selectedDriverId = ref<number | null>(null)
 
 const rentalId = computed(() => Number(route.params.id))
 
@@ -104,6 +109,25 @@ const durationLabel = computed(() => {
   }
 })
 
+function getDriverDisplayName(driver: Driver): string {
+  if (driver.fullName) return driver.fullName
+  return `${driver.firstName || ''} ${driver.lastName || ''}`.trim() || 'İsimsiz Sürücü'
+}
+
+const filteredCustomerDrivers = computed(() => {
+  const query = driverSearch.value.toLowerCase().trim()
+  if (!query) return customerDrivers.value
+
+  return customerDrivers.value.filter(driver => {
+    const displayName = getDriverDisplayName(driver).toLowerCase()
+    return (
+      displayName.includes(query) ||
+      driver.licenseNumber?.toLowerCase().includes(query) ||
+      driver.nationalId?.includes(query)
+    )
+  })
+})
+
 async function fetchRental() {
   loading.value = true
   try {
@@ -182,13 +206,36 @@ async function fetchDrivers() {
   }
 }
 
-async function addDriver() {
-  if (!rental.value || !newDriverId.value) return
+async function fetchCustomerDrivers() {
+  if (!rental.value?.customerId) {
+    customerDrivers.value = []
+    return
+  }
+
+  loadingDrivers.value = true
   try {
-    await rentalsApi.addDriver(rental.value.id, { driverId: newDriverId.value, primary: drivers.value.length === 0 })
+    customerDrivers.value = await customersApi.getDrivers(rental.value.customerId, true)
+  } catch (err) {
+    toast.apiError(err, 'Sürücüler yüklenemedi')
+    customerDrivers.value = []
+  } finally {
+    loadingDrivers.value = false
+  }
+}
+
+async function addDriver() {
+  if (!rental.value) return
+
+  const chosenDriverId = selectedDriverId.value || newDriverId.value
+  if (!chosenDriverId) return
+
+  try {
+    await rentalsApi.addDriver(rental.value.id, { driverId: chosenDriverId, primary: drivers.value.length === 0 })
     toast.success('Sürücü eklendi')
     showDriverModal.value = false
     newDriverId.value = null
+    selectedDriverId.value = null
+    driverSearch.value = ''
     fetchDrivers()
   } catch (err) {
     toast.apiError(err, 'Sürücü eklenemedi')
@@ -500,6 +547,19 @@ function formatKm(km: number): string {
   return new Intl.NumberFormat('tr-TR').format(km) + ' km'
 }
 
+watch(showDriverModal, (isOpen) => {
+  if (isOpen) {
+    driverSearch.value = ''
+    selectedDriverId.value = null
+    newDriverId.value = null
+    fetchCustomerDrivers()
+  } else {
+    newDriverId.value = null
+    selectedDriverId.value = null
+    driverSearch.value = ''
+  }
+})
+
 onMounted(fetchRental)
 </script>
 
@@ -670,7 +730,6 @@ onMounted(fetchRental)
               </div>
             </div>
 
-            <!-- KM Package Info -->
             <div v-if="kmPackage || rental.customIncludedKm" class="km-package-info">
                 <div class="package-header">
                     <h4>KM Paketi: {{ kmPackage?.name || 'Özel Paket' }}</h4>
@@ -817,14 +876,97 @@ onMounted(fetchRental)
               <button class="close-btn" @click="showDriverModal = false">×</button>
             </div>
             <div class="modal-body">
-              <div class="form-group">
-                <label>Sürücü ID</label>
-                <input v-model.number="newDriverId" type="number" placeholder="Müşteri ID girin" />
+              <div class="driver-modal-body">
+                <p class="modal-description">
+                  Kiralamaya eklenecek sürücüyü seçin. Varsayılan olarak ilk eklenen sürücü ana sürücü olarak işaretlenir.
+                </p>
+
+                <div v-if="loadingDrivers" class="driver-loading">
+                  <span class="spinner-sm"></span>
+                  <span>Sürücüler yükleniyor...</span>
+                </div>
+
+                <template v-else>
+                  <div v-if="rental?.customerId" class="driver-search">
+                    <input
+                      v-model="driverSearch"
+                      type="text"
+                      class="driver-search-input"
+                      placeholder="İsim, TC veya ehliyet numarası ile ara"
+                    />
+                  </div>
+
+                  <div v-if="filteredCustomerDrivers.length > 0" class="driver-list">
+                    <div
+                      v-for="driver in filteredCustomerDrivers"
+                      :key="driver.id"
+                      :class="['driver-list-item', { selected: selectedDriverId === driver.id }]"
+                      @click="selectedDriverId = driver.id"
+                    >
+                      <div class="driver-avatar">
+                        {{ driver.fullName?.charAt(0) || driver.firstName?.charAt(0) || 'S' }}
+                      </div>
+                      <div class="driver-meta">
+                        <div class="driver-name-row">
+                          <span class="driver-list-name">
+                            {{ getDriverDisplayName(driver) }}
+                          </span>
+                          <span
+                            v-if="driver.customerId === rental?.customerId"
+                            class="badge"
+                          >
+                            Müşteriye Ait
+                          </span>
+                        </div>
+                        <div class="driver-details-row">
+                          <span v-if="driver.licenseNumber">Ehliyet: {{ driver.licenseNumber }}</span>
+                          <span v-if="driver.licenseClass"> · Sınıf: {{ driver.licenseClass }}</span>
+                          <span v-if="driver.nationalId"> · TC: {{ driver.nationalId.substring(0, 3) }}***</span>
+                        </div>
+                      </div>
+                      <div class="driver-radio">
+                        <input
+                          type="radio"
+                          :checked="selectedDriverId === driver.id"
+                          @change.stop="selectedDriverId = driver.id"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div v-else class="driver-empty">
+                    <p>Bu müşteri için kayıtlı sürücü bulunamadı.</p>
+                    <p class="driver-empty-hint">
+                      Müşteri detay sayfasından yeni sürücü ekleyebilir veya aşağıdan ID ile ekleyebilirsiniz.
+                    </p>
+                  </div>
+
+                  <div class="divider">
+                    <span>veya ID ile ekle</span>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="driver-id-input">Sürücü ID</label>
+                    <input
+                      id="driver-id-input"
+                      v-model.number="newDriverId"
+                      type="number"
+                      placeholder="Sürücü ID girin"
+                    />
+                    <small class="field-hint">Sadece sürücü ID'si biliniyorsa kullanın.</small>
+                  </div>
+                </template>
               </div>
             </div>
             <div class="modal-footer">
               <button class="btn btn-outline" @click="showDriverModal = false">İptal</button>
-              <button class="btn btn-primary" :disabled="!newDriverId" @click="addDriver">Ekle</button>
+              <button
+                class="btn btn-primary"
+                :disabled="!selectedDriverId && !newDriverId"
+                @click="addDriver"
+              >
+                Ekle
+              </button>
             </div>
           </div>
         </div>
@@ -1433,6 +1575,167 @@ onMounted(fetchRental)
   gap: 12px;
   padding: 16px 24px;
   border-top: 1px solid var(--color-border);
+}
+
+.driver-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.modal-description {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin: 0 0 4px 0;
+}
+
+.driver-search {
+  margin-bottom: 4px;
+}
+
+.driver-search-input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  font-size: 14px;
+  background: var(--color-bg-secondary);
+  transition: all 0.2s;
+}
+
+.driver-search-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  background: var(--color-surface);
+  box-shadow: 0 0 0 3px var(--color-primary-light);
+}
+
+.driver-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+}
+
+.driver-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.driver-list-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.driver-list-item:hover {
+  border-color: var(--color-primary);
+  background: var(--color-surface);
+}
+
+.driver-list-item.selected {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.driver-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: var(--color-primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.driver-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.driver-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.driver-list-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.driver-details-row {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.driver-radio {
+  margin-left: 8px;
+}
+
+.driver-radio input[type='radio'] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.driver-empty {
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--color-bg-secondary);
+  border: 1px dashed var(--color-border);
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.driver-empty p {
+  margin: 0 0 4px 0;
+}
+
+.driver-empty-hint {
+  font-size: 12px;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
+}
+
+.field-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--color-text-muted);
 }
 
 .price-card {

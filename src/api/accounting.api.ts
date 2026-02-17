@@ -22,6 +22,7 @@ import type {
   ClaimFilters,
   ClaimDocumentType
 } from '@/types'
+import { normalizePhoneDigits } from '@/utils/phone'
 
 class ReceivablesApiService extends BaseApi {
   protected readonly basePath = '/receivables'
@@ -173,7 +174,14 @@ class ServiceProvidersApiService extends BaseApi {
   protected readonly basePath = '/service-providers'
 
   async create(request: CreateServiceProviderRequest): Promise<ServiceProviderResponse> {
-    return this.post('', request)
+    const payload = { ...request }
+    if (typeof payload.phone === 'string' && payload.phone) {
+      payload.phone = normalizePhoneDigits(payload.phone)
+    }
+    if (typeof payload.contactPhone === 'string' && payload.contactPhone) {
+      payload.contactPhone = normalizePhoneDigits(payload.contactPhone)
+    }
+    return this.post('', payload)
   }
 
   async getById(id: number): Promise<ServiceProviderResponse> {
@@ -193,7 +201,14 @@ class ServiceProvidersApiService extends BaseApi {
   }
 
   async update(id: number, request: UpdateServiceProviderRequest): Promise<ServiceProviderResponse> {
-    return this.put(`/${id}`, request)
+    const payload = { ...request }
+    if (typeof payload.phone === 'string' && payload.phone) {
+      payload.phone = normalizePhoneDigits(payload.phone)
+    }
+    if (typeof payload.contactPhone === 'string' && payload.contactPhone) {
+      payload.contactPhone = normalizePhoneDigits(payload.contactPhone)
+    }
+    return this.put(`/${id}`, payload)
   }
 
   async deactivate(id: number): Promise<void> {
@@ -217,7 +232,11 @@ class VehicleInsurancesApiService extends BaseApi {
   }
 
   async create(request: CreateVehicleInsuranceRequest): Promise<VehicleInsuranceResponse> {
-    return this.post('', request)
+    const payload = { ...request }
+    if (typeof payload.contactPhone === 'string' && payload.contactPhone) {
+      payload.contactPhone = normalizePhoneDigits(payload.contactPhone)
+    }
+    return this.post('', payload)
   }
 
   async deactivate(id: number): Promise<void> {

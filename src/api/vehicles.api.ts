@@ -38,8 +38,16 @@ class VehiclesApiService extends BaseApi {
         return this.post('', vehicle)
     }
 
-    async update(id: number, vehicle: UpdateVehicleForm): Promise<Vehicle> {
+    async patchById(id: number, vehicle: UpdateVehicleForm): Promise<Vehicle> {
+        return this.patch(`/${id}`, vehicle)
+    }
+
+    async putById(id: number, vehicle: UpdateVehicleForm): Promise<Vehicle> {
         return this.put(`/${id}`, vehicle)
+    }
+
+    async update(id: number, vehicle: UpdateVehicleForm): Promise<Vehicle> {
+        return this.putById(id, vehicle)
     }
 
     async updateStatus(id: number, form: UpdateVehicleStatusForm): Promise<Vehicle> {

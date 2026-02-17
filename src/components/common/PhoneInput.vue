@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
 import { validators, validate, formatPhoneInput, type ValidationRule } from '@/utils/validation'
+import { PHONE_INPUT_MAX_LENGTH } from '@/utils/phone'
 
 interface Props {
   modelValue: string
@@ -13,7 +14,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   required: false,
   disabled: false,
-  placeholder: '(555) 123 45 67'
+  placeholder: '555 111 11 11'
 })
 
 const emit = defineEmits<{
@@ -84,6 +85,8 @@ defineExpose({
     <input
       :value="modelValue"
       type="tel"
+      inputmode="numeric"
+      :maxlength="PHONE_INPUT_MAX_LENGTH"
       :placeholder="placeholder"
       :disabled="disabled"
       :class="['input-field', { error: touched && errorMessage }]"

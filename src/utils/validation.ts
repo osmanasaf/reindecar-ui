@@ -1,3 +1,5 @@
+import { formatPhoneInput as formatTrPhoneInput, isValidPhoneNumber } from './phone'
+
 export interface ValidationRule {
     validate: (value: any) => boolean
     message: string
@@ -30,8 +32,7 @@ export const validators = {
     phone: (message = 'Geçerli bir telefon numarası giriniz'): ValidationRule => ({
         validate: (value: string) => {
             if (!value) return true
-            const phoneRegex = /^[0-9]{10,11}$/
-            return phoneRegex.test(value.replace(/[\s()-]/g, ''))
+            return isValidPhoneNumber(value)
         },
         message
     }),
@@ -156,11 +157,7 @@ export function validate(value: any, rules: ValidationRule[]): ValidationResult 
 }
 
 export function formatPhoneInput(value: string): string {
-    const digits = value.replace(/\D/g, '')
-    if (digits.length <= 10) {
-        return digits.replace(/(\d{3})(\d{3})(\d{2})(\d{2})/, '($1) $2 $3 $4')
-    }
-    return digits.replace(/(\d{4})(\d{3})(\d{2})(\d{2})/, '($1) $2 $3 $4')
+    return formatTrPhoneInput(value)
 }
 
 export function formatIbanInput(value: string): string {

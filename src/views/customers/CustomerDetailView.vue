@@ -1,9 +1,11 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { customersApi, driversApi } from '@/api'
 import { useToast } from '@/composables'
+import { formatPhoneInput } from '@/utils/phone'
 import type { Customer, CustomerType, Driver, CreateDriverForm, UpdateDriverForm } from '@/types'
+import CompanyAuthorizedPersonsSection from '@/components/customers/CompanyAuthorizedPersonsSection.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -95,11 +97,8 @@ function getDriverDisplayName(driver: Driver): string {
 }
 
 function formatPhone(phone: string): string {
-  const digits = phone.replace(/\D/g, '')
-  if (digits.length === 10) {
-    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)} ${digits.slice(6, 8)} ${digits.slice(8)}`
-  }
-  return phone
+  const formatted = formatPhoneInput(phone)
+  return formatted || phone
 }
 
 function formatDate(date: string): string {
@@ -164,7 +163,7 @@ function openEditModal(driver: Driver) {
     firstName: driver.firstName,
     lastName: driver.lastName,
     nationalId: driver.nationalId,
-    phone: driver.phone,
+    phone: formatPhoneInput(driver.phone || ''),
     licenseNumber: driver.licenseNumber,
     licenseClass: driver.licenseClass,
     licenseExpiryDate: driver.licenseExpiryDate,
@@ -179,6 +178,16 @@ function closeEditModal() {
   editDriverForm.value = {}
 }
 
+function handleNewDriverPhoneInput(event: Event) {
+  const target = event.target as HTMLInputElement
+  newDriver.value.phone = formatPhoneInput(target.value)
+}
+
+function handleEditDriverPhoneInput(event: Event) {
+  const target = event.target as HTMLInputElement
+  editDriverForm.value.phone = formatPhoneInput(target.value)
+}
+
 async function updateDriver() {
   if (!editingDriver.value) return
   
@@ -186,8 +195,6 @@ async function updateDriver() {
   try {
     const updated = await driversApi.update(editingDriver.value.id, editDriverForm.value)
     toast.success('Sürücü başarıyla güncellendi')
-    
-    // Update in list
     const index = drivers.value.findIndex(d => d.id === editingDriver.value!.id)
     if (index !== -1) {
       drivers.value[index] = updated
@@ -209,8 +216,6 @@ async function confirmDeleteDriver(driver: Driver) {
   try {
     await driversApi.delete(driver.id)
     toast.success('Sürücü başarıyla silindi')
-    
-    // Remove from list
     drivers.value = drivers.value.filter(d => d.id !== driver.id)
   } catch (err) {
     toast.apiError(err, 'Sürücü silinemedi')
@@ -324,17 +329,21 @@ onMounted(fetchCustomer)
             </div>
             <div class="info-item">
               <span class="label">Ticaret Sicil No</span>
-              <span class="value">{{ customer.tradeRegistryNumber || '-' }}</span>
+              <span class="value">{{ customer.tradeRegisterNo || customer.tradeRegistryNumber || '-' }}</span>
             </div>
             <div class="info-item">
-              <span class="label">Yetkili Kişi</span>
-              <span class="value">{{ customer.authorizedPersonName || '-' }}</span>
+              <span class="label">Ana Yetkili</span>
+              <span class="value">{{ customer.authorizedPerson || customer.authorizedPersonName || '-' }}</span>
             </div>
             <div class="info-item">
               <span class="label">Yetkili Telefon</span>
-              <span class="value">{{ customer.authorizedPersonPhone ? formatPhone(customer.authorizedPersonPhone) : '-' }}</span>
+              <span class="value">{{ customer.authorizedPersonPhone || '-' }}</span>
             </div>
           </div>
+        </section>
+
+        <section v-if="customer.customerType === 'COMPANY'" class="authorized-persons-card">
+          <CompanyAuthorizedPersonsSection :customer-id="customer.id" />
         </section>
 
         <section class="card stats-card">
@@ -362,32 +371,60 @@ onMounted(fetchCustomer)
           <div v-if="showDriverForm" class="driver-form">
             <div class="form-grid">
               <div class="form-group">
-                <label>Ad *</label>
-                <input v-model="newDriver.firstName" type="text" placeholder="Ad" />
+                <label for="new-driver-first-name">Ad *</label>
+                <input id="new-driver-first-name" v-model="newDriver.firstName" type="text" placeholder="Ad" />
               </div>
               <div class="form-group">
-                <label>Soyad *</label>
-                <input v-model="newDriver.lastName" type="text" placeholder="Soyad" />
+                <label for="new-driver-last-name">Soyad *</label>
+                <input id="new-driver-last-name" v-model="newDriver.lastName" type="text" placeholder="Soyad" />
               </div>
               <div class="form-group">
-                <label>TC Kimlik No *</label>
-                <input v-model="newDriver.nationalId" type="text" maxlength="11" placeholder="11 haneli TC No" />
+                <label for="new-driver-national-id">TC Kimlik No *</label>
+                <input
+                  id="new-driver-national-id"
+                  v-model="newDriver.nationalId"
+                  type="text"
+                  maxlength="11"
+                  placeholder="11 haneli TC No"
+                />
               </div>
               <div class="form-group">
-                <label>Telefon</label>
-                <input v-model="newDriver.phone" type="tel" placeholder="05XX..." />
+                <label for="new-driver-phone">Telefon</label>
+                <input
+                  id="new-driver-phone"
+                  v-model="newDriver.phone"
+                  type="tel"
+                  inputmode="numeric"
+                  maxlength="13"
+                  placeholder="555 111 11 11"
+                  @input="handleNewDriverPhoneInput"
+                />
               </div>
               <div class="form-group">
-                <label>Ehliyet No *</label>
-                <input v-model="newDriver.licenseNumber" type="text" placeholder="Ehliyet numarası" />
+                <label for="new-driver-license-number">Ehliyet No *</label>
+                <input
+                  id="new-driver-license-number"
+                  v-model="newDriver.licenseNumber"
+                  type="text"
+                  placeholder="Ehliyet numarası"
+                />
               </div>
               <div class="form-group">
-                <label>Ehliyet Sınıfı</label>
-                <input v-model="newDriver.licenseClass" type="text" placeholder="B" />
+                <label for="new-driver-license-class">Ehliyet Sınıfı</label>
+                <input
+                  id="new-driver-license-class"
+                  v-model="newDriver.licenseClass"
+                  type="text"
+                  placeholder="B"
+                />
               </div>
               <div class="form-group full">
-                <label>Ehliyet Geçerlilik Tarihi *</label>
-                <input v-model="newDriver.licenseExpiryDate" type="date" />
+                <label for="new-driver-license-expiry">Ehliyet Geçerlilik Tarihi *</label>
+                <input
+                  id="new-driver-license-expiry"
+                  v-model="newDriver.licenseExpiryDate"
+                  type="date"
+                />
               </div>
             </div>
             <div class="form-actions">
@@ -429,7 +466,6 @@ onMounted(fetchCustomer)
           </div>
         </section>
 
-        <!-- Edit Driver Modal -->
         <div v-if="showEditModal" class="modal-overlay" @click.self="closeEditModal">
           <div class="modal">
             <div class="modal-header">
@@ -439,32 +475,60 @@ onMounted(fetchCustomer)
             <div class="modal-body">
               <div class="form-grid">
                 <div class="form-group">
-                  <label>Ad *</label>
-                  <input v-model="editDriverForm.firstName" type="text" placeholder="Ad" />
+                  <label for="edit-driver-first-name">Ad *</label>
+                  <input id="edit-driver-first-name" v-model="editDriverForm.firstName" type="text" placeholder="Ad" />
                 </div>
                 <div class="form-group">
-                  <label>Soyad *</label>
-                  <input v-model="editDriverForm.lastName" type="text" placeholder="Soyad" />
+                  <label for="edit-driver-last-name">Soyad *</label>
+                  <input id="edit-driver-last-name" v-model="editDriverForm.lastName" type="text" placeholder="Soyad" />
                 </div>
                 <div class="form-group">
-                  <label>TC Kimlik No *</label>
-                  <input v-model="editDriverForm.nationalId" type="text" maxlength="11" placeholder="11 haneli TC No" />
+                  <label for="edit-driver-national-id">TC Kimlik No *</label>
+                  <input
+                    id="edit-driver-national-id"
+                    v-model="editDriverForm.nationalId"
+                    type="text"
+                    maxlength="11"
+                    placeholder="11 haneli TC No"
+                  />
                 </div>
                 <div class="form-group">
-                  <label>Telefon</label>
-                  <input v-model="editDriverForm.phone" type="tel" placeholder="05XX..." />
+                  <label for="edit-driver-phone">Telefon</label>
+                  <input
+                    id="edit-driver-phone"
+                    v-model="editDriverForm.phone"
+                    type="tel"
+                    inputmode="numeric"
+                    maxlength="13"
+                    placeholder="555 111 11 11"
+                    @input="handleEditDriverPhoneInput"
+                  />
                 </div>
                 <div class="form-group">
-                  <label>Ehliyet No *</label>
-                  <input v-model="editDriverForm.licenseNumber" type="text" placeholder="Ehliyet numarası" />
+                  <label for="edit-driver-license-number">Ehliyet No *</label>
+                  <input
+                    id="edit-driver-license-number"
+                    v-model="editDriverForm.licenseNumber"
+                    type="text"
+                    placeholder="Ehliyet numarası"
+                  />
                 </div>
                 <div class="form-group">
-                  <label>Ehliyet Sınıfı</label>
-                  <input v-model="editDriverForm.licenseClass" type="text" placeholder="B" />
+                  <label for="edit-driver-license-class">Ehliyet Sınıfı</label>
+                  <input
+                    id="edit-driver-license-class"
+                    v-model="editDriverForm.licenseClass"
+                    type="text"
+                    placeholder="B"
+                  />
                 </div>
                 <div class="form-group full">
-                  <label>Ehliyet Geçerlilik Tarihi *</label>
-                  <input v-model="editDriverForm.licenseExpiryDate" type="date" />
+                  <label for="edit-driver-license-expiry">Ehliyet Geçerlilik Tarihi *</label>
+                  <input
+                    id="edit-driver-license-expiry"
+                    v-model="editDriverForm.licenseExpiryDate"
+                    type="date"
+                  />
                 </div>
                 <div class="form-group full">
                   <label class="checkbox-label">
@@ -474,9 +538,16 @@ onMounted(fetchCustomer)
                 </div>
               </div>
             </div>
-            <div class="form-actions">
-              <button class="btn btn-outline" @click="closeEditModal">İptal</button>
-              <button class="btn btn-primary" :disabled="updatingDriver" @click="updateDriver">
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline" @click="closeEditModal">
+                İptal
+              </button>
+              <button
+                type="button"
+                class="btn btn-primary"
+                :disabled="updatingDriver"
+                @click="updateDriver"
+              >
                 {{ updatingDriver ? 'Güncelleniyor...' : 'Güncelle' }}
               </button>
             </div>
@@ -485,7 +556,6 @@ onMounted(fetchCustomer)
       </div>
     </template>
 
-    <!-- Blacklist Modal -->
     <div v-if="showBlacklistModal" class="modal-overlay" @click.self="showBlacklistModal = false">
       <div class="modal">
         <div class="modal-header">
@@ -497,10 +567,11 @@ onMounted(fetchCustomer)
             <strong>{{ customer?.displayName }}</strong> adlı müşteriyi kara listeye eklemek istediğinize emin misiniz?
           </p>
           <div class="form-group">
-            <label>Sebep *</label>
-            <textarea 
-              v-model="blacklistReason" 
-              rows="4" 
+            <label for="blacklist-reason">Sebep *</label>
+            <textarea
+              id="blacklist-reason"
+              v-model="blacklistReason"
+              rows="4"
               placeholder="Kara listeye ekleme sebebini yazınız..."
               autofocus
             ></textarea>
@@ -704,6 +775,10 @@ onMounted(fetchCustomer)
 }
 
 .stats-card {
+  grid-column: span 2;
+}
+
+.authorized-persons-card {
   grid-column: span 2;
 }
 
@@ -930,7 +1005,6 @@ onMounted(fetchCustomer)
   font-weight: 500;
 }
 
-/* Modal Styles */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -999,6 +1073,16 @@ onMounted(fetchCustomer)
   color: var(--color-text-secondary);
 }
 
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 24px 20px 24px;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+}
+
 .checkbox-label {
   display: flex;
   align-items: center;
@@ -1018,6 +1102,7 @@ onMounted(fetchCustomer)
   }
   
   .stats-card,
+  .authorized-persons-card,
   .drivers-card {
     grid-column: span 1;
   }
@@ -1031,3 +1116,5 @@ onMounted(fetchCustomer)
   }
 }
 </style>
+
+

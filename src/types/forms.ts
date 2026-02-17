@@ -1,4 +1,4 @@
-import type { RentalType, PaymentMethod, KmRecordSource, DiscountType, CalculationType, CustomerType, DamageType, DamageLocation, DamageSeverity, MaintenanceType } from './enums'
+import type { RentalType, PaymentMethod, KmRecordSource, DiscountType, CalculationType, CustomerType, DamageType, DamageLocation, DamageSeverity, MaintenanceType, FuelType, Transmission } from './enums'
 
 
 export interface LoginForm {
@@ -30,19 +30,48 @@ export interface AuthorizedPerson {
     phone: string
     email?: string
     title?: string
+    isPrimary: boolean
 }
 
-export interface CreateCompanyCustomerForm {
+export interface CompanyCustomerBaseForm {
     taxNumber: string
     companyName: string
     taxOffice: string
-    tradeRegistryNumber: string
+    tradeRegisterNo?: string
     phone: string
     email: string
     address: string
     city: string
     invoiceAddress: string
+    sector?: string
+    employeeCount?: number
+    creditScore?: number
+}
+
+export interface CreateCompanyCustomerForm extends CompanyCustomerBaseForm {
     authorizedPersons: AuthorizedPerson[]
+}
+
+export interface UpdateCompanyCustomerForm extends CompanyCustomerBaseForm {}
+
+export interface CreateAuthorizedPersonRequest {
+    firstName: string
+    lastName: string
+    nationalId: string
+    phone: string
+    email?: string | null
+    title?: string | null
+    isPrimary?: boolean
+}
+
+export interface UpdateAuthorizedPersonRequest {
+    firstName?: string
+    lastName?: string
+    nationalId?: string
+    phone?: string
+    email?: string | null
+    title?: string | null
+    isPrimary?: boolean
 }
 
 
@@ -53,8 +82,8 @@ export interface CreateVehicleForm {
     model: string
     year: number
     color: string
-    fuelType: string
-    transmission: string
+    fuelType: FuelType
+    transmission: Transmission
     engineCapacity: number
     seatCount: number
     categoryId: number
@@ -74,27 +103,30 @@ export interface UpdateVehicleStatusForm {
     notes?: string
 }
 
-export interface UpdateVehicleForm {
+export interface UpdateVehicleRequest {
     plateNumber: string
     vinNumber: string
     brand: string
     model: string
     year: number
-    color: string
-    fuelType: string
-    transmission: string
+    color: string | null
+    fuelType: FuelType
+    transmission: Transmission
     engineCapacity: number
     seatCount: number
     categoryId: number
     branchId: number
     currentKm: number
-    insuranceExpiryDate: string
-    inspectionExpiryDate: string
-    dailyPrice: number
-    weeklyPrice?: number
-    monthlyPrice?: number
-    notes?: string
+    insuranceExpiryDate: string | null
+    inspectionExpiryDate: string | null
+    registrationDate: string | null
+    dailyPrice: number | null
+    weeklyPrice: number | null
+    monthlyPrice: number | null
+    notes: string | null
 }
+
+export type UpdateVehicleForm = UpdateVehicleRequest
 
 
 export interface CreateRentalForm {

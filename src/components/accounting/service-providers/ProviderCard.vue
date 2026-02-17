@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import type { ServiceProviderResponse } from '@/types'
 import { useEnumTranslations } from '@/composables'
+import { formatPhone } from '@/utils/format'
 
 interface Props {
   provider: ServiceProviderResponse
@@ -59,7 +60,7 @@ const location = computed(() => {
 
       <div v-if="provider.phone" class="info-row">
         <span class="label">Telefon:</span>
-        <span class="value">{{ provider.phone }}</span>
+        <span class="value">{{ formatPhone(provider.phone) }}</span>
       </div>
 
       <div v-if="provider.email" class="info-row">

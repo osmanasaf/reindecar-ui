@@ -122,15 +122,16 @@ const priceUnitLabel = computed(() => {
 })
 
 function getVehiclePrice(vehicle: Vehicle): number {
+  const baseDailyPrice = safeNumber(vehicle.dailyPrice)
   switch (props.rentalType) {
     case 'LEASING':
     case 'MONTHLY':
-      return vehicle.monthlyPrice ?? vehicle.dailyPrice * 30
+      return vehicle.monthlyPrice ?? baseDailyPrice * 30
     case 'WEEKLY':
-      return vehicle.weeklyPrice ?? vehicle.dailyPrice * 7
+      return vehicle.weeklyPrice ?? baseDailyPrice * 7
     case 'DAILY':
     default:
-      return vehicle.dailyPrice
+      return baseDailyPrice
   }
 }
 

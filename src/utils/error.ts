@@ -1,4 +1,4 @@
-import { type ErrorResponse, ErrorCategory } from '@/types'
+﻿import { type ErrorResponse, ErrorCategory } from '@/types'
 
 export function isErrorResponse(obj: unknown): obj is ErrorResponse {
     return (
@@ -125,30 +125,36 @@ export function getErrorSeverity(code: string): 'error' | 'warning' | 'info' {
 }
 
 export function getApiErrorMessage(err: unknown, fallback = 'Bir hata oluştu'): string {
+    const resolveBackendMessage = (error: ErrorResponse): string => {
+        if (error.code === 'E004' && error.details) {
+            const details = Object.values(error.details)
+            if (details.length > 0) {
+                return details.slice(0, 3).join(', ') + (details.length > 3 ? '...' : '')
+            }
+        }
+
+        if (typeof error.message === 'string' && error.message.trim().length > 0) {
+            return error.message
+        }
+
+        return errorMessageMap[error.code] || fallback
+    }
+
     if (!err) return fallback
     if (typeof err === 'string') return err
     if (typeof err === 'object') {
         if (isErrorResponse(err)) {
-            if (err.code === 'E004' && err.details) {
-                const details = Object.values(err.details)
-                if (details.length > 0) {
-                    return details.slice(0, 3).join(', ') + (details.length > 3 ? '...' : '')
-                }
-            }
-            return errorMessageMap[err.code] || err.message
+            return resolveBackendMessage(err)
         }
+
         const e = err as { message?: string; response?: { data?: unknown } }
         if (e.response?.data && isErrorResponse(e.response.data)) {
-            const errData = e.response.data
-            if (errData.code === 'E004' && errData.details) {
-                const details = Object.values(errData.details)
-                if (details.length > 0) {
-                    return details.slice(0, 3).join(', ') + (details.length > 3 ? '...' : '')
-                }
-            }
-            return errorMessageMap[errData.code] || errData.message
+            return resolveBackendMessage(e.response.data)
         }
+
         if (e.message) return e.message
     }
+
     return fallback
 }
+

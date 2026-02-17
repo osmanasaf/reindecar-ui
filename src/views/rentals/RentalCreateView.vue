@@ -1,8 +1,7 @@
-```
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { rentalsApi, branchesApi, kmPackagesApi } from '@/api'
+import { rentalsApi, branchesApi, kmPackagesApi, rentalExtraItemApi } from '@/api'
 import { useToast, useValidation } from '@/composables'
 import { RentalType, CustomerType } from '@/types'
 import type { Customer, CreateRentalForm, RentalExtraItem, Branch, KmPackage, Vehicle } from '@/types'
@@ -20,7 +19,7 @@ const router = useRouter()
 const toast = useToast()
 
 const currentStep = ref(1)
-const totalSteps = 6
+const totalSteps = 7
 const submitting = ref(false)
 const branches = ref<Branch[]>([])
 const kmPackages = ref<KmPackage[]>([])
@@ -36,6 +35,8 @@ const endDate = ref('')
 const selectedTermMonths = ref<number>(12)
 const selectedLeasingPlanId = ref<number | null>(null)
 const selectedKmPackageId = ref<number | null>(null)
+const customIncludedKm = ref<number | null>(null)
+const customExtraKmPrice = ref<number | null>(null)
 const extraItems = ref<RentalExtraItem[]>([])
 const extraItemsTotal = ref(0)
 const discountAmount = ref(0)
@@ -72,7 +73,7 @@ async function fetchBranches() {
 }
 
 const stepTitles = computed(() => {
-  return ['Tip', 'Tarih', 'Araç', 'Müşteri', 'Ek Kalemler', 'Özet']
+  return ['Tip', 'Tarih', 'Araç', 'Müşteri', 'KM Paketi', 'Ek Kalemler', 'Özet']
 })
 
 const canProceed = computed(() => {
@@ -80,9 +81,14 @@ const canProceed = computed(() => {
     case 1: return !!rentalType.value
     case 2: return !!startDate.value && !!endDate.value && validateDates()
     case 3: return !!selectedVehicleId.value
-    case 4: return !!selectedCustomerId.value
-    case 5: return true
+    case 4:
+      return !!selectedCustomerId.value &&
+        selectedDriverIds.value.length > 0 &&
+        !!primaryDriverId.value &&
+        selectedDriverIds.value.includes(primaryDriverId.value)
+    case 5: return kmPackages.value.length === 0 || !!selectedKmPackageId.value
     case 6: return true
+    case 7: return true
     default: return false
   }
 })
@@ -135,9 +141,14 @@ function isStepComplete(step: number): boolean {
     case 1: return !!rentalType.value
     case 2: return !!startDate.value && !!endDate.value && validateDates()
     case 3: return !!selectedVehicleId.value
-    case 4: return !!selectedCustomerId.value
-    case 5: return true
+    case 4:
+      return !!selectedCustomerId.value &&
+        selectedDriverIds.value.length > 0 &&
+        !!primaryDriverId.value &&
+        selectedDriverIds.value.includes(primaryDriverId.value)
+    case 5: return kmPackages.value.length === 0 || !!selectedKmPackageId.value
     case 6: return true
+    case 7: return true
     default: return false
   }
 }
@@ -175,35 +186,62 @@ const totalDays = computed(() => {
   return Math.ceil((new Date(endDate.value).getTime() - new Date(startDate.value).getTime()) / (1000 * 60 * 60 * 24))
 })
 
+const selectedKmPackage = computed(() => {
+  if (!selectedKmPackageId.value) return null
+  return kmPackages.value.find(pkg => pkg.id === selectedKmPackageId.value) || null
+})
+
+const baseTotal = computed(() => priceData.value?.finalTotal || 0)
+const subtotalWithExtras = computed(() => baseTotal.value + extraItemsTotal.value)
+const rawDiscount = computed(() => Math.max(0, discountAmount.value || 0))
+const appliedDiscountAmount = computed(() => Math.min(rawDiscount.value, subtotalWithExtras.value))
+const finalTotalWithDiscount = computed(() => Math.max(0, subtotalWithExtras.value - appliedDiscountAmount.value))
+
 async function fetchKmPackages() {
   try {
-    kmPackages.value = await kmPackagesApi.getByRentalType(rentalType.value)
-    // Auto-select first package if available
-    // Auto-select first package if available
-    if (kmPackages.value && kmPackages.value.length > 0 && !selectedKmPackageId.value) {
+    const byTypePackages = await kmPackagesApi.getByRentalType(rentalType.value)
+
+    if (!selectedVehicleCategoryId.value) {
+      kmPackages.value = byTypePackages
+    } else {
+      const availableForCategory = await kmPackagesApi.getAvailableForCategory(selectedVehicleCategoryId.value)
+      const byTypeIds = new Set(byTypePackages.map(pkg => pkg.id))
+      kmPackages.value = availableForCategory.filter(pkg =>
+        byTypeIds.has(pkg.id) || pkg.applicableTypes.includes(rentalType.value)
+      )
+    }
+
+    if (!kmPackages.value || kmPackages.value.length === 0) {
+      selectedKmPackageId.value = null
+      return
+    }
+
+    const hasSelection = kmPackages.value.some(pkg => pkg.id === selectedKmPackageId.value)
+    if (!hasSelection) {
       selectedKmPackageId.value = kmPackages.value[0]?.id ?? null
     }
   } catch (err) {
     toast.apiError(err, 'KM paketleri yüklenemedi')
     kmPackages.value = []
+    selectedKmPackageId.value = null
   }
 }
 
-watch(rentalType, () => {
-  fetchKmPackages()
-})
-
-function formatCurrency(amount: number): string {
+function formatCurrency(amount: number | null | undefined): string {
   return new Intl.NumberFormat('tr-TR', { 
     style: 'currency', 
     currency: 'TRY',
     maximumFractionDigits: 0
-  }).format(amount)
+  }).format(amount || 0)
 }
 
 async function handleSubmit() {
   if (!canProceed.value || !selectedVehicleId.value || !selectedCustomerId.value) return
-  
+  if (selectedDriverIds.value.length === 0 || !primaryDriverId.value) {
+    toast.error('Lütfen en az bir sürücü ve ana sürücü seçiniz')
+    return
+  }
+
   if (!selectedBranchId.value) {
     toast.error('Lütfen teslim şubesi seçiniz')
     return
@@ -224,19 +262,32 @@ async function handleSubmit() {
       endDate: endDate.value,
       termMonths: rentalType.value === RentalType.LEASING ? selectedTermMonths.value : undefined,
       kmPackageId: selectedKmPackageId.value || undefined,
-      extraItems: extraItems.value.length > 0 ? extraItems.value.map(item => ({
-        itemTypeId: item.itemTypeId,
-        customName: item.name,
-        description: item.description,
-        amount: item.amount,
-        currency: item.currency,
-        calculationType: item.calculationType
-      })) : undefined,
-      discountAmount: discountAmount.value > 0 ? discountAmount.value : undefined,
-      discountReason: discountAmount.value > 0 ? discountReason.value : undefined
+      customIncludedKm: customIncludedKm.value && customIncludedKm.value > 0 ? customIncludedKm.value : undefined,
+      customExtraKmPrice: customExtraKmPrice.value && customExtraKmPrice.value > 0 ? customExtraKmPrice.value : undefined,
+      discountAmount: appliedDiscountAmount.value > 0 ? appliedDiscountAmount.value : undefined
     }
 
     const rental = await rentalsApi.create(payload)
+
+    if (extraItems.value.length > 0) {
+      try {
+        await Promise.all(
+          extraItems.value.map(item =>
+            rentalExtraItemApi.add(rental.id, {
+              itemTypeId: item.itemTypeId ?? undefined,
+              customName: item.itemTypeId ? undefined : item.name,
+              description: item.description ?? undefined,
+              amount: item.amount,
+              currency: item.currency,
+              calculationType: item.calculationType
+            })
+          )
+        )
+      } catch (extraItemErr) {
+        toast.apiError(extraItemErr, 'Kiralama oluştu ancak ek kalemler kaydedilemedi')
+      }
+    }
+
     toast.success(`Kiralama #${rental.rentalNumber} başarıyla oluşturuldu`)
     router.push(`/rentals/${rental.id}`)
   } catch (err) {
@@ -256,8 +307,22 @@ watch(rentalType, () => {
     startDate.value = ''
     endDate.value = ''
     selectedLeasingPlanId.value = null
-    extraItems.value = []
   }
+
+  selectedKmPackageId.value = null
+  customIncludedKm.value = null
+  customExtraKmPrice.value = null
+  kmPackages.value = []
+  extraItems.value = []
+  extraItemsTotal.value = 0
+  discountAmount.value = 0
+  discountReason.value = ''
+  priceData.value = null
+  fetchKmPackages()
+}, { immediate: true })
+
+watch(selectedVehicleCategoryId, () => {
+  fetchKmPackages()
 })
 
 watch(selectedVehicleId, (newId) => {
@@ -330,19 +395,6 @@ onMounted(() => {
                 </div>
               </div>
 
-              <div v-if="isLeasing && selectedVehicleCategoryId" class="term-section">
-                <h3>Vade Süresi</h3>
-                <TermSelector 
-                  v-model="selectedTermMonths"
-                  :category-id="selectedVehicleCategoryId"
-                />
-              </div>
-              
-              <div v-if="isLeasing && !selectedVehicleCategoryId" class="term-notice">
-                <span>ℹ️</span>
-                <p>Vade seçimi için önce araç seçimi yapmanız gerekmektedir.</p>
-              </div>
-
               <div v-if="isLeasing" class="leasing-notice">
                 <span class="notice-icon">ℹ️</span>
                 <p>Leasing için minimum süre <strong>12 ay (365 gün)</strong> olmalıdır.</p>
@@ -357,34 +409,6 @@ onMounted(() => {
                 </div>
               </div>
 
-              <!-- KM Package Selection -->
-              <div v-if="kmPackages.length > 0" class="km-package-section">
-                <h3>KM Paketi Seçimi</h3>
-                <p class="section-description">Kiralama için uygun KM paketini seçiniz</p>
-                <div class="package-grid">
-                  <div 
-                    v-for="pkg in kmPackages" 
-                    :key="pkg.id"
-                    :class="['package-card', { selected: selectedKmPackageId === pkg.id }]"
-                    @click="selectedKmPackageId = pkg.id"
-                  >
-                    <div class="package-header">
-                      <h4>{{ pkg.name }}</h4>
-                      <span v-if="selectedKmPackageId === pkg.id" class="check-icon">✓</span>
-                    </div>
-                    <div class="package-body">
-                      <div class="package-km">
-                        <span class="km-value">{{ pkg.includedKm?.toLocaleString() }}</span>
-                        <span class="km-label">KM</span>
-                      </div>
-                      <div class="package-price">
-                        <span class="price-label">Fazla KM:</span>
-                        <span class="price-value">{{ pkg.extraKmPrice }} ₺/KM</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
         </div>
 
@@ -424,143 +448,231 @@ onMounted(() => {
         </div>
 
         <div v-else-if="currentStep === 5" key="step-5" class="step-content">
+          <h2>KM Paketi ve Vade</h2>
+          <p class="step-description">
+            Araca uygun KM paketini seçin. Bu adım opsiyoneldir.
+          </p>
+
+          <div v-if="isLeasing && selectedVehicleCategoryId" class="term-section">
+            <h3>Vade Süresi</h3>
+            <TermSelector
+              v-model="selectedTermMonths"
+              :category-id="selectedVehicleCategoryId"
+            />
+          </div>
+
+          <div v-if="isLeasing && !selectedVehicleCategoryId" class="term-notice">
+            <span>ℹ️</span>
+            <p>Vade seçimi için önce araç kategorisi belirlenmelidir.</p>
+          </div>
+
+          <div v-if="kmPackages.length > 0" class="km-package-section">
+            <h3>KM Paketi Seçimi</h3>
+            <div class="package-grid">
+              <div
+                v-for="pkg in kmPackages"
+                :key="pkg.id"
+                :class="['package-card', { selected: selectedKmPackageId === pkg.id }]"
+                @click="selectedKmPackageId = pkg.id"
+              >
+                <div class="package-header">
+                  <h4>{{ pkg.name }}</h4>
+                  <span v-if="selectedKmPackageId === pkg.id" class="check-icon">✓</span>
+                </div>
+                <div class="package-body">
+                  <div class="package-km">
+                    <span class="km-value">{{ pkg.includedKm?.toLocaleString('tr-TR') }}</span>
+                    <span class="km-label">KM</span>
+                  </div>
+                  <div class="package-price">
+                    <span class="price-label">Fazla KM:</span>
+                    <span class="price-value">{{ formatCurrency(pkg.extraKmPrice) }}/KM</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="km-override-section">
+            <h3>KM Override (Opsiyonel)</h3>
+            <p class="section-description">
+              Bu alanlar doldurulursa seçilen paketin dahili km ve fazla km ücreti override edilir.
+            </p>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Özel Dahil KM</label>
+                <input
+                  v-model.number="customIncludedKm"
+                  type="number"
+                  min="0"
+                  step="1"
+                  placeholder="Örn: 7500"
+                />
+              </div>
+              <div class="form-group">
+                <label>Özel Fazla KM Ücreti (₺)</label>
+                <input
+                  v-model.number="customExtraKmPrice"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="Örn: 0.75"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div v-if="kmPackages.length === 0" class="skip-notice">
+            <span>ℹ️</span>
+            <p>Bu kiralama tipi için aktif KM paketi bulunamadı. Paketsiz devam edebilirsiniz.</p>
+          </div>
+        </div>
+
+        <div v-else-if="currentStep === 6" key="step-6" class="step-content">
           <h2>Ek Kalemler</h2>
           <p class="step-description">
             Kiralamaya bakım, sigorta veya diğer ek kalemleri ekleyebilirsiniz. Bu adım opsiyoneldir.
           </p>
-          
+
           <ExtraItemsManager
             v-model="extraItems"
             :term-months="isLeasing ? selectedTermMonths : 1"
             @total-changed="handleExtraItemsTotal"
           />
-          
+
           <div v-if="extraItems.length === 0" class="skip-notice">
             <span>💡</span>
             <p>Ek kalem eklemeden devam edebilirsiniz.</p>
           </div>
-
-          <!-- Discount Section -->
-          <div class="discount-section">
-            <h3>İndirim (Opsiyonel)</h3>
-            <div class="form-grid">
-              <div class="form-group">
-                <label>İndirim Tutarı (₺)</label>
-                <input 
-                  v-model.number="discountAmount" 
-                  type="number" 
-                  min="0" 
-                  step="0.01"
-                  placeholder="0.00"
-                />
-              </div>
-              <div class="form-group">
-                <label>İndirim Sebebi</label>
-                <input 
-                  v-model="discountReason" 
-                  type="text" 
-                  placeholder="Örn: Sadık müşteri indirimi"
-                  :disabled="discountAmount <= 0"
-                />
-              </div>
-            </div>
-            <div v-if="discountAmount > 0" class="discount-preview">
-              <span class="discount-icon">🎉</span>
-              <span class="discount-text">{{ formatCurrency(discountAmount) }} indirim uygulanacak</span>
-            </div>
-          </div>
         </div>
 
-        <div v-else-if="currentStep === 6" key="step-6" class="step-content">
-            <h2>Kiralama Özeti</h2>
-            
-            <div class="summary-grid">
-              <div class="summary-card">
-                <h4>Kiralama Detayları</h4>
-                <div class="summary-row">
-                  <span>Kiralama Tipi</span>
-                  <strong>{{ rentalTypes.find(t => t.value === rentalType)?.label }}</strong>
+        <div v-else-if="currentStep === 7" key="step-7" class="step-content">
+          <h2>Kiralama Özeti</h2>
+
+          <div class="summary-grid">
+            <div class="summary-card">
+              <h4>Kiralama Detayları</h4>
+              <div class="summary-row">
+                <span>Kiralama Tipi</span>
+                <strong>{{ rentalTypes.find(t => t.value === rentalType)?.label }}</strong>
+              </div>
+              <div class="summary-row">
+                <span>Başlangıç</span>
+                <strong>{{ startDate }}</strong>
+              </div>
+              <div class="summary-row">
+                <span>Bitiş</span>
+                <strong>{{ endDate }}</strong>
+              </div>
+              <div class="summary-row">
+                <span>Toplam Süre</span>
+                <strong>
+                  {{ isLeasing ? `${selectedTermMonths} Ay` : `${totalDays} Gün` }}
+                </strong>
+              </div>
+              <div class="summary-row">
+                <span>KM Paketi</span>
+                <strong>{{ selectedKmPackage?.name || 'Seçilmedi' }}</strong>
+              </div>
+              <div v-if="customIncludedKm && customIncludedKm > 0" class="summary-row">
+                <span>Özel Dahil KM</span>
+                <strong>{{ customIncludedKm.toLocaleString('tr-TR') }} KM</strong>
+              </div>
+              <div v-if="customExtraKmPrice && customExtraKmPrice > 0" class="summary-row">
+                <span>Özel Fazla KM</span>
+                <strong>{{ formatCurrency(customExtraKmPrice) }}/KM</strong>
+              </div>
+              <div class="summary-row">
+                <span>Teslim Şubesi</span>
+                <div class="branch-selector-inline">
+                  <select v-model.number="selectedBranchId" class="branch-select">
+                    <option :value="null" disabled>Şube seçiniz</option>
+                    <option v-for="branch in branches" :key="branch.id" :value="branch.id">
+                      {{ branch.name }}
+                    </option>
+                  </select>
                 </div>
-                <div class="summary-row">
-                  <span>Başlangıç</span>
-                  <strong>{{ startDate }}</strong>
+              </div>
+              <div class="summary-row">
+                <span>İade Şubesi</span>
+                <div class="branch-selector-inline">
+                  <select v-model.number="selectedReturnBranchId" class="branch-select">
+                    <option :value="null" disabled>Şube seçiniz</option>
+                    <option v-for="branch in branches" :key="branch.id" :value="branch.id">
+                      {{ branch.name }}
+                    </option>
+                  </select>
                 </div>
-                <div class="summary-row">
-                  <span>Bitiş</span>
-                  <strong>{{ endDate }}</strong>
-                </div>
-                <div class="summary-row">
-                  <span>Toplam Süre</span>
-                  <strong>
-                    {{ isLeasing ? `${selectedTermMonths} Ay` : `${totalDays} Gün` }}
-                  </strong>
-                </div>
-                <div class="summary-row">
-                  <span>Teslim Şubesi</span>
-                  <div class="branch-selector-inline">
-                    <select v-model.number="selectedBranchId" class="branch-select">
-                      <option :value="null" disabled>Şube seçiniz</option>
-                      <option v-for="branch in branches" :key="branch.id" :value="branch.id">
-                        {{ branch.name }}
-                      </option>
-                    </select>
+              </div>
+              <div v-if="extraItems.length > 0" class="summary-row">
+                <span>Ek Kalemler</span>
+                <strong>{{ extraItems.length }} kalem</strong>
+              </div>
+            </div>
+
+            <div class="summary-card pricing-card">
+              <h4>Fiyat Bilgisi</h4>
+              <PricingCalculator
+                v-if="selectedVehicleId && selectedCustomerId"
+                :vehicle-id="selectedVehicleId"
+                :customer-id="selectedCustomerId"
+                :rental-type="rentalType"
+                :start-date="startDate"
+                :end-date="endDate"
+                :term-months="isLeasing ? selectedTermMonths : undefined"
+                :km-package-id="selectedKmPackageId || undefined"
+                @calculated="handlePriceCalculated"
+                @leasing-plan-selected="handleLeasingPlanSelected"
+              />
+
+              <div class="discount-editor">
+                <h5>İndirim (Opsiyonel)</h5>
+                <div class="form-grid">
+                  <div class="form-group">
+                    <label>İndirim Tutarı (₺)</label>
+                    <input
+                      v-model.number="discountAmount"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                    />
                   </div>
-                </div>
-                <div class="summary-row">
-                  <span>İade Şubesi</span>
-                  <div class="branch-selector-inline">
-                    <select v-model.number="selectedReturnBranchId" class="branch-select">
-                      <option :value="null" disabled>Şube seçiniz</option>
-                      <option v-for="branch in branches" :key="branch.id" :value="branch.id">
-                        {{ branch.name }}
-                      </option>
-                    </select>
+                  <div class="form-group">
+                    <label>İndirim Sebebi</label>
+                    <input
+                      v-model="discountReason"
+                      type="text"
+                      placeholder="Örn: Sadık müşteri indirimi"
+                      :disabled="discountAmount <= 0"
+                    />
                   </div>
-                </div>
-                <div v-if="extraItems.length > 0" class="summary-row">
-                  <span>Ek Kalemler</span>
-                  <strong>{{ extraItems.length }} kalem</strong>
                 </div>
               </div>
 
-              <div class="summary-card pricing-card">
-                <h4>Fiyat Bilgisi</h4>
-                <PricingCalculator
-                  v-if="selectedVehicleId && selectedCustomerId"
-                  :vehicle-id="selectedVehicleId"
-                  :customer-id="selectedCustomerId"
-                  :rental-type="rentalType"
-                  :start-date="startDate"
-                  :end-date="endDate"
-                  :term-months="isLeasing ? selectedTermMonths : undefined"
-                  @calculated="handlePriceCalculated"
-                  @leasing-plan-selected="handleLeasingPlanSelected"
-                />
-                
-                <div v-if="extraItemsTotal > 0" class="extra-items-summary">
-                  <div class="summary-row">
-                    <span>Ek Kalemler Toplamı</span>
-                    <strong>{{ formatCurrency(extraItemsTotal) }}</strong>
-                  </div>
-                  <div class="summary-row total">
-                    <span>Genel Toplam</span>
-                    <strong>{{ formatCurrency((priceData?.finalTotal || 0) + extraItemsTotal) }}</strong>
-                  </div>
+              <div class="extra-items-summary">
+                <div class="summary-row">
+                  <span>Temel Tutar</span>
+                  <strong>{{ formatCurrency(baseTotal) }}</strong>
                 </div>
-
-                <div v-if="discountAmount > 0" class="discount-summary">
-                  <div class="summary-row discount-row">
-                    <span>🎉 İndirim</span>
-                    <strong class="discount-value">-{{ formatCurrency(discountAmount) }}</strong>
-                  </div>
-                  <div v-if="discountReason" class="discount-reason">{{ discountReason }}</div>
-                  <div class="summary-row final-total">
-                    <span>İndirimli Toplam</span>
-                    <strong>{{ formatCurrency(Math.max(0, (priceData?.finalTotal || 0) + extraItemsTotal - discountAmount)) }}</strong>
-                  </div>
+                <div class="summary-row">
+                  <span>Ek Kalemler</span>
+                  <strong>{{ formatCurrency(extraItemsTotal) }}</strong>
+                </div>
+                <div v-if="appliedDiscountAmount > 0" class="summary-row">
+                  <span>İndirim</span>
+                  <strong class="discount-value">-{{ formatCurrency(appliedDiscountAmount) }}</strong>
+                </div>
+                <div class="summary-row total">
+                  <span>Genel Toplam</span>
+                  <strong>{{ formatCurrency(finalTotalWithDiscount) }}</strong>
+                </div>
+                <div v-if="discountReason && appliedDiscountAmount > 0" class="discount-reason">
+                  {{ discountReason }}
                 </div>
               </div>
             </div>
+          </div>
         </div>
       </div>
 
@@ -1016,6 +1128,109 @@ onMounted(() => {
   color: var(--color-text-secondary);
   font-size: 14px;
   margin: 0 0 20px 0;
+}
+
+.km-package-section {
+  margin-top: 20px;
+}
+
+.km-package-section h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 12px 0;
+}
+
+.km-override-section {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--color-border);
+}
+
+.km-override-section h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+}
+
+.package-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.package-card {
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 14px;
+  background: var(--color-surface);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.package-card:hover {
+  border-color: var(--color-primary);
+}
+
+.package-card.selected {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.package-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.package-header h4 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.package-km {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.km-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.km-label,
+.price-label {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.price-value {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.discount-editor {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+}
+
+.discount-editor h5 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+}
+
+.discount-value {
+  color: var(--color-success);
+}
+
+.discount-reason {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
 }
 
 .skip-notice {

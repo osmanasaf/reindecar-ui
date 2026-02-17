@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
 import { validators, validate, type ValidationRule } from '@/utils/validation'
+import { formatPhoneInput, PHONE_INPUT_MAX_LENGTH } from '@/utils/phone'
 
 interface Props {
   modelValue: string
@@ -57,7 +58,11 @@ function validateInput() {
 
 function handleInput(event: Event) {
   const target = event.target as HTMLInputElement
-  emit('update:modelValue', target.value)
+  if (props.type === 'tel') {
+    emit('update:modelValue', formatPhoneInput(target.value))
+  } else {
+    emit('update:modelValue', target.value)
+  }
   
   if (touched.value) {
     validateInput()
@@ -100,6 +105,8 @@ defineExpose({
       :type="type"
       :placeholder="placeholder"
       :disabled="disabled"
+      :maxlength="type === 'tel' ? PHONE_INPUT_MAX_LENGTH : undefined"
+      :inputmode="type === 'tel' ? 'numeric' : undefined"
       :class="['input-field', { error: touched && errorMessage }]"
       @input="handleInput"
       @blur="handleBlur"

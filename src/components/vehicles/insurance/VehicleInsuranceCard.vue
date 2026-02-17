@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import type { VehicleInsuranceResponse } from '@/types'
 import { useEnumTranslations } from '@/composables'
 import { formatCurrency, formatDate } from '@/utils/format'
+import { formatPhoneInput } from '@/utils/phone'
 
 interface Props {
   insurance: VehicleInsuranceResponse
@@ -79,7 +80,7 @@ const borderColor = computed(() => {
 
       <div v-if="insurance.contactPhone" class="info-row">
         <span class="label">İletişim:</span>
-        <span class="value">{{ insurance.contactPhone }}</span>
+        <span class="value">{{ formatPhoneInput(insurance.contactPhone) }}</span>
       </div>
     </div>
   </div>

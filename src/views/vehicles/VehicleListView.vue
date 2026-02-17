@@ -1,9 +1,10 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import { vehiclesApi } from '@/api'
 import { usePagination, useToast } from '@/composables'
-import type { Vehicle, VehicleStatus } from '@/types'
+import { VehicleStatus } from '@/types'
+import type { Vehicle } from '@/types'
 
 const vehicles = ref<Vehicle[]>([])
 const loading = ref(true)
@@ -13,28 +14,32 @@ const statusFilter = ref<VehicleStatus | ''>('')
 const { page, size, totalElements, setPage, setTotal, getParams } = usePagination()
 const toast = useToast()
 
-const statusOptions: { value: VehicleStatus | '', label: string }[] = [
+const statusOptions: { value: VehicleStatus | ''; label: string }[] = [
   { value: '', label: 'Tüm Durumlar' },
-  { value: 'AVAILABLE', label: 'Müsait' },
-  { value: 'RENTED', label: 'Kirada' },
-  { value: 'MAINTENANCE', label: 'Bakımda' },
-  { value: 'RESERVED', label: 'Rezerve' }
+  { value: VehicleStatus.AVAILABLE, label: 'Müsait' },
+  { value: VehicleStatus.RENTED, label: 'Kirada' },
+  { value: VehicleStatus.MAINTENANCE, label: 'Bakımda' },
+  { value: VehicleStatus.RESERVED, label: 'Rezerve' }
 ]
 
 const statusLabels: Record<VehicleStatus, string> = {
   AVAILABLE: 'Müsait',
+  RESERVED: 'Rezerve',
   RENTED: 'Kirada',
   MAINTENANCE: 'Bakımda',
-  RESERVED: 'Rezerve',
-  OUT_OF_SERVICE: 'Hizmet Dışı'
+  DAMAGED: 'Hasarlı',
+  INACTIVE: 'Pasif',
+  SOLD: 'Satıldı'
 }
 
 const statusColors: Record<VehicleStatus, string> = {
   AVAILABLE: 'success',
+  RESERVED: 'primary',
   RENTED: 'warning',
   MAINTENANCE: 'info',
-  RESERVED: 'primary',
-  OUT_OF_SERVICE: 'danger'
+  DAMAGED: 'danger',
+  INACTIVE: 'danger',
+  SOLD: 'danger'
 }
 
 const filteredVehicles = computed(() => {
@@ -42,7 +47,7 @@ const filteredVehicles = computed(() => {
 
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
-    result = result.filter(v => 
+    result = result.filter(v =>
       v.plateNumber.toLowerCase().includes(query) ||
       v.brand.toLowerCase().includes(query) ||
       v.model.toLowerCase().includes(query)
@@ -141,7 +146,7 @@ onMounted(fetchVehicles)
 
         <div class="card-footer">
           <div class="km">{{ formatKm(vehicle.currentKm) }}</div>
-          <div class="branch">{{ vehicle.branch?.name || '-' }}</div>
+          <div class="branch">{{ vehicle.branchName || '-' }}</div>
         </div>
       </RouterLink>
     </div>
@@ -346,3 +351,6 @@ onMounted(fetchVehicles)
   cursor: not-allowed;
 }
 </style>
+
+
+

@@ -1,4 +1,5 @@
 import { ref, computed, type Ref } from 'vue'
+import { isValidPhoneNumber } from '@/utils/phone'
 
 export interface ValidationRule {
     validate: (value: unknown) => boolean
@@ -17,7 +18,6 @@ export interface ValidationResult {
 
 const TCKN_PATTERN = /^[1-9]\d{10}$/
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const PHONE_PATTERN = /^(5\d{9}|0?5\d{9}|\+90\s?5\d{9})$/
 const PLATE_PATTERN = /^(0[1-9]|[1-7]\d|8[01])\s?[A-Z]{1,3}\s?\d{2,4}$/i
 const VIN_PATTERN = /^[A-HJ-NPR-Z0-9]{17}$/i
 const TAX_NUMBER_PATTERN = /^\d{10,11}$/
@@ -51,8 +51,7 @@ export const rules = {
     phone: (message = 'Geçerli bir telefon numarası giriniz'): ValidationRule => ({
         validate: (value) => {
             if (typeof value !== 'string') return false
-            const cleaned = value.replace(/[\s\-\(\)]/g, '')
-            return PHONE_PATTERN.test(cleaned)
+            return isValidPhoneNumber(value)
         },
         message
     }),

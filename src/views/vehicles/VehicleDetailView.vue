@@ -1,7 +1,7 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { vehiclesApi, branchesApi, vehicleCategoriesApi } from '@/api'
+import { vehiclesApi } from '@/api'
 import { useToast } from '@/composables'
 import type { Vehicle, VehicleStatus } from '@/types'
 import VehicleEditModal from '@/components/vehicles/VehicleEditModal.vue'
@@ -21,8 +21,6 @@ const loading = ref(true)
 const showEditModal = ref(false)
 const showCreateInsuranceModal = ref(false)
 const activeTab = ref<'info' | 'history' | 'damages' | 'maintenance' | 'insurance' | 'installments'>('info')
-const branchName = ref<string | null>(null)
-const categoryName = ref<string | null>(null)
 const insuranceListRef = ref<InstanceType<typeof VehicleInsuranceList> | null>(null)
 
 const vehicleId = computed(() => Number(route.params.id))
@@ -30,53 +28,39 @@ const vehicleId = computed(() => Number(route.params.id))
 const displayBranchName = computed(() => {
   const v = vehicle.value
   if (!v) return '-'
-  return v.branch?.name || v.branchName || branchName.value || '-'
+  return v.branchName || '-'
 })
 
 const displayCategoryName = computed(() => {
   const v = vehicle.value
   if (!v) return '-'
-  return v.category?.name || v.categoryName || categoryName.value || '-'
+  return v.categoryName || '-'
 })
 
 const statusLabels: Record<VehicleStatus, string> = {
   AVAILABLE: 'Müsait',
+  RESERVED: 'Rezerve',
   RENTED: 'Kirada',
   MAINTENANCE: 'Bakımda',
-  RESERVED: 'Rezerve',
-  OUT_OF_SERVICE: 'Hizmet Dışı'
+  DAMAGED: 'Hasarlı',
+  INACTIVE: 'Pasif',
+  SOLD: 'Satıldı'
 }
 
 const statusColors: Record<VehicleStatus, string> = {
   AVAILABLE: 'success',
+  RESERVED: 'primary',
   RENTED: 'warning',
   MAINTENANCE: 'info',
-  RESERVED: 'primary',
-  OUT_OF_SERVICE: 'danger'
+  DAMAGED: 'danger',
+  INACTIVE: 'danger',
+  SOLD: 'danger'
 }
 
 async function fetchVehicle() {
   loading.value = true
-  branchName.value = null
-  categoryName.value = null
   try {
     vehicle.value = await vehiclesApi.getById(vehicleId.value)
-    const v = vehicle.value
-    if (!v) return
-
-    const needsBranch = v.branchId && !v.branch?.name && !v.branchName
-    const needsCategory = v.categoryId && !v.category?.name && !v.categoryName
-
-    if (needsBranch) {
-      branchesApi.getById(v.branchId)
-        .then((b) => { branchName.value = b.name })
-        .catch(() => { branchName.value = null })
-    }
-    if (needsCategory) {
-      vehicleCategoriesApi.getById(v.categoryId)
-        .then((c) => { categoryName.value = c.name })
-        .catch(() => { categoryName.value = null })
-    }
   } catch {
     toast.error('Araç bilgileri yüklenemedi')
     router.push('/vehicles')
@@ -520,3 +504,6 @@ onMounted(fetchVehicle)
   }
 }
 </style>
+
+
+

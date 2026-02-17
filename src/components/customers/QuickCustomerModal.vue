@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { customersApi } from '@/api'
 import { useValidation, rules, useToast } from '@/composables'
+import { formatPhoneInput } from '@/utils/phone'
 import type { Customer, CreatePersonalCustomerForm } from '@/types'
 
 interface Props {
@@ -110,6 +111,11 @@ function handleBlur(field: string) {
   touch(field)
 }
 
+function handlePhoneInput(event: Event) {
+  const target = event.target as HTMLInputElement
+  form.value.phone = formatPhoneInput(target.value)
+}
+
 watch(() => props.visible, (isVisible) => {
   if (isVisible) {
     resetForm()
@@ -171,8 +177,11 @@ watch(() => props.visible, (isVisible) => {
               <input 
                 v-model="form.phone" 
                 @blur="handleBlur('phone')" 
+                @input="handlePhoneInput"
                 type="tel"
-                placeholder="05XX..."
+                inputmode="numeric"
+                maxlength="13"
+                placeholder="555 111 11 11"
               />
               <span class="error-text">{{ getError('phone') }}</span>
             </div>

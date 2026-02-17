@@ -3,6 +3,7 @@ import { ref, watch } from 'vue'
 import type { CreateServiceProviderRequest } from '@/types'
 import { ProviderType, ServiceType } from '@/types'
 import { useForm, useEnumTranslations } from '@/composables'
+import { formatPhoneInput, isValidPhoneNumber, normalizePhoneDigits } from '@/utils/phone'
 
 interface Props {
   show: boolean
@@ -66,8 +67,12 @@ const validate = (data: CreateServiceProviderRequest) => {
     formErrors.email = 'Gecerli bir e-posta adresi giriniz'
   }
 
-  if (data.phone && data.phone.length > 20) {
-    formErrors.phone = 'Telefon numarasi 20 karakterden uzun olamaz'
+  if (data.phone && !isValidPhoneNumber(data.phone)) {
+    formErrors.phone = 'Telefon numarasi 10 haneli olmalidir'
+  }
+
+  if (data.contactPhone && !isValidPhoneNumber(data.contactPhone)) {
+    formErrors.contactPhone = 'Iletisim telefonu 10 haneli olmalidir'
   }
 
   return formErrors
@@ -79,6 +84,8 @@ const { values, errors, touched, handleSubmit, validateField, reset, isSubmittin
   onSubmit: async (data) => {
     const request: CreateServiceProviderRequest = {
       ...data,
+      phone: data.phone ? normalizePhoneDigits(data.phone) : '',
+      contactPhone: data.contactPhone ? normalizePhoneDigits(data.contactPhone) : '',
       serviceTypes: selectedServiceTypes.value.length > 0 ? selectedServiceTypes.value : undefined
     }
     emit('submit', request)
@@ -104,6 +111,16 @@ const toggleServiceType = (type: ServiceType) => {
   } else {
     selectedServiceTypes.value.splice(index, 1)
   }
+}
+
+function handlePhoneInput(event: Event) {
+  const target = event.target as HTMLInputElement
+  values.phone = formatPhoneInput(target.value)
+}
+
+function handleContactPhoneInput(event: Event) {
+  const target = event.target as HTMLInputElement
+  values.contactPhone = formatPhoneInput(target.value)
 }
 
 watch(() => props.show, (newVal) => {
@@ -232,10 +249,12 @@ watch(() => props.show, (newVal) => {
               <input
                 v-model="values.phone"
                 type="tel"
+                inputmode="numeric"
                 class="form-input"
                 :class="{ 'error': touched.phone && errors.phone }"
-                placeholder="02121234567"
-                maxlength="20"
+                placeholder="555 111 11 11"
+                maxlength="13"
+                @input="handlePhoneInput"
                 @blur="validateField('phone')"
               />
               <span v-if="touched.phone && errors.phone" class="error-text">
@@ -277,9 +296,11 @@ watch(() => props.show, (newVal) => {
               <input
                 v-model="values.contactPhone"
                 type="tel"
+                inputmode="numeric"
                 class="form-input"
-                placeholder="05321234567"
-                maxlength="20"
+                placeholder="555 111 11 11"
+                maxlength="13"
+                @input="handleContactPhoneInput"
               />
             </div>
           </div>

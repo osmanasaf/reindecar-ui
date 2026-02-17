@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { customersApi } from '@/api'
 import { useToast } from '@/composables'
+import { formatPhoneInput } from '@/utils/phone'
 import type { Driver, CreateDriverForm } from '@/types'
 
 const props = defineProps<{
@@ -132,6 +133,11 @@ function toggleNewDriverForm() {
   }
 }
 
+function handlePhoneInput(event: Event) {
+  const target = event.target as HTMLInputElement
+  newDriver.value.phone = formatPhoneInput(target.value)
+}
+
 watch(() => props.customerId, (newCustomerId) => {
   newDriver.value.customerId = newCustomerId
 
@@ -176,7 +182,15 @@ watch(() => props.customerId, (newCustomerId) => {
         </div>
         <div class="form-group">
           <label for="phone">Telefon</label>
-          <input id="phone" v-model="newDriver.phone" type="tel" />
+          <input
+            id="phone"
+            v-model="newDriver.phone"
+            type="tel"
+            inputmode="numeric"
+            maxlength="13"
+            placeholder="555 111 11 11"
+            @input="handlePhoneInput"
+          />
         </div>
         <div class="form-group">
           <label for="licenseNumber">Ehliyet No *</label>

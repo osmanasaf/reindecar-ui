@@ -1,6 +1,7 @@
-<script setup lang="ts">
-import { ref, computed } from 'vue'
-import type { RecordPaymentRequest, PaymentMethod } from '@/types'
+﻿<script setup lang="ts">
+import { ref } from 'vue'
+import { PaymentMethod } from '@/types'
+import type { RecordPaymentRequest } from '@/types'
 import { useForm, useToast } from '@/composables'
 import { formatCurrency } from '@/utils/format'
 
@@ -23,16 +24,24 @@ const emit = defineEmits<{
 const toast = useToast()
 
 const paymentMethods: { value: PaymentMethod; label: string }[] = [
-  { value: 'CASH', label: 'Nakit' },
-  { value: 'CREDIT_CARD', label: 'Kredi Kartı' },
-  { value: 'DEBIT_CARD', label: 'Banka Kartı' },
-  { value: 'BANK_TRANSFER', label: 'Havale/EFT' },
-  { value: 'ONLINE', label: 'Online Ödeme' }
+  { value: PaymentMethod.CASH, label: 'Nakit' },
+  { value: PaymentMethod.CREDIT_CARD, label: 'Kredi Kartı' },
+  { value: PaymentMethod.DEBIT_CARD, label: 'Banka Kartı' },
+  { value: PaymentMethod.BANK_TRANSFER, label: 'Havale/EFT' },
+  { value: PaymentMethod.ONLINE, label: 'Online Ödeme' }
 ]
 
-const initialValues: RecordPaymentRequest = {
+interface PaymentFormValues {
+  [key: string]: unknown
+  amount: number
+  paymentMethod: PaymentMethod
+  transactionRef: string
+  notes: string
+}
+
+const initialValues: PaymentFormValues = {
   amount: 0,
-  paymentMethod: 'CASH',
+  paymentMethod: PaymentMethod.CASH,
   transactionRef: '',
   notes: ''
 }
@@ -57,24 +66,45 @@ const validationRules = {
   }
 }
 
-const { values, errors, touched, handleSubmit, setFieldValue, validateField, reset } = useForm(
+const { values, errors, touched, setFieldValue, validateField, validateAll, reset } = useForm<PaymentFormValues>({
   initialValues,
-  validationRules
-)
+  validate: (formValues) => ({
+    amount: validationRules.amount(formValues.amount),
+    paymentMethod: validationRules.paymentMethod(formValues.paymentMethod),
+    transactionRef: validationRules.transactionRef(formValues.transactionRef || ''),
+    notes: validationRules.notes(formValues.notes || '')
+  })
+})
 
 const isSubmitting = ref(false)
 
-const onSubmit = handleSubmit(async (data) => {
+const onSubmit = async () => {
+  touched.value = {
+    amount: true,
+    paymentMethod: true,
+    transactionRef: true,
+    notes: true
+  }
+
+  if (!validateAll()) {
+    return
+  }
+
   isSubmitting.value = true
   try {
-    emit('submit', data)
+    emit('submit', {
+      amount: values.amount,
+      paymentMethod: values.paymentMethod,
+      transactionRef: values.transactionRef || undefined,
+      notes: values.notes || undefined
+    })
     reset()
   } catch (error: any) {
     toast.error(error.message || 'Ödeme kaydedilirken hata oluştu')
   } finally {
     isSubmitting.value = false
   }
-})
+}
 
 const handleClose = () => {
   reset()
@@ -375,3 +405,4 @@ textarea.form-input {
   background: var(--color-primary-dark, #1d4ed8);
 }
 </style>
+

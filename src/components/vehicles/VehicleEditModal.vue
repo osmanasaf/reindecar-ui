@@ -1,8 +1,9 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { ref, watch, computed } from 'vue'
 import { vehiclesApi, vehicleCategoriesApi, branchesApi } from '@/api'
 import { useValidation, rules, useToast } from '@/composables'
 import { formatPlateInput } from '@/utils'
+import { isErrorResponse } from '@/utils/error'
 import type { Vehicle, VehicleCategory, Branch, UpdateVehicleForm } from '@/types'
 import { FuelType, Transmission } from '@/types'
 
@@ -23,6 +24,7 @@ const loading = ref(false)
 const saving = ref(false)
 const categories = ref<VehicleCategory[]>([])
 const branches = ref<Branch[]>([])
+const originalVehicle = ref<Vehicle | null>(null)
 
 const form = ref<UpdateVehicleForm>({
   plateNumber: '',
@@ -40,11 +42,15 @@ const form = ref<UpdateVehicleForm>({
   currentKm: 0,
   insuranceExpiryDate: '',
   inspectionExpiryDate: '',
+  registrationDate: '',
   dailyPrice: 0,
+  weeklyPrice: null,
+  monthlyPrice: null,
   notes: ''
 })
 
 const currentYear = new Date().getFullYear()
+const minimumEditableKm = computed(() => originalVehicle.value?.currentKm ?? 0)
 const { validateForm, getError, hasError, touch, reset } = useValidation()
 
 const formRules = computed(() => ({
@@ -53,8 +59,11 @@ const formRules = computed(() => ({
   brand: { value: form.value.brand, rules: [rules.required()] },
   model: { value: form.value.model, rules: [rules.required()] },
   year: { value: form.value.year, rules: [rules.required(), rules.yearRange(2000, currentYear)] },
-  color: { value: form.value.color, rules: [rules.required()] },
-  currentKm: { value: form.value.currentKm, rules: [rules.minValue(0)] },
+  color: { value: form.value.color ?? '', rules: [rules.required()] },
+  currentKm: {
+    value: form.value.currentKm,
+    rules: [rules.required(), rules.minValue(minimumEditableKm.value, `KM cannot be lower than ${minimumEditableKm.value}`)]
+  },
   dailyPrice: { value: form.value.dailyPrice, rules: [rules.required(), rules.positive()] },
   categoryId: { value: form.value.categoryId, rules: [rules.required()] },
   branchId: { value: form.value.branchId, rules: [rules.required('Şube seçiniz')] }
@@ -73,19 +82,50 @@ const transmissionOptions = [
   { value: Transmission.AUTOMATIC, label: 'Otomatik' }
 ]
 
+function normalizeOptionalNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null
+  const parsed = Number(value)
+  return Number.isNaN(parsed) ? null : parsed
+}
+
+function isBranchAvailabilityError(error: unknown): boolean {
+  const matchesMessage = (message: string): boolean => {
+    const normalized = message.toLowerCase()
+    return (
+      (normalized.includes('branch') && normalized.includes('available')) ||
+      (normalized.includes('sube') && normalized.includes('musait')) ||
+      (normalized.includes('şube') && normalized.includes('müsait'))
+    )
+  }
+
+  if (isErrorResponse(error)) {
+    return matchesMessage(error.message) || error.code === 'V004'
+  }
+
+  if (typeof error === 'object' && error !== null && 'response' in error) {
+    const responseData = (error as { response?: { data?: unknown } }).response?.data
+    if (isErrorResponse(responseData)) {
+      return matchesMessage(responseData.message) || responseData.code === 'V004'
+    }
+  }
+
+  return false
+}
+
 async function fetchVehicle() {
   if (!props.vehicleId) return
-  
+
   loading.value = true
   try {
     const vehicle = await vehiclesApi.getById(props.vehicleId)
+    originalVehicle.value = vehicle
     form.value = {
       plateNumber: vehicle.plateNumber,
       vinNumber: vehicle.vinNumber,
       brand: vehicle.brand,
       model: vehicle.model,
       year: vehicle.year,
-      color: vehicle.color,
+      color: vehicle.color ?? '',
       fuelType: vehicle.fuelType,
       transmission: vehicle.transmission,
       engineCapacity: vehicle.engineCapacity,
@@ -93,10 +133,13 @@ async function fetchVehicle() {
       categoryId: vehicle.categoryId,
       branchId: vehicle.branchId,
       currentKm: vehicle.currentKm,
-      insuranceExpiryDate: vehicle.insuranceExpiryDate.split('T')[0],
-      inspectionExpiryDate: vehicle.inspectionExpiryDate.split('T')[0],
-      dailyPrice: vehicle.dailyPrice,
-      notes: vehicle.notes || ''
+      insuranceExpiryDate: vehicle.insuranceExpiryDate?.split('T')[0] || '',
+      inspectionExpiryDate: vehicle.inspectionExpiryDate?.split('T')[0] || '',
+      registrationDate: vehicle.registrationDate?.split('T')[0] || '',
+      dailyPrice: vehicle.dailyPrice ?? 0,
+      weeklyPrice: vehicle.weeklyPrice ?? null,
+      monthlyPrice: vehicle.monthlyPrice ?? null,
+      notes: vehicle.notes ?? ''
     }
   } catch {
     toast.error('Araç bilgileri yüklenemedi')
@@ -130,14 +173,32 @@ async function handleSubmit() {
 
   if (!props.vehicleId) return
 
+  const branchChanged = originalVehicle.value !== null && form.value.branchId !== originalVehicle.value.branchId
+
   saving.value = true
   try {
-    const updatedVehicle = await vehiclesApi.update(props.vehicleId, form.value)
+    const payload: UpdateVehicleForm = {
+      ...form.value,
+      color: form.value.color?.trim() || null,
+      insuranceExpiryDate: form.value.insuranceExpiryDate || null,
+      inspectionExpiryDate: form.value.inspectionExpiryDate || null,
+      registrationDate: form.value.registrationDate || null,
+      dailyPrice: normalizeOptionalNumber(form.value.dailyPrice),
+      weeklyPrice: normalizeOptionalNumber(form.value.weeklyPrice),
+      monthlyPrice: normalizeOptionalNumber(form.value.monthlyPrice),
+      notes: form.value.notes?.trim() || null
+    }
+
+    const updatedVehicle = await vehiclesApi.patchById(props.vehicleId, payload)
     toast.success('Araç başarıyla güncellendi')
     emit('saved', updatedVehicle)
     emit('close')
-  } catch (err) {
-    toast.apiError(err, 'Güncelleme işlemi başarısız')
+  } catch (err: unknown) {
+    if (branchChanged && isBranchAvailabilityError(err)) {
+      toast.error('Branch can only be changed when vehicle is AVAILABLE')
+    } else {
+      toast.apiError(err, 'Güncelleme işlemi başarısız')
+    }
   } finally {
     saving.value = false
   }
@@ -145,6 +206,7 @@ async function handleSubmit() {
 
 function handleClose() {
   reset()
+  originalVehicle.value = null
   emit('close')
 }
 
@@ -281,7 +343,7 @@ watch(() => props.visible, (isVisible) => {
 
               <div class="form-group" :class="{ error: hasError('categoryId') }">
                 <label>Kategori <span class="required">*</span></label>
-                <select v-model="form.categoryId" @blur="handleBlur('categoryId')">
+                <select v-model.number="form.categoryId" @blur="handleBlur('categoryId')">
                   <option :value="0" disabled>Kategori seçiniz</option>
                   <option v-for="cat in categories" :key="cat.id" :value="cat.id">
                     {{ cat.name }}
@@ -292,7 +354,7 @@ watch(() => props.visible, (isVisible) => {
 
               <div class="form-group" :class="{ error: hasError('branchId') }">
                 <label>Şube <span class="required">*</span></label>
-                <select v-model="form.branchId" @blur="handleBlur('branchId')">
+                <select v-model.number="form.branchId" @blur="handleBlur('branchId')">
                   <option :value="0" disabled>Şube seçiniz</option>
                   <option v-for="branch in branches" :key="branch.id" :value="branch.id">
                     {{ branch.name }}
@@ -312,7 +374,7 @@ watch(() => props.visible, (isVisible) => {
                   v-model.number="form.currentKm" 
                   @blur="handleBlur('currentKm')" 
                   type="number" 
-                  min="0"
+                  :min="minimumEditableKm"
                 />
                 <span class="error-text">{{ getError('currentKm') }}</span>
               </div>
@@ -327,6 +389,31 @@ watch(() => props.visible, (isVisible) => {
                   step="0.01"
                 />
                 <span class="error-text">{{ getError('dailyPrice') }}</span>
+              </div>
+
+              <div class="form-group">
+                <label>Haftalık Fiyat (₺)</label>
+                <input
+                  v-model.number="form.weeklyPrice"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+
+              <div class="form-group">
+                <label>Aylık Fiyat (₺)</label>
+                <input
+                  v-model.number="form.monthlyPrice"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+
+              <div class="form-group">
+                <label>Tescil Tarihi</label>
+                <input v-model="form.registrationDate" type="date" />
               </div>
 
               <div class="form-group">
@@ -560,3 +647,6 @@ watch(() => props.visible, (isVisible) => {
   }
 }
 </style>
+
+
+

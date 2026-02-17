@@ -1,3 +1,5 @@
+import { isValidPhoneNumber } from './phone'
+
 const TCKN_LENGTH = 11
 
 export function validateTCKN(id: string): boolean {
@@ -24,11 +26,8 @@ export function validateEmail(email: string): boolean {
     return EMAIL_PATTERN.test(email)
 }
 
-const PHONE_PATTERN = /^5\d{9}$/
-
 export function validatePhone(phone: string): boolean {
-    const digits = phone.replace(/\D/g, '')
-    return PHONE_PATTERN.test(digits)
+    return isValidPhoneNumber(phone)
 }
 
 const TAX_NUMBER_PATTERN = /^\d{10}$/

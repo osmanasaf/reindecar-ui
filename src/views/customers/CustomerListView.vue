@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import { customersApi } from '@/api'
 import { usePagination, useToast } from '@/composables'
+import { formatPhoneInput } from '@/utils/phone'
 import type { Customer, CustomerType } from '@/types'
 
 const customers = ref<Customer[]>([])
@@ -62,11 +63,8 @@ function handlePageChange(newPage: number) {
 }
 
 function formatPhone(phone: string): string {
-  const digits = phone.replace(/\D/g, '')
-  if (digits.length === 10) {
-    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)} ${digits.slice(6, 8)} ${digits.slice(8)}`
-  }
-  return phone
+  const formatted = formatPhoneInput(phone)
+  return formatted || phone
 }
 
 onMounted(fetchCustomers)

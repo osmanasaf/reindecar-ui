@@ -69,30 +69,32 @@ export interface Vehicle {
     brand: string
     model: string
     year: number
-    color: string
+    color: string | null
     fuelType: FuelType
     transmission: Transmission
     engineCapacity: number
     seatCount: number
     categoryId: number
-    categoryName: string
+    categoryName: string | null
     category?: VehicleCategory
     branchId: number
-    branchName: string
+    branchName: string | null
     branch?: Branch
     status: VehicleStatus
     currentKm: number
-    insuranceExpiryDate: string
-    inspectionExpiryDate: string
-    registrationDate: string
-    dailyPrice: number
+    insuranceExpiryDate: string | null
+    inspectionExpiryDate: string | null
+    registrationDate: string | null
+    dailyPrice: number | null
     weeklyPrice: number | null
     monthlyPrice: number | null
     isInsuranceExpiringSoon: boolean
     isInspectionExpiringSoon: boolean
-    notes?: string
+    notes: string | null
     createdAt: string
 }
+
+export type VehicleResponse = Vehicle
 
 
 export interface PersonalInfo {
@@ -109,9 +111,31 @@ export interface PersonalInfo {
 export interface CompanyInfo {
     taxNumber: string
     companyName: string
-    tradeRegistryNumber: string
-    authorizedPersonName: string
-    authorizedPersonPhone: string
+    tradeRegisterNo?: string
+    tradeRegistryNumber?: string
+    taxOffice?: string
+    invoiceAddress?: string
+    sector?: string
+    employeeCount?: number
+    authorizedPerson?: string
+    authorizedPersonPhone?: string
+    authorizedPersonName?: string
+}
+
+export interface CompanyAuthorizedPerson {
+    id: number
+    customerId: number
+    firstName: string
+    lastName: string
+    nationalId: string
+    phone: string
+    email: string | null
+    title: string | null
+    primary?: boolean
+    isPrimary?: boolean
+    active: boolean
+    createdAt: string
+    updatedAt: string
 }
 
 
@@ -137,7 +161,13 @@ export interface Customer {
     licenseClass?: string
     licenseExpiryDate?: string
     taxNumber?: string
+    taxOffice?: string
+    invoiceAddress?: string
+    tradeRegisterNo?: string
     tradeRegistryNumber?: string
+    sector?: string
+    employeeCount?: number
+    authorizedPerson?: string
     authorizedPersonName?: string
     authorizedPersonPhone?: string
     totalRentals?: number
