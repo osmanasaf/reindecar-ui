@@ -7,7 +7,9 @@ import { PayableStatusBadge, PaymentModal } from '@/components/accounting'
 import PaymentProgress from '@/components/accounting/PaymentProgress.vue'
 import DueStatusBadge from '@/components/accounting/DueStatusBadge.vue'
 import { formatCurrency, formatDate } from '@/utils/format'
-import type { RecordPaymentRequest } from '@/types'
+import { payablesApi } from '@/api/accounting.api'
+import type { RecordPaymentRequest, PaymentTransactionResponse } from '@/types'
+import { PayableStatus } from '@/types/accounting'
 
 const route = useRoute()
 const router = useRouter()
@@ -16,47 +18,84 @@ const toast = useToast()
 const { translatePayableType } = useEnumTranslations()
 
 const showPaymentModal = ref(false)
+const paymentHistory = ref<PaymentTransactionResponse[]>([])
+const historyLoading = ref(false)
 
 const payable = computed(() => accountingStore.selectedPayable)
 const loading = computed(() => accountingStore.payablesLoading)
 
 const canMakePayment = computed(() => {
-  return payable.value && 
-    payable.value.status !== 'FULLY_PAID' && 
-    payable.value.status !== 'CANCELLED'
+  return payable.value &&
+    payable.value.status !== PayableStatus.FULLY_PAID &&
+    payable.value.status !== PayableStatus.CANCELLED &&
+    payable.value.status !== PayableStatus.WRITTEN_OFF
+})
+
+const canWriteOff = computed(() => {
+  return payable.value &&
+    payable.value.status === PayableStatus.OVERDUE &&
+    payable.value.remainingAmount > 0
 })
 
 const canCancel = computed(() => {
-  return payable.value && 
-    payable.value.status === 'PENDING'
+  return payable.value &&
+    payable.value.status === PayableStatus.PENDING
 })
 
-onMounted(() => {
+onMounted(async () => {
   const id = Number(route.params.id)
-  if (id) accountingStore.fetchPayableById(id)
+  if (id) {
+    await accountingStore.fetchPayableById(id)
+    loadPaymentHistory(id)
+  }
 })
+
+const loadPaymentHistory = async (id: number) => {
+  historyLoading.value = true
+  try {
+    paymentHistory.value = await payablesApi.getPayments(id)
+  } catch {
+    paymentHistory.value = []
+  } finally {
+    historyLoading.value = false
+  }
+}
 
 const submitPayment = async (data: RecordPaymentRequest) => {
   if (!payable.value) return
-  
   try {
     await accountingStore.recordPayablePayment(payable.value.id, data)
     toast.success('Ödeme başarıyla kaydedildi')
     showPaymentModal.value = false
-  } catch (error: any) {
-    toast.error(error.message || 'Ödeme kaydedilemedi')
+    loadPaymentHistory(payable.value.id)
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Ödeme kaydedilemedi'
+    toast.error(message)
+  }
+}
+
+const handleWriteOff = async () => {
+  if (!payable.value) return
+  if (!confirm('Bu vereceği şüpheli olarak işaretlemek istediğinize emin misiniz?')) return
+  try {
+    await payablesApi.writeOff(payable.value.id)
+    toast.success('Verecek şüpheli olarak işaretlendi')
+    await accountingStore.fetchPayableById(payable.value.id)
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'İşlem başarısız oldu'
+    toast.error(message)
   }
 }
 
 const handleCancel = async () => {
   if (!payable.value) return
   if (!confirm('Bu borcun ödemesini iptal etmek istediğinize emin misiniz?')) return
-  
   try {
     await accountingStore.cancelPayable(payable.value.id)
     toast.success('Borç iptal edildi')
-  } catch (error: any) {
-    toast.error(error.message || 'İptal işlemi başarısız oldu')
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'İptal işlemi başarısız oldu'
+    toast.error(message)
   }
 }
 </script>
@@ -87,6 +126,13 @@ const handleCancel = async () => {
           @click="showPaymentModal = true"
         >
           Ödeme Yap
+        </button>
+        <button
+          v-if="canWriteOff"
+          class="btn btn-warning"
+          @click="handleWriteOff"
+        >
+          Şüpheli Olarak İşaretle
         </button>
         <button
           v-if="canCancel"
@@ -154,11 +200,39 @@ const handleCancel = async () => {
       </div>
     </div>
 
+    <div v-if="payable" class="detail-card history-card">
+      <h3 class="card-title">Ödeme Geçmişi</h3>
+      <div v-if="historyLoading" class="loading-sm">Yükleniyor...</div>
+      <div v-else-if="paymentHistory.length === 0" class="empty-sm">Henüz ödeme kaydı yok.</div>
+      <table v-else class="history-table">
+        <thead>
+          <tr>
+            <th>İşlem No</th>
+            <th>Tarih</th>
+            <th>Tutar</th>
+            <th>Yöntem</th>
+            <th>Referans</th>
+            <th>Kaydeden</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="tx in paymentHistory" :key="tx.id">
+            <td>{{ tx.transactionNumber }}</td>
+            <td>{{ formatDate(tx.transactionDate) }}</td>
+            <td>{{ formatCurrency(tx.amount, tx.currency) }}</td>
+            <td>{{ tx.paymentMethod }}</td>
+            <td>{{ tx.transactionRef || '-' }}</td>
+            <td>{{ tx.createdBy }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
     <PaymentModal
       v-if="payable"
       :show="showPaymentModal"
       :remaining-amount="payable.remainingAmount"
-      :receivable-number="payable.payableNumber"
+      :reference-number="payable.payableNumber"
       @close="showPaymentModal = false"
       @submit="submitPayment"
     />
@@ -303,6 +377,13 @@ const handleCancel = async () => {
   background: var(--color-primary-dark, #1d4ed8);
 }
 
+.btn-warning {
+  background: #f59e0b;
+  color: white;
+}
+
+.btn-warning:hover { background: #d97706; }
+
 .btn-danger {
   background: #ef4444;
   color: white;
@@ -310,6 +391,35 @@ const handleCancel = async () => {
 
 .btn-danger:hover {
   background: #dc2626;
+}
+
+.history-card {
+  margin-top: 1.5rem;
+}
+
+.loading-sm, .empty-sm {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary, #6b7280);
+  padding: 0.75rem 0;
+}
+
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.history-table th,
+.history-table td {
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
+}
+
+.history-table th {
+  font-weight: 600;
+  color: var(--color-text-secondary, #6b7280);
+  background: var(--color-background, #f9fafb);
 }
 
 @media (max-width: 768px) {

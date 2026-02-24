@@ -191,6 +191,8 @@ export interface CreateDamageReportForm {
     estimatedCostAmount?: number
     estimatedCostCurrency?: string
     reportedBy?: string
+    customerId?: number
+    customerResponsible?: boolean
 }
 
 export interface MarkDamageRepairedForm {
@@ -224,7 +226,7 @@ export interface CreateMaintenanceRecordForm {
     currentKm: number
     costAmount?: number
     costCurrency?: string
-    serviceProvider?: string
+    serviceProviderId?: number
     description?: string
     affectedZones?: number[]
     partsReplaced?: string[]

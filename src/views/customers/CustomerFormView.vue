@@ -1,8 +1,8 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { customersApi } from '@/api'
-import { useValidation, rules, useToast } from '@/composables'
+import { useValidation, rules, useToast, useReferenceData } from '@/composables'
 import { SearchableSelect } from '@/components/common'
 import { formatPhoneInput } from '@/utils/phone'
 import type { ValidationRule } from '@/composables/useValidation'
@@ -25,6 +25,17 @@ const customerType = ref<CustomerType>(
 
 const loading = ref(false)
 
+const { cities, loadCities } = useReferenceData()
+const selectedCityId = ref<number | null>(null)
+
+watch(selectedCityId, (cityId) => {
+  if (!cityId) {
+    form.value.city = ''
+    return
+  }
+  const c = cities.value.find(x => x.id === cityId)
+  form.value.city = c ? c.name : ''
+})
 
 const form = ref({
 
@@ -67,6 +78,8 @@ const commonTitles = [
   { value: 'Muhasebe Müdürü', label: 'Muhasebe Müdürü' },
   { value: 'İnsan Kaynakları Müdürü', label: 'İnsan Kaynakları Müdürü' }
 ]
+
+const licenseClasses = ['A1', 'A2', 'A', 'B1', 'B', 'BE', 'C1', 'C1E', 'C', 'CE', 'D1', 'D1E', 'D', 'DE']
 
 function addAuthorizedPerson() {
   authorizedPersons.value.push({ firstName: '', lastName: '', nationalId: '', phone: '', email: '', title: '', isPrimary: false })
@@ -187,41 +200,54 @@ const formRules = computed(() => {
 })
 
 async function fetchCustomer() {
-  if (!isEditMode.value) return
-  
   loading.value = true
   try {
+    await loadCities()
+    if (!isEditMode.value) return
     const data = await customersApi.getById(Number(route.params.id))
     customerType.value = data.customerType
     
+    let firstName = ''
+    let lastName = ''
+    if (customerType.value === 'PERSONAL') {
+      if (data.personalInfo) {
+        firstName = data.personalInfo.firstName || ''
+        lastName = data.personalInfo.lastName || ''
+      } else {
+        const [first, ...last] = (data.displayName || '').split(' ')
+        firstName = first || ''
+        lastName = last.join(' ') || ''
+      }
+    }
 
-    const [first, ...last] = (data.displayName || '').split(' ')
     const invoiceAddress = data.invoiceAddress || data.address || ''
     sameAsAddress.value = customerType.value !== 'COMPANY' || invoiceAddress === (data.address || '')
 
     form.value = {
       phone: formatPhoneInput(data.phone),
-      email: data.email,
-      address: data.address,
-      city: data.city,
+      email: data.email || '',
+      address: data.address || '',
+      city: data.city || '',
       
-      firstName: first || '',
-      lastName: last.join(' ') || '',
-      nationalId: data.nationalId || '',
-      birthDate: data.birthDate ? (data.birthDate.split('T')[0] ?? '') : '',
-      licenseNumber: data.licenseNumber || '',
-      licenseClass: data.licenseClass || '',
-      licenseExpiryDate: data.licenseExpiryDate ? (data.licenseExpiryDate.split('T')[0] ?? '') : '',
+      firstName,
+      lastName,
+      nationalId: data.personalInfo?.nationalId || data.nationalId || '',
+      birthDate: data.personalInfo?.birthDate ? (data.personalInfo.birthDate.split('T')[0] ?? '') : (data.birthDate ? (data.birthDate.split('T')[0] ?? '') : ''),
+      licenseNumber: data.personalInfo?.licenseNumber || data.licenseNumber || '',
+      licenseClass: data.personalInfo?.licenseClass || data.licenseClass || '',
+      licenseExpiryDate: data.personalInfo?.licenseExpiryDate ? (data.personalInfo.licenseExpiryDate.split('T')[0] ?? '') : (data.licenseExpiryDate ? (data.licenseExpiryDate.split('T')[0] ?? '') : ''),
       
-      companyName: data.displayName || '',
-      taxNumber: data.taxNumber || '',
-      taxOffice: data.taxOffice || '',
+      companyName: data.companyInfo?.companyName || data.displayName || '',
+      taxNumber: data.companyInfo?.taxNumber || data.taxNumber || '',
+      taxOffice: data.companyInfo?.taxOffice || data.taxOffice || '',
       tradeRegisterNo: data.tradeRegisterNo || data.tradeRegistryNumber || '',
       invoiceAddress,
       sector: data.sector || '',
       employeeCount: typeof data.employeeCount === 'number' ? String(data.employeeCount) : '',
       creditScore: typeof data.creditScore === 'number' ? String(data.creditScore) : ''
     }
+    const cityMatch = cities.value.find(c => c.name === (data.city || ''))
+    selectedCityId.value = cityMatch ? cityMatch.id : null
   } catch {
     toast.error('Müşteri bilgileri yüklenemedi')
     router.push('/customers')
@@ -254,7 +280,7 @@ async function handleSubmit() {
       }
 
       if (isEditMode.value) {
-        await customersApi.update(Number(route.params.id), payload)
+        await customersApi.update(Number(route.params.id), { ...payload, customerType: customerType.value } as any)
         toast.success('Müşteri başarıyla güncellendi')
       } else {
         await customersApi.createPersonal(payload)
@@ -281,7 +307,7 @@ async function handleSubmit() {
       }
 
       if (isEditMode.value) {
-        await customersApi.update(Number(route.params.id), basePayload)
+        await customersApi.update(Number(route.params.id), { ...basePayload, customerType: customerType.value } as any)
         toast.success('Müşteri başarıyla güncellendi')
       } else {
         const normalizedAuthorizedPersons = authorizedPersons.value.map(normalizeAuthorizedPerson)
@@ -398,7 +424,10 @@ watch(customerType, () => reset())
 
               <div class="form-group" :class="{ error: hasError('licenseClass') }">
                 <label>Sınıf <span class="required">*</span></label>
-                <input v-model="form.licenseClass" @blur="handleBlur('licenseClass')" type="text" placeholder="B, E..." />
+                <select v-model="form.licenseClass" @blur="handleBlur('licenseClass')">
+                  <option value="" disabled>Seçiniz</option>
+                  <option v-for="cls in licenseClasses" :key="cls" :value="cls">{{ cls }}</option>
+                </select>
                 <span class="error-text">{{ getError('licenseClass') }}</span>
               </div>
 
@@ -565,7 +594,10 @@ watch(customerType, () => reset())
 
             <div class="form-group" :class="{ error: hasError('city') }">
               <label>Şehir <span class="required">*</span></label>
-              <input v-model="form.city" @blur="handleBlur('city')" type="text" />
+              <select v-model="selectedCityId" @blur="handleBlur('city')">
+                <option :value="null">İl seçin</option>
+                <option v-for="c in cities" :key="c.id" :value="c.id">{{ c.name }}</option>
+              </select>
               <span class="error-text">{{ getError('city') }}</span>
             </div>
           </div>
@@ -714,7 +746,8 @@ watch(customerType, () => reset())
 }
 
 .form-group input,
-.form-group textarea {
+.form-group textarea,
+.form-group select {
   padding: 10px 14px;
   border: 1px solid var(--color-border);
   border-radius: 8px;
@@ -724,14 +757,16 @@ watch(customerType, () => reset())
 }
 
 .form-group input:focus,
-.form-group textarea:focus {
+.form-group textarea:focus,
+.form-group select:focus {
   outline: none;
   border-color: var(--color-primary);
   background: var(--color-surface);
   box-shadow: 0 0 0 3px var(--color-primary-light);
 }
 
-.form-group.error input {
+.form-group.error input,
+.form-group.error select {
   border-color: var(--color-danger);
   background: #fff5f5;
 }

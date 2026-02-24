@@ -1,9 +1,10 @@
-﻿<script setup lang="ts">
-import { ref, onMounted } from 'vue'
+<script setup lang="ts">
+import { ref, onMounted, watch } from 'vue'
 import { branchesApi, vehiclesApi } from '@/api'
-import { useToast } from '@/composables'
+import { useToast, useReferenceData } from '@/composables'
 import { validators, validate, formatPhoneInput } from '@/utils/validation'
 import type { Branch } from '@/types'
+import type { District } from '@/types/reference'
 
 interface BranchWithCount extends Branch {
   vehicleCount?: number
@@ -16,12 +17,42 @@ const editingBranch = ref<Branch | null>(null)
 
 const toast = useToast()
 
+const { cities, loadCities, loadDistrictsByCity } = useReferenceData()
+const selectedCityId = ref<number | null>(null)
+const selectedDistrictId = ref<number | null>(null)
+const districts = ref<District[]>([])
+
+watch(selectedCityId, async (cityId) => {
+  if (!cityId) {
+    districts.value = []
+    selectedDistrictId.value = null
+    formData.value.city = ''
+    formData.value.district = ''
+    return
+  }
+  const c = cities.value.find(x => x.id === cityId)
+  formData.value.city = c ? c.name : ''
+  formData.value.district = ''
+  selectedDistrictId.value = null
+  districts.value = await loadDistrictsByCity(cityId)
+})
+
+watch(selectedDistrictId, (districtId) => {
+  if (!districtId) {
+    formData.value.district = ''
+    return
+  }
+  const d = districts.value.find(x => x.id === districtId)
+  formData.value.district = d ? d.name : ''
+})
+
 const formData = ref({
   code: '',
   branchCode: '',
   name: '',
   address: '',
   city: '',
+  district: '',
   phone: '',
   active: true
 })
@@ -85,22 +116,40 @@ async function fetchVehicleCounts() {
   await Promise.all(promises)
 }
 
-function openCreateForm() {
+async function openCreateForm() {
   editingBranch.value = null
-  formData.value = { code: '', branchCode: '', name: '', address: '', city: '', phone: '', active: true }
+  await loadCities()
+  formData.value = { code: '', branchCode: '', name: '', address: '', city: '', district: '', phone: '', active: true }
+  selectedCityId.value = null
+  selectedDistrictId.value = null
+  districts.value = []
   formErrors.value = {}
   touchedFields.value = new Set()
   showForm.value = true
 }
 
-function openEditForm(branch: Branch) {
+async function openEditForm(branch: Branch) {
   editingBranch.value = branch
+  await loadCities()
+  const cityMatch = cities.value.find(c => c.name === (branch.city ?? ''))
+  if (cityMatch) {
+    selectedCityId.value = cityMatch.id
+    const distList = await loadDistrictsByCity(cityMatch.id)
+    districts.value = distList
+    const districtMatch = distList.find(d => d.name === (branch.district ?? ''))
+    if (districtMatch) selectedDistrictId.value = districtMatch.id
+  } else {
+    selectedCityId.value = null
+    selectedDistrictId.value = null
+    districts.value = []
+  }
   formData.value = {
     code: branch.code,
     branchCode: branch.branchCode ?? branch.code ?? '',
     name: branch.name,
     address: branch.address ?? '',
     city: branch.city ?? '',
+    district: branch.district ?? '',
     phone: branch.phone ?? '',
     active: branch.active
   }
@@ -328,17 +377,29 @@ onMounted(fetchBranches)
           
           <div class="form-group">
             <label>Şehir <span class="required">*</span></label>
-            <input 
-              v-model="formData.city" 
-              type="text" 
+            <select
+              v-model="selectedCityId"
               :class="{ 'error': touchedFields.has('city') && formErrors.city }"
               @blur="handleBlur('city')"
-              @input="touchedFields.has('city') && validateField('city')"
-              placeholder="Örn: İstanbul"
-            />
+              @change="touchedFields.has('city') && validateField('city')"
+            >
+              <option :value="null">İl seçin</option>
+              <option v-for="c in cities" :key="c.id" :value="c.id">{{ c.name }}</option>
+            </select>
             <span v-if="touchedFields.has('city') && formErrors.city" class="error-message">
               {{ formErrors.city }}
             </span>
+          </div>
+
+          <div class="form-group">
+            <label>İlçe</label>
+            <select
+              v-model="selectedDistrictId"
+              :disabled="!selectedCityId"
+            >
+              <option :value="null">{{ selectedCityId ? 'İlçe seçin (opsiyonel)' : 'Önce il seçin' }}</option>
+              <option v-for="d in districts" :key="d.id" :value="d.id">{{ d.name }}</option>
+            </select>
           </div>
           
           <div class="form-group">

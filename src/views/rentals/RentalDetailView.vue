@@ -1,9 +1,13 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onActivated, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { rentalsApi, vehiclesApi, customersApi, branchesApi, kmPackagesApi } from '@/api'
+import { rentalsApi, vehiclesApi, customersApi, branchesApi, kmPackagesApi, paymentApi, penaltiesApi, damagesApi, tollsApi } from '@/api'
 import { useToast } from '@/composables'
-import type { Rental, RentalStatus, RentalType, Vehicle, Customer, Branch, RentalDriver, KmPackage, Driver } from '@/types'
+import ReturnCompleteModal from '@/components/rentals/ReturnCompleteModal.vue'
+import CreateDamageForm from '@/components/vehicles/CreateDamageForm.vue'
+import CreatePenaltyModal from '@/components/penalties/CreatePenaltyModal.vue'
+import CreateTollModal from '@/components/tolls/CreateTollModal.vue'
+import type { Rental, RentalStatus, RentalType, Vehicle, Customer, Branch, RentalDriver, KmPackage, Driver, Payment, PenaltyResponse, DamageReport, TollRecord } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -26,6 +30,21 @@ const customerDrivers = ref<Driver[]>([])
 const loadingDrivers = ref(false)
 const driverSearch = ref('')
 const selectedDriverId = ref<number | null>(null)
+
+const payments = ref<Payment[]>([])
+const paymentSummary = ref<{ totalPaid: number; currency: string } | null>(null)
+const loadingPayments = ref(false)
+const showReturnModal = ref(false)
+
+const penalties = ref<PenaltyResponse[]>([])
+const damages = ref<DamageReport[]>([])
+const tolls = ref<TollRecord[]>([])
+const loadingPenalties = ref(false)
+const loadingDamages = ref(false)
+const loadingTolls = ref(false)
+const showCreateDamageForm = ref(false)
+const showCreatePenaltyModal = ref(false)
+const showCreateTollModal = ref(false)
 
 const rentalId = computed(() => Number(route.params.id))
 
@@ -109,6 +128,61 @@ const durationLabel = computed(() => {
   }
 })
 
+const totalPaid = computed(() => {
+  if (paymentSummary.value != null && paymentSummary.value.totalPaid != null) {
+    return Number(paymentSummary.value.totalPaid)
+  }
+  return payments.value
+    .filter(p => p.status === 'COMPLETED')
+    .reduce((sum, p) => sum + p.amount, 0)
+})
+
+const penaltyTotalAmount = computed(() => {
+  const unpaidStatuses = new Set(['PENDING', 'NOTIFIED', 'DISPUTED', 'PAID_BY_COMPANY'])
+  return penalties.value
+    .filter(p => unpaidStatuses.has(String(p.status)))
+    .reduce((sum, p) => sum + (p.penaltyAmount ?? 0), 0)
+})
+
+const damageTotalAmount = computed(() => {
+  return damages.value
+    .filter(d => d.customerResponsible === true)
+    .reduce((sum, d) => {
+      const cost = d.repaired && d.repairCostAmount != null ? d.repairCostAmount : (d.estimatedCostAmount ?? 0)
+      return sum + cost
+    }, 0)
+})
+
+const tollTotalAmount = computed(() => {
+  const unpaidStatuses = new Set(['PENDING', 'CHARGED_TO_CUSTOMER'])
+  return tolls.value
+    .filter(t => unpaidStatuses.has(String(t.status)))
+    .reduce((sum, t) => sum + (t.tollAmount ?? 0), 0)
+})
+
+const grandTotal = computed(() => {
+  if (!rental.value) return 0
+  const total = rental.value.totalPrice || 0
+  const extraKm = rental.value.extraKmCharge || 0
+  const discount = rental.value.discountAmount || 0
+  return total + extraKm - discount + penaltyTotalAmount.value + damageTotalAmount.value + tollTotalAmount.value
+})
+
+const remainingAmount = computed(() => {
+  return Math.max(0, grandTotal.value - totalPaid.value)
+})
+
+const paymentStatus = computed(() => {
+  if (totalPaid.value === 0) return 'Ödenmedi'
+  if (remainingAmount.value === 0) return 'Tamamlandı'
+  return 'Kısmen Ödendi'
+})
+
+const showPenaltiesAndDamages = computed(() => {
+  const s = rental.value?.status
+  return s === 'ACTIVE' || s === 'OVERDUE' || s === 'RETURN_PENDING' || s === 'CLOSED'
+})
+
 function getDriverDisplayName(driver: Driver): string {
   if (driver.fullName) return driver.fullName
   return `${driver.firstName || ''} ${driver.lastName || ''}`.trim() || 'İsimsiz Sürücü'
@@ -132,7 +206,15 @@ async function fetchRental() {
   loading.value = true
   try {
     rental.value = await rentalsApi.getById(rentalId.value)
-    await Promise.all([fetchRelatedData(), fetchDrivers()])
+    await Promise.all([
+      fetchRelatedData(),
+      fetchDrivers(),
+      fetchPayments(),
+      fetchPaymentSummary(),
+      fetchPenalties(),
+      fetchDamages(),
+      fetchTolls()
+    ])
   } catch {
     toast.error('Kiralama bilgileri yüklenemedi')
     router.push('/rentals')
@@ -204,6 +286,78 @@ async function fetchDrivers() {
   } catch {
     drivers.value = []
   }
+}
+
+async function fetchPayments() {
+  if (!rental.value) return
+  loadingPayments.value = true
+  try {
+    payments.value = await paymentApi.getByRentalId(rental.value.id)
+  } catch {
+    payments.value = []
+  } finally {
+    loadingPayments.value = false
+  }
+}
+
+async function fetchPaymentSummary() {
+  if (!rental.value) return
+  try {
+    paymentSummary.value = await rentalsApi.getPaymentSummary(rental.value.id)
+  } catch {
+    paymentSummary.value = null
+  }
+}
+
+async function fetchPenalties() {
+  if (!rental.value || !showPenaltiesAndDamages.value) return
+  loadingPenalties.value = true
+  try {
+    penalties.value = await penaltiesApi.getByRental(rental.value.id)
+  } catch {
+    penalties.value = []
+  } finally {
+    loadingPenalties.value = false
+  }
+}
+
+async function fetchDamages() {
+  if (!rental.value || !showPenaltiesAndDamages.value) return
+  loadingDamages.value = true
+  try {
+    damages.value = await damagesApi.getRentalDamages(rental.value.id)
+  } catch {
+    damages.value = []
+  } finally {
+    loadingDamages.value = false
+  }
+}
+
+async function fetchTolls() {
+  if (!rental.value || !showPenaltiesAndDamages.value) return
+  loadingTolls.value = true
+  try {
+    tolls.value = await tollsApi.getByRental(rental.value.id)
+  } catch {
+    tolls.value = []
+  } finally {
+    loadingTolls.value = false
+  }
+}
+
+function handleDamageCreated() {
+  showCreateDamageForm.value = false
+  fetchDamages()
+}
+
+function handlePenaltyCreated() {
+  showCreatePenaltyModal.value = false
+  fetchPenalties()
+}
+
+function handleTollCreated() {
+  showCreateTollModal.value = false
+  fetchTolls()
 }
 
 async function fetchCustomerDrivers() {
@@ -289,33 +443,15 @@ async function handleActivate() {
   }
 }
 
-async function handleStartReturn() {
+function handleStartReturn() {
   if (!rental.value) return
-  try {
-    await rentalsApi.startReturn(rental.value.id)
-    toast.success('İade süreci başlatıldı')
-    fetchRental()
-  } catch (err) {
-    toast.apiError(err, 'İşlem başarısız')
-  }
+  showReturnModal.value = true
 }
 
-async function handleComplete() {
-  if (!rental.value) return
-  const endKm = prompt('Bitiş KM değerini girin:', String(rental.value.startKm || 0))
-  if (endKm === null) return
-  const today = new Date()
-  const returnDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
-  try {
-    await rentalsApi.complete(rental.value.id, { 
-      actualReturnDate: returnDate,
-      endKm: Number(endKm)
-    })
-    toast.success('Kiralama tamamlandı')
-    fetchRental()
-  } catch (err) {
-    toast.apiError(err, 'İşlem başarısız')
-  }
+function handleReturnCompleted(updatedRental: Rental) {
+  rental.value = updatedRental
+  showReturnModal.value = false
+  fetchRental()
 }
 
 async function handleCancel() {
@@ -490,7 +626,7 @@ function buildPdfContent(): string {
       ${r.extraKmCharge > 0 ? `<tr><td>Ekstra KM Ücreti</td><td style="text-align: right;">${formatCurrency(r.extraKmCharge)}</td></tr>` : ''}
       <tr class="total">
         <td>Genel Toplam</td>
-        <td style="text-align: right;">${formatCurrency(r.grandTotal)}</td>
+        <td style="text-align: right;">${formatCurrency((r.totalPrice || 0) + (r.extraKmCharge || 0) - (r.discountAmount || 0))}</td>
       </tr>
     </table>
   </div>
@@ -560,7 +696,17 @@ watch(showDriverModal, (isOpen) => {
   }
 })
 
-onMounted(fetchRental)
+const hasMounted = ref(false)
+onMounted(async () => {
+  await fetchRental()
+  hasMounted.value = true
+})
+
+onActivated(() => {
+  if (hasMounted.value && rental.value?.id === rentalId.value) {
+    fetchRental()
+  }
+})
 </script>
 
 <template>
@@ -598,21 +744,14 @@ onMounted(fetchRental)
               🚗 Teslim Et
             </button>
             <button 
-              v-if="rental.status === 'ACTIVE'" 
+              v-if="rental.status === 'ACTIVE' || rental.status === 'OVERDUE' || rental.status === 'RETURN_PENDING'" 
               class="btn btn-warning"
               @click="handleStartReturn"
             >
-              🔄 İade Başlat
+              🔄 Kiralamayı Sonlandır
             </button>
             <button 
-              v-if="rental.status === 'RETURN_PENDING'" 
-              class="btn btn-primary"
-              @click="handleComplete"
-            >
-              ✓ Tamamla
-            </button>
-            <button 
-              v-if="rental.status !== 'CLOSED' && rental.status !== 'CANCELLED'"
+              v-if="rental.status === 'DRAFT' || rental.status === 'RESERVED'"
               class="btn btn-danger-outline"
               @click="handleCancel"
             >
@@ -718,11 +857,11 @@ onMounted(fetchRental)
             <div class="km-grid">
               <div class="km-item">
                 <span class="label">Başlangıç KM</span>
-                <span class="value">{{ rental.startKm ? formatKm(rental.startKm) : '-' }}</span>
+                <span class="value">{{ rental.startKm !== undefined && rental.startKm !== null ? formatKm(rental.startKm) : '-' }}</span>
               </div>
               <div class="km-item">
                 <span class="label">Bitiş KM</span>
-                <span class="value">{{ rental.endKm ? formatKm(rental.endKm) : '-' }}</span>
+                <span class="value">{{ rental.endKm !== undefined && rental.endKm !== null ? formatKm(rental.endKm) : '-' }}</span>
               </div>
               <div v-if="rental.totalKm > 0" class="km-item total">
                 <span class="label">Toplam KM</span>
@@ -811,6 +950,83 @@ onMounted(fetchRental)
             </div>
           </div>
 
+          <div v-if="showPenaltiesAndDamages" class="card">
+            <div class="card-header">
+              <h3>Trafik Cezaları</h3>
+              <button
+                v-if="rental.status !== 'CLOSED' && rental.status !== 'CANCELLED'"
+                class="btn-sm btn-outline"
+                @click="showCreatePenaltyModal = true"
+              >
+                + Ceza Ekle
+              </button>
+            </div>
+            <div v-if="loadingPenalties" class="loading-placeholder">Yükleniyor...</div>
+            <div v-else-if="penalties.length === 0" class="empty-list">Bu kiralamaya ait trafik cezası bulunmuyor.</div>
+            <div v-else class="penalty-list">
+              <div v-for="p in penalties" :key="p.id" class="list-row">
+                <div class="list-row-main">
+                  <span class="list-row-title">{{ p.penaltyNumber }}</span>
+                  <span class="list-row-meta">{{ p.violationType }} · {{ p.status }}</span>
+                </div>
+                <span class="list-row-value">{{ formatCurrency(p.penaltyAmount) }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="showPenaltiesAndDamages" class="card">
+            <div class="card-header">
+              <h3>Hasarlar</h3>
+              <button
+                v-if="rental.status !== 'CLOSED' && rental.status !== 'CANCELLED'"
+                class="btn-sm btn-outline"
+                @click="showCreateDamageForm = true"
+              >
+                + Hasar Ekle
+              </button>
+            </div>
+            <div v-if="loadingDamages" class="loading-placeholder">Yükleniyor...</div>
+            <div v-else-if="damages.length === 0" class="empty-list">Bu kiralamaya ait hasar kaydı bulunmuyor.</div>
+            <div v-else class="damage-list">
+              <div v-for="d in damages" :key="d.id" class="list-row">
+                <div class="list-row-main">
+                  <span class="list-row-title">{{ d.description || d.damageTypeDisplayName || d.damageType }}</span>
+                  <span class="list-row-meta">
+                    {{ d.locationDisplayName || d.location }} · {{ d.severityDisplayName || d.severity }} · {{ d.repaired ? 'Onarıldı' : 'Beklemede' }}
+                    <template v-if="d.customerName"> · {{ d.customerName }}</template>
+                  </span>
+                </div>
+                <span class="list-row-value">{{ formatCurrency(d.repaired && d.repairCostAmount != null ? d.repairCostAmount : (d.estimatedCostAmount ?? 0)) }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="showPenaltiesAndDamages" class="card">
+            <div class="card-header">
+              <h3>HGS/OGS Geçişler</h3>
+              <button
+                v-if="rental.status !== 'CLOSED' && rental.status !== 'CANCELLED'"
+                class="btn-sm btn-outline"
+                @click="showCreateTollModal = true"
+              >
+                + Geçiş Ekle
+              </button>
+            </div>
+            <div v-if="loadingTolls" class="loading-placeholder">Yükleniyor...</div>
+            <div v-else-if="tolls.length === 0" class="empty-list">Bu kiralamaya ait geçiş kaydı bulunmuyor.</div>
+            <div v-else class="toll-list">
+              <div v-for="t in tolls" :key="t.id" class="list-row">
+                <div class="list-row-main">
+                  <span class="list-row-title">{{ t.tollNumber }}</span>
+                  <span class="list-row-meta">
+                    {{ t.tollTypeDisplayName }} · {{ t.passageLocation || '-' }} · {{ t.status }}
+                  </span>
+                </div>
+                <span class="list-row-value">{{ formatCurrency(t.tollAmount) }}</span>
+              </div>
+            </div>
+          </div>
+
           <div v-if="rental.notes" class="card">
             <h3>Notlar</h3>
             <p class="notes-text">{{ rental.notes }}</p>
@@ -837,10 +1053,44 @@ onMounted(fetchRental)
                 <span class="label">Ekstra KM</span>
                 <span class="value">{{ formatCurrency(rental.extraKmCharge) }}</span>
               </div>
+              <div v-if="penalties.length > 0" class="price-item">
+                <span class="label">Trafik Cezaları</span>
+                <span class="value">{{ formatCurrency(penaltyTotalAmount) }}{{ penaltyTotalAmount === 0 ? ' (ödenmiş)' : '' }}</span>
+              </div>
+              <div v-if="damageTotalAmount > 0" class="price-item">
+                <span class="label">Hasar Bedelleri</span>
+                <span class="value">{{ formatCurrency(damageTotalAmount) }}</span>
+              </div>
+              <div v-if="tollTotalAmount > 0" class="price-item">
+                <span class="label">HGS/OGS</span>
+                <span class="value">{{ formatCurrency(tollTotalAmount) }}</span>
+              </div>
             </div>
             <div class="price-total">
               <span class="label">Genel Toplam</span>
-              <span class="value">{{ formatCurrency(rental.grandTotal) }}</span>
+              <span class="value">{{ formatCurrency(grandTotal) }}</span>
+            </div>
+          </div>
+
+          <div v-if="rental.status !== 'DRAFT'" class="card payment-card">
+            <h3>Ödeme Bilgisi</h3>
+            <div class="payment-info">
+              <div class="payment-item">
+                <span class="label">Toplam Ödenen</span>
+                <span class="value">{{ formatCurrency(totalPaid) }}</span>
+              </div>
+              <div class="payment-item">
+                <span class="label">Kalan Tutar</span>
+                <span class="value" :class="{ 'text-danger': remainingAmount > 0 }">{{ formatCurrency(remainingAmount) }}</span>
+              </div>
+              <div class="payment-item">
+                <span class="label">Ödeme Durumu</span>
+                <span class="value" :class="{
+                  'text-danger': paymentStatus === 'Ödenmedi',
+                  'text-warning': paymentStatus === 'Kısmen Ödendi',
+                  'text-success': paymentStatus === 'Tamamlandı'
+                }">{{ paymentStatus }}</span>
+              </div>
             </div>
           </div>
 
@@ -971,6 +1221,40 @@ onMounted(fetchRental)
           </div>
         </div>
       </Teleport>
+
+      <ReturnCompleteModal
+        :visible="showReturnModal"
+        :rental-id="rentalId"
+        @close="showReturnModal = false"
+        @completed="handleReturnCompleted"
+      />
+
+      <CreateDamageForm
+        v-if="showCreateDamageForm && rental"
+        :vehicle-id="rental.vehicleId"
+        :rental-id="rental.id"
+        @close="showCreateDamageForm = false"
+        @created="handleDamageCreated"
+      />
+
+      <CreatePenaltyModal
+        v-if="rental"
+        :show="showCreatePenaltyModal"
+        :rental-id="rental.id"
+        :vehicle-id="rental.vehicleId"
+        :customer-id="rental.customerId"
+        @close="showCreatePenaltyModal = false"
+        @success="handlePenaltyCreated"
+      />
+
+      <CreateTollModal
+        v-if="showCreateTollModal && rental"
+        :rental-id="rental.id"
+        :vehicle-id="rental.vehicleId"
+        :customer-id="rental.customerId"
+        @close="showCreateTollModal = false"
+        @created="handleTollCreated"
+      />
     </template>
   </div>
 </template>
@@ -1018,6 +1302,42 @@ onMounted(fetchRental)
 
 .text-danger {
     color: #ef4444;
+}
+
+.text-warning {
+    color: #f59e0b;
+}
+
+.text-success {
+    color: #10b981;
+}
+
+.payment-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+}
+
+.payment-info {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.payment-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.payment-item .label {
+    font-size: 13px;
+    color: var(--color-text-muted);
+}
+
+.payment-item .value {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--color-text);
 }
 
 .loading-state {
@@ -1435,6 +1755,54 @@ onMounted(fetchRental)
   text-align: center;
   padding: 20px;
   color: var(--color-text-muted);
+}
+
+.loading-placeholder,
+.empty-list {
+  text-align: center;
+  padding: 20px;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+.penalty-list,
+.damage-list,
+.toll-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.list-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  background: var(--color-bg-secondary);
+  border-radius: 10px;
+}
+
+.list-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.list-row-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.list-row-meta {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.list-row-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
 }
 
 .drivers-list {

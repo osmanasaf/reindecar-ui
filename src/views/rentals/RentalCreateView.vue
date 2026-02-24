@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { rentalsApi, branchesApi, kmPackagesApi, rentalExtraItemApi } from '@/api'
 import { useToast, useValidation } from '@/composables'
+import { formatCurrency } from '@/utils/format'
 import { RentalType, CustomerType } from '@/types'
 import type { Customer, CreateRentalForm, RentalExtraItem, Branch, KmPackage, Vehicle } from '@/types'
 import type { PriceCalculationResponse } from '@/api'
@@ -227,13 +228,6 @@ async function fetchKmPackages() {
   }
 }
 
-function formatCurrency(amount: number | null | undefined): string {
-  return new Intl.NumberFormat('tr-TR', { 
-    style: 'currency', 
-    currency: 'TRY',
-    maximumFractionDigits: 0
-  }).format(amount || 0)
-}
 
 async function handleSubmit() {
   if (!canProceed.value || !selectedVehicleId.value || !selectedCustomerId.value) return

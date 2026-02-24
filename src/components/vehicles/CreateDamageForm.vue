@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { damagesApi } from '@/api'
+import { ref, computed, watch, onMounted } from 'vue'
+import { damagesApi, rentalsApi, customersApi } from '@/api'
 import { useToast } from '@/composables'
 import { DamageType, DamageLocation, DamageSeverity } from '@/types'
-import type { CreateDamageReportForm } from '@/types'
+import type { CreateDamageReportForm, Customer, Rental } from '@/types'
 
 const props = defineProps<{
   vehicleId: number
+  rentalId?: number
 }>()
 
 const emit = defineEmits<{
@@ -17,8 +18,15 @@ const emit = defineEmits<{
 const toast = useToast()
 const submitting = ref(false)
 
+const vehicleRentals = ref<Rental[]>([])
+const loadingRentals = ref(false)
+const selectedCustomer = ref<Customer | null>(null)
+
+const isRentalLocked = computed(() => !!props.rentalId)
+
 const form = ref<CreateDamageReportForm>({
   vehicleId: props.vehicleId,
+  rentalId: props.rentalId,
   reportDate: new Date().toISOString().split('T')[0],
   damageType: DamageType.SCRATCH,
   location: DamageLocation.FRONT_BUMPER,
@@ -26,7 +34,9 @@ const form = ref<CreateDamageReportForm>({
   description: '',
   estimatedCostAmount: undefined,
   estimatedCostCurrency: 'TRY',
-  reportedBy: ''
+  reportedBy: '',
+  customerId: undefined,
+  customerResponsible: false
 })
 
 const damageTypes = [
@@ -74,9 +84,57 @@ const severities = [
   { value: DamageSeverity.CRITICAL, label: 'Kritik', color: '#B71C1C' }
 ]
 
+const selectedRentalDisplay = computed(() => {
+  if (!form.value.rentalId) return ''
+  const r = vehicleRentals.value.find(r => r.id === form.value.rentalId)
+  return r ? `${r.rentalNumber} - ${r.customerName || 'Müşteri'}` : ''
+})
+
+watch(() => form.value.rentalId, async (rentalId) => {
+  if (!rentalId) {
+    if (!isRentalLocked.value) {
+      form.value.customerId = undefined
+      selectedCustomer.value = null
+      form.value.customerResponsible = false
+    }
+    return
+  }
+
+  const rental = vehicleRentals.value.find(r => r.id === rentalId)
+  if (rental) {
+    form.value.customerId = rental.customerId
+    form.value.customerResponsible = true
+    try {
+      selectedCustomer.value = await customersApi.getById(rental.customerId)
+    } catch {
+      selectedCustomer.value = null
+    }
+  }
+})
+
+async function loadVehicleRentals() {
+  loadingRentals.value = true
+  try {
+    const response = await rentalsApi.getAll({ size: 200 })
+    vehicleRentals.value = response.content.filter(r =>
+      r.vehicleId === props.vehicleId &&
+      (r.status === 'ACTIVE' || r.status === 'OVERDUE' || r.status === 'RETURN_PENDING')
+    )
+  } catch {
+    vehicleRentals.value = []
+  } finally {
+    loadingRentals.value = false
+  }
+}
+
 async function handleSubmit() {
   if (!form.value.description.trim()) {
     toast.error('Lütfen hasar açıklaması girin')
+    return
+  }
+
+  if (form.value.customerResponsible && (!form.value.estimatedCostAmount || form.value.estimatedCostAmount <= 0)) {
+    toast.error('Müşteri sorumlu ise tahmini maliyet girilmelidir')
     return
   }
 
@@ -91,6 +149,22 @@ async function handleSubmit() {
     submitting.value = false
   }
 }
+
+onMounted(async () => {
+  await loadVehicleRentals()
+
+  if (props.rentalId) {
+    form.value.rentalId = props.rentalId
+    const rental = vehicleRentals.value.find(r => r.id === props.rentalId)
+    if (rental) {
+      form.value.customerId = rental.customerId
+      form.value.customerResponsible = true
+      try {
+        selectedCustomer.value = await customersApi.getById(rental.customerId)
+      } catch { /* ignore */ }
+    }
+  }
+})
 </script>
 
 <template>
@@ -98,11 +172,46 @@ async function handleSubmit() {
     <div class="modal-content">
       <div class="modal-header">
         <h2>Yeni Hasar Raporu</h2>
-        <button class="close-btn" @click="emit('close')">×</button>
+        <button class="close-btn" @click="emit('close')">&times;</button>
       </div>
 
       <form @submit.prevent="handleSubmit" class="damage-form">
         <div class="form-grid">
+
+          <div class="form-group full-width">
+            <label for="rental">Kiralama</label>
+            <select
+              v-if="!isRentalLocked"
+              id="rental"
+              v-model="form.rentalId"
+              class="form-select"
+            >
+              <option :value="undefined">Kiralama seçin (opsiyonel)</option>
+              <option
+                v-for="r in vehicleRentals"
+                :key="r.id"
+                :value="r.id"
+              >
+                {{ r.rentalNumber }} - {{ r.customerName || 'Müşteri' }} [{{ r.status }}]
+              </option>
+            </select>
+            <div v-else class="locked-field">
+              {{ selectedRentalDisplay || `Kiralama #${form.rentalId}` }}
+            </div>
+            <div v-if="loadingRentals" class="field-hint">Kiralamalar yükleniyor...</div>
+            <div v-else-if="!isRentalLocked && vehicleRentals.length === 0" class="field-hint">
+              Bu araca ait aktif kiralama bulunamadı
+            </div>
+          </div>
+
+          <div v-if="form.rentalId && selectedCustomer" class="form-group full-width">
+            <label>Müşteri</label>
+            <div class="locked-field">
+              {{ selectedCustomer.displayName }}
+              <span class="customer-badge">{{ selectedCustomer.customerType === 'PERSONAL' ? 'Bireysel' : 'Kurumsal' }}</span>
+            </div>
+          </div>
+
           <div class="form-group">
             <label for="damageType">Hasar Tipi *</label>
             <select id="damageType" v-model="form.damageType" required>
@@ -181,6 +290,17 @@ async function handleSubmit() {
               <option value="USD">USD</option>
               <option value="EUR">EUR</option>
             </select>
+          </div>
+
+          <div v-if="form.rentalId" class="form-group full-width">
+            <label for="customerResponsible" class="checkbox-label">
+              <input
+                id="customerResponsible"
+                type="checkbox"
+                v-model="form.customerResponsible"
+              />
+              <span>Müşteri Sorumlu (Alacak oluştur)</span>
+            </label>
           </div>
 
           <div class="form-group full-width">
@@ -292,7 +412,8 @@ async function handleSubmit() {
 
 .form-group input,
 .form-group select,
-.form-group textarea {
+.form-group textarea,
+.form-select {
   padding: 10px 12px;
   border: 1px solid var(--color-border);
   border-radius: 8px;
@@ -302,10 +423,38 @@ async function handleSubmit() {
 
 .form-group input:focus,
 .form-group select:focus,
-.form-group textarea:focus {
+.form-group textarea:focus,
+.form-select:focus {
   outline: none;
   border-color: var(--color-primary);
   background: var(--color-surface);
+}
+
+.locked-field {
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 14px;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.customer-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: var(--color-primary, #2563eb);
+  color: white;
+  font-weight: 500;
+}
+
+.field-hint {
+  font-size: 12px;
+  color: var(--color-text-secondary);
 }
 
 .severity-options {
@@ -344,6 +493,21 @@ async function handleSubmit() {
   border-radius: 50%;
   border: 2px solid white;
   box-shadow: 0 0 0 1px var(--color-border);
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 10px 0;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
 }
 
 .form-actions {

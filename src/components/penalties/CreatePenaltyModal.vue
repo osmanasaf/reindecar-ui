@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
-import { penaltiesApi } from '@/api'
-import { useForm, useToast, useEnumTranslations } from '@/composables'
-import type { CreatePenaltyRequest } from '@/types'
+import { ref, computed, watch } from 'vue'
+import { penaltiesApi, rentalsApi, vehiclesApi, customersApi } from '@/api'
+import { useToast, useEnumTranslations } from '@/composables'
+import type { Rental, Vehicle, Customer, RentalDriver, ViolationType } from '@/types'
 
 interface Props {
   show: boolean
-  rentalId: number
-  vehicleId: number
-  customerId: number
+  rentalId?: number
+  vehicleId?: number
+  customerId?: number
   driverId?: number
 }
 
@@ -22,84 +22,198 @@ const emit = defineEmits<{
 const toast = useToast()
 const { violationTypes } = useEnumTranslations()
 
-const initialValues: CreatePenaltyRequest = {
-  rentalId: props.rentalId,
-  vehicleId: props.vehicleId,
-  customerId: props.customerId,
-  driverId: props.driverId,
-  violationType: 'SPEED',
-  violationDate: '',
-  violationLocation: '',
-  penaltyAmount: 0,
-  dueDate: '',
-  ticketNumber: '',
-  description: '',
-  notes: ''
-}
+const isSubmitting = ref(false)
+const rentals = ref<Rental[]>([])
+const vehicles = ref<Vehicle[]>([])
+const customers = ref<Customer[]>([])
+const drivers = ref<RentalDriver[]>([])
+const loadingRentals = ref(false)
+const loadingVehicles = ref(false)
 
-const validationRules = {
-  violationType: (value: string) => !value ? 'İhlal türü seçilmelidir' : '',
-  violationDate: (value: string) => {
-    if (!value) return 'İhlal tarihi zorunludur'
-    const date = new Date(value)
-    if (date > new Date()) return 'İhlal tarihi gelecekte olamaz'
-    return ''
-  },
-  penaltyAmount: (value: number) => {
-    if (!value || value <= 0) return 'Ceza tutarı 0\'dan büyük olmalıdır'
-    return ''
-  },
-  violationLocation: (value?: string) => {
-    if (value && value.length > 200) return 'İhlal yeri en fazla 200 karakter olabilir'
-    return ''
-  },
-  ticketNumber: (value?: string) => {
-    if (value && value.length > 50) return 'Makbuz numarası en fazla 50 karakter olabilir'
-    return ''
-  },
-  description: (value?: string) => {
-    if (value && value.length > 1000) return 'Açıklama en fazla 1000 karakter olabilir'
-    return ''
-  },
-  notes: (value?: string) => {
-    if (value && value.length > 500) return 'Notlar en fazla 500 karakter olabilir'
-    return ''
-  }
-}
+const selectedRentalId = ref<number | undefined>(props.rentalId)
+const selectedVehicleId = ref<number | undefined>(props.vehicleId)
+const selectedCustomerId = ref<number | undefined>(props.customerId)
+const selectedDriverId = ref<number | undefined>(props.driverId)
 
-const { values, errors, touched, handleSubmit, validateField, reset } = useForm(
-  initialValues,
-  validationRules
+const violationType = ref<string>('SPEED')
+const violationDate = ref('')
+const violationLocation = ref('')
+const penaltyAmount = ref<number>(0)
+const dueDate = ref('')
+const ticketNumber = ref('')
+const description = ref('')
+const notes = ref('')
+
+const isRentalLocked = computed(() => !!props.rentalId)
+
+const selectedRental = computed(() =>
+  rentals.value.find(r => r.id === selectedRentalId.value)
 )
 
-const isSubmitting = ref(false)
+const selectedVehicleDisplay = computed(() => {
+  if (!selectedVehicleId.value) return ''
+  const v = vehicles.value.find(v => v.id === selectedVehicleId.value)
+  return v ? `${v.plateNumber} - ${v.brand} ${v.model}` : ''
+})
 
-const onSubmit = handleSubmit(async (data) => {
-  isSubmitting.value = true
-  try {
-    await penaltiesApi.create(data)
-    toast.success('Trafik cezası başarıyla oluşturuldu')
-    emit('success')
-    emit('close')
-    reset()
-  } catch (error: any) {
-    toast.error(error.message || 'Ceza oluşturulurken hata oluştu')
-  } finally {
-    isSubmitting.value = false
+const selectedCustomerDisplay = computed(() => {
+  if (!selectedCustomerId.value) return ''
+  const c = customers.value.find(c => c.id === selectedCustomerId.value)
+  return c?.displayName || ''
+})
+
+watch(selectedRentalId, async (rentalId) => {
+  if (!rentalId) {
+    if (!isRentalLocked.value) {
+      selectedVehicleId.value = undefined
+      selectedCustomerId.value = undefined
+      selectedDriverId.value = undefined
+      drivers.value = []
+    }
+    return
+  }
+
+  const rental = rentals.value.find(r => r.id === rentalId)
+  if (rental) {
+    selectedVehicleId.value = rental.vehicleId
+    selectedCustomerId.value = rental.customerId
+
+    if (!vehicles.value.some(v => v.id === rental.vehicleId)) {
+      try {
+        const v = await vehiclesApi.getById(rental.vehicleId)
+        vehicles.value.push(v)
+      } catch { /* ignore */ }
+    }
+    if (!customers.value.some(c => c.id === rental.customerId)) {
+      try {
+        const c = await customersApi.getById(rental.customerId)
+        customers.value.push(c)
+      } catch { /* ignore */ }
+    }
+
+    try {
+      drivers.value = await rentalsApi.getDrivers(rentalId)
+      if (drivers.value.length > 0) {
+        const primary = drivers.value.find(d => d.primary)
+        selectedDriverId.value = primary?.driverId || drivers.value[0].driverId
+      }
+    } catch {
+      drivers.value = []
+    }
   }
 })
 
-const handleClose = () => {
-  reset()
+async function loadRentals() {
+  loadingRentals.value = true
+  try {
+    const response = await rentalsApi.getAll({ size: 200 })
+    rentals.value = response.content.filter(r =>
+      r.status === 'ACTIVE' || r.status === 'OVERDUE' || r.status === 'RETURN_PENDING' || r.status === 'RESERVED'
+    )
+  } catch {
+    rentals.value = []
+  } finally {
+    loadingRentals.value = false
+  }
+}
+
+async function loadInitialData() {
+  if (props.vehicleId && !vehicles.value.some(v => v.id === props.vehicleId)) {
+    try {
+      const v = await vehiclesApi.getById(props.vehicleId)
+      vehicles.value.push(v)
+    } catch { /* ignore */ }
+  }
+  if (props.customerId && !customers.value.some(c => c.id === props.customerId)) {
+    try {
+      const c = await customersApi.getById(props.customerId)
+      customers.value.push(c)
+    } catch { /* ignore */ }
+  }
+}
+
+function validate(): boolean {
+  if (!selectedRentalId.value) {
+    toast.error('Lütfen bir kiralama seçin')
+    return false
+  }
+  if (!violationType.value) {
+    toast.error('İhlal türü seçilmelidir')
+    return false
+  }
+  if (!violationDate.value) {
+    toast.error('İhlal tarihi zorunludur')
+    return false
+  }
+  if (!penaltyAmount.value || penaltyAmount.value <= 0) {
+    toast.error('Ceza tutarı 0\'dan büyük olmalıdır')
+    return false
+  }
+  return true
+}
+
+async function handleSubmit() {
+  if (!validate()) return
+
+  isSubmitting.value = true
+  try {
+    await penaltiesApi.create({
+      rentalId: selectedRentalId.value!,
+      vehicleId: selectedVehicleId.value!,
+      customerId: selectedCustomerId.value!,
+      driverId: selectedDriverId.value,
+      violationType: violationType.value as ViolationType,
+      violationDate: violationDate.value,
+      violationLocation: violationLocation.value || undefined,
+      penaltyAmount: penaltyAmount.value,
+      dueDate: dueDate.value || undefined,
+      ticketNumber: ticketNumber.value || undefined,
+      description: description.value || undefined,
+      notes: notes.value || undefined,
+    })
+    toast.success('Trafik cezası başarıyla oluşturuldu')
+    emit('success')
+    emit('close')
+    resetForm()
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : 'Ceza oluşturulurken hata oluştu'
+    toast.error(msg)
+  } finally {
+    isSubmitting.value = false
+  }
+}
+
+function resetForm() {
+  violationType.value = 'SPEED'
+  violationDate.value = ''
+  violationLocation.value = ''
+  penaltyAmount.value = 0
+  dueDate.value = ''
+  ticketNumber.value = ''
+  description.value = ''
+  notes.value = ''
+  if (!isRentalLocked.value) {
+    selectedRentalId.value = undefined
+    selectedVehicleId.value = undefined
+    selectedCustomerId.value = undefined
+    selectedDriverId.value = undefined
+    drivers.value = []
+  }
+}
+
+function handleClose() {
+  resetForm()
   emit('close')
 }
 
-watch(() => props.show, (newVal) => {
+watch(() => props.show, async (newVal) => {
   if (newVal) {
-    values.rentalId = props.rentalId
-    values.vehicleId = props.vehicleId
-    values.customerId = props.customerId
-    values.driverId = props.driverId
+    selectedRentalId.value = props.rentalId
+    selectedVehicleId.value = props.vehicleId
+    selectedCustomerId.value = props.customerId
+    selectedDriverId.value = props.driverId
+    await loadRentals()
+    await loadInitialData()
   }
 })
 </script>
@@ -109,34 +223,79 @@ watch(() => props.show, (newVal) => {
     <div class="modal-content">
       <div class="modal-header">
         <h2 class="modal-title">Yeni Trafik Cezası</h2>
-        <button class="close-btn" @click="handleClose">×</button>
+        <button class="close-btn" @click="handleClose">&times;</button>
       </div>
 
-      <form @submit.prevent="onSubmit">
+      <form @submit.prevent="handleSubmit">
         <div class="modal-body">
+          <div class="form-group full-width">
+            <label class="form-label">
+              Kiralama <span class="required">*</span>
+            </label>
+            <select
+              v-if="!isRentalLocked"
+              v-model="selectedRentalId"
+              class="form-input"
+            >
+              <option :value="undefined">Kiralama seçin...</option>
+              <option
+                v-for="r in rentals"
+                :key="r.id"
+                :value="r.id"
+              >
+                {{ r.rentalNumber }} - {{ r.customerName || 'Müşteri' }} ({{ r.vehiclePlate || 'Araç' }}) [{{ r.status }}]
+              </option>
+            </select>
+            <div v-else class="locked-field">
+              {{ selectedRental?.rentalNumber || `Kiralama #${selectedRentalId}` }}
+            </div>
+            <div v-if="loadingRentals" class="field-hint">Kiralamalar yükleniyor...</div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Araç</label>
+              <div class="locked-field">
+                {{ selectedVehicleDisplay || 'Kiralama seçildiğinde otomatik dolar' }}
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Müşteri</label>
+              <div class="locked-field">
+                {{ selectedCustomerDisplay || 'Kiralama seçildiğinde otomatik dolar' }}
+              </div>
+            </div>
+          </div>
+
+          <div v-if="drivers.length > 0" class="form-group full-width">
+            <label class="form-label">Sürücü</label>
+            <select v-model="selectedDriverId" class="form-input">
+              <option :value="undefined">Sürücü seçin (opsiyonel)</option>
+              <option
+                v-for="d in drivers"
+                :key="d.driverId"
+                :value="d.driverId"
+              >
+                {{ d.driverName }} {{ d.primary ? '(Ana Sürücü)' : '' }}
+              </option>
+            </select>
+          </div>
+
           <div class="form-row">
             <div class="form-group">
               <label class="form-label">
                 İhlal Türü <span class="required">*</span>
               </label>
-              <select
-                v-model="values.violationType"
-                class="form-input"
-                :class="{ 'error': touched.violationType && errors.violationType }"
-                @blur="validateField('violationType')"
-              >
+              <select v-model="violationType" class="form-input">
                 <option value="">Seçiniz</option>
-                <option 
-                  v-for="(label, value) in violationTypes" 
-                  :key="value" 
+                <option
+                  v-for="(label, value) in violationTypes"
+                  :key="value"
                   :value="value"
                 >
                   {{ label }}
                 </option>
               </select>
-              <span v-if="touched.violationType && errors.violationType" class="error-text">
-                {{ errors.violationType }}
-              </span>
             </div>
 
             <div class="form-group">
@@ -144,33 +303,23 @@ watch(() => props.show, (newVal) => {
                 İhlal Tarihi <span class="required">*</span>
               </label>
               <input
-                v-model="values.violationDate"
+                v-model="violationDate"
                 type="date"
                 class="form-input"
-                :class="{ 'error': touched.violationDate && errors.violationDate }"
                 :max="new Date().toISOString().split('T')[0]"
-                @blur="validateField('violationDate')"
               />
-              <span v-if="touched.violationDate && errors.violationDate" class="error-text">
-                {{ errors.violationDate }}
-              </span>
             </div>
           </div>
 
           <div class="form-group full-width">
             <label class="form-label">İhlal Yeri</label>
             <input
-              v-model="values.violationLocation"
+              v-model="violationLocation"
               type="text"
               class="form-input"
-              :class="{ 'error': touched.violationLocation && errors.violationLocation }"
               maxlength="200"
               placeholder="İhlal yapılan yer"
-              @blur="validateField('violationLocation')"
             />
-            <span v-if="touched.violationLocation && errors.violationLocation" class="error-text">
-              {{ errors.violationLocation }}
-            </span>
           </div>
 
           <div class="form-row">
@@ -179,23 +328,18 @@ watch(() => props.show, (newVal) => {
                 Ceza Tutarı (TL) <span class="required">*</span>
               </label>
               <input
-                v-model.number="values.penaltyAmount"
+                v-model.number="penaltyAmount"
                 type="number"
                 step="0.01"
                 class="form-input"
-                :class="{ 'error': touched.penaltyAmount && errors.penaltyAmount }"
                 placeholder="0.00"
-                @blur="validateField('penaltyAmount')"
               />
-              <span v-if="touched.penaltyAmount && errors.penaltyAmount" class="error-text">
-                {{ errors.penaltyAmount }}
-              </span>
             </div>
 
             <div class="form-group">
               <label class="form-label">Ödeme Vadesi</label>
               <input
-                v-model="values.dueDate"
+                v-model="dueDate"
                 type="date"
                 class="form-input"
               />
@@ -205,49 +349,34 @@ watch(() => props.show, (newVal) => {
           <div class="form-group full-width">
             <label class="form-label">Ceza Makbuzu No</label>
             <input
-              v-model="values.ticketNumber"
+              v-model="ticketNumber"
               type="text"
               class="form-input"
-              :class="{ 'error': touched.ticketNumber && errors.ticketNumber }"
               maxlength="50"
               placeholder="Makbuz numarası"
-              @blur="validateField('ticketNumber')"
             />
-            <span v-if="touched.ticketNumber && errors.ticketNumber" class="error-text">
-              {{ errors.ticketNumber }}
-            </span>
           </div>
 
           <div class="form-group full-width">
             <label class="form-label">Açıklama</label>
             <textarea
-              v-model="values.description"
+              v-model="description"
               class="form-input"
-              :class="{ 'error': touched.description && errors.description }"
               rows="3"
               maxlength="1000"
               placeholder="İhlal detayları..."
-              @blur="validateField('description')"
             ></textarea>
-            <span v-if="touched.description && errors.description" class="error-text">
-              {{ errors.description }}
-            </span>
           </div>
 
           <div class="form-group full-width">
             <label class="form-label">Notlar</label>
             <textarea
-              v-model="values.notes"
+              v-model="notes"
               class="form-input"
-              :class="{ 'error': touched.notes && errors.notes }"
               rows="2"
               maxlength="500"
               placeholder="Ek notlar..."
-              @blur="validateField('notes')"
             ></textarea>
-            <span v-if="touched.notes && errors.notes" class="error-text">
-              {{ errors.notes }}
-            </span>
           </div>
         </div>
 
@@ -255,7 +384,7 @@ watch(() => props.show, (newVal) => {
           <button type="button" class="btn btn-secondary" @click="handleClose">
             İptal
           </button>
-          <button type="submit" class="btn btn-primary" :disabled="isSubmitting">
+          <button type="submit" class="btn btn-primary" :disabled="isSubmitting || !selectedRentalId">
             {{ isSubmitting ? 'Kaydediliyor...' : 'Kaydet' }}
           </button>
         </div>
@@ -280,8 +409,8 @@ watch(() => props.show, (newVal) => {
 }
 
 .modal-content {
-  background: white;
-  border-radius: 0.5rem;
+  background: var(--color-surface, white);
+  border-radius: 12px;
   width: 100%;
   max-width: 700px;
   max-height: 90vh;
@@ -300,7 +429,6 @@ watch(() => props.show, (newVal) => {
 .modal-title {
   font-size: 1.25rem;
   font-weight: 600;
-  color: var(--color-text, #111827);
   margin: 0;
 }
 
@@ -317,12 +445,10 @@ watch(() => props.show, (newVal) => {
   align-items: center;
   justify-content: center;
   border-radius: 0.25rem;
-  transition: all 0.2s;
 }
 
 .close-btn:hover {
-  background: var(--color-background, #f3f4f6);
-  color: var(--color-text, #111827);
+  background: var(--color-bg-secondary, #f3f4f6);
 }
 
 .modal-body {
@@ -351,7 +477,6 @@ watch(() => props.show, (newVal) => {
 .form-label {
   font-size: 0.875rem;
   font-weight: 500;
-  color: var(--color-text, #111827);
 }
 
 .required {
@@ -361,29 +486,38 @@ watch(() => props.show, (newVal) => {
 .form-input {
   padding: 0.625rem 0.75rem;
   border: 1px solid var(--color-border, #d1d5db);
-  border-radius: 0.375rem;
+  border-radius: 0.5rem;
   font-size: 0.875rem;
-  transition: all 0.2s;
+  background: var(--color-bg-secondary, #f9fafb);
+  transition: border-color 0.2s;
 }
 
 .form-input:focus {
   outline: none;
   border-color: var(--color-primary, #2563eb);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-}
-
-.form-input.error {
-  border-color: #dc2626;
-}
-
-.error-text {
-  font-size: 0.75rem;
-  color: #dc2626;
+  background: var(--color-surface, white);
 }
 
 textarea.form-input {
   resize: vertical;
   min-height: 4rem;
+}
+
+.locked-field {
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  background: var(--color-bg-secondary, #f3f4f6);
+  color: var(--color-text-secondary, #6b7280);
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+}
+
+.field-hint {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary, #9ca3af);
 }
 
 .modal-footer {
@@ -396,7 +530,7 @@ textarea.form-input {
 
 .btn {
   padding: 0.625rem 1.25rem;
-  border-radius: 0.375rem;
+  border-radius: 0.5rem;
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
@@ -405,18 +539,17 @@ textarea.form-input {
 }
 
 .btn:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
 .btn-secondary {
-  background: white;
-  color: var(--color-text, #111827);
+  background: var(--color-surface, white);
   border: 1px solid var(--color-border, #d1d5db);
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: var(--color-background, #f3f4f6);
+  background: var(--color-bg-secondary, #f3f4f6);
 }
 
 .btn-primary {

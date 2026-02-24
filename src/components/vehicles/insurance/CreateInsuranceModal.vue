@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { watch } from 'vue'
 import { vehicleInsurancesApi } from '@/api'
 import { useForm, useToast, useEnumTranslations } from '@/composables'
 import { formatPhoneInput, isValidPhoneNumber, normalizePhoneDigits } from '@/utils/phone'
-import type { CreateVehicleInsuranceRequest, InsuranceType } from '@/types'
+import type { CreateVehicleInsuranceRequest } from '@/types'
 
 interface Props {
   show: boolean
@@ -33,56 +33,49 @@ const initialValues: CreateVehicleInsuranceRequest = {
   notes: ''
 }
 
-const validationRules = {
-  insuranceType: (value: string) => !value ? 'Sigorta türü seçilmelidir' : '',
-  startDate: (value: string) => !value ? 'Başlangıç tarihi zorunludur' : '',
-  endDate: (value: string, formValues: CreateVehicleInsuranceRequest) => {
-    if (!value) return 'Bitiş tarihi zorunludur'
-    if (formValues.startDate && value < formValues.startDate) {
-      return 'Bitiş tarihi başlangıçtan sonra olmalıdır'
-    }
-    return ''
-  },
-  policyNumber: (value?: string) => {
-    if (value && value.length > 50) return 'Poliçe numarası en fazla 50 karakter olabilir'
-    return ''
-  },
-  company: (value?: string) => {
-    if (value && value.length > 100) return 'Şirket adı en fazla 100 karakter olabilir'
-    return ''
-  },
-  contactPhone: (value?: string) => {
-    if (value && !isValidPhoneNumber(value)) return 'Telefon 10 haneli olmalidir'
-    return ''
-  },
-  notes: (value?: string) => {
-    if (value && value.length > 500) return 'Notlar en fazla 500 karakter olabilir'
-    return ''
+function validate(
+  formValues: CreateVehicleInsuranceRequest
+): Partial<Record<keyof CreateVehicleInsuranceRequest, string>> {
+  const err: Partial<Record<keyof CreateVehicleInsuranceRequest, string>> = {}
+  if (!formValues.insuranceType) err.insuranceType = 'Sigorta türü seçilmelidir'
+  if (!formValues.startDate) err.startDate = 'Başlangıç tarihi zorunludur'
+  if (!formValues.endDate) {
+    err.endDate = 'Bitiş tarihi zorunludur'
+  } else if (formValues.startDate && formValues.endDate < formValues.startDate) {
+    err.endDate = 'Bitiş tarihi başlangıçtan sonra olmalıdır'
   }
+  if (formValues.policyNumber && formValues.policyNumber.length > 50) {
+    err.policyNumber = 'Poliçe numarası en fazla 50 karakter olabilir'
+  }
+  if (formValues.company && formValues.company.length > 100) {
+    err.company = 'Şirket adı en fazla 100 karakter olabilir'
+  }
+  if (formValues.contactPhone && !isValidPhoneNumber(formValues.contactPhone)) {
+    err.contactPhone = 'Telefon 10 haneli olmalidir'
+  }
+  if (formValues.notes && formValues.notes.length > 500) {
+    err.notes = 'Notlar en fazla 500 karakter olabilir'
+  }
+  return err
 }
 
-const { values, errors, touched, handleSubmit, validateField, reset } = useForm(
+const { values, errors, touched, handleSubmit, validateField, reset, isSubmitting } = useForm({
   initialValues,
-  validationRules
-)
-
-const isSubmitting = ref(false)
-
-const onSubmit = handleSubmit(async (data) => {
-  isSubmitting.value = true
-  try {
-    await vehicleInsurancesApi.create({
-      ...data,
-      contactPhone: data.contactPhone ? normalizePhoneDigits(data.contactPhone) : ''
-    })
-    toast.success('Sigorta poliçesi başarıyla eklendi')
-    emit('success')
-    emit('close')
-    reset()
-  } catch (error: any) {
-    toast.error(error.message || 'Poliçe oluşturulurken hata oluştu')
-  } finally {
-    isSubmitting.value = false
+  validate,
+  async onSubmit(data) {
+    try {
+      await vehicleInsurancesApi.create({
+        ...data,
+        contactPhone: data.contactPhone ? normalizePhoneDigits(data.contactPhone) : ''
+      })
+      toast.success('Sigorta poliçesi başarıyla eklendi')
+      emit('success')
+      emit('close')
+      reset()
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Poliçe oluşturulurken hata oluştu')
+      throw err
+    }
   }
 })
 
@@ -111,7 +104,7 @@ watch(() => props.show, (newVal) => {
         <button class="close-btn" @click="handleClose">×</button>
       </div>
 
-      <form @submit.prevent="onSubmit">
+      <form @submit.prevent="handleSubmit">
         <div class="modal-body">
           <div class="form-row">
             <div class="form-group full-width">

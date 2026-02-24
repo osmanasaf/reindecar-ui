@@ -42,3 +42,7 @@ export {
 } from './accounting.api'
 export { penaltiesApi } from './penalties.api'
 export { installmentsApi } from './installments.api'
+export { paymentApi } from './payment.api'
+export { tollsApi } from './tolls.api'
+export type { CreateTollRecordRequest } from './tolls.api'
+export { referenceDataApi } from './reference-data.api'

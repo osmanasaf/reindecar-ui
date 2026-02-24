@@ -1,38 +1,159 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAccountingStore } from '@/stores'
-import { usePagination, useToast, useAccountingStats } from '@/composables'
-import { PayableCard, CreatePayableModal } from '@/components/accounting'
+import { usePagination, useToast } from '@/composables'
+import { PayableCard, CreatePayableModal, PaymentModal } from '@/components/accounting'
 import { formatCurrency } from '@/utils/format'
-import type { CreatePayableRequest, PayableFilters } from '@/types'
+import { rentalsApi, vehiclesApi } from '@/api'
+import type { CreatePayableRequest, PayableFilters, RecordPaymentRequest, Rental, Vehicle } from '@/types'
+import { PayableStatus, PayableType } from '@/types'
 
 const router = useRouter()
 const accountingStore = useAccountingStore()
 const toast = useToast()
-const { getParams } = usePagination()
-const stats = useAccountingStats()
+const { page, size, setPage, setTotal, getParams } = usePagination()
+
+type ViewMode = 'all' | 'rental' | 'vehicle'
+const viewMode = ref<ViewMode>('all')
+const selectedRentalId = ref<number | null>(null)
+const selectedVehicleId = ref<number | null>(null)
+const rentalsList = ref<Rental[]>([])
+const vehiclesList = ref<Vehicle[]>([])
+const loadingRentals = ref(false)
+const loadingVehicles = ref(false)
 
 const filters = ref<PayableFilters>({})
 const showCreateModal = ref(false)
+const showPaymentModal = ref(false)
+const selectedPayableId = ref<number | null>(null)
+const selectedPayableAmount = ref(0)
+const selectedPayableNumber = ref('')
 
 const payables = computed(() => accountingStore.payables)
 const loading = computed(() => accountingStore.payablesLoading)
+
+const totalPayable = computed(() => payables.value.reduce((s, p) => s + p.amount, 0))
+const outstandingPayable = computed(() => payables.value.reduce((s, p) => s + p.remainingAmount, 0))
+const overduePayables = computed(() => payables.value.filter(p => p.status === PayableStatus.OVERDUE))
+const overduePayablesTotal = computed(() =>
+  overduePayables.value.reduce((s, p) => s + p.remainingAmount, 0)
+)
+const paymentRate = computed(() => {
+  const total = totalPayable.value
+  if (!total) return 0
+  const paid = payables.value.reduce((s, p) => s + p.paidAmount, 0)
+  return Math.round((paid / total) * 100)
+})
 
 onMounted(() => {
   loadPayables()
 })
 
+watch(viewMode, (mode) => {
+  if (mode === 'rental') {
+    selectedVehicleId.value = null
+    accountingStore.clearPayables()
+    loadRentalsList()
+  } else if (mode === 'vehicle') {
+    selectedRentalId.value = null
+    accountingStore.clearPayables()
+    loadVehiclesList()
+  } else {
+    selectedRentalId.value = null
+    selectedVehicleId.value = null
+    setPage(0)
+    loadPayables()
+  }
+})
+
+watch(selectedRentalId, (id) => {
+  if (viewMode.value === 'rental' && id != null) loadPayables()
+})
+
+watch(selectedVehicleId, (id) => {
+  if (viewMode.value === 'vehicle' && id != null) loadPayables()
+})
+
+const loadRentalsList = async () => {
+  loadingRentals.value = true
+  try {
+    const res = await rentalsApi.getAll({ page: 0, size: 500, sort: 'startDate', direction: 'DESC' })
+    rentalsList.value = res.content
+  } catch {
+    rentalsList.value = []
+  } finally {
+    loadingRentals.value = false
+  }
+}
+
+const loadVehiclesList = async () => {
+  loadingVehicles.value = true
+  try {
+    const res = await vehiclesApi.getAll({ page: 0, size: 500, sort: 'plate', direction: 'ASC' })
+    vehiclesList.value = res.content
+  } catch {
+    vehiclesList.value = []
+  } finally {
+    loadingVehicles.value = false
+  }
+}
+
 const loadPayables = async () => {
   try {
-    await accountingStore.fetchPayables(filters.value, getParams())
-  } catch (error: any) {
-    toast.error(error.message || 'Verecekler yüklenemedi')
+    if (viewMode.value === 'rental' && selectedRentalId.value != null) {
+      await accountingStore.fetchPayablesByRental(selectedRentalId.value)
+      setTotal(payables.value.length, 1)
+    } else if (viewMode.value === 'vehicle' && selectedVehicleId.value != null) {
+      await accountingStore.fetchPayablesByVehicle(selectedVehicleId.value)
+      setTotal(payables.value.length, 1)
+    } else if (viewMode.value === 'all') {
+      const response = await accountingStore.fetchPayables(filters.value, getParams())
+      if (response) setTotal(response.totalElements, response.totalPages)
+    }
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Verecekler yüklenemedi'
+    toast.error(message)
   }
+}
+
+const applyFilters = () => {
+  setPage(0)
+  loadPayables()
+}
+
+const clearFilters = () => {
+  filters.value = {}
+  setPage(0)
+  loadPayables()
 }
 
 const handleCardClick = (id: number) => {
   router.push({ name: 'payable-detail', params: { id } })
+}
+
+const handlePayment = (id: number) => {
+  const payable = payables.value.find(p => p.id === id)
+  if (payable) {
+    selectedPayableId.value = id
+    selectedPayableAmount.value = payable.remainingAmount
+    selectedPayableNumber.value = payable.payableNumber
+    showPaymentModal.value = true
+  }
+}
+
+const submitPayment = async (data: RecordPaymentRequest) => {
+  if (!selectedPayableId.value) return
+  try {
+    await accountingStore.recordPayablePayment(selectedPayableId.value, data)
+    toast.success('Ödeme başarıyla kaydedildi')
+    showPaymentModal.value = false
+    selectedPayableId.value = null
+    loadPayables()
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Ödeme kaydedilemedi'
+    toast.error(message)
+  }
 }
 
 const submitCreate = async (data: CreatePayableRequest) => {
@@ -41,10 +162,19 @@ const submitCreate = async (data: CreatePayableRequest) => {
     toast.success('Verecek başarıyla oluşturuldu')
     showCreateModal.value = false
     loadPayables()
-  } catch (error: any) {
-    toast.error(error.message || 'Verecek oluşturulamadı')
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Verecek oluşturulamadı'
+    toast.error(message)
   }
 }
+
+const handlePageChange = (newPage: number) => {
+  setPage(newPage)
+  loadPayables()
+}
+
+const statusOptions = Object.values(PayableStatus)
+const typeOptions = Object.values(PayableType)
 </script>
 
 <template>
@@ -54,31 +184,81 @@ const submitCreate = async (data: CreatePayableRequest) => {
         <h1 class="page-title">Verecekler</h1>
         <p class="page-subtitle">Servis sağlayıcılara ödenecek tutarlar</p>
       </div>
-      <button class="btn btn-primary" @click="showCreateModal = true">
-        Yeni Verecek
-      </button>
+      <button class="btn btn-primary" @click="showCreateModal = true">Yeni Verecek</button>
     </div>
 
     <div class="stats-grid">
       <div class="stat-card">
         <div class="stat-label">Toplam Verecek</div>
-        <div class="stat-value">{{ formatCurrency(stats.totalPayables.value) }}</div>
+        <div class="stat-value">{{ formatCurrency(totalPayable) }}</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Ödenecek</div>
-        <div class="stat-value text-orange">{{ formatCurrency(stats.outstandingPayables.value) }}</div>
+        <div class="stat-value text-orange">{{ formatCurrency(outstandingPayable) }}</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Vadesi Geçmiş</div>
         <div class="stat-value text-red">
-          {{ formatCurrency(stats.overduePayablesAmount.value) }}
-          <span class="stat-count">({{ stats.overduePayablesCount.value }})</span>
+          {{ formatCurrency(overduePayablesTotal) }}
+          <span class="stat-count">({{ overduePayables.length }})</span>
         </div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Ödeme Oranı</div>
-        <div class="stat-value text-green">{{ stats.payablesPaymentRate.value }}%</div>
+        <div class="stat-value text-green">{{ paymentRate }}%</div>
       </div>
+    </div>
+
+    <div class="filter-bar">
+      <div class="view-mode-group">
+        <span class="filter-label">Görünüm:</span>
+        <select v-model="viewMode" class="filter-select">
+          <option value="all">Tümü</option>
+          <option value="rental">Kiralama bazlı</option>
+          <option value="vehicle">Araç bazlı</option>
+        </select>
+      </div>
+      <template v-if="viewMode === 'rental'">
+        <select
+          v-model="selectedRentalId"
+          class="filter-select rental-select"
+          :disabled="loadingRentals"
+        >
+          <option :value="null">Kiralama seçin</option>
+          <option v-for="r in rentalsList" :key="r.id" :value="r.id">
+            {{ r.rentalNumber }} ({{ r.startDate }} - {{ r.endDate }})
+          </option>
+        </select>
+      </template>
+      <template v-else-if="viewMode === 'vehicle'">
+        <select
+          v-model="selectedVehicleId"
+          class="filter-select vehicle-select"
+          :disabled="loadingVehicles"
+        >
+          <option :value="null">Araç seçin</option>
+          <option v-for="v in vehiclesList" :key="v.id" :value="v.id">
+            {{ v.plate }} – {{ v.brand }} {{ v.model }}
+          </option>
+        </select>
+      </template>
+      <template v-if="viewMode === 'all'">
+        <select v-model="filters.status" class="filter-select">
+          <option value="">Tüm Durumlar</option>
+          <option v-for="s in statusOptions" :key="s" :value="s">{{ s }}</option>
+        </select>
+        <select v-model="filters.type" class="filter-select">
+          <option value="">Tüm Tipler</option>
+          <option v-for="t in typeOptions" :key="t" :value="t">{{ t }}</option>
+        </select>
+        <input v-model="filters.startDate" type="date" class="filter-input" />
+        <input v-model="filters.endDate" type="date" class="filter-input" />
+        <label class="filter-check">
+          <input type="checkbox" v-model="filters.overdue" /> Yalnızca Vadesi Geçmiş
+        </label>
+        <button class="btn btn-secondary" @click="applyFilters">Filtrele</button>
+        <button class="btn btn-ghost" @click="clearFilters">Temizle</button>
+      </template>
     </div>
 
     <div v-if="loading" class="loading">Yükleniyor...</div>
@@ -93,7 +273,20 @@ const submitCreate = async (data: CreatePayableRequest) => {
         :key="payable.id"
         :payable="payable"
         @click="handleCardClick"
+        @payment="handlePayment"
       />
+    </div>
+
+    <div v-if="!loading && payables.length > 0 && viewMode === 'rental'" class="list-info">
+      Bu kiralamaya ait {{ payables.length }} verecek kaydı.
+    </div>
+    <div v-else-if="!loading && payables.length > 0 && viewMode === 'vehicle'" class="list-info">
+      Bu araca ait {{ payables.length }} verecek kaydı.
+    </div>
+    <div v-if="!loading && payables.length > 0 && viewMode === 'all'" class="pagination">
+      <button class="page-btn" :disabled="page === 0" @click="handlePageChange(page - 1)">‹ Önceki</button>
+      <span class="page-info">Sayfa {{ page + 1 }}</span>
+      <button class="page-btn" @click="handlePageChange(page + 1)">Sonraki ›</button>
     </div>
 
     <CreatePayableModal
@@ -101,116 +294,47 @@ const submitCreate = async (data: CreatePayableRequest) => {
       @close="showCreateModal = false"
       @submit="submitCreate"
     />
+
+    <PaymentModal
+      :show="showPaymentModal"
+      :remaining-amount="selectedPayableAmount"
+      :reference-number="selectedPayableNumber"
+      @close="showPaymentModal = false"
+      @submit="submitPayment"
+    />
   </div>
 </template>
 
 <style scoped>
-.page-container {
-  padding: 2rem;
-  max-width: 1400px;
-  margin: 0 auto;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 2rem;
-}
-
-.page-title {
-  font-size: 1.875rem;
-  font-weight: 700;
-  color: var(--color-text, #111827);
-  margin: 0 0 0.5rem 0;
-}
-
-.page-subtitle {
-  color: var(--color-text-secondary, #6b7280);
-  margin: 0;
-}
-
-.btn {
-  padding: 0.625rem 1.25rem;
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  border: none;
-  transition: all 0.2s;
-}
-
-.btn-primary {
-  background: var(--color-primary, #2563eb);
-  color: white;
-}
-
-.btn-primary:hover {
-  background: var(--color-primary-dark, #1d4ed8);
-}
-
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1.5rem;
-  margin-bottom: 2rem;
-}
-
-.stat-card {
-  background: white;
-  border: 1px solid var(--color-border, #e5e7eb);
-  border-radius: 0.5rem;
-  padding: 1.5rem;
-}
-
-.stat-label {
-  font-size: 0.875rem;
-  color: var(--color-text-secondary, #6b7280);
-  margin-bottom: 0.5rem;
-}
-
-.stat-value {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--color-text, #111827);
-}
-
-.stat-count {
-  font-size: 1rem;
-  font-weight: 400;
-  color: var(--color-text-secondary, #6b7280);
-}
-
-.text-orange {
-  color: #c2410c !important;
-}
-
-.text-red {
-  color: #b91c1c !important;
-}
-
-.text-green {
-  color: #15803d !important;
-}
-
-.loading {
-  text-align: center;
-  padding: 3rem;
-  color: var(--color-text-secondary, #6b7280);
-}
-
-.empty-state {
-  text-align: center;
-  padding: 3rem;
-  background: white;
-  border: 1px solid var(--color-border, #e5e7eb);
-  border-radius: 0.5rem;
-  color: var(--color-text-secondary, #6b7280);
-}
-
-.cards-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-  gap: 1.5rem;
-}
+.page-container { padding: 2rem; max-width: 1400px; margin: 0 auto; }
+.page-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2rem; }
+.page-title { font-size: 1.875rem; font-weight: 700; color: var(--color-text, #111827); margin: 0 0 0.5rem 0; }
+.page-subtitle { color: var(--color-text-secondary, #6b7280); margin: 0; }
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+.stat-card { background: white; border: 1px solid var(--color-border, #e5e7eb); border-radius: 0.5rem; padding: 1.5rem; }
+.stat-label { font-size: 0.875rem; color: var(--color-text-secondary, #6b7280); margin-bottom: 0.5rem; }
+.stat-value { font-size: 1.5rem; font-weight: 700; color: var(--color-text, #111827); }
+.stat-count { font-size: 1rem; font-weight: 400; color: var(--color-text-secondary, #6b7280); }
+.text-orange { color: #c2410c !important; }
+.text-red { color: #b91c1c !important; }
+.text-green { color: #15803d !important; }
+.filter-bar { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; background: white; border: 1px solid var(--color-border, #e5e7eb); border-radius: 0.5rem; padding: 1rem 1.25rem; margin-bottom: 1.5rem; }
+.view-mode-group { display: flex; align-items: center; gap: 0.5rem; }
+.filter-label { font-size: 0.875rem; font-weight: 500; color: var(--color-text-secondary, #6b7280); }
+.rental-select, .vehicle-select { min-width: 220px; }
+.list-info { font-size: 0.875rem; color: var(--color-text-secondary, #6b7280); margin-top: 1rem; }
+.filter-select, .filter-input { padding: 0.4rem 0.75rem; border: 1px solid var(--color-border, #e5e7eb); border-radius: 0.375rem; font-size: 0.875rem; background: white; }
+.filter-check { font-size: 0.875rem; display: flex; align-items: center; gap: 0.375rem; cursor: pointer; }
+.loading { text-align: center; padding: 3rem; color: var(--color-text-secondary, #6b7280); }
+.empty-state { text-align: center; padding: 3rem; background: white; border: 1px solid var(--color-border, #e5e7eb); border-radius: 0.5rem; color: var(--color-text-secondary, #6b7280); }
+.cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 1.5rem; }
+.pagination { display: flex; justify-content: center; align-items: center; gap: 1rem; margin-top: 2rem; }
+.page-btn { padding: 0.5rem 1rem; border: 1px solid var(--color-border, #e5e7eb); border-radius: 0.375rem; background: white; cursor: pointer; font-size: 0.875rem; }
+.page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.page-info { font-size: 0.875rem; color: var(--color-text-secondary, #6b7280); }
+.btn { padding: 0.5rem 1.25rem; border-radius: 0.375rem; font-size: 0.875rem; font-weight: 500; cursor: pointer; border: none; transition: all 0.2s; }
+.btn-primary { background: var(--color-primary, #2563eb); color: white; }
+.btn-primary:hover { background: var(--color-primary-dark, #1d4ed8); }
+.btn-secondary { background: var(--color-secondary, #4b5563); color: white; }
+.btn-ghost { background: transparent; border: 1px solid var(--color-border, #e5e7eb); color: var(--color-text, #111827); }
 </style>

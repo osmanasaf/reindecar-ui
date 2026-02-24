@@ -278,7 +278,13 @@ onMounted(() => {
                     <strong>Onarım Maliyeti:</strong> 
                     {{ formatCurrency(damage.repairCostAmount, damage.repairCostCurrency) }}
                   </p>
+                  <p v-if="damage.serviceProviderName">
+                    <strong>Servis Sağlayıcı:</strong> {{ damage.serviceProviderName }}
+                  </p>
                 </div>
+                <p v-if="damage.customerName">
+                  <strong>Müşteri:</strong> {{ damage.customerName }}
+                </p>
               </div>
               <div v-if="!damage.repaired" class="damage-actions">
                 <button class="btn btn-sm btn-success" @click="handleMarkRepaired(damage.id)">

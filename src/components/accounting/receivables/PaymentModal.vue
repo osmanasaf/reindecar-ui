@@ -1,5 +1,5 @@
-﻿<script setup lang="ts">
-import { ref } from 'vue'
+<script setup lang="ts">
+import { ref, computed } from 'vue'
 import { PaymentMethod } from '@/types'
 import type { RecordPaymentRequest } from '@/types'
 import { useForm, useToast } from '@/composables'
@@ -37,13 +37,17 @@ interface PaymentFormValues {
   paymentMethod: PaymentMethod
   transactionRef: string
   notes: string
+  discountAmount: number
+  discountReason: string
 }
 
 const initialValues: PaymentFormValues = {
   amount: 0,
   paymentMethod: PaymentMethod.CASH,
   transactionRef: '',
-  notes: ''
+  notes: '',
+  discountAmount: 0,
+  discountReason: ''
 }
 
 const validationRules = {
@@ -63,6 +67,15 @@ const validationRules = {
   notes: (value: string) => {
     if (value && value.length > 500) return 'Notlar 500 karakterden uzun olamaz'
     return ''
+  },
+  discountAmount: (value: number) => {
+    if (value < 0) return 'İndirim tutarı negatif olamaz'
+    if (value > values.amount) return 'İndirim tutarı ödeme tutarından fazla olamaz'
+    return ''
+  },
+  discountReason: (value: string) => {
+    if (value && value.length > 500) return 'İndirim nedeni 500 karakterden uzun olamaz'
+    return ''
   }
 }
 
@@ -72,7 +85,9 @@ const { values, errors, touched, setFieldValue, validateField, validateAll, rese
     amount: validationRules.amount(formValues.amount),
     paymentMethod: validationRules.paymentMethod(formValues.paymentMethod),
     transactionRef: validationRules.transactionRef(formValues.transactionRef || ''),
-    notes: validationRules.notes(formValues.notes || '')
+    notes: validationRules.notes(formValues.notes || ''),
+    discountAmount: validationRules.discountAmount(formValues.discountAmount || 0),
+    discountReason: validationRules.discountReason(formValues.discountReason || '')
   })
 })
 
@@ -83,7 +98,9 @@ const onSubmit = async () => {
     amount: true,
     paymentMethod: true,
     transactionRef: true,
-    notes: true
+    notes: true,
+    discountAmount: true,
+    discountReason: true
   }
 
   if (!validateAll()) {
@@ -96,7 +113,9 @@ const onSubmit = async () => {
       amount: values.amount,
       paymentMethod: values.paymentMethod,
       transactionRef: values.transactionRef || undefined,
-      notes: values.notes || undefined
+      notes: values.notes || undefined,
+      discountAmount: values.discountAmount > 0 ? values.discountAmount : undefined,
+      discountReason: values.discountReason || undefined
     })
     reset()
   } catch (error: any) {
@@ -114,6 +133,11 @@ const handleClose = () => {
 const setFullAmount = () => {
   setFieldValue('amount', props.remainingAmount)
 }
+
+const netAmount = computed(() => {
+  const discount = values.discountAmount || 0
+  return Math.max(0, values.amount - discount)
+})
 </script>
 
 <template>
@@ -135,6 +159,13 @@ const setFullAmount = () => {
             <button type="button" class="link-btn" @click="setFullAmount">
               (Tamamını Öde)
             </button>
+          </div>
+
+          <div v-if="values.discountAmount > 0" class="alert alert-info">
+            <strong>Gerçek Ödenecek Tutar:</strong> {{ formatCurrency(netAmount) }}
+            <span v-if="values.discountAmount > 0" style="margin-left: 1rem;">
+              (İndirim: {{ formatCurrency(values.discountAmount) }})
+            </span>
           </div>
 
           <div class="form-group">
@@ -188,6 +219,39 @@ const setFullAmount = () => {
             />
             <span v-if="touched.transactionRef && errors.transactionRef" class="error-text">
               {{ errors.transactionRef }}
+            </span>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">İndirim Tutarı</label>
+            <input
+              v-model.number="values.discountAmount"
+              type="number"
+              step="0.01"
+              min="0"
+              class="form-input"
+              :class="{ 'error': touched.discountAmount && errors.discountAmount }"
+              placeholder="0.00"
+              @blur="validateField('discountAmount')"
+            />
+            <span v-if="touched.discountAmount && errors.discountAmount" class="error-text">
+              {{ errors.discountAmount }}
+            </span>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">İndirim Nedeni</label>
+            <textarea
+              v-model="values.discountReason"
+              class="form-input"
+              :class="{ 'error': touched.discountReason && errors.discountReason }"
+              placeholder="Opsiyonel"
+              rows="2"
+              maxlength="500"
+              @blur="validateField('discountReason')"
+            ></textarea>
+            <span v-if="touched.discountReason && errors.discountReason" class="error-text">
+              {{ errors.discountReason }}
             </span>
           </div>
 

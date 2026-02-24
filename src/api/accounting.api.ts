@@ -20,12 +20,19 @@ import type {
   ReceivableFilters,
   PayableFilters,
   ClaimFilters,
-  ClaimDocumentType
+  ClaimDocumentType,
+  CreateReceivableRequest,
+  PaymentTransactionResponse,
+  AccountingSummaryResponse
 } from '@/types'
 import { normalizePhoneDigits } from '@/utils/phone'
 
 class ReceivablesApiService extends BaseApi {
   protected readonly basePath = '/receivables'
+
+  async create(request: CreateReceivableRequest): Promise<ReceivableResponse> {
+    return this.post('', request)
+  }
 
   async getById(id: number): Promise<ReceivableResponse> {
     return this.get(`/${id}`)
@@ -33,6 +40,14 @@ class ReceivablesApiService extends BaseApi {
 
   async getByCustomer(customerId: number): Promise<ReceivableResponse[]> {
     return this.get(`/customer/${customerId}`)
+  }
+
+  async getByRental(rentalId: number): Promise<ReceivableResponse[]> {
+    return this.get(`/by-rental/${rentalId}`)
+  }
+
+  async getByVehicle(vehicleId: number): Promise<ReceivableResponse[]> {
+    return this.get(`/by-vehicle/${vehicleId}`)
   }
 
   async getOverdue(): Promise<ReceivableResponse[]> {
@@ -52,12 +67,20 @@ class ReceivablesApiService extends BaseApi {
     return this.post(`/${id}/payment`, request)
   }
 
+  async getPayments(id: number): Promise<PaymentTransactionResponse[]> {
+    return this.get(`/${id}/payments`)
+  }
+
   async writeOff(id: number): Promise<ReceivableResponse> {
     return this.put(`/${id}/write-off`)
   }
 
   async cancel(id: number): Promise<ReceivableResponse> {
     return this.put(`/${id}/cancel`)
+  }
+
+  async deleteReceivable(id: number): Promise<void> {
+    return this.remove(`/${id}`)
   }
 }
 
@@ -74,6 +97,14 @@ class PayablesApiService extends BaseApi {
 
   async getByProvider(providerId: number): Promise<PayableResponse[]> {
     return this.get(`/provider/${providerId}`)
+  }
+
+  async getByRental(rentalId: number): Promise<PayableResponse[]> {
+    return this.get(`/by-rental/${rentalId}`)
+  }
+
+  async getByVehicle(vehicleId: number): Promise<PayableResponse[]> {
+    return this.get(`/by-vehicle/${vehicleId}`)
   }
 
   async getOverdue(): Promise<PayableResponse[]> {
@@ -97,8 +128,28 @@ class PayablesApiService extends BaseApi {
     return this.post(`/${id}/payment`, request)
   }
 
+  async getPayments(id: number): Promise<PaymentTransactionResponse[]> {
+    return this.get(`/${id}/payments`)
+  }
+
+  async writeOff(id: number): Promise<PayableResponse> {
+    return this.put(`/${id}/write-off`)
+  }
+
   async cancel(id: number): Promise<PayableResponse> {
     return this.put(`/${id}/cancel`)
+  }
+
+  async deletePayable(id: number): Promise<void> {
+    return this.remove(`/${id}`)
+  }
+}
+
+class AccountingApiService extends BaseApi {
+  protected readonly basePath = '/accounting'
+
+  async getSummary(): Promise<AccountingSummaryResponse> {
+    return this.get('/summary')
   }
 }
 
@@ -249,3 +300,4 @@ export const payablesApi = new PayablesApiService()
 export const insuranceClaimsApi = new InsuranceClaimsApiService()
 export const serviceProvidersApi = new ServiceProvidersApiService()
 export const vehicleInsurancesApi = new VehicleInsurancesApiService()
+export const accountingApi = new AccountingApiService()

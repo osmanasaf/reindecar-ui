@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { customersApi, driversApi } from '@/api'
@@ -285,7 +285,7 @@ onMounted(fetchCustomer)
             </div>
             <div class="info-item full">
               <span class="label">Adres</span>
-              <span class="value">{{ customer.address }}, {{ customer.city }}</span>
+              <span class="value">{{ [customer.address || customer.companyInfo?.invoiceAddress, customer.city].filter(Boolean).join(', ') || '-' }}</span>
             </div>
           </div>
         </section>
@@ -294,24 +294,32 @@ onMounted(fetchCustomer)
           <h2>Kişisel Bilgiler</h2>
           <div class="info-grid">
             <div class="info-item">
+              <span class="label">Ad</span>
+              <span class="value">{{ customer.personalInfo?.firstName || '-' }}</span>
+            </div>
+            <div class="info-item">
+              <span class="label">Soyad</span>
+              <span class="value">{{ customer.personalInfo?.lastName || '-' }}</span>
+            </div>
+            <div class="info-item">
               <span class="label">TC Kimlik No</span>
-              <span class="value mono">{{ maskId(customer.nationalId || '') }}</span>
+              <span class="value mono">{{ maskId(customer.personalInfo?.nationalId || customer.nationalId || '') }}</span>
             </div>
             <div class="info-item">
               <span class="label">Doğum Tarihi</span>
-              <span class="value">{{ customer.birthDate ? formatDate(customer.birthDate) : '-' }}</span>
+              <span class="value">{{ customer.personalInfo?.birthDate ? formatDate(customer.personalInfo.birthDate) : (customer.birthDate ? formatDate(customer.birthDate) : '-') }}</span>
             </div>
             <div class="info-item">
               <span class="label">Ehliyet No</span>
-              <span class="value">{{ customer.licenseNumber || '-' }}</span>
+              <span class="value">{{ customer.personalInfo?.licenseNumber || customer.licenseNumber || '-' }}</span>
             </div>
             <div class="info-item">
               <span class="label">Ehliyet Sınıfı</span>
-              <span class="value">{{ customer.licenseClass || '-' }}</span>
+              <span class="value">{{ customer.personalInfo?.licenseClass || customer.licenseClass || '-' }}</span>
             </div>
             <div class="info-item">
               <span class="label">Ehliyet Bitiş</span>
-              <span class="value">{{ customer.licenseExpiryDate ? formatDate(customer.licenseExpiryDate) : '-' }}</span>
+              <span class="value">{{ customer.personalInfo?.licenseExpiryDate ? formatDate(customer.personalInfo.licenseExpiryDate) : (customer.licenseExpiryDate ? formatDate(customer.licenseExpiryDate) : '-') }}</span>
             </div>
             <div class="info-item">
               <span class="label">Kredi Skoru</span>
@@ -323,9 +331,25 @@ onMounted(fetchCustomer)
         <section class="card" v-if="customer.customerType === 'COMPANY'">
           <h2>Şirket Bilgileri</h2>
           <div class="info-grid">
+            <div class="info-item full">
+              <span class="label">Şirket Adı</span>
+              <span class="value">{{ customer.companyInfo?.companyName || customer.displayName || '-' }}</span>
+            </div>
             <div class="info-item">
               <span class="label">Vergi No</span>
-              <span class="value mono">{{ customer.taxNumber || '-' }}</span>
+              <span class="value mono">{{ customer.companyInfo?.taxNumber || customer.taxNumber || '-' }}</span>
+            </div>
+            <div class="info-item">
+              <span class="label">Vergi Dairesi</span>
+              <span class="value">{{ customer.companyInfo?.taxOffice || customer.taxOffice || '-' }}</span>
+            </div>
+            <div class="info-item">
+              <span class="label">Sektör</span>
+              <span class="value">{{ customer.companyInfo?.sector ?? customer.sector ?? '-' }}</span>
+            </div>
+            <div class="info-item">
+              <span class="label">Çalışan Sayısı</span>
+              <span class="value">{{ customer.companyInfo?.employeeCount ?? customer.employeeCount ?? '-' }}</span>
             </div>
             <div class="info-item">
               <span class="label">Ticaret Sicil No</span>

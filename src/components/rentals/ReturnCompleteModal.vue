@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { rentalsApi } from '@/api'
+import { rentalsApi, vehiclesApi } from '@/api'
 import { useValidation, rules, useToast } from '@/composables'
-import type { Rental, VehicleReturnForm } from '@/types'
-import { FuelLevel } from '@/types'
+import type { Rental, Vehicle, VehicleReturnForm, ReturnPreviewResponse } from '@/types'
 
 interface Props {
   visible: boolean
@@ -19,21 +18,25 @@ const emit = defineEmits<{
 
 const toast = useToast()
 const loading = ref(false)
+const calculating = ref(false)
 const saving = ref(false)
 const rental = ref<Rental | null>(null)
-const step = ref<'info' | 'form'>('info')
+const vehicle = ref<Vehicle | null>(null)
+const step = ref<'input' | 'preview'>('input')
+const preview = ref<ReturnPreviewResponse | null>(null)
 
-const form = ref<VehicleReturnForm>({
+const form = ref<{
+  endKm: number
+  actualReturnDate: string
+}>({
   endKm: 0,
-  fuelLevel: FuelLevel.FULL,
-  damageNotes: '',
-  extraCharges: 0
+  actualReturnDate: ''
 })
 
 const startKmRef = computed(() => rental.value?.startKm || 0)
 const { validateForm, getError, hasError, touch, reset } = useValidation()
 
-const formRules = computed(() => ({
+const inputRules = computed(() => ({
   endKm: { 
     value: form.value.endKm, 
     rules: [
@@ -41,16 +44,11 @@ const formRules = computed(() => ({
       rules.minValue(startKmRef.value, `KM değeri başlangıç KM'den (${startKmRef.value}) büyük olmalıdır`)
     ] 
   },
-  fuelLevel: { value: form.value.fuelLevel, rules: [rules.required()] }
+  actualReturnDate: { 
+    value: form.value.actualReturnDate, 
+    rules: [rules.required()] 
+  }
 }))
-
-const fuelLevelOptions = [
-  { value: FuelLevel.EMPTY, label: 'Boş' },
-  { value: FuelLevel.QUARTER, label: '1/4' },
-  { value: FuelLevel.HALF, label: '1/2' },
-  { value: FuelLevel.THREE_QUARTERS, label: '3/4' },
-  { value: FuelLevel.FULL, label: 'Dolu' }
-]
 
 const totalKm = computed(() => {
   if (!rental.value?.startKm) return 0
@@ -59,11 +57,17 @@ const totalKm = computed(() => {
 
 async function fetchRental() {
   if (!props.rentalId) return
-  
+
   loading.value = true
+  vehicle.value = null
   try {
     rental.value = await rentalsApi.getById(props.rentalId)
-    form.value.endKm = rental.value.startKm || 0
+    form.value.endKm = rental.value.startKm ?? 0
+    const today = new Date()
+    form.value.actualReturnDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+    if (rental.value.vehicleId) {
+      vehicle.value = await vehiclesApi.getById(rental.value.vehicleId)
+    }
   } catch {
     toast.error('Kiralama bilgileri yüklenemedi')
     emit('close')
@@ -72,37 +76,45 @@ async function fetchRental() {
   }
 }
 
-async function startReturn() {
-  if (!props.rentalId) return
-  
-  saving.value = true
-  try {
-    await rentalsApi.startReturn(props.rentalId)
-    step.value = 'form'
-    toast.info('İade süreci başlatıldı')
-  } catch (err) {
-    toast.apiError(err, 'İade başlatılamadı')
-  } finally {
-    saving.value = false
-  }
-}
-
-async function completeReturn() {
-  if (!validateForm(formRules.value)) {
+async function calculatePreview() {
+  if (!validateForm(inputRules.value)) {
     toast.error('Lütfen formdaki hataları düzeltin')
     return
   }
 
   if (!props.rentalId) return
 
+  calculating.value = true
+  try {
+    preview.value = await rentalsApi.previewReturn(
+      props.rentalId,
+      form.value.endKm,
+      form.value.actualReturnDate
+    )
+    step.value = 'preview'
+  } catch (err) {
+    toast.apiError(err, 'Hesaplama yapılamadı')
+  } finally {
+    calculating.value = false
+  }
+}
+
+async function completeReturn() {
+  if (!props.rentalId) return
+
   saving.value = true
   try {
-    const updatedRental = await rentalsApi.complete(props.rentalId, form.value)
-    toast.success('Kiralama başarıyla tamamlandı')
+    const completeRequest: VehicleReturnForm = {
+      endKm: form.value.endKm,
+      actualReturnDate: form.value.actualReturnDate,
+      notes: ''
+    }
+    const updatedRental = await rentalsApi.complete(props.rentalId, completeRequest)
+    toast.success('Kiralama başarıyla sonlandırıldı')
     emit('completed', updatedRental)
     handleClose()
   } catch (err) {
-    toast.apiError(err, 'İade tamamlanamadı')
+    toast.apiError(err, 'Kiralama sonlandırılamadı')
   } finally {
     saving.value = false
   }
@@ -110,36 +122,35 @@ async function completeReturn() {
 
 function handleClose() {
   reset()
-  step.value = 'info'
+  step.value = 'input'
+  preview.value = null
   rental.value = null
+  vehicle.value = null
   form.value = {
     endKm: 0,
-    fuelLevel: FuelLevel.FULL,
-    damageNotes: '',
-    extraCharges: 0
+    actualReturnDate: ''
   }
   emit('close')
+}
+
+function handleBack() {
+  step.value = 'input'
+  preview.value = null
 }
 
 function handleBlur(field: string) {
   touch(field)
 }
 
-function safeNumber(value: unknown, defaultValue = 0): number {
-  if (value === null || value === undefined) return defaultValue
-  const num = Number(value)
-  return isNaN(num) ? defaultValue : num
-}
-
-function formatCurrency(amount: unknown): string {
-  const num = safeNumber(amount)
+function formatCurrency(amount: number | { amount: number; currency: string }): string {
+  const num = typeof amount === 'number' ? amount : amount.amount
   return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(num)
 }
 
 function formatDate(date: unknown): string {
   if (!date) return '-'
   const d = new Date(String(date))
-  if (isNaN(d.getTime())) return '-'
+  if (Number.isNaN(d.getTime())) return '-'
   return d.toLocaleDateString('tr-TR', {
     day: '2-digit',
     month: '2-digit',
@@ -150,7 +161,8 @@ function formatDate(date: unknown): string {
 watch(() => props.visible, (isVisible) => {
   if (isVisible && props.rentalId) {
     reset()
-    step.value = 'info'
+    step.value = 'input'
+    preview.value = null
     fetchRental()
   }
 })
@@ -161,7 +173,7 @@ watch(() => props.visible, (isVisible) => {
     <div v-if="visible" class="modal-overlay" @click.self="handleClose">
       <div class="modal">
         <header class="modal-header">
-          <h2>Araç İadesi</h2>
+          <h2>Kiralamayı Sonlandır</h2>
           <button class="close-btn" @click="handleClose">&times;</button>
         </header>
 
@@ -179,18 +191,20 @@ watch(() => props.visible, (isVisible) => {
               </div>
               <div class="info-row">
                 <span class="label">Araç</span>
-                <span class="value">{{ rental.vehiclePlate }} - {{ rental.vehicleName }}</span>
+                <span class="value">
+                  {{ vehicle ? `${vehicle.plateNumber} - ${vehicle.brand} ${vehicle.model}` : (rental.vehiclePlate && rental.vehicleName ? `${rental.vehiclePlate} - ${rental.vehicleName}` : '-') }}
+                </span>
               </div>
               <div class="info-row">
                 <span class="label">Müşteri</span>
                 <span class="value">{{ rental.customerName }}</span>
               </div>
               <div class="info-row">
-                <span class="label">Tarih Aralığı</span>
-                <span class="value">{{ formatDate(rental.startDate) }} - {{ formatDate(rental.endDate) }}</span>
+                <span class="label">Planlanan Bitiş</span>
+                <span class="value">{{ formatDate(rental.endDate) }}</span>
               </div>
               <div class="info-row" v-if="rental.startKm">
-                <span class="label">Teslim KM</span>
+                <span class="label">Başlangıç KM</span>
                 <span class="value">{{ rental.startKm.toLocaleString('tr-TR') }} km</span>
               </div>
             </div>
@@ -200,59 +214,137 @@ watch(() => props.visible, (isVisible) => {
               <p>Bu kiralama <strong>{{ rental.overdueDays }} gün</strong> gecikmiş durumda!</p>
             </div>
 
-            <template v-if="step === 'form'">
+            <template v-if="step === 'input'">
               <div class="divider"></div>
 
-              <form class="return-form" @submit.prevent="completeReturn">
+              <form class="return-form" @submit.prevent="calculatePreview">
                 <h3>İade Bilgileri</h3>
 
                 <div class="form-grid">
                   <div class="form-group" :class="{ error: hasError('endKm') }">
-                    <label>İade KM <span class="required">*</span></label>
+                    <label for="endKm">Bitiş KM <span class="required">*</span></label>
                     <input 
+                      id="endKm"
                       v-model.number="form.endKm" 
                       @blur="handleBlur('endKm')"
                       type="number"
                       :min="rental.startKm || 0"
+                      placeholder="Bitiş KM değerini girin"
                     />
                     <span class="error-text">{{ getError('endKm') }}</span>
                     <span v-if="totalKm > 0" class="helper-text">
-                      Toplam: {{ totalKm.toLocaleString('tr-TR') }} km
+                      Kullanılan: {{ totalKm.toLocaleString('tr-TR') }} km
                     </span>
                   </div>
 
-                  <div class="form-group" :class="{ error: hasError('fuelLevel') }">
-                    <label>Yakıt Seviyesi <span class="required">*</span></label>
-                    <select v-model="form.fuelLevel" @blur="handleBlur('fuelLevel')">
-                      <option v-for="opt in fuelLevelOptions" :key="opt.value" :value="opt.value">
-                        {{ opt.label }}
-                      </option>
-                    </select>
-                    <span class="error-text">{{ getError('fuelLevel') }}</span>
-                  </div>
-
-                  <div class="form-group full">
-                    <label>Hasar Notları</label>
-                    <textarea 
-                      v-model="form.damageNotes" 
-                      rows="3"
-                      placeholder="Varsa hasar veya eksiklik notları..."
-                    ></textarea>
-                  </div>
-
-                  <div class="form-group">
-                    <label>Ekstra Ücretler (₺)</label>
+                  <div class="form-group" :class="{ error: hasError('actualReturnDate') }">
+                    <label for="actualReturnDate">Gerçek İade Tarihi <span class="required">*</span></label>
                     <input 
-                      v-model.number="form.extraCharges" 
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      placeholder="0.00"
+                      id="actualReturnDate"
+                      v-model="form.actualReturnDate" 
+                      @blur="handleBlur('actualReturnDate')"
+                      type="date"
                     />
-                    <span class="helper-text">Hasar, yakıt farkı vb. için</span>
+                    <span class="error-text">{{ getError('actualReturnDate') }}</span>
                   </div>
                 </div>
               </form>
+            </template>
+
+            <template v-else-if="step === 'preview' && preview">
+              <div class="divider"></div>
+
+              <div class="preview-section">
+                <h3>Hesaplanan Ek Kalemler</h3>
+
+                <div class="preview-grid">
+                  <div class="preview-item">
+                    <span class="label">Kullanılan KM</span>
+                    <span class="value">{{ preview.kmUsed.toLocaleString('tr-TR') }} km</span>
+                  </div>
+
+                  <div v-if="preview.kmOverage > 0" class="preview-item highlight">
+                    <span class="label">KM Aşımı</span>
+                    <span class="value">{{ preview.kmOverage.toLocaleString('tr-TR') }} km</span>
+                  </div>
+
+                  <div v-if="preview.kmPenalty.amount > 0" class="preview-item highlight">
+                    <span class="label">KM Ceza Ücreti</span>
+                    <span class="value">{{ formatCurrency(preview.kmPenalty) }}</span>
+                  </div>
+
+                  <div v-if="preview.lateDays > 0" class="preview-item highlight">
+                    <span class="label">Geç İade Günü</span>
+                    <span class="value">{{ preview.lateDays }} gün</span>
+                  </div>
+
+                  <div v-if="preview.lateFee.amount > 0" class="preview-item highlight">
+                    <span class="label">Geç İade Ücreti</span>
+                    <span class="value">{{ formatCurrency(preview.lateFee) }}</span>
+                  </div>
+
+                  <template v-if="preview.penalties?.length">
+                    <div class="preview-subtitle">Trafik Cezaları</div>
+                    <div
+                      v-for="(p, i) in preview.penalties"
+                      :key="i"
+                      :class="['preview-item', p.paid ? 'preview-item-paid' : 'highlight']"
+                    >
+                      <span class="label">
+                        {{ p.penaltyNumber }} ({{ p.violationType }})
+                        <span v-if="p.paid" class="paid-badge">Ödendi</span>
+                      </span>
+                      <span class="value">{{ formatCurrency(p.amount) }}</span>
+                    </div>
+                    <div v-if="preview.penaltyTotal?.amount > 0" class="preview-item highlight">
+                      <span class="label">Ceza Toplamı (ödenmemiş)</span>
+                      <span class="value">{{ formatCurrency(preview.penaltyTotal) }}</span>
+                    </div>
+                  </template>
+
+                  <template v-if="preview.tolls?.length">
+                    <div class="preview-subtitle">HGS/OGS Geçişler</div>
+                    <div
+                      v-for="(t, i) in preview.tolls"
+                      :key="'toll-' + i"
+                      class="preview-item highlight"
+                    >
+                      <span class="label">{{ t.tollNumber }} ({{ t.tollType }}) {{ t.passageLocation ? '– ' + t.passageLocation : '' }}</span>
+                      <span class="value">{{ formatCurrency(t.amount) }}</span>
+                    </div>
+                    <div v-if="preview.tollTotal?.amount > 0" class="preview-item highlight">
+                      <span class="label">HGS/OGS Toplamı</span>
+                      <span class="value">{{ formatCurrency(preview.tollTotal) }}</span>
+                    </div>
+                  </template>
+
+                  <template v-if="preview.damages?.length">
+                    <div class="preview-subtitle">Hasar Bedelleri</div>
+                    <div
+                      v-for="(d, i) in preview.damages"
+                      :key="i"
+                      class="preview-item highlight"
+                    >
+                      <span class="label">{{ d.description }} ({{ d.severity }}) {{ d.repaired ? '– Onarıldı' : '' }}</span>
+                      <span class="value">{{ formatCurrency(d.estimatedCost) }}</span>
+                    </div>
+                    <div v-if="preview.damageTotal?.amount > 0" class="preview-item highlight">
+                      <span class="label">Hasar Toplamı</span>
+                      <span class="value">{{ formatCurrency(preview.damageTotal) }}</span>
+                    </div>
+                  </template>
+
+                  <div
+                    class="preview-item total"
+                    :class="{ success: preview.grandTotal?.amount === 0 }"
+                  >
+                    <span class="label">Genel Toplam</span>
+                    <span class="value">
+                      {{ preview.grandTotal?.amount === 0 ? 'Yok' : formatCurrency(preview.grandTotal) }}
+                    </span>
+                  </div>
+                </div>
+              </div>
             </template>
           </div>
 
@@ -260,23 +352,33 @@ watch(() => props.visible, (isVisible) => {
             <button type="button" class="btn btn-outline" @click="handleClose">İptal</button>
             
             <button 
-              v-if="step === 'info'"
+              v-if="step === 'input'"
               type="button" 
               class="btn btn-primary"
-              :disabled="saving"
-              @click="startReturn"
+              :disabled="calculating"
+              @click="calculatePreview"
             >
-              {{ saving ? 'Başlatılıyor...' : 'İade Başlat' }}
+              {{ calculating ? 'Hesaplanıyor...' : 'Hesapla' }}
             </button>
 
             <button 
-              v-if="step === 'form'"
+              v-if="step === 'preview'"
+              type="button" 
+              class="btn btn-outline"
+              :disabled="saving"
+              @click="handleBack"
+            >
+              Geri
+            </button>
+
+            <button 
+              v-if="step === 'preview'"
               type="button" 
               class="btn btn-success"
               :disabled="saving"
               @click="completeReturn"
             >
-              {{ saving ? 'Tamamlanıyor...' : 'İadeyi Tamamla' }}
+              {{ saving ? 'Sonlandırılıyor...' : 'Kiralamayı Sonlandır' }}
             </button>
           </footer>
         </template>
@@ -410,7 +512,8 @@ watch(() => props.visible, (isVisible) => {
   margin: 24px 0;
 }
 
-.return-form h3 {
+.return-form h3,
+.preview-section h3 {
   font-size: 15px;
   font-weight: 600;
   color: var(--color-text-secondary);
@@ -429,10 +532,6 @@ watch(() => props.visible, (isVisible) => {
   gap: 6px;
 }
 
-.form-group.full {
-  grid-column: span 2;
-}
-
 .form-group label {
   font-size: 13px;
   font-weight: 500;
@@ -443,9 +542,7 @@ watch(() => props.visible, (isVisible) => {
   color: var(--color-danger);
 }
 
-.form-group input,
-.form-group select,
-.form-group textarea {
+.form-group input {
   padding: 10px 12px;
   border: 1px solid var(--color-border);
   border-radius: 8px;
@@ -454,17 +551,14 @@ watch(() => props.visible, (isVisible) => {
   transition: all 0.2s;
 }
 
-.form-group input:focus,
-.form-group select:focus,
-.form-group textarea:focus {
+.form-group input:focus {
   outline: none;
   border-color: var(--color-primary);
   background: var(--color-surface);
   box-shadow: 0 0 0 3px var(--color-primary-light);
 }
 
-.form-group.error input,
-.form-group.error select {
+.form-group.error input {
   border-color: var(--color-danger);
   background: #fff5f5;
 }
@@ -478,6 +572,88 @@ watch(() => props.visible, (isVisible) => {
 .helper-text {
   font-size: 12px;
   color: var(--color-text-muted);
+}
+
+.preview-section {
+  margin-top: 8px;
+}
+
+.preview-subtitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-top: 16px;
+  margin-bottom: 8px;
+}
+
+.preview-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.preview-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background: var(--color-bg-secondary);
+  border-radius: 8px;
+}
+
+.preview-item.highlight {
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+}
+
+.preview-item.total {
+  background: var(--color-primary-light);
+  border: 1px solid var(--color-primary);
+  font-weight: 600;
+}
+
+.preview-item.success {
+  background: #dcfce7;
+  border: 1px solid #10b981;
+}
+
+.preview-item-paid {
+  opacity: 0.85;
+}
+
+.preview-item-paid .label {
+  text-decoration: line-through;
+  color: var(--color-text-muted);
+}
+
+.paid-badge {
+  margin-left: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-success);
+  text-decoration: none;
+}
+
+.preview-item .label {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+}
+
+.preview-item.total .label,
+.preview-item.highlight .label {
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.preview-item .value {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.preview-item.total .value {
+  font-size: 18px;
+  color: var(--color-primary);
 }
 
 .modal-footer {
@@ -496,18 +672,17 @@ watch(() => props.visible, (isVisible) => {
   font-size: 14px;
   cursor: pointer;
   transition: all 0.2s;
+  border: none;
 }
 
 .btn-primary {
   background: var(--color-primary);
   color: white;
-  border: none;
 }
 
 .btn-success {
   background: var(--color-success);
   color: white;
-  border: none;
 }
 
 .btn-primary:hover:not(:disabled),
@@ -533,10 +708,6 @@ watch(() => props.visible, (isVisible) => {
 @media (max-width: 500px) {
   .form-grid {
     grid-template-columns: 1fr;
-  }
-  
-  .form-group.full {
-    grid-column: span 1;
   }
 }
 </style>

@@ -170,6 +170,40 @@ export const useAccountingStore = defineStore('accounting', () => {
     }
   }
 
+  function clearReceivables() {
+    receivables.value = []
+  }
+
+  async function fetchReceivablesByRental(rentalId: number) {
+    receivablesLoading.value = true
+    receivablesError.value = null
+    try {
+      const data = await receivablesApi.getByRental(rentalId)
+      receivables.value = data
+      return data
+    } catch (error: any) {
+      receivablesError.value = error.message || 'Kiralama alacakları yüklenirken hata oluştu'
+      throw error
+    } finally {
+      receivablesLoading.value = false
+    }
+  }
+
+  async function fetchReceivablesByVehicle(vehicleId: number) {
+    receivablesLoading.value = true
+    receivablesError.value = null
+    try {
+      const data = await receivablesApi.getByVehicle(vehicleId)
+      receivables.value = data
+      return data
+    } catch (error: any) {
+      receivablesError.value = error.message || 'Araç alacakları yüklenirken hata oluştu'
+      throw error
+    } finally {
+      receivablesLoading.value = false
+    }
+  }
+
   async function recordReceivablePayment(id: number, request: RecordPaymentRequest) {
     receivablesLoading.value = true
     receivablesError.value = null
@@ -255,6 +289,40 @@ export const useAccountingStore = defineStore('accounting', () => {
       return response
     } catch (error: any) {
       payablesError.value = error.message || 'Verecekler yüklenirken hata oluştu'
+      throw error
+    } finally {
+      payablesLoading.value = false
+    }
+  }
+
+  function clearPayables() {
+    payables.value = []
+  }
+
+  async function fetchPayablesByRental(rentalId: number) {
+    payablesLoading.value = true
+    payablesError.value = null
+    try {
+      const data = await payablesApi.getByRental(rentalId)
+      payables.value = data
+      return data
+    } catch (error: any) {
+      payablesError.value = error.message || 'Kiralama verecekleri yüklenirken hata oluştu'
+      throw error
+    } finally {
+      payablesLoading.value = false
+    }
+  }
+
+  async function fetchPayablesByVehicle(vehicleId: number) {
+    payablesLoading.value = true
+    payablesError.value = null
+    try {
+      const data = await payablesApi.getByVehicle(vehicleId)
+      payables.value = data
+      return data
+    } catch (error: any) {
+      payablesError.value = error.message || 'Araç verecekleri yüklenirken hata oluştu'
       throw error
     } finally {
       payablesLoading.value = false
@@ -732,12 +800,18 @@ export const useAccountingStore = defineStore('accounting', () => {
     fetchReceivableById,
     fetchCustomerReceivables,
     fetchOverdueReceivables,
+    clearReceivables,
+    fetchReceivablesByRental,
+    fetchReceivablesByVehicle,
     recordReceivablePayment,
     markAsWrittenOff,
     writeOffReceivable: markAsWrittenOff,
     cancelReceivable,
 
     fetchPayables,
+    clearPayables,
+    fetchPayablesByRental,
+    fetchPayablesByVehicle,
     fetchPayableById,
     createPayable,
     updatePayable,

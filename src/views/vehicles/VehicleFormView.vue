@@ -1,8 +1,9 @@
-﻿<script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+<script setup lang="ts">
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { vehiclesApi, vehicleCategoriesApi, branchesApi } from '@/api'
-import { useValidation, rules, useToast } from '@/composables'
+import { useValidation, rules, useToast, useReferenceData } from '@/composables'
+import type { CarModel } from '@/types/reference'
 import { formatPlateInput } from '@/utils'
 import { isErrorResponse } from '@/utils/error'
 import { FuelType, Transmission } from '@/types'
@@ -40,6 +41,20 @@ const loading = ref(false)
 const categories = ref<VehicleCategory[]>([])
 const branches = ref<Branch[]>([])
 const originalVehicle = ref<Vehicle | null>(null)
+
+const {
+  brands,
+  colors,
+  loadBrands,
+  loadModelsByBrand,
+  loadColors,
+  getModelsForBrand
+} = useReferenceData()
+const selectedBrandId = ref<number | null>(null)
+const selectedModelId = ref<number | null>(null)
+const selectedColorId = ref<number | null>(null)
+const models = ref<CarModel[]>([])
+const modelsLoading = ref(false)
 
 const currentYear = new Date().getFullYear()
 
@@ -82,6 +97,44 @@ const form = ref<VehicleFormModel>({
   weeklyPrice: null,
   monthlyPrice: null,
   notes: ''
+})
+
+watch(selectedBrandId, async (brandId) => {
+  if (!brandId) {
+    models.value = []
+    selectedModelId.value = null
+    form.value.model = ''
+    form.value.brand = ''
+    return
+  }
+  const b = brands.value.find(x => x.id === brandId)
+  form.value.brand = b ? b.name : ''
+  modelsLoading.value = true
+  try {
+    models.value = await loadModelsByBrand(brandId)
+    selectedModelId.value = null
+    form.value.model = ''
+  } finally {
+    modelsLoading.value = false
+  }
+})
+
+watch(selectedModelId, (modelId) => {
+  if (!modelId) {
+    form.value.model = ''
+    return
+  }
+  const m = models.value.find(x => x.id === modelId)
+  form.value.model = m ? m.name : ''
+})
+
+watch(selectedColorId, (colorId) => {
+  if (!colorId) {
+    form.value.color = ''
+    return
+  }
+  const c = colors.value.find(x => x.id === colorId)
+  form.value.color = c ? c.name : ''
 })
 
 const { validateForm, getError, hasError, touch } = useValidation()
@@ -195,6 +248,7 @@ function isBranchAvailabilityError(error: unknown): boolean {
 async function fetchData() {
   loading.value = true
   try {
+    await Promise.all([loadBrands(), loadColors()])
     const [categoriesData, branchesData] = await Promise.all([
       vehicleCategoriesApi.getAll(),
       branchesApi.getActive()
@@ -209,6 +263,15 @@ async function fetchData() {
     if (isEditMode.value) {
       const vehicle = await vehiclesApi.getById(Number(route.params.id))
       originalVehicle.value = vehicle
+      const brandMatch = brands.value.find(b => b.name === vehicle.brand)
+      if (brandMatch) {
+        selectedBrandId.value = brandMatch.id
+        const modelsList = await loadModelsByBrand(brandMatch.id)
+        const modelMatch = modelsList.find(m => m.name === vehicle.model)
+        if (modelMatch) selectedModelId.value = modelMatch.id
+      }
+      const colorMatch = colors.value.find(c => c.name === vehicle.color)
+      if (colorMatch) selectedColorId.value = colorMatch.id
       form.value = {
         plateNumber: vehicle.plateNumber,
         vinNumber: vehicle.vinNumber,
@@ -330,23 +393,26 @@ onMounted(fetchData)
 
           <div class="form-group" :class="{ error: hasError('brand') }">
             <label>Marka <span class="required">*</span></label>
-            <input 
-              v-model="form.brand" 
-              type="text" 
-              placeholder="Toyota, BMW..."
+            <select
+              v-model="selectedBrandId"
               @blur="handleBlur('brand')"
-            />
+            >
+              <option :value="null">Marka seçin</option>
+              <option v-for="b in brands" :key="b.id" :value="b.id">{{ b.name }}</option>
+            </select>
             <span class="error-text">{{ getError('brand') }}</span>
           </div>
 
           <div class="form-group" :class="{ error: hasError('model') }">
             <label>Model <span class="required">*</span></label>
-            <input 
-              v-model="form.model" 
-              type="text" 
-              placeholder="Corolla, 320i..."
+            <select
+              v-model="selectedModelId"
+              :disabled="!selectedBrandId || modelsLoading"
               @blur="handleBlur('model')"
-            />
+            >
+              <option :value="null">{{ selectedBrandId ? (modelsLoading ? 'Yükleniyor...' : 'Model seçin') : 'Önce marka seçin' }}</option>
+              <option v-for="m in models" :key="m.id" :value="m.id">{{ m.name }}</option>
+            </select>
             <span class="error-text">{{ getError('model') }}</span>
           </div>
 
@@ -364,12 +430,13 @@ onMounted(fetchData)
 
           <div class="form-group" :class="{ error: hasError('color') }">
             <label>Renk <span class="required">*</span></label>
-            <input 
-              v-model="form.color" 
-              type="text" 
-              placeholder="Beyaz, Siyah..."
+            <select
+              v-model="selectedColorId"
               @blur="handleBlur('color')"
-            />
+            >
+              <option :value="null">Renk seçin</option>
+              <option v-for="c in colors" :key="c.id" :value="c.id">{{ c.name }}</option>
+            </select>
             <span class="error-text">{{ getError('color') }}</span>
           </div>
         </div>

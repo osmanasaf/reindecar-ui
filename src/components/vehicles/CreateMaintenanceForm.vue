@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { maintenancesApi } from '@/api'
+import { ref, onMounted } from 'vue'
+import { maintenancesApi, serviceProvidersApi } from '@/api'
 import { useToast } from '@/composables'
 import { MaintenanceType } from '@/types'
-import type { CreateMaintenanceRecordForm } from '@/types'
+import type { CreateMaintenanceRecordForm, ServiceProvider } from '@/types'
 
 const props = defineProps<{
   vehicleId: number
@@ -16,6 +16,8 @@ const emit = defineEmits<{
 
 const toast = useToast()
 const submitting = ref(false)
+const serviceProviders = ref<ServiceProvider[]>([])
+const loadingProviders = ref(false)
 
 const form = ref<CreateMaintenanceRecordForm>({
   vehicleId: props.vehicleId,
@@ -24,7 +26,7 @@ const form = ref<CreateMaintenanceRecordForm>({
   currentKm: 0,
   costAmount: undefined,
   costCurrency: 'TRY',
-  serviceProvider: '',
+  serviceProviderId: undefined,
   description: '',
   affectedZones: [],
   partsReplaced: [],
@@ -82,6 +84,18 @@ function removePart(index: number) {
   form.value.partsReplaced!.splice(index, 1)
 }
 
+async function fetchServiceProviders() {
+  loadingProviders.value = true
+  try {
+    const providers = await serviceProvidersApi.getAll(true)
+    serviceProviders.value = providers
+  } catch {
+    toast.error('Servis sağlayıcılar yüklenemedi')
+  } finally {
+    loadingProviders.value = false
+  }
+}
+
 async function handleSubmit() {
   if (!form.value.currentKm || form.value.currentKm <= 0) {
     toast.error('Lütfen geçerli bir KM değeri girin')
@@ -99,6 +113,10 @@ async function handleSubmit() {
     submitting.value = false
   }
 }
+
+onMounted(() => {
+  fetchServiceProviders()
+})
 </script>
 
 <template>
@@ -144,12 +162,19 @@ async function handleSubmit() {
 
           <div class="form-group">
             <label for="serviceProvider">Servis Sağlayıcı</label>
-            <input
+            <select
               id="serviceProvider"
-              type="text"
-              v-model="form.serviceProvider"
-              placeholder="Yetkili servis adı"
-            />
+              v-model="form.serviceProviderId"
+            >
+              <option :value="undefined">Seçiniz...</option>
+              <option
+                v-for="provider in serviceProviders"
+                :key="provider.id"
+                :value="provider.id"
+              >
+                {{ provider.name }}
+              </option>
+            </select>
           </div>
 
           <div class="form-group">

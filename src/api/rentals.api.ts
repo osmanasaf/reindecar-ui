@@ -35,6 +35,10 @@ class RentalsApiService extends BaseApi {
         return this.get(`/${id}`)
     }
 
+    async getPaymentSummary(id: number): Promise<import('@/types').RentalPaymentSummaryResponse> {
+        return this.get(`/${id}/payment-summary`)
+    }
+
     async create(rental: CreateRentalForm): Promise<Rental> {
         return this.post('', rental)
     }
@@ -49,6 +53,10 @@ class RentalsApiService extends BaseApi {
 
     async startReturn(id: number): Promise<Rental> {
         return this.post(`/${id}/start-return`)
+    }
+
+    async previewReturn(id: number, endKm: number, actualReturnDate: string): Promise<ReturnPreviewResponse> {
+        return this.get(`/${id}/return-preview`, { endKm, actualReturnDate })
     }
 
     async complete(id: number, form: VehicleReturnForm): Promise<Rental> {

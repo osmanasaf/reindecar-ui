@@ -39,7 +39,8 @@ class DamagesApiService extends BaseApi {
     }
 
     async getRentalDamages(rentalId: number): Promise<DamageReport[]> {
-        return this.get(`/rental/${rentalId}`)
+        const response = await this.getList<DamageReport>(`/rental/${rentalId}`)
+        return response.content
     }
 }
 

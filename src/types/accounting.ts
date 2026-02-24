@@ -32,7 +32,8 @@ export enum PayableStatus {
   PARTIAL_PAID = 'PARTIAL_PAID',
   FULLY_PAID = 'FULLY_PAID',
   OVERDUE = 'OVERDUE',
-  CANCELLED = 'CANCELLED'
+  CANCELLED = 'CANCELLED',
+  WRITTEN_OFF = 'WRITTEN_OFF'
 }
 
 export enum InsuranceType {
@@ -218,6 +219,8 @@ export interface RecordPaymentRequest {
   paymentMethod: PaymentMethod
   transactionRef?: string
   notes?: string
+  discountAmount?: number
+  discountReason?: string
 }
 
 export interface CreatePayableRequest {
@@ -330,4 +333,54 @@ export interface ClaimFilters {
   type?: ClaimType
   startDate?: string
   endDate?: string
+}
+
+export interface CreateReceivableRequest {
+  type: ReceivableType
+  customerId: number
+  description: string
+  amount: number
+  dueDate?: string
+}
+
+export interface PaymentTransactionResponse {
+  id: number
+  transactionNumber: string
+  transactionType: string
+  amount: number
+  currency: string
+  paymentMethod: string
+  transactionRef?: string
+  transactionDate: string
+  notes?: string
+  createdBy: string
+}
+
+export interface AccountingSummaryResponse {
+  receivables: {
+    totalAmount: number
+    paidAmount: number
+    remainingAmount: number
+    totalCount: number
+    overdueCount: number
+    overdueAmount: number
+  }
+  payables: {
+    totalAmount: number
+    paidAmount: number
+    remainingAmount: number
+    totalCount: number
+    overdueCount: number
+    overdueAmount: number
+  }
+  netPosition: number
+  netPositive: boolean
+  currency: string
+  receivableAging: Array<{
+    label: string
+    fromDays: number
+    toDays: number
+    count: number
+    amount: number
+  }>
 }

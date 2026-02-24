@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { pricingApi, leasingApi } from '@/api'
 import { useToast } from '@/composables'
+import { formatCurrency } from '@/utils/format'
 import type { PriceCalculationResponse, LeasingPlan } from '@/api'
 import type { RentalType } from '@/types'
 
@@ -131,16 +132,6 @@ function selectLeasingPlan(planId: number) {
   emit('leasingPlanSelected', planId)
 }
 
-function safeNumber(value: unknown, defaultValue = 0): number {
-  if (value === null || value === undefined) return defaultValue
-  const num = Number(value)
-  return Number.isNaN(num) ? defaultValue : num
-}
-
-function formatCurrency(amount: unknown): string {
-  const num = safeNumber(amount)
-  return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(num)
-}
 
 function isDiscountItem(description: string): boolean {
   const lowerDesc = description.toLowerCase()

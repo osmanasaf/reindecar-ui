@@ -8,7 +8,9 @@ import PaymentProgress from '@/components/accounting/PaymentProgress.vue'
 import DueStatusBadge from '@/components/accounting/DueStatusBadge.vue'
 import { formatCurrency, formatDate } from '@/utils/format'
 import { useEnumTranslations } from '@/composables'
-import type { RecordPaymentRequest } from '@/types'
+import { receivablesApi } from '@/api/accounting.api'
+import type { RecordPaymentRequest, PaymentTransactionResponse } from '@/types'
+import { ReceivableStatus } from '@/types/accounting'
 
 const route = useRoute()
 const router = useRouter()
@@ -17,44 +19,74 @@ const toast = useToast()
 const { translateReceivableType } = useEnumTranslations()
 
 const showPaymentModal = ref(false)
+const paymentHistory = ref<PaymentTransactionResponse[]>([])
+const historyLoading = ref(false)
 
 const receivable = computed(() => accountingStore.selectedReceivable)
 const loading = computed(() => accountingStore.receivablesLoading)
 
 const canMakePayment = computed(() => {
-  return receivable.value && 
-    receivable.value.status !== 'FULLY_PAID' && 
-    receivable.value.status !== 'CANCELLED' &&
-    receivable.value.status !== 'WRITTEN_OFF'
+  return receivable.value &&
+    receivable.value.status !== ReceivableStatus.FULLY_PAID &&
+    receivable.value.status !== ReceivableStatus.CANCELLED &&
+    receivable.value.status !== ReceivableStatus.WRITTEN_OFF
 })
 
 const canWriteOff = computed(() => {
-  return receivable.value && 
-    receivable.value.status === 'OVERDUE' &&
+  return receivable.value &&
+    receivable.value.status === ReceivableStatus.OVERDUE &&
     receivable.value.remainingAmount > 0
 })
 
 const canCancel = computed(() => {
-  return receivable.value && 
-    receivable.value.status === 'PENDING'
+  return receivable.value &&
+    receivable.value.status === ReceivableStatus.PENDING
 })
 
-onMounted(() => {
+const sourceRoute = computed(() => {
+  if (!receivable.value) return null
+  if (receivable.value.sourceType === 'RENTAL') {
+    return { name: 'rental-detail', params: { id: receivable.value.sourceId } }
+  }
+  return null
+})
+
+const sourceLabel = computed(() => {
+  if (!receivable.value) return null
+  if (receivable.value.sourceType === 'RENTAL') return 'Kiralamaya Git'
+  if (receivable.value.sourceType === 'DAMAGE') return 'Hasara Git'
+  return null
+})
+
+onMounted(async () => {
   const id = Number(route.params.id)
   if (id) {
-    accountingStore.fetchReceivableById(id)
+    await accountingStore.fetchReceivableById(id)
+    loadPaymentHistory(id)
   }
 })
 
+const loadPaymentHistory = async (id: number) => {
+  historyLoading.value = true
+  try {
+    paymentHistory.value = await receivablesApi.getPayments(id)
+  } catch {
+    paymentHistory.value = []
+  } finally {
+    historyLoading.value = false
+  }
+}
+
 const submitPayment = async (data: RecordPaymentRequest) => {
   if (!receivable.value) return
-  
   try {
     await accountingStore.recordReceivablePayment(receivable.value.id, data)
     toast.success('Ödeme başarıyla kaydedildi')
     showPaymentModal.value = false
-  } catch (error: any) {
-    toast.error(error.message || 'Ödeme kaydedilemedi')
+    loadPaymentHistory(receivable.value.id)
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Ödeme kaydedilemedi'
+    toast.error(message)
   }
 }
 
@@ -65,8 +97,9 @@ const handleWriteOff = async () => {
   try {
     await accountingStore.writeOffReceivable(receivable.value.id)
     toast.success('Alacak şüpheli alacak olarak işaretlendi')
-  } catch (error: any) {
-    toast.error(error.message || 'İşlem başarısız oldu')
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'İşlem başarısız oldu'
+    toast.error(message)
   }
 }
 
@@ -77,8 +110,9 @@ const handleCancel = async () => {
   try {
     await accountingStore.cancelReceivable(receivable.value.id)
     toast.success('Alacak iptal edildi')
-  } catch (error: any) {
-    toast.error(error.message || 'İptal işlemi başarısız oldu')
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'İptal işlemi başarısız oldu'
+    toast.error(message)
   }
 }
 
@@ -129,6 +163,13 @@ const goBack = () => {
         >
           İptal Et
         </button>
+        <router-link
+          v-if="sourceRoute"
+          :to="sourceRoute"
+          class="btn btn-secondary"
+        >
+          {{ sourceLabel }}
+        </router-link>
       </div>
 
       <div class="detail-grid">
@@ -184,11 +225,39 @@ const goBack = () => {
       </div>
     </div>
 
+    <div v-if="receivable" class="detail-card detail-card-mt">
+      <h3 class="card-title">Ödeme Geçmişi</h3>
+      <div v-if="historyLoading" class="loading-sm">Yükleniyor...</div>
+      <div v-else-if="paymentHistory.length === 0" class="empty-sm">Henüz ödeme kaydı yok.</div>
+      <table v-else class="history-table">
+        <thead>
+          <tr>
+            <th>İşlem No</th>
+            <th>Tarih</th>
+            <th>Tutar</th>
+            <th>Yöntem</th>
+            <th>Referans</th>
+            <th>Kaydeden</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="tx in paymentHistory" :key="tx.id">
+            <td>{{ tx.transactionNumber }}</td>
+            <td>{{ formatDate(tx.transactionDate) }}</td>
+            <td>{{ formatCurrency(tx.amount, tx.currency) }}</td>
+            <td>{{ tx.paymentMethod }}</td>
+            <td>{{ tx.transactionRef || '-' }}</td>
+            <td>{{ tx.createdBy }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
     <PaymentModal
       v-if="receivable"
       :show="showPaymentModal"
       :remaining-amount="receivable.remainingAmount"
-      :receivable-number="receivable.receivableNumber"
+      :reference-number="receivable.receivableNumber"
       @close="showPaymentModal = false"
       @submit="submitPayment"
     />
@@ -270,6 +339,10 @@ const goBack = () => {
   border: 1px solid var(--color-border, #e5e7eb);
   border-radius: 0.5rem;
   padding: 1.5rem;
+}
+
+.detail-card-mt {
+  margin-top: 1.5rem;
 }
 
 .card-title {
@@ -374,6 +447,39 @@ const goBack = () => {
 
 .btn-danger:hover {
   background: #dc2626;
+}
+
+.btn-secondary {
+  background: var(--color-secondary, #4b5563);
+  color: white;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.loading-sm, .empty-sm {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary, #6b7280);
+  padding: 0.75rem 0;
+}
+
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.history-table th,
+.history-table td {
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
+}
+
+.history-table th {
+  font-weight: 600;
+  color: var(--color-text-secondary, #6b7280);
+  background: var(--color-background, #f9fafb);
 }
 
 @media (max-width: 768px) {

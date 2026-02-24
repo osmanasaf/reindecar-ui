@@ -216,6 +216,26 @@ export enum PenaltySource {
     EXTERNAL = 'EXTERNAL'
 }
 
+export enum TollType {
+    HGS = 'HGS',
+    OGS = 'OGS',
+    BRIDGE = 'BRIDGE',
+    TUNNEL = 'TUNNEL',
+    OTHER = 'OTHER'
+}
+
+export enum TollStatus {
+    PENDING = 'PENDING',
+    CHARGED_TO_CUSTOMER = 'CHARGED_TO_CUSTOMER',
+    PAID = 'PAID',
+    CANCELLED = 'CANCELLED'
+}
+
+export enum TollSource {
+    MANUAL = 'MANUAL',
+    EXTERNAL = 'EXTERNAL'
+}
+
 export enum InstallmentPaymentStatus {
     PENDING = 'PENDING',
     PAID = 'PAID',

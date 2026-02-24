@@ -18,7 +18,10 @@ import type {
     DamageType,
     DamageLocation,
     DamageSeverity,
-    MaintenanceType
+    MaintenanceType,
+    TollType,
+    TollStatus,
+    TollSource
 } from './enums'
 
 
@@ -478,6 +481,11 @@ export interface DamageReport {
     repairedDate: string | null
     repairCostAmount: number | null
     repairCostCurrency: string | null
+    serviceProviderId: number | null
+    serviceProviderName: string | null
+    customerId: number | null
+    customerName: string | null
+    customerResponsible?: boolean
     createdAt: string
     updatedAt: string
 }
@@ -607,4 +615,77 @@ export interface VehicleHistory {
     maintenances: MaintenanceHistoryItem[]
     damages: DamageHistoryItem[]
     statusChanges: StatusChangeItem[]
+}
+
+export interface MoneyLike {
+    amount: number
+    currency: string
+}
+
+export interface PenaltySummaryItem {
+    penaltyNumber: string
+    violationType: string
+    amount: MoneyLike
+    status: string
+    paid?: boolean
+}
+
+export interface DamageSummaryItem {
+    description: string
+    severity: string
+    estimatedCost: MoneyLike
+    repaired: boolean
+}
+
+export interface TollSummaryItem {
+    tollNumber: string
+    tollType: string
+    passageLocation: string
+    amount: MoneyLike
+    status: string
+}
+
+export interface ReturnPreviewResponse {
+    kmUsed: number
+    kmOverage: number
+    kmPenalty: MoneyLike
+    lateDays: number
+    lateFee: MoneyLike
+    totalExtra: MoneyLike
+    penalties: PenaltySummaryItem[]
+    damages: DamageSummaryItem[]
+    tolls?: TollSummaryItem[]
+    penaltyTotal: MoneyLike
+    damageTotal: MoneyLike
+    tollTotal?: MoneyLike
+    grandTotal: MoneyLike
+}
+
+export interface RentalPaymentSummaryResponse {
+    totalPaid: number
+    currency: string
+}
+
+export interface TollRecord {
+    id: number
+    tollNumber: string
+    rentalId: number
+    vehicleId: number
+    customerId: number
+    tollType: TollType
+    tollTypeDisplayName: string
+    passageDate: string
+    passageLocation: string | null
+    plateNumber: string
+    tollAmount: number
+    currency: string
+    status: TollStatus
+    source: TollSource
+    externalReferenceId: string | null
+    receivableId: number | null
+    hgsTagNumber: string | null
+    description: string | null
+    createdBy: string
+    createdAt: string
+    updatedAt: string
 }
