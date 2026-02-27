@@ -3,6 +3,7 @@ import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAccountingStore } from '@/stores'
 import { usePagination, useToast } from '@/composables'
+import { SearchableSelect } from '@/components/common'
 import { ReceivableCard, PaymentModal } from '@/components/accounting'
 import { formatCurrency } from '@/utils/format'
 import { receivablesApi, rentalsApi, vehiclesApi } from '@/api'
@@ -188,8 +189,19 @@ const handlePageChange = (newPage: number) => {
   loadReceivables()
 }
 
-const statusOptions = Object.values(ReceivableStatus)
-const typeOptions = Object.values(ReceivableType)
+const statusOptions = Object.values(ReceivableStatus).map(s => ({ value: s, label: s }))
+const typeOptions = Object.values(ReceivableType).map(t => ({ value: t, label: t }))
+const rentalOptions = computed(() =>
+  rentalsList.value.map(r => ({ value: r.id as number, label: `${r.rentalNumber} (${r.startDate} - ${r.endDate})` }))
+)
+const vehicleOptions = computed(() =>
+  vehiclesList.value.map(v => ({ value: v.id as number, label: `${v.plate} – ${v.brand} ${v.model}` }))
+)
+const viewModeOptions = [
+  { value: 'all', label: 'Tümü' },
+  { value: 'rental', label: 'Kiralama bazlı' },
+  { value: 'vehicle', label: 'Araç bazlı' }
+]
 </script>
 
 <template>
@@ -227,49 +239,56 @@ const typeOptions = Object.values(ReceivableType)
     <div class="filter-bar">
       <div class="view-mode-group">
         <span class="filter-label">Görünüm:</span>
-        <select v-model="viewMode" class="filter-select">
-          <option value="all">Tümü</option>
-          <option value="rental">Kiralama bazlı</option>
-          <option value="vehicle">Araç bazlı</option>
-        </select>
+        <SearchableSelect
+          :model-value="viewMode"
+          :options="viewModeOptions"
+          placeholder="Tümü"
+          search-placeholder="Ara..."
+          class="filter-searchable"
+          @update:model-value="(v) => { if (v) viewMode = v as ViewMode }"
+        />
       </div>
       <template v-if="viewMode === 'rental'">
-        <select
+        <SearchableSelect
           v-model="selectedRentalId"
-          class="filter-select rental-select"
-          :disabled="loadingRentals"
-        >
-          <option :value="null">Kiralama seçin</option>
-          <option
-            v-for="r in rentalsList"
-            :key="r.id"
-            :value="r.id"
-          >{{ r.rentalNumber }} ({{ r.startDate }} - {{ r.endDate }})</option>
-        </select>
+          :options="rentalOptions"
+          placeholder="Kiralama seçin"
+          search-placeholder="Kiralama ara..."
+          clearable
+          :loading="loadingRentals"
+          class="filter-searchable rental-select"
+        />
       </template>
       <template v-else-if="viewMode === 'vehicle'">
-        <select
+        <SearchableSelect
           v-model="selectedVehicleId"
-          class="filter-select vehicle-select"
-          :disabled="loadingVehicles"
-        >
-          <option :value="null">Araç seçin</option>
-          <option
-            v-for="v in vehiclesList"
-            :key="v.id"
-            :value="v.id"
-          >{{ v.plate }} – {{ v.brand }} {{ v.model }}</option>
-        </select>
+          :options="vehicleOptions"
+          placeholder="Araç seçin"
+          search-placeholder="Araç ara..."
+          clearable
+          :loading="loadingVehicles"
+          class="filter-searchable vehicle-select"
+        />
       </template>
       <template v-if="viewMode === 'all'">
-        <select v-model="filters.status" class="filter-select">
-          <option value="">Tüm Durumlar</option>
-          <option v-for="s in statusOptions" :key="s" :value="s">{{ s }}</option>
-        </select>
-        <select v-model="filters.type" class="filter-select">
-          <option value="">Tüm Tipler</option>
-          <option v-for="t in typeOptions" :key="t" :value="t">{{ t }}</option>
-        </select>
+        <SearchableSelect
+          :model-value="filters.status ?? null"
+          :options="statusOptions"
+          placeholder="Tüm Durumlar"
+          search-placeholder="Durum ara..."
+          clearable
+          class="filter-searchable"
+          @update:model-value="(v) => filters.status = v ?? undefined"
+        />
+        <SearchableSelect
+          :model-value="filters.type ?? null"
+          :options="typeOptions"
+          placeholder="Tüm Tipler"
+          search-placeholder="Tip ara..."
+          clearable
+          class="filter-searchable"
+          @update:model-value="(v) => filters.type = v ?? undefined"
+        />
         <input v-model="filters.startDate" type="date" class="filter-input" placeholder="Başlangıç" />
         <input v-model="filters.endDate" type="date" class="filter-input" placeholder="Bitiş" />
         <label class="filter-check">
@@ -328,9 +347,12 @@ const typeOptions = Object.values(ReceivableType)
         <h2 class="modal-title">Yeni Alacak Oluştur</h2>
         <div class="form-group">
           <label>Tip</label>
-          <select v-model="createForm.type" class="form-control">
-            <option v-for="t in typeOptions" :key="t" :value="t">{{ t }}</option>
-          </select>
+          <SearchableSelect
+            v-model="createForm.type"
+            :options="typeOptions"
+            placeholder="Tip seçin"
+            search-placeholder="Ara..."
+          />
         </div>
         <div class="form-group">
           <label>Müşteri ID</label>

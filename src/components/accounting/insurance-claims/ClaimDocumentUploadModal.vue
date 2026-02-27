@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { insuranceClaimsApi } from '@/api'
 import { useToast, useEnumTranslations } from '@/composables'
+import { SearchableSelect } from '@/components/common'
 import type { ClaimDocumentType } from '@/types'
 import FileUpload from '@/components/base/FileUpload.vue'
 
@@ -82,15 +83,12 @@ const handleClose = () => {
           <label class="form-label">
             Belge Türü <span class="required">*</span>
           </label>
-          <select v-model="selectedType" class="form-input">
-            <option 
-              v-for="option in documentTypeOptions" 
-              :key="option.value" 
-              :value="option.value"
-            >
-              {{ option.label }}
-            </option>
-          </select>
+          <SearchableSelect
+            v-model="selectedType"
+            :options="documentTypeOptions"
+            placeholder="Seçiniz"
+            search-placeholder="Belge türü ara..."
+          />
         </div>
 
         <div class="form-group">

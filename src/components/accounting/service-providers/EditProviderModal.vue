@@ -3,6 +3,7 @@ import { ref, watch } from 'vue'
 import type { ServiceProviderResponse, UpdateServiceProviderRequest } from '@/types'
 import { ProviderType, ServiceType } from '@/types'
 import { useForm, useEnumTranslations } from '@/composables'
+import { SearchableSelect } from '@/components/common'
 import { formatPhoneInput, isValidPhoneNumber, normalizePhoneDigits } from '@/utils/phone'
 
 interface Props {
@@ -175,16 +176,14 @@ watch(() => props.provider, (newVal) => {
               <label class="form-label">
                 Sağlayıcı Tipi <span class="required">*</span>
               </label>
-              <select
+              <SearchableSelect
                 v-model="values.type"
-                class="form-input"
-                :class="{ 'error': touched.type && errors.type }"
+                :options="providerTypeOptions"
+                placeholder="Seçiniz"
+                search-placeholder="Ara..."
+                :error="!!(touched.type && errors.type)"
                 @blur="validateField('type')"
-              >
-                <option v-for="option in providerTypeOptions" :key="option.value" :value="option.value">
-                  {{ option.label }}
-                </option>
-              </select>
+              />
               <span v-if="touched.type && errors.type" class="error-text">
                 {{ errors.type }}
               </span>

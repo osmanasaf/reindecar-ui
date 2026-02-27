@@ -1,5 +1,5 @@
 <script setup lang="ts" generic="T extends string | number">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 
 interface Option {
   value: T
@@ -16,24 +16,28 @@ const props = withDefaults(defineProps<{
   clearable?: boolean
   createable?: boolean
   loading?: boolean
+  error?: boolean
 }>(), {
   placeholder: 'Seçiniz',
   searchPlaceholder: 'Ara...',
   disabled: false,
   clearable: false,
   createable: false,
-  loading: false
+  loading: false,
+  error: false
 })
 
 const emit = defineEmits<{
   'update:modelValue': [value: T | null]
   'create': [value: string]
+  'blur': []
 }>()
 
 const isOpen = ref(false)
 const searchQuery = ref('')
 const customValue = ref('')
 const showCreateInput = ref(false)
+const searchInput = ref<HTMLInputElement | null>(null)
 
 const selectedOption = computed(() => {
   return props.options.find(opt => opt.value === props.modelValue)
@@ -65,6 +69,9 @@ function openDropdown() {
   if (props.disabled) return
   isOpen.value = true
   searchQuery.value = ''
+  nextTick(() => {
+    searchInput.value?.focus()
+  })
 }
 
 function closeDropdown() {
@@ -72,6 +79,7 @@ function closeDropdown() {
   searchQuery.value = ''
   showCreateInput.value = false
   customValue.value = ''
+  emit('blur')
 }
 
 function handleCreateNew() {
@@ -95,7 +103,7 @@ watch(() => props.modelValue, () => {
 </script>
 
 <template>
-  <div class="searchable-select" :class="{ disabled, open: isOpen }">
+  <div class="searchable-select" :class="{ disabled, open: isOpen, 'has-error': error }">
     <div class="select-trigger" @click="openDropdown">
       <span v-if="selectedOption" class="selected-value">
         {{ selectedOption.label }}
@@ -208,6 +216,16 @@ watch(() => props.modelValue, () => {
   background: var(--color-bg-secondary);
   cursor: not-allowed;
   opacity: 0.6;
+}
+
+.searchable-select.has-error .select-trigger {
+  border-color: var(--color-danger);
+  background: #fff5f5;
+}
+
+.searchable-select.has-error.open .select-trigger {
+  border-color: var(--color-danger);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
 }
 
 .selected-value {

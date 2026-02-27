@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useToast } from '@/composables'
+import { SearchableSelect } from '@/components/common'
 
 interface User {
   id: number
@@ -188,11 +189,16 @@ onMounted(fetchUsers)
           
           <div class="form-group">
             <label>Rol</label>
-            <select v-model="formData.role" required>
-              <option value="OPERATOR">Operatör</option>
-              <option value="MANAGER">Şube Müdürü</option>
-              <option value="ADMIN">Yönetici</option>
-            </select>
+            <SearchableSelect
+              v-model="formData.role"
+              :options="[
+                { value: 'OPERATOR', label: 'Operatör' },
+                { value: 'MANAGER', label: 'Şube Müdürü' },
+                { value: 'ADMIN', label: 'Yönetici' }
+              ]"
+              placeholder="Rol seçin"
+              search-placeholder="Ara..."
+            />
           </div>
           
           <div v-if="!editingUser" class="form-group">

@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { watch } from 'vue'
+import { watch, computed } from 'vue'
 import { vehicleInsurancesApi } from '@/api'
 import { useForm, useToast, useEnumTranslations } from '@/composables'
+import { SearchableSelect } from '@/components/common'
 import { formatPhoneInput, isValidPhoneNumber, normalizePhoneDigits } from '@/utils/phone'
 import type { CreateVehicleInsuranceRequest } from '@/types'
 
@@ -19,6 +20,10 @@ const emit = defineEmits<{
 
 const toast = useToast()
 const { insuranceTypes } = useEnumTranslations()
+
+const insuranceTypeOptions = computed(() =>
+  Object.entries(insuranceTypes.value).map(([value, label]) => ({ value, label: label as string }))
+)
 
 const initialValues: CreateVehicleInsuranceRequest = {
   vehicleId: props.vehicleId,
@@ -111,21 +116,14 @@ watch(() => props.show, (newVal) => {
               <label class="form-label">
                 Sigorta Türü <span class="required">*</span>
               </label>
-              <select
+              <SearchableSelect
                 v-model="values.insuranceType"
-                class="form-input"
-                :class="{ 'error': touched.insuranceType && errors.insuranceType }"
+                :options="insuranceTypeOptions"
+                placeholder="Seçiniz"
+                search-placeholder="Sigorta türü ara..."
+                :error="!!(touched.insuranceType && errors.insuranceType)"
                 @blur="validateField('insuranceType')"
-              >
-                <option value="">Seçiniz</option>
-                <option 
-                  v-for="(label, value) in insuranceTypes" 
-                  :key="value" 
-                  :value="value"
-                >
-                  {{ label }}
-                </option>
-              </select>
+              />
               <span v-if="touched.insuranceType && errors.insuranceType" class="error-text">
                 {{ errors.insuranceType }}
               </span>

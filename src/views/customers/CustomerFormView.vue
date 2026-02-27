@@ -28,6 +28,10 @@ const loading = ref(false)
 const { cities, loadCities } = useReferenceData()
 const selectedCityId = ref<number | null>(null)
 
+const cityOptions = computed(() =>
+  cities.value.map(c => ({ value: c.id as number, label: c.name }))
+)
+
 watch(selectedCityId, (cityId) => {
   if (!cityId) {
     form.value.city = ''
@@ -79,7 +83,7 @@ const commonTitles = [
   { value: 'İnsan Kaynakları Müdürü', label: 'İnsan Kaynakları Müdürü' }
 ]
 
-const licenseClasses = ['A1', 'A2', 'A', 'B1', 'B', 'BE', 'C1', 'C1E', 'C', 'CE', 'D1', 'D1E', 'D', 'DE']
+const licenseClasses = ['A1', 'A2', 'A', 'B1', 'B', 'BE', 'C1', 'C1E', 'C', 'CE', 'D1', 'D1E', 'D', 'DE'].map(cls => ({ value: cls, label: cls }))
 
 function addAuthorizedPerson() {
   authorizedPersons.value.push({ firstName: '', lastName: '', nationalId: '', phone: '', email: '', title: '', isPrimary: false })
@@ -424,10 +428,14 @@ watch(customerType, () => reset())
 
               <div class="form-group" :class="{ error: hasError('licenseClass') }">
                 <label>Sınıf <span class="required">*</span></label>
-                <select v-model="form.licenseClass" @blur="handleBlur('licenseClass')">
-                  <option value="" disabled>Seçiniz</option>
-                  <option v-for="cls in licenseClasses" :key="cls" :value="cls">{{ cls }}</option>
-                </select>
+                <SearchableSelect
+                  v-model="form.licenseClass"
+                  :options="licenseClasses"
+                  placeholder="Sınıf seçin"
+                  search-placeholder="Ara..."
+                  :error="hasError('licenseClass')"
+                  @blur="handleBlur('licenseClass')"
+                />
                 <span class="error-text">{{ getError('licenseClass') }}</span>
               </div>
 
@@ -594,10 +602,15 @@ watch(customerType, () => reset())
 
             <div class="form-group" :class="{ error: hasError('city') }">
               <label>Şehir <span class="required">*</span></label>
-              <select v-model="selectedCityId" @blur="handleBlur('city')">
-                <option :value="null">İl seçin</option>
-                <option v-for="c in cities" :key="c.id" :value="c.id">{{ c.name }}</option>
-              </select>
+              <SearchableSelect
+                v-model="selectedCityId"
+                :options="cityOptions"
+                placeholder="İl seçin"
+                search-placeholder="İl ara..."
+                clearable
+                :error="hasError('city')"
+                @blur="handleBlur('city')"
+              />
               <span class="error-text">{{ getError('city') }}</span>
             </div>
           </div>

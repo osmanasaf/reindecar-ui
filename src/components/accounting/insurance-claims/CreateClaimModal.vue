@@ -3,6 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { vehicleInsurancesApi } from '@/api'
 import type { CreateClaimRequest, ClaimType, VehicleInsuranceResponse } from '@/types'
 import { useForm, useToast } from '@/composables'
+import { SearchableSelect } from '@/components/common'
 
 interface Props {
   show: boolean
@@ -23,6 +24,15 @@ const toast = useToast()
 
 const insurances = ref<VehicleInsuranceResponse[]>([])
 const loadingInsurances = ref(false)
+
+const insuranceOptions = computed(() =>
+  insurances.value.map(ins => ({
+    value: ins.id as number,
+    label: ins.coverage
+      ? `${ins.company} - ${ins.policyNumber} (Teminat: ${ins.coverage.toLocaleString('tr-TR')} ${ins.coverageCurrency})`
+      : `${ins.company} - ${ins.policyNumber}`
+  }))
+)
 
 const claimTypes: { value: ClaimType; label: string }[] = [
   { value: 'ACCIDENT', label: 'Kaza' },
@@ -152,24 +162,16 @@ watch(() => props.show, (newVal) => {
               <label class="form-label">
                 Sigorta Poliçesi <span class="required">*</span>
               </label>
-              <select
-                v-model.number="values.vehicleInsuranceId"
-                class="form-input"
-                :class="{ 'error': touched.vehicleInsuranceId && errors.vehicleInsuranceId }"
+              <SearchableSelect
+                :model-value="values.vehicleInsuranceId || null"
+                :options="insuranceOptions"
+                placeholder="Seçiniz"
+                search-placeholder="Poliçe ara..."
+                :loading="loadingInsurances"
+                :error="!!(touched.vehicleInsuranceId && errors.vehicleInsuranceId)"
+                @update:model-value="(v) => values.vehicleInsuranceId = v ?? 0"
                 @blur="validateField('vehicleInsuranceId')"
-              >
-                <option :value="0">Seçiniz</option>
-                <option 
-                  v-for="insurance in insurances" 
-                  :key="insurance.id" 
-                  :value="insurance.id"
-                >
-                  {{ insurance.company }} - {{ insurance.policyNumber }}
-                  <template v-if="insurance.coverage">
-                    (Teminat: {{ insurance.coverage.toLocaleString('tr-TR') }} {{ insurance.coverageCurrency }})
-                  </template>
-                </option>
-              </select>
+              />
               <span v-if="touched.vehicleInsuranceId && errors.vehicleInsuranceId" class="error-text">
                 {{ errors.vehicleInsuranceId }}
               </span>
@@ -182,17 +184,14 @@ watch(() => props.show, (newVal) => {
               <label class="form-label">
                 Başvuru Türü <span class="required">*</span>
               </label>
-              <select
+              <SearchableSelect
                 v-model="values.claimType"
-                class="form-input"
-                :class="{ 'error': touched.claimType && errors.claimType }"
+                :options="claimTypes"
+                placeholder="Seçiniz"
+                search-placeholder="Ara..."
+                :error="!!(touched.claimType && errors.claimType)"
                 @blur="validateField('claimType')"
-              >
-                <option value="">Seçiniz</option>
-                <option v-for="type in claimTypes" :key="type.value" :value="type.value">
-                  {{ type.label }}
-                </option>
-              </select>
+              />
               <span v-if="touched.claimType && errors.claimType" class="error-text">
                 {{ errors.claimType }}
               </span>

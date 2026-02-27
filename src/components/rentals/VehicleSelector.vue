@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { vehiclesApi, vehicleCategoriesApi } from '@/api'
+import { SearchableSelect } from '@/components/common'
 import type { Vehicle, VehicleCategory, RentalType } from '@/types'
 
 interface Props {
@@ -22,6 +23,10 @@ const vehicles = ref<Vehicle[]>([])
 const categories = ref<VehicleCategory[]>([])
 const searchQuery = ref('')
 const selectedCategoryId = ref<number | null>(null)
+
+const categoryOptions = computed(() => [
+  ...categories.value.map(c => ({ value: c.id as number, label: c.name }))
+])
 
 const filteredVehicles = computed(() => {
   let result = vehicles.value
@@ -158,12 +163,14 @@ watch([() => props.startDate, () => props.endDate], () => {
             placeholder="Marka, model veya plaka ara..."
           />
         </div>
-        <select v-model="selectedCategoryId" class="category-filter">
-          <option :value="null">Tüm Kategoriler</option>
-          <option v-for="cat in categories" :key="cat.id" :value="cat.id">
-            {{ cat.name }}
-          </option>
-        </select>
+        <SearchableSelect
+          v-model="selectedCategoryId"
+          :options="categoryOptions"
+          placeholder="Tüm Kategoriler"
+          search-placeholder="Kategori ara..."
+          clearable
+          class="category-filter-searchable"
+        />
       </div>
       <div class="result-count">
         {{ filteredVehicles.length }} araç bulundu

@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { branchesApi, vehiclesApi } from '@/api'
 import { useToast, useReferenceData } from '@/composables'
 import { validators, validate, formatPhoneInput } from '@/utils/validation'
+import { SearchableSelect } from '@/components/common'
 import type { Branch } from '@/types'
 import type { District } from '@/types/reference'
 
@@ -21,6 +22,13 @@ const { cities, loadCities, loadDistrictsByCity } = useReferenceData()
 const selectedCityId = ref<number | null>(null)
 const selectedDistrictId = ref<number | null>(null)
 const districts = ref<District[]>([])
+
+const cityOptions = computed(() =>
+  cities.value.map(c => ({ value: c.id as number, label: c.name }))
+)
+const districtOptions = computed(() =>
+  districts.value.map(d => ({ value: d.id as number, label: d.name }))
+)
 
 watch(selectedCityId, async (cityId) => {
   if (!cityId) {
@@ -377,15 +385,15 @@ onMounted(fetchBranches)
           
           <div class="form-group">
             <label>Şehir <span class="required">*</span></label>
-            <select
+            <SearchableSelect
               v-model="selectedCityId"
-              :class="{ 'error': touchedFields.has('city') && formErrors.city }"
+              :options="cityOptions"
+              placeholder="İl seçin"
+              search-placeholder="İl ara..."
+              clearable
+              :error="!!(touchedFields.has('city') && formErrors.city)"
               @blur="handleBlur('city')"
-              @change="touchedFields.has('city') && validateField('city')"
-            >
-              <option :value="null">İl seçin</option>
-              <option v-for="c in cities" :key="c.id" :value="c.id">{{ c.name }}</option>
-            </select>
+            />
             <span v-if="touchedFields.has('city') && formErrors.city" class="error-message">
               {{ formErrors.city }}
             </span>
@@ -393,13 +401,14 @@ onMounted(fetchBranches)
 
           <div class="form-group">
             <label>İlçe</label>
-            <select
+            <SearchableSelect
               v-model="selectedDistrictId"
+              :options="districtOptions"
+              :placeholder="selectedCityId ? 'İlçe seçin (opsiyonel)' : 'Önce il seçin'"
+              search-placeholder="İlçe ara..."
+              clearable
               :disabled="!selectedCityId"
-            >
-              <option :value="null">{{ selectedCityId ? 'İlçe seçin (opsiyonel)' : 'Önce il seçin' }}</option>
-              <option v-for="d in districts" :key="d.id" :value="d.id">{{ d.name }}</option>
-            </select>
+            />
           </div>
           
           <div class="form-group">

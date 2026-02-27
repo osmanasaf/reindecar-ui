@@ -3,6 +3,7 @@ import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAccountingStore } from '@/stores'
 import { useToast, useEnumTranslations } from '@/composables'
+import { SearchableSelect } from '@/components/common'
 import { ProviderType } from '@/types'
 import type { ServiceProviderResponse, CreateServiceProviderRequest, UpdateServiceProviderRequest } from '@/types'
 import { ProviderCard, CreateProviderModal, EditProviderModal } from '@/components/accounting'
@@ -182,11 +183,15 @@ watch(searchQuery, () => {
       </div>
 
       <div class="filter-group">
-        <select v-model="selectedType" class="filter-select">
-          <option v-for="option in providerTypeOptions" :key="option.value" :value="option.value">
-            {{ option.label }}
-          </option>
-        </select>
+        <SearchableSelect
+          :model-value="selectedType || null"
+          :options="providerTypeOptions"
+          placeholder="Tüm Tipler"
+          search-placeholder="Tip ara..."
+          clearable
+          class="filter-searchable"
+          @update:model-value="(v) => selectedType = v ?? ''"
+        />
 
         <label class="checkbox-filter">
           <input v-model="showInactive" type="checkbox" />

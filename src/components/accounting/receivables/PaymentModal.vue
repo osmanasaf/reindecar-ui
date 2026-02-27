@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { PaymentMethod } from '@/types'
 import type { RecordPaymentRequest } from '@/types'
 import { useForm, useToast } from '@/composables'
+import { SearchableSelect } from '@/components/common'
 import { formatCurrency } from '@/utils/format'
 
 interface Props {
@@ -190,17 +191,14 @@ const netAmount = computed(() => {
             <label class="form-label">
               Ödeme Yöntemi <span class="required">*</span>
             </label>
-            <select
+            <SearchableSelect
               v-model="values.paymentMethod"
-              class="form-input"
-              :class="{ 'error': touched.paymentMethod && errors.paymentMethod }"
+              :options="paymentMethods"
+              placeholder="Seçiniz"
+              search-placeholder="Ara..."
+              :error="!!(touched.paymentMethod && errors.paymentMethod)"
               @blur="validateField('paymentMethod')"
-            >
-              <option value="">Seçiniz</option>
-              <option v-for="method in paymentMethods" :key="method.value" :value="method.value">
-                {{ method.label }}
-              </option>
-            </select>
+            />
             <span v-if="touched.paymentMethod && errors.paymentMethod" class="error-text">
               {{ errors.paymentMethod }}
             </span>

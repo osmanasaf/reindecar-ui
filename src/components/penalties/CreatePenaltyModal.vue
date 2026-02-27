@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { penaltiesApi, rentalsApi, vehiclesApi, customersApi } from '@/api'
 import { useToast, useEnumTranslations } from '@/composables'
+import { SearchableSelect } from '@/components/common'
 import type { Rental, Vehicle, Customer, RentalDriver, ViolationType } from '@/types'
 
 interface Props {
@@ -45,6 +46,24 @@ const description = ref('')
 const notes = ref('')
 
 const isRentalLocked = computed(() => !!props.rentalId)
+
+const rentalOptions = computed(() =>
+  rentals.value.map(r => ({
+    value: r.id as number,
+    label: `${r.rentalNumber} - ${r.customerName || 'Müşteri'} (${r.vehiclePlate || 'Araç'}) [${r.status}]`
+  }))
+)
+
+const driverOptions = computed(() =>
+  drivers.value.map(d => ({
+    value: d.driverId as number,
+    label: `${d.driverName}${d.primary ? ' (Ana Sürücü)' : ''}`
+  }))
+)
+
+const violationTypeOptions = computed(() =>
+  Object.entries(violationTypes.value).map(([value, label]) => ({ value, label: label as string }))
+)
 
 const selectedRental = computed(() =>
   rentals.value.find(r => r.id === selectedRentalId.value)
@@ -232,20 +251,16 @@ watch(() => props.show, async (newVal) => {
             <label class="form-label">
               Kiralama <span class="required">*</span>
             </label>
-            <select
+            <SearchableSelect
               v-if="!isRentalLocked"
-              v-model="selectedRentalId"
-              class="form-input"
-            >
-              <option :value="undefined">Kiralama seçin...</option>
-              <option
-                v-for="r in rentals"
-                :key="r.id"
-                :value="r.id"
-              >
-                {{ r.rentalNumber }} - {{ r.customerName || 'Müşteri' }} ({{ r.vehiclePlate || 'Araç' }}) [{{ r.status }}]
-              </option>
-            </select>
+              :model-value="selectedRentalId ?? null"
+              :options="rentalOptions"
+              placeholder="Kiralama seçin..."
+              search-placeholder="Kiralama ara..."
+              clearable
+              :loading="loadingRentals"
+              @update:model-value="(v) => selectedRentalId = v ?? undefined"
+            />
             <div v-else class="locked-field">
               {{ selectedRental?.rentalNumber || `Kiralama #${selectedRentalId}` }}
             </div>
@@ -269,16 +284,14 @@ watch(() => props.show, async (newVal) => {
 
           <div v-if="drivers.length > 0" class="form-group full-width">
             <label class="form-label">Sürücü</label>
-            <select v-model="selectedDriverId" class="form-input">
-              <option :value="undefined">Sürücü seçin (opsiyonel)</option>
-              <option
-                v-for="d in drivers"
-                :key="d.driverId"
-                :value="d.driverId"
-              >
-                {{ d.driverName }} {{ d.primary ? '(Ana Sürücü)' : '' }}
-              </option>
-            </select>
+            <SearchableSelect
+              :model-value="selectedDriverId ?? null"
+              :options="driverOptions"
+              placeholder="Sürücü seçin (opsiyonel)"
+              search-placeholder="Sürücü ara..."
+              clearable
+              @update:model-value="(v) => selectedDriverId = v ?? undefined"
+            />
           </div>
 
           <div class="form-row">
@@ -286,16 +299,12 @@ watch(() => props.show, async (newVal) => {
               <label class="form-label">
                 İhlal Türü <span class="required">*</span>
               </label>
-              <select v-model="violationType" class="form-input">
-                <option value="">Seçiniz</option>
-                <option
-                  v-for="(label, value) in violationTypes"
-                  :key="value"
-                  :value="value"
-                >
-                  {{ label }}
-                </option>
-              </select>
+              <SearchableSelect
+                v-model="violationType"
+                :options="violationTypeOptions"
+                placeholder="Seçiniz"
+                search-placeholder="İhlal türü ara..."
+              />
             </div>
 
             <div class="form-group">

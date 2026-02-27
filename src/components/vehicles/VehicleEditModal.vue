@@ -2,6 +2,7 @@
 import { ref, watch, computed } from 'vue'
 import { vehiclesApi, vehicleCategoriesApi, branchesApi } from '@/api'
 import { useValidation, rules, useToast, useReferenceData } from '@/composables'
+import { SearchableSelect } from '@/components/common'
 import { formatPlateInput } from '@/utils'
 import { isErrorResponse } from '@/utils/error'
 import type { Vehicle, VehicleCategory, Branch, UpdateVehicleForm } from '@/types'
@@ -89,6 +90,12 @@ const transmissionOptions = [
   { value: Transmission.MANUAL, label: 'Manuel' },
   { value: Transmission.AUTOMATIC, label: 'Otomatik' }
 ]
+
+const brandOptions = computed(() => brands.value.map(b => ({ value: b.id as number, label: b.name })))
+const modelOptions = computed(() => models.value.map(m => ({ value: m.id as number, label: m.name })))
+const colorOptions = computed(() => colors.value.map(c => ({ value: c.id as number, label: c.name })))
+const categoryOptions = computed(() => categories.value.map(c => ({ value: c.id as number, label: c.name })))
+const branchOptions = computed(() => branches.value.map(b => ({ value: b.id as number, label: b.name })))
 
 watch(selectedBrandId, async (brandId) => {
   if (!brandId) {
@@ -328,23 +335,31 @@ watch(() => props.visible, (isVisible) => {
 
               <div class="form-group" :class="{ error: hasError('brand') }">
                 <label>Marka <span class="required">*</span></label>
-                <select v-model="selectedBrandId" @blur="handleBlur('brand')">
-                  <option :value="null">Marka seçin</option>
-                  <option v-for="b in brands" :key="b.id" :value="b.id">{{ b.name }}</option>
-                </select>
+                <SearchableSelect
+                  v-model="selectedBrandId"
+                  :options="brandOptions"
+                  placeholder="Marka seçin"
+                  search-placeholder="Marka ara..."
+                  clearable
+                  :error="hasError('brand')"
+                  @blur="handleBlur('brand')"
+                />
                 <span class="error-text">{{ getError('brand') }}</span>
               </div>
 
               <div class="form-group" :class="{ error: hasError('model') }">
                 <label>Model <span class="required">*</span></label>
-                <select
+                <SearchableSelect
                   v-model="selectedModelId"
+                  :options="modelOptions"
+                  :placeholder="selectedBrandId ? (modelsLoading ? 'Yükleniyor...' : 'Model seçin') : 'Önce marka seçin'"
+                  search-placeholder="Model ara..."
+                  clearable
                   :disabled="!selectedBrandId || modelsLoading"
+                  :loading="modelsLoading"
+                  :error="hasError('model')"
                   @blur="handleBlur('model')"
-                >
-                  <option :value="null">{{ selectedBrandId ? (modelsLoading ? 'Yükleniyor...' : 'Model seçin') : 'Önce marka seçin' }}</option>
-                  <option v-for="m in models" :key="m.id" :value="m.id">{{ m.name }}</option>
-                </select>
+                />
                 <span class="error-text">{{ getError('model') }}</span>
               </div>
 
@@ -362,10 +377,15 @@ watch(() => props.visible, (isVisible) => {
 
               <div class="form-group" :class="{ error: hasError('color') }">
                 <label>Renk <span class="required">*</span></label>
-                <select v-model="selectedColorId" @blur="handleBlur('color')">
-                  <option :value="null">Renk seçin</option>
-                  <option v-for="c in colors" :key="c.id" :value="c.id">{{ c.name }}</option>
-                </select>
+                <SearchableSelect
+                  v-model="selectedColorId"
+                  :options="colorOptions"
+                  placeholder="Renk seçin"
+                  search-placeholder="Renk ara..."
+                  clearable
+                  :error="hasError('color')"
+                  @blur="handleBlur('color')"
+                />
                 <span class="error-text">{{ getError('color') }}</span>
               </div>
             </div>
@@ -376,20 +396,22 @@ watch(() => props.visible, (isVisible) => {
             <div class="form-grid">
               <div class="form-group">
                 <label>Yakıt Tipi</label>
-                <select v-model="form.fuelType">
-                  <option v-for="opt in fuelTypeOptions" :key="opt.value" :value="opt.value">
-                    {{ opt.label }}
-                  </option>
-                </select>
+                <SearchableSelect
+                  v-model="form.fuelType"
+                  :options="fuelTypeOptions"
+                  placeholder="Yakıt tipi seçin"
+                  search-placeholder="Ara..."
+                />
               </div>
 
               <div class="form-group">
                 <label>Vites</label>
-                <select v-model="form.transmission">
-                  <option v-for="opt in transmissionOptions" :key="opt.value" :value="opt.value">
-                    {{ opt.label }}
-                  </option>
-                </select>
+                <SearchableSelect
+                  v-model="form.transmission"
+                  :options="transmissionOptions"
+                  placeholder="Vites seçin"
+                  search-placeholder="Ara..."
+                />
               </div>
 
               <div class="form-group">
@@ -404,23 +426,29 @@ watch(() => props.visible, (isVisible) => {
 
               <div class="form-group" :class="{ error: hasError('categoryId') }">
                 <label>Kategori <span class="required">*</span></label>
-                <select v-model.number="form.categoryId" @blur="handleBlur('categoryId')">
-                  <option :value="0" disabled>Kategori seçiniz</option>
-                  <option v-for="cat in categories" :key="cat.id" :value="cat.id">
-                    {{ cat.name }}
-                  </option>
-                </select>
+                <SearchableSelect
+                  :model-value="form.categoryId || null"
+                  :options="categoryOptions"
+                  placeholder="Kategori seçiniz"
+                  search-placeholder="Kategori ara..."
+                  :error="hasError('categoryId')"
+                  @update:model-value="(v) => form.categoryId = v ?? 0"
+                  @blur="handleBlur('categoryId')"
+                />
                 <span class="error-text">{{ getError('categoryId') }}</span>
               </div>
 
               <div class="form-group" :class="{ error: hasError('branchId') }">
                 <label>Şube <span class="required">*</span></label>
-                <select v-model.number="form.branchId" @blur="handleBlur('branchId')">
-                  <option :value="0" disabled>Şube seçiniz</option>
-                  <option v-for="branch in branches" :key="branch.id" :value="branch.id">
-                    {{ branch.name }}
-                  </option>
-                </select>
+                <SearchableSelect
+                  :model-value="form.branchId || null"
+                  :options="branchOptions"
+                  placeholder="Şube seçiniz"
+                  search-placeholder="Şube ara..."
+                  :error="hasError('branchId')"
+                  @update:model-value="(v) => form.branchId = v ?? 0"
+                  @blur="handleBlur('branchId')"
+                />
                 <span class="error-text">{{ getError('branchId') }}</span>
               </div>
             </div>

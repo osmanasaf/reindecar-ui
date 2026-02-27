@@ -40,11 +40,12 @@
           <div class="form-row">
             <div class="form-group">
               <label>Para Birimi</label>
-              <select v-model="form.costCurrency">
-                <option value="TRY">TRY (₺)</option>
-                <option value="USD">USD ($)</option>
-                <option value="EUR">EUR (€)</option>
-              </select>
+              <SearchableSelect
+                v-model="form.costCurrency"
+                :options="currencyOptions"
+                placeholder="Para birimi seçin"
+                search-placeholder="Ara..."
+              />
             </div>
 
             <div class="form-group">
@@ -68,12 +69,14 @@
 
           <div class="form-group">
             <label>Servis Sağlayıcı {{ type === 'maintenance' ? '*' : '' }}</label>
-            <select v-model="form.serviceProviderId" :class="{ error: errors.serviceProviderId }">
-              <option :value="null">Seçilmedi</option>
-              <option v-for="provider in serviceProviders" :key="provider.id" :value="provider.id">
-                {{ provider.name }}
-              </option>
-            </select>
+            <SearchableSelect
+              v-model="form.serviceProviderId"
+              :options="serviceProviderOptions"
+              placeholder="Seçilmedi"
+              search-placeholder="Sağlayıcı ara..."
+              clearable
+              :error="!!errors.serviceProviderId"
+            />
             <span v-if="errors.serviceProviderId" class="error-message">
               {{ errors.serviceProviderId }}
             </span>
@@ -163,6 +166,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { SearchableSelect } from '@/components/common'
 import type { CompleteMaintenanceForm, MarkDamageRepairedForm } from '@/types'
 
 interface Props {
@@ -183,6 +187,16 @@ const router = useRouter()
 
 const processing = ref(false)
 const errors = ref<Record<string, string>>({})
+
+const currencyOptions = [
+  { value: 'TRY', label: 'TRY (₺)' },
+  { value: 'USD', label: 'USD ($)' },
+  { value: 'EUR', label: 'EUR (€)' }
+]
+
+const serviceProviderOptions = computed(() =>
+  props.serviceProviders.map(p => ({ value: p.id, label: p.name }))
+)
 
 const form = ref({
   completionDate: new Date().toISOString().split('T')[0],

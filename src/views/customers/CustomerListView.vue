@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import { customersApi } from '@/api'
 import { usePagination, useToast } from '@/composables'
+import { SearchableSelect } from '@/components/common'
 import { formatPhoneInput } from '@/utils/phone'
 import type { Customer, CustomerType } from '@/types'
 
@@ -92,11 +93,15 @@ onMounted(fetchCustomers)
           placeholder="İsim, telefon veya e-posta ara..."
         />
       </div>
-      <select v-model="typeFilter" class="filter-select">
-        <option v-for="opt in typeOptions" :key="opt.value" :value="opt.value">
-          {{ opt.label }}
-        </option>
-      </select>
+      <SearchableSelect
+        :model-value="typeFilter || null"
+        :options="typeOptions"
+        placeholder="Tüm Tipler"
+        search-placeholder="Tip ara..."
+        clearable
+        class="filter-searchable"
+        @update:model-value="(v) => typeFilter = v ?? ''"
+      />
     </div>
 
     <div v-if="loading" class="loading">Yükleniyor...</div>

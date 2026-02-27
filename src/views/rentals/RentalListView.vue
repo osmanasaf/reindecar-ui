@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import { rentalsApi, vehiclesApi, customersApi } from '@/api'
 import { usePagination, useToast } from '@/composables'
+import { SearchableSelect } from '@/components/common'
 import type { Rental, RentalStatus, RentalType, Vehicle, Customer } from '@/types'
 
 const rentals = ref<Rental[]>([])
@@ -153,16 +154,24 @@ onMounted(fetchRentals)
     </header>
 
     <div class="filters">
-      <select v-model="statusFilter" class="filter-select" @change="fetchRentals">
-        <option v-for="opt in statusOptions" :key="opt.value" :value="opt.value">
-          {{ opt.label }}
-        </option>
-      </select>
-      <select v-model="typeFilter" class="filter-select">
-        <option v-for="opt in typeOptions" :key="opt.value" :value="opt.value">
-          {{ opt.label }}
-        </option>
-      </select>
+      <SearchableSelect
+        :model-value="statusFilter || null"
+        :options="statusOptions"
+        placeholder="Tüm Durumlar"
+        search-placeholder="Durum ara..."
+        clearable
+        class="filter-searchable"
+        @update:model-value="(v) => { statusFilter = v ?? ''; fetchRentals() }"
+      />
+      <SearchableSelect
+        :model-value="typeFilter || null"
+        :options="typeOptions"
+        placeholder="Tüm Tipler"
+        search-placeholder="Tip ara..."
+        clearable
+        class="filter-searchable"
+        @update:model-value="(v) => typeFilter = v ?? ''"
+      />
     </div>
 
     <div v-if="loading" class="loading">Yükleniyor...</div>

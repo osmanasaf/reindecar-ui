@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { customersApi } from '@/api'
 import { useValidation, rules, useToast } from '@/composables'
+import { SearchableSelect } from '@/components/common'
 import { formatPhoneInput } from '@/utils/phone'
 import type { Customer, CreatePersonalCustomerForm } from '@/types'
 
@@ -53,7 +54,7 @@ const formRules = computed(() => ({
   }
 }))
 
-const licenseClassOptions = ['A1', 'A2', 'A', 'B1', 'B', 'BE', 'C1', 'C1E', 'C', 'CE', 'D1', 'D1E', 'D', 'DE']
+const licenseClassOptions = ['A1', 'A2', 'A', 'B1', 'B', 'BE', 'C1', 'C1E', 'C', 'CE', 'D1', 'D1E', 'D', 'DE'].map(cls => ({ value: cls, label: cls }))
 
 async function handleSubmit() {
   if (!validateForm(formRules.value)) {
@@ -208,11 +209,14 @@ watch(() => props.visible, (isVisible) => {
 
             <div class="form-group" :class="{ error: hasError('licenseClass') }">
               <label>Ehliyet Sınıfı <span class="required">*</span></label>
-              <select v-model="form.licenseClass" @blur="handleBlur('licenseClass')">
-                <option v-for="cls in licenseClassOptions" :key="cls" :value="cls">
-                  {{ cls }}
-                </option>
-              </select>
+              <SearchableSelect
+                v-model="form.licenseClass"
+                :options="licenseClassOptions"
+                placeholder="Sınıf seçin"
+                search-placeholder="Ara..."
+                :error="hasError('licenseClass')"
+                @blur="handleBlur('licenseClass')"
+              />
               <span class="error-text">{{ getError('licenseClass') }}</span>
             </div>
 

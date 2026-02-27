@@ -2,6 +2,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { damagesApi, rentalsApi, customersApi } from '@/api'
 import { useToast } from '@/composables'
+import { SearchableSelect } from '@/components/common'
 import { DamageType, DamageLocation, DamageSeverity } from '@/types'
 import type { CreateDamageReportForm, Customer, Rental } from '@/types'
 
@@ -83,6 +84,19 @@ const severities = [
   { value: DamageSeverity.MAJOR, label: 'Büyük', color: '#F44336' },
   { value: DamageSeverity.CRITICAL, label: 'Kritik', color: '#B71C1C' }
 ]
+
+const currencyOptions = [
+  { value: 'TRY', label: 'TRY (₺)' },
+  { value: 'USD', label: 'USD ($)' },
+  { value: 'EUR', label: 'EUR (€)' }
+]
+
+const rentalOptions = computed(() =>
+  vehicleRentals.value.map(r => ({
+    value: r.id as number,
+    label: `${r.rentalNumber} - ${r.customerName || 'Müşteri'} [${r.status}]`
+  }))
+)
 
 const selectedRentalDisplay = computed(() => {
   if (!form.value.rentalId) return ''
@@ -179,27 +193,21 @@ onMounted(async () => {
         <div class="form-grid">
 
           <div class="form-group full-width">
-            <label for="rental">Kiralama</label>
-            <select
+            <label>Kiralama</label>
+            <SearchableSelect
               v-if="!isRentalLocked"
-              id="rental"
-              v-model="form.rentalId"
-              class="form-select"
-            >
-              <option :value="undefined">Kiralama seçin (opsiyonel)</option>
-              <option
-                v-for="r in vehicleRentals"
-                :key="r.id"
-                :value="r.id"
-              >
-                {{ r.rentalNumber }} - {{ r.customerName || 'Müşteri' }} [{{ r.status }}]
-              </option>
-            </select>
+              :model-value="form.rentalId ?? null"
+              :options="rentalOptions"
+              placeholder="Kiralama seçin (opsiyonel)"
+              search-placeholder="Kiralama ara..."
+              clearable
+              :loading="loadingRentals"
+              @update:model-value="(v) => form.rentalId = v ?? undefined"
+            />
             <div v-else class="locked-field">
               {{ selectedRentalDisplay || `Kiralama #${form.rentalId}` }}
             </div>
-            <div v-if="loadingRentals" class="field-hint">Kiralamalar yükleniyor...</div>
-            <div v-else-if="!isRentalLocked && vehicleRentals.length === 0" class="field-hint">
+            <div v-if="!isRentalLocked && !loadingRentals && vehicleRentals.length === 0" class="field-hint">
               Bu araca ait aktif kiralama bulunamadı
             </div>
           </div>
@@ -213,21 +221,23 @@ onMounted(async () => {
           </div>
 
           <div class="form-group">
-            <label for="damageType">Hasar Tipi *</label>
-            <select id="damageType" v-model="form.damageType" required>
-              <option v-for="type in damageTypes" :key="type.value" :value="type.value">
-                {{ type.label }}
-              </option>
-            </select>
+            <label>Hasar Tipi *</label>
+            <SearchableSelect
+              v-model="form.damageType"
+              :options="damageTypes"
+              placeholder="Hasar tipi seçin"
+              search-placeholder="Ara..."
+            />
           </div>
 
           <div class="form-group">
-            <label for="location">Lokasyon *</label>
-            <select id="location" v-model="form.location" required>
-              <option v-for="loc in locations" :key="loc.value" :value="loc.value">
-                {{ loc.label }}
-              </option>
-            </select>
+            <label>Lokasyon *</label>
+            <SearchableSelect
+              v-model="form.location"
+              :options="locations"
+              placeholder="Lokasyon seçin"
+              search-placeholder="Lokasyon ara..."
+            />
           </div>
 
           <div class="form-group full-width">
@@ -284,12 +294,13 @@ onMounted(async () => {
           </div>
 
           <div class="form-group">
-            <label for="currency">Para Birimi</label>
-            <select id="currency" v-model="form.estimatedCostCurrency">
-              <option value="TRY">TRY</option>
-              <option value="USD">USD</option>
-              <option value="EUR">EUR</option>
-            </select>
+            <label>Para Birimi</label>
+            <SearchableSelect
+              v-model="form.estimatedCostCurrency"
+              :options="currencyOptions"
+              placeholder="Para birimi seçin"
+              search-placeholder="Ara..."
+            />
           </div>
 
           <div v-if="form.rentalId" class="form-group full-width">

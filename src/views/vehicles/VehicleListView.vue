@@ -1,8 +1,9 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import { vehiclesApi } from '@/api'
 import { usePagination, useToast } from '@/composables'
+import { SearchableSelect } from '@/components/common'
 import { VehicleStatus } from '@/types'
 import type { Vehicle } from '@/types'
 
@@ -106,11 +107,15 @@ onMounted(fetchVehicles)
           placeholder="Plaka, marka veya model ara..."
         />
       </div>
-      <select v-model="statusFilter" class="filter-select">
-        <option v-for="opt in statusOptions" :key="opt.value" :value="opt.value">
-          {{ opt.label }}
-        </option>
-      </select>
+      <SearchableSelect
+        :model-value="statusFilter || null"
+        :options="statusOptions"
+        placeholder="Tüm Durumlar"
+        search-placeholder="Durum ara..."
+        clearable
+        class="filter-searchable"
+        @update:model-value="(v) => statusFilter = v ?? ''"
+      />
     </div>
 
     <div v-if="loading" class="loading">

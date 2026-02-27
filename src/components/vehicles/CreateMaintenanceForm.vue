@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { maintenancesApi, serviceProvidersApi } from '@/api'
 import { useToast } from '@/composables'
+import { SearchableSelect } from '@/components/common'
 import { MaintenanceType } from '@/types'
 import type { CreateMaintenanceRecordForm, ServiceProvider } from '@/types'
 
@@ -49,6 +50,16 @@ const maintenanceTypes = [
   { value: MaintenanceType.BODY_WORK, label: 'Kaporta İşi' },
   { value: MaintenanceType.OTHER, label: 'Diğer' }
 ]
+
+const currencyOptions = [
+  { value: 'TRY', label: 'TRY (₺)' },
+  { value: 'USD', label: 'USD ($)' },
+  { value: 'EUR', label: 'EUR (€)' }
+]
+
+const serviceProviderOptions = computed(() =>
+  serviceProviders.value.map(p => ({ value: p.id as number, label: p.name }))
+)
 
 const zones = [
   { id: 1, name: 'Sağ Ön Köşe' },
@@ -130,12 +141,13 @@ onMounted(() => {
       <form @submit.prevent="handleSubmit" class="maintenance-form">
         <div class="form-grid">
           <div class="form-group">
-            <label for="maintenanceType">Bakım Tipi *</label>
-            <select id="maintenanceType" v-model="form.maintenanceType" required>
-              <option v-for="type in maintenanceTypes" :key="type.value" :value="type.value">
-                {{ type.label }}
-              </option>
-            </select>
+            <label>Bakım Tipi *</label>
+            <SearchableSelect
+              v-model="form.maintenanceType"
+              :options="maintenanceTypes"
+              placeholder="Bakım tipi seçin"
+              search-placeholder="Ara..."
+            />
           </div>
 
           <div class="form-group">
@@ -161,20 +173,16 @@ onMounted(() => {
           </div>
 
           <div class="form-group">
-            <label for="serviceProvider">Servis Sağlayıcı</label>
-            <select
-              id="serviceProvider"
-              v-model="form.serviceProviderId"
-            >
-              <option :value="undefined">Seçiniz...</option>
-              <option
-                v-for="provider in serviceProviders"
-                :key="provider.id"
-                :value="provider.id"
-              >
-                {{ provider.name }}
-              </option>
-            </select>
+            <label>Servis Sağlayıcı</label>
+            <SearchableSelect
+              :model-value="form.serviceProviderId ?? null"
+              :options="serviceProviderOptions"
+              placeholder="Seçiniz..."
+              search-placeholder="Sağlayıcı ara..."
+              clearable
+              :loading="loadingProviders"
+              @update:model-value="(v) => form.serviceProviderId = v ?? undefined"
+            />
           </div>
 
           <div class="form-group">
@@ -190,12 +198,13 @@ onMounted(() => {
           </div>
 
           <div class="form-group">
-            <label for="currency">Para Birimi</label>
-            <select id="currency" v-model="form.costCurrency">
-              <option value="TRY">TRY</option>
-              <option value="USD">USD</option>
-              <option value="EUR">EUR</option>
-            </select>
+            <label>Para Birimi</label>
+            <SearchableSelect
+              v-model="form.costCurrency"
+              :options="currencyOptions"
+              placeholder="Para birimi seçin"
+              search-placeholder="Ara..."
+            />
           </div>
 
           <div v-if="form.maintenanceType === 'PAINT'" class="form-group full-width">

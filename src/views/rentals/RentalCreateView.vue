@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { rentalsApi, branchesApi, kmPackagesApi, rentalExtraItemApi } from '@/api'
 import { useToast, useValidation } from '@/composables'
+import { SearchableSelect } from '@/components/common'
 import { formatCurrency } from '@/utils/format'
 import { RentalType, CustomerType } from '@/types'
 import type { Customer, CreateRentalForm, RentalExtraItem, Branch, KmPackage, Vehicle } from '@/types'
@@ -46,6 +47,8 @@ const priceData = ref<PriceCalculationResponse | null>(null)
 const showQuickCustomerModal = ref(false)
 const selectedBranchId = ref<number | null>(null)
 const selectedReturnBranchId = ref<number | null>(null)
+
+const branchOptions = computed(() => branches.value.map(b => ({ value: b.id as number, label: b.name })))
 
 const { getError, hasError, touch } = useValidation()
 
@@ -579,23 +582,25 @@ onMounted(() => {
               <div class="summary-row">
                 <span>Teslim Şubesi</span>
                 <div class="branch-selector-inline">
-                  <select v-model.number="selectedBranchId" class="branch-select">
-                    <option :value="null" disabled>Şube seçiniz</option>
-                    <option v-for="branch in branches" :key="branch.id" :value="branch.id">
-                      {{ branch.name }}
-                    </option>
-                  </select>
+                  <SearchableSelect
+                    v-model="selectedBranchId"
+                    :options="branchOptions"
+                    placeholder="Şube seçiniz"
+                    search-placeholder="Şube ara..."
+                    class="branch-select-searchable"
+                  />
                 </div>
               </div>
               <div class="summary-row">
                 <span>İade Şubesi</span>
                 <div class="branch-selector-inline">
-                  <select v-model.number="selectedReturnBranchId" class="branch-select">
-                    <option :value="null" disabled>Şube seçiniz</option>
-                    <option v-for="branch in branches" :key="branch.id" :value="branch.id">
-                      {{ branch.name }}
-                    </option>
-                  </select>
+                  <SearchableSelect
+                    v-model="selectedReturnBranchId"
+                    :options="branchOptions"
+                    placeholder="Şube seçiniz"
+                    search-placeholder="Şube ara..."
+                    class="branch-select-searchable"
+                  />
                 </div>
               </div>
               <div v-if="extraItems.length > 0" class="summary-row">

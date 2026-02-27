@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import type { CreatePayableRequest, PayableType, ServiceProviderResponse } from '@/types'
 import { useForm, useToast } from '@/composables'
+import { SearchableSelect } from '@/components/common'
 import { useAccountingStore } from '@/stores'
 import { onMounted } from 'vue'
 
@@ -32,6 +33,10 @@ const payableTypes: { value: PayableType; label: string }[] = [
 ]
 
 const providers = ref<ServiceProviderResponse[]>([])
+
+const providerOptions = computed(() =>
+  providers.value.map(p => ({ value: p.id as number, label: `${p.name} (${p.code})` }))
+)
 
 const initialValues: CreatePayableRequest = {
   type: 'MAINTENANCE_COST',
@@ -109,17 +114,14 @@ const handleClose = () => {
             <label class="form-label">
               Verecek Türü <span class="required">*</span>
             </label>
-            <select
+            <SearchableSelect
               v-model="values.type"
-              class="form-input"
-              :class="{ 'error': touched.type && errors.type }"
+              :options="payableTypes"
+              placeholder="Seçiniz"
+              search-placeholder="Ara..."
+              :error="!!(touched.type && errors.type)"
               @blur="validateField('type')"
-            >
-              <option value="">Seçiniz</option>
-              <option v-for="type in payableTypes" :key="type.value" :value="type.value">
-                {{ type.label }}
-              </option>
-            </select>
+            />
             <span v-if="touched.type && errors.type" class="error-text">
               {{ errors.type }}
             </span>
@@ -129,17 +131,15 @@ const handleClose = () => {
             <label class="form-label">
               Servis Sağlayıcı <span class="required">*</span>
             </label>
-            <select
-              v-model.number="values.serviceProviderId"
-              class="form-input"
-              :class="{ 'error': touched.serviceProviderId && errors.serviceProviderId }"
+            <SearchableSelect
+              :model-value="values.serviceProviderId || null"
+              :options="providerOptions"
+              placeholder="Seçiniz"
+              search-placeholder="Sağlayıcı ara..."
+              :error="!!(touched.serviceProviderId && errors.serviceProviderId)"
+              @update:model-value="(v) => values.serviceProviderId = v ?? 0"
               @blur="validateField('serviceProviderId')"
-            >
-              <option :value="0">Seçiniz</option>
-              <option v-for="provider in providers" :key="provider.id" :value="provider.id">
-                {{ provider.name }} ({{ provider.code }})
-              </option>
-            </select>
+            />
             <span v-if="touched.serviceProviderId && errors.serviceProviderId" class="error-text">
               {{ errors.serviceProviderId }}
             </span>

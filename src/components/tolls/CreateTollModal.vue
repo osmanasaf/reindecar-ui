@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { tollsApi } from '@/api'
 import { useToast } from '@/composables'
+import { SearchableSelect } from '@/components/common'
 import { TollType } from '@/types'
 import type { CreateTollRecordRequest } from '@/api'
 
@@ -77,12 +78,13 @@ async function handleSubmit() {
       <form @submit.prevent="handleSubmit" class="toll-form">
         <div class="form-grid">
           <div class="form-group">
-            <label for="tollType">Geçiş Tipi *</label>
-            <select id="tollType" v-model="form.tollType" required>
-              <option v-for="t in tollTypes" :key="t.value" :value="t.value">
-                {{ t.label }}
-              </option>
-            </select>
+            <label>Geçiş Tipi *</label>
+            <SearchableSelect
+              v-model="form.tollType"
+              :options="tollTypes"
+              placeholder="Geçiş tipi seçin"
+              search-placeholder="Ara..."
+            />
           </div>
 
           <div class="form-group">
