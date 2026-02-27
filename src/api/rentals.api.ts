@@ -23,12 +23,12 @@ class RentalsApiService extends BaseApi {
         return this.getList<Rental>('', params)
     }
 
-    async getActive(): Promise<Rental[]> {
-        return this.get('/active')
+    async getActive(params?: PaginationParams): Promise<PaginatedResponse<Rental>> {
+        return this.getList<Rental>('/active', params)
     }
 
-    async getOverdue(): Promise<Rental[]> {
-        return this.get('/overdue')
+    async getOverdue(params?: PaginationParams): Promise<PaginatedResponse<Rental>> {
+        return this.getList<Rental>('/overdue', params)
     }
 
     async getById(id: number): Promise<Rental> {

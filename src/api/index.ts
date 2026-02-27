@@ -30,7 +30,7 @@ export type {
     KmPackageInfo
 } from './pricing.api'
 export { dashboardApi } from './dashboard.api'
-export type { DashboardStats, RevenueData, VehicleStatusData, UpcomingReturn, DashboardResponse } from './dashboard.api'
+export type { DashboardStats, RevenueData, VehicleStatusData, UpcomingReturn, DashboardResponse, AccountingStats } from './dashboard.api'
 export { usersApi } from './users.api'
 export type { UpdateProfileRequest, ChangePasswordRequest, UserSettings, UserResponse } from './users.api'
 export {

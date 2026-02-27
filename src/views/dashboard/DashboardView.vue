@@ -1,659 +1,1266 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { LineChart, DoughnutChart } from '@/components/charts'
-import DateRangePicker from '@/components/base/DateRangePicker.vue'
+import { LineChart } from '@/components/charts'
 import ReturnCompleteModal from '@/components/rentals/ReturnCompleteModal.vue'
 import { useDashboardStats, useToast } from '@/composables'
-import type { Rental } from '@/types'
 import type { UpcomingReturn } from '@/api'
+import type { Rental } from '@/types'
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const REVENUE_PERIOD_OPTIONS = [
+    { label: '6 Ay', months: 6 },
+    { label: '12 Ay', months: 12 },
+] as const
+type RevenuePeriodMonths = typeof REVENUE_PERIOD_OPTIONS[number]['months']
+
+const VEHICLE_STATUS_CONFIG = [
+    { key: 'available',   label: 'Müsait',   color: '#10b981', bg: 'rgba(16,185,129,0.1)' },
+    { key: 'rented',      label: 'Kirada',   color: '#3b82f6', bg: 'rgba(59,130,246,0.1)' },
+    { key: 'reserved',    label: 'Rezerve',  color: '#8b5cf6', bg: 'rgba(139,92,246,0.1)' },
+    { key: 'maintenance', label: 'Bakımda',  color: '#f59e0b', bg: 'rgba(245,158,11,0.1)' },
+    { key: 'damaged',     label: 'Hasarlı',  color: '#ef4444', bg: 'rgba(239,68,68,0.1)'  },
+] as const
+
+const VEHICLE_TABLE_TABS = ['Kirada', 'Bakım & Hasar'] as const
+type VehicleTab = typeof VEHICLE_TABLE_TABS[number]
+
+// ─── Composables ──────────────────────────────────────────────────────────────
 
 const router = useRouter()
 const toast = useToast()
-
-const { 
-  stats, 
-  revenue, 
-  vehicleStatus, 
-  upcomingReturns, 
-  loading, 
-  fetchAll 
+const {
+    stats,
+    revenue,
+    vehicleStatus,
+    upcomingReturns,
+    accounting,
+    activeRentals,
+    loading,
+    fetchAll,
+    fetchRevenue,
 } = useDashboardStats()
 
-const dateRange = ref({ start: '', end: '' })
+// ─── State ────────────────────────────────────────────────────────────────────
+
+const revenuePeriod  = ref<RevenuePeriodMonths>(6)
+const vehicleTab     = ref<VehicleTab>('Kirada')
 const showReturnModal = ref(false)
 const selectedRentalId = ref<number | null>(null)
 
-function safeNumber(value: unknown, defaultValue = 0): number {
-  if (value === null || value === undefined) return defaultValue
-  const num = Number(value)
-  return isNaN(num) ? defaultValue : num
-}
+// ─── Utilities ────────────────────────────────────────────────────────────────
 
-const statsCards = computed(() => {
-  if (!stats.value) return []
-  
-  const activeRentals = safeNumber(stats.value.activeRentals)
-  const overdueRentals = safeNumber(stats.value.overdueRentals)
-  const availableVehicles = safeNumber(stats.value.availableVehicles)
-  const totalVehicles = safeNumber(stats.value.totalVehicles)
-  const todayReturns = safeNumber(stats.value.todayReturns)
-  const tomorrowReturns = safeNumber(stats.value.tomorrowReturns)
-  const pendingPayments = safeNumber(stats.value.pendingPayments)
-  const pendingPaymentAmount = safeNumber(stats.value.pendingPaymentAmount)
-  
-  return [
-    { 
-      id: 'active', 
-      label: 'Aktif Kiralama', 
-      value: activeRentals.toString(), 
-      icon: '🔑', 
-      color: 'primary',
-      trend: overdueRentals > 0 ? `${overdueRentals} gecikmiş` : 'Zamanında'
-    },
-    { 
-      id: 'available', 
-      label: 'Müsait Araç', 
-      value: availableVehicles.toString(), 
-      icon: '🚗', 
-      color: 'success',
-      trend: `${totalVehicles} toplam`
-    },
-    { 
-      id: 'returns', 
-      label: 'Yaklaşan İade', 
-      value: (todayReturns + tomorrowReturns).toString(), 
-      icon: '📅', 
-      color: 'warning',
-      trend: `${todayReturns} bugün`
-    },
-    { 
-      id: 'payments', 
-      label: 'Bekleyen Ödeme', 
-      value: pendingPayments.toString(), 
-      icon: '💳', 
-      color: 'info',
-      trend: formatCurrency(pendingPaymentAmount)
-    }
-  ]
-})
-
-const revenueChartData = computed(() => {
-  if (!revenue.value) {
-    return {
-      labels: [],
-      datasets: [{
-        label: 'Aylık Ciro (₺)',
-        backgroundColor: '#3b82f6',
-        borderColor: '#3b82f6',
-        data: [],
-        tension: 0.4
-      }]
-    }
-  }
-
-  return {
-    labels: revenue.value.labels,
-    datasets: [{
-      label: 'Aylık Ciro (₺)',
-      backgroundColor: '#3b82f6',
-      borderColor: '#3b82f6',
-      data: revenue.value.values,
-      tension: 0.4
-    }]
-  }
-})
-
-const revenueOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: { display: false }
-  },
-  scales: {
-    y: { beginAtZero: true, grid: { color: '#e2e8f0' } },
-    x: { grid: { display: false } }
-  }
-}
-
-const vehicleStatusChartData = computed(() => {
-  if (!vehicleStatus.value) {
-    return {
-      labels: ['Müsait', 'Kirada', 'Bakımda', 'Rezerve'],
-      datasets: [{
-        backgroundColor: ['#10b981', '#3b82f6', '#ef4444', '#f59e0b'],
-        data: [0, 0, 0, 0]
-      }]
-    }
-  }
-
-  return {
-    labels: ['Müsait', 'Kirada', 'Bakımda', 'Rezerve'],
-    datasets: [{
-      backgroundColor: ['#10b981', '#3b82f6', '#ef4444', '#f59e0b'],
-      data: [
-        safeNumber(vehicleStatus.value.available),
-        safeNumber(vehicleStatus.value.rented),
-        safeNumber(vehicleStatus.value.maintenance),
-        safeNumber(vehicleStatus.value.reserved)
-      ]
-    }]
-  }
-})
-
-const vehicleStatusOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: { position: 'bottom' as const }
-  }
+function safeNum(v: unknown, fallback = 0): number {
+    const n = Number(v)
+    return Number.isFinite(n) ? n : fallback
 }
 
 function formatCurrency(amount: unknown): string {
-  const num = safeNumber(amount)
-  return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(num)
+    return new Intl.NumberFormat('tr-TR', {
+        style: 'currency',
+        currency: 'TRY',
+        maximumFractionDigits: 0,
+    }).format(safeNum(amount))
 }
 
-function formatReturnTime(item: UpcomingReturn): string {
-  if (item.daysUntilReturn === 0) return 'Bugün'
-  if (item.daysUntilReturn === 1) return 'Yarın'
-  if (item.daysUntilReturn < 0) return `${Math.abs(item.daysUntilReturn)} gün gecikti`
-
-  const [year, month, day] = item.endDate.split('-')
-  if (year && month && day) return `${day}.${month}`
-  return item.endDate
+function formatDate(dateStr: string): string {
+    const [year, month, day] = dateStr.split('-')
+    return year && month && day ? `${day}.${month}.${year}` : dateStr
 }
 
-function openReturnModal(rental: UpcomingReturn) {
-  selectedRentalId.value = rental.rentalId
-  showReturnModal.value = true
+function netPositionLabel(netPositive: boolean): string {
+    return netPositive ? 'Pozitif bakiye' : 'Negatif bakiye'
 }
 
-function handleReturnCompleted(rental: Rental) {
-  toast.success(`Kiralama #${rental.rentalNumber} tamamlandı`)
-  fetchAll()
+function formatReturnBadge(item: UpcomingReturn): { text: string; cls: string } {
+    if (item.daysUntilReturn < 0)  return { text: `${Math.abs(item.daysUntilReturn)} gün gecikti`, cls: 'badge-danger' }
+    if (item.daysUntilReturn === 0) return { text: 'Bugün',  cls: 'badge-warning' }
+    if (item.daysUntilReturn === 1) return { text: 'Yarın',  cls: 'badge-warning' }
+    return { text: `${item.daysUntilReturn} gün`, cls: 'badge-neutral' }
 }
 
-function handleDateRangeChange(range: { start: string; end: string }) {
-  dateRange.value = range
+// ─── Stat Cards ───────────────────────────────────────────────────────────────
+
+interface StatCard {
+    id: string
+    label: string
+    value: string
+    sub: string
+    icon: string
+    color: string
+    alert?: string
+    route?: string
 }
 
-function navigateTo(route: string) {
-  router.push(route)
-}
+const statCards = computed<StatCard[]>(() => {
+    if (!stats.value) return []
+    const s = stats.value
+    const a = accounting.value
 
-onMounted(() => {
-  fetchAll()
+    return [
+        {
+            id: 'active',
+            label: 'Aktif Kiralama',
+            value: String(safeNum(s.activeRentals)),
+            sub: `${safeNum(s.totalRentals)} toplam`,
+            icon: '🔑',
+            color: '#3b82f6',
+            alert: s.overdueRentals > 0 ? `${s.overdueRentals} gecikmiş` : undefined,
+            route: '/rentals',
+        },
+        {
+            id: 'vehicles',
+            label: 'Müsait Araç',
+            value: String(safeNum(s.availableVehicles)),
+            sub: `${safeNum(s.totalVehicles)} toplam araç`,
+            icon: '🚗',
+            color: '#10b981',
+            route: '/vehicles',
+        },
+        {
+            id: 'returns',
+            label: 'Bugün İade',
+            value: String(safeNum(s.todayReturns)),
+            sub: `${safeNum(s.tomorrowReturns)} yarın`,
+            icon: '📅',
+            color: '#f59e0b',
+        },
+        {
+            id: 'payments',
+            label: 'Bekleyen Ödeme',
+            value: String(safeNum(s.pendingPayments)),
+            sub: formatCurrency(s.pendingPaymentAmount),
+            icon: '💳',
+            color: '#8b5cf6',
+            route: '/accounting/receivables',
+        },
+        {
+            id: 'net',
+            label: 'Net Pozisyon',
+            value: a ? formatCurrency(a.netPosition) : '—',
+            sub: a ? netPositionLabel(a.netPositive) : '',
+            icon: '📊',
+            color: a?.netPositive ? '#10b981' : '#ef4444',
+        },
+    ]
 })
+
+// ─── Revenue Chart ────────────────────────────────────────────────────────────
+
+const revenueChartData = computed(() => ({
+    labels: revenue.value?.labels ?? [],
+    datasets: [{
+        label: 'Ciro (₺)',
+        backgroundColor: 'rgba(59,130,246,0.08)',
+        borderColor: '#3b82f6',
+        borderWidth: 2.5,
+        pointBackgroundColor: '#ffffff',
+        pointBorderColor: '#3b82f6',
+        pointBorderWidth: 2,
+        pointRadius: 5,
+        data: revenue.value?.values ?? [],
+        tension: 0.4,
+        fill: true,
+    }],
+}))
+
+const revenueChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false }, tooltip: { mode: 'index' as const, intersect: false } },
+    scales: {
+        y: {
+            beginAtZero: true,
+            grid: { color: 'rgba(0,0,0,0.04)' },
+            ticks: {
+                callback: (v: unknown) =>
+                    new Intl.NumberFormat('tr-TR', { notation: 'compact' }).format(Number(v)) + ' ₺',
+            },
+        },
+        x: { grid: { display: false } },
+    },
+}
+
+// ─── Vehicle Status ───────────────────────────────────────────────────────────
+
+const vehicleStatusCounts = computed(() => {
+    if (!vehicleStatus.value) return {}
+    return {
+        available:   safeNum(vehicleStatus.value.available),
+        rented:      safeNum(vehicleStatus.value.rented),
+        reserved:    safeNum(vehicleStatus.value.reserved),
+        maintenance: safeNum(vehicleStatus.value.maintenance),
+        damaged:     safeNum(vehicleStatus.value.damaged),
+    }
+})
+
+const totalVehiclesFromStatus = computed(() =>
+    Object.values(vehicleStatusCounts.value).reduce((a, b) => a + b, 0)
+)
+
+// ─── Active Rentals Table ─────────────────────────────────────────────────────
+
+const rentedVehicles = computed<Rental[]>(() =>
+    (activeRentals.value ?? []).filter(r => !r.isOverdue)
+)
+
+const overdueVehicles = computed<Rental[]>(() =>
+    (activeRentals.value ?? []).filter(r => r.isOverdue)
+)
+
+const maintenanceDamagedRentals = computed<Rental[]>(() => {
+    // Bu tab için gerçek bakım/hasar araçları vehicle status'tan gelir
+    // Aktif kiralama listesinde bu durum yoktur; placeholder olarak boş
+    return []
+})
+
+const vehicleTabCount = computed(() => ({
+    'Kirada': rentedVehicles.value.length + overdueVehicles.value.length,
+    'Bakım & Hasar': safeNum(vehicleStatusCounts.value.maintenance) + safeNum(vehicleStatusCounts.value.damaged),
+}))
+
+// ─── Upcoming Returns ─────────────────────────────────────────────────────────
+
+const sortedReturns = computed<UpcomingReturn[]>(() =>
+    [...(upcomingReturns.value ?? [])].sort((a, b) => a.daysUntilReturn - b.daysUntilReturn)
+)
+
+// ─── Accounting ───────────────────────────────────────────────────────────────
+
+const receivableCollectionRate = computed(() => {
+    if (!accounting.value) return 0
+    const { totalReceivable, paidReceivable } = accounting.value
+    if (totalReceivable === 0) return 100
+    return Math.round((paidReceivable / totalReceivable) * 100)
+})
+
+// ─── Actions ──────────────────────────────────────────────────────────────────
+
+function openReturnModal(rentalId: number): void {
+    selectedRentalId.value = rentalId
+    showReturnModal.value = true
+}
+
+function handleReturnCompleted(rental: Rental): void {
+    toast.success(`Kiralama #${rental.rentalNumber} tamamlandı`)
+    fetchAll(revenuePeriod.value)
+}
+
+function go(route?: string): void {
+    if (route) router.push(route)
+}
+
+// ─── Watchers & Lifecycle ─────────────────────────────────────────────────────
+
+watch(revenuePeriod, (months) => fetchRevenue(months))
+
+onMounted(() => fetchAll(revenuePeriod.value))
 </script>
 
 <template>
-  <div class="dashboard">
-    <div class="header">
-      <div>
-        <h1>Hoş Geldiniz</h1>
-        <p class="subtitle">Güncel istatistikler ve özet bilgiler</p>
-      </div>
-      <div class="actions">
-        <DateRangePicker
-          v-model="dateRange"
-          @change="handleDateRangeChange"
-        />
-        <button class="btn btn-primary" @click="navigateTo('/rentals/create')">
-          + Yeni Kiralama
-        </button>
-      </div>
-    </div>
+    <div class="dashboard">
 
-    <div class="stats-grid">
-      <template v-if="loading">
-        <div v-for="i in 4" :key="i" class="stat-card skeleton">
-          <div class="skeleton-content"></div>
-        </div>
-      </template>
-      <template v-else>
-        <div 
-          v-for="stat in statsCards" 
-          :key="stat.id" 
-          class="stat-card"
-          :class="stat.color"
-        >
-          <div class="stat-content">
-            <span class="stat-label">{{ stat.label }}</span>
-            <span class="stat-value">{{ stat.value }}</span>
-            <div class="stat-trend">
-              {{ stat.trend }}
+        <!-- ── Header ─────────────────────────────────────────────────────── -->
+        <header class="db-header">
+            <div>
+                <h1 class="db-title">Dashboard</h1>
+                <p class="db-sub">Operasyonel ve finansal özet</p>
             </div>
-          </div>
-          <div class="stat-icon-bg">
-            <span class="icon">{{ stat.icon }}</span>
-          </div>
-        </div>
-      </template>
-    </div>
+            <button class="btn-primary" @click="go('/rentals/create')">+ Yeni Kiralama</button>
+        </header>
 
-    <div class="dashboard-grid">
-      <div class="card chart-card revenue-chart">
-        <div class="card-header">
-          <h3>Gelir Analizi</h3>
-          <select class="chart-filter">
-            <option>Son 6 Ay</option>
-            <option>Bu Yıl</option>
-          </select>
-        </div>
-        <div class="chart-body">
-          <template v-if="loading">
-            <div class="loading-skeleton"></div>
-          </template>
-          <LineChart v-else :data="revenueChartData" :options="revenueOptions" />
-        </div>
-      </div>
-
-      <div class="card chart-card status-chart">
-        <div class="card-header">
-          <h3>Araç Durumu</h3>
-        </div>
-        <div class="chart-body donut-body">
-          <template v-if="loading">
-            <div class="loading-skeleton donut"></div>
-          </template>
-          <DoughnutChart v-else :data="vehicleStatusChartData" :options="vehicleStatusOptions" />
-        </div>
-      </div>
-
-      <div class="card table-card">
-        <div class="card-header">
-          <h3>Yaklaşan İadeler</h3>
-          <router-link to="/rentals?status=ACTIVE" class="view-all">Tümünü Gör</router-link>
-        </div>
-        <div class="table-body">
-          <template v-if="loading">
-            <div class="table-skeleton">
-              <div v-for="i in 3" :key="i" class="skeleton-row"></div>
-            </div>
-          </template>
-          <template v-else-if="upcomingReturns && upcomingReturns.length > 0">
-            <table class="simple-table">
-              <thead>
-                <tr>
-                  <th>Plaka</th>
-                  <th>Müşteri</th>
-                  <th>İade Zamanı</th>
-                  <th>Durum</th>
-                  <th>İşlem</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="item in upcomingReturns" :key="item.rentalId">
-                  <td class="font-medium">{{ item.plateNumber }}</td>
-                  <td>
-                    <div class="person-cell">
-                      <span>{{ item.customerName }}</span>
-                      <small v-if="item.customerPhone" class="person-sub">{{ item.customerPhone }}</small>
-                      <small v-if="item.primaryDriverName" class="person-sub">
-                        Sürücü: {{ item.primaryDriverName }}<span v-if="item.primaryDriverPhone"> ({{ item.primaryDriverPhone }})</span>
-                      </small>
+        <!-- ── Stat Cards ─────────────────────────────────────────────────── -->
+        <section class="stat-row">
+            <template v-if="loading">
+                <div v-for="i in 5" :key="i" class="stat-card skel" />
+            </template>
+            <template v-else>
+                <div
+                    v-for="card in statCards"
+                    :key="card.id"
+                    class="stat-card"
+                    :class="{ 'is-link': !!card.route }"
+                    :style="{ '--accent': card.color }"
+                    @click="go(card.route)"
+                >
+                    <div class="sc-left">
+                        <span class="sc-label">{{ card.label }}</span>
+                        <span class="sc-value">{{ card.value }}</span>
+                        <span class="sc-sub">{{ card.sub }}</span>
+                        <span v-if="card.alert" class="sc-alert">{{ card.alert }}</span>
                     </div>
-                  </td>
-                  <td>{{ formatReturnTime(item) }}</td>
-                  <td>
-                    <span :class="['status-dot', item.isOverdue ? 'danger' : 'success']"></span>
-                    {{ item.isOverdue ? 'Gecikmede' : 'Zamanında' }}
-                  </td>
-                  <td>
-                    <button class="btn-sm btn-outline" @click="openReturnModal(item)">
-                      İade Al
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </template>
-          <template v-else>
-            <div class="empty-state">
-              <p>Yaklaşan iade bulunmuyor</p>
-            </div>
-          </template>
-        </div>
-      </div>
-    </div>
+                    <div class="sc-icon">{{ card.icon }}</div>
+                </div>
+            </template>
+        </section>
 
-    <ReturnCompleteModal
-      :visible="showReturnModal"
-      :rental-id="selectedRentalId"
-      @close="showReturnModal = false"
-      @completed="handleReturnCompleted"
-    />
-  </div>
+        <!-- ── Charts Row ─────────────────────────────────────────────────── -->
+        <section class="charts-row">
+
+            <!-- Revenue -->
+            <div class="card revenue-card">
+                <div class="card-head">
+                    <h2 class="card-title">Gelir Analizi</h2>
+                    <div class="seg-ctrl">
+                        <button
+                            v-for="opt in REVENUE_PERIOD_OPTIONS"
+                            :key="opt.months"
+                            :class="['seg-btn', { active: revenuePeriod === opt.months }]"
+                            @click="revenuePeriod = opt.months"
+                        >{{ opt.label }}</button>
+                    </div>
+                </div>
+                <div class="chart-area">
+                    <div v-if="loading" class="skel-chart" />
+                    <LineChart v-else :data="revenueChartData" :options="revenueChartOptions" />
+                </div>
+                <div v-if="!loading && revenue" class="card-foot">
+                    <span>{{ revenuePeriod }} aylık toplam</span>
+                    <strong>{{ formatCurrency(revenue.total) }}</strong>
+                </div>
+            </div>
+
+            <!-- Vehicle Status -->
+            <div class="card status-card">
+                <div class="card-head">
+                    <h2 class="card-title">Araç Durumu</h2>
+                    <span class="badge-neutral">{{ totalVehiclesFromStatus }} araç</span>
+                </div>
+
+                <div v-if="loading" class="status-skel">
+                    <div v-for="i in 5" :key="i" class="skel-row" />
+                </div>
+                <div v-else class="status-list">
+                    <div
+                        v-for="cfg in VEHICLE_STATUS_CONFIG"
+                        :key="cfg.key"
+                        class="status-item"
+                    >
+                        <div class="si-left">
+                            <span class="si-dot" :style="{ background: cfg.color }" />
+                            <span class="si-label">{{ cfg.label }}</span>
+                        </div>
+                        <div class="si-right">
+                            <div
+                                class="si-bar-wrap"
+                                :title="`${vehicleStatusCounts[cfg.key as keyof typeof vehicleStatusCounts] ?? 0} araç`"
+                            >
+                                <div
+                                    class="si-bar"
+                                    :style="{
+                                        width: totalVehiclesFromStatus
+                                            ? `${((vehicleStatusCounts[cfg.key as keyof typeof vehicleStatusCounts] ?? 0) / totalVehiclesFromStatus) * 100}%`
+                                            : '0%',
+                                        background: cfg.color,
+                                    }"
+                                />
+                            </div>
+                            <span class="si-count" :style="{ color: cfg.color }">
+                                {{ vehicleStatusCounts[cfg.key as keyof typeof vehicleStatusCounts] ?? 0 }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- ── Vehicle Detail Table ───────────────────────────────────────── -->
+        <section class="card">
+            <div class="card-head">
+                <h2 class="card-title">Araç Detayı</h2>
+                <div class="tab-bar">
+                    <button
+                        v-for="tab in VEHICLE_TABLE_TABS"
+                        :key="tab"
+                        :class="['tab-btn', { active: vehicleTab === tab }]"
+                        @click="vehicleTab = tab"
+                    >
+                        {{ tab }}
+                        <span class="tab-count">{{ vehicleTabCount[tab] }}</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Kirada Tab -->
+            <template v-if="vehicleTab === 'Kirada'">
+                <div v-if="loading" class="tbl-skel">
+                    <div v-for="i in 4" :key="i" class="skel-row" />
+                </div>
+                <div v-else-if="activeRentals.length === 0" class="empty-state">
+                    Şu an kirada araç bulunmuyor.
+                </div>
+                <div v-else class="tbl-wrap">
+                    <table class="dtbl">
+                        <thead>
+                            <tr>
+                                <th>Plaka</th>
+                                <th>Araç</th>
+                                <th>Müşteri</th>
+                                <th>Başlangıç</th>
+                                <th>İade</th>
+                                <th>Durum</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr
+                                v-for="r in activeRentals"
+                                :key="r.id"
+                                :class="{ 'row-overdue': r.isOverdue }"
+                            >
+                                <td class="td-mono">{{ r.vehiclePlate ?? '—' }}</td>
+                                <td>{{ r.vehicleName ?? '—' }}</td>
+                                <td>
+                                    <div class="person-cell">
+                                        <span>{{ r.customerName ?? '—' }}</span>
+                                    </div>
+                                </td>
+                                <td class="td-date">{{ formatDate(r.startDate) }}</td>
+                                <td class="td-date">{{ formatDate(r.endDate) }}</td>
+                                <td>
+                                    <span v-if="r.isOverdue" class="badge-danger">
+                                        {{ r.overdueDays }}g gecikti
+                                    </span>
+                                    <span v-else class="badge-success">Aktif</span>
+                                </td>
+                                <td>
+                                    <button class="btn-sm" @click="openReturnModal(r.id)">İade Al</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </template>
+
+            <!-- Bakım & Hasar Tab -->
+            <template v-else>
+                <div class="bh-grid">
+                    <div class="bh-block">
+                        <div class="bh-head">
+                            <span class="bh-dot" style="background:#f59e0b" />
+                            <span>Bakımda</span>
+                            <strong>{{ vehicleStatusCounts.maintenance ?? 0 }}</strong>
+                        </div>
+                        <p class="bh-hint">
+                            Bakımdaki araçların detayı için
+                            <router-link to="/vehicles" class="link">Araçlar</router-link>
+                            sayfasını ziyaret edin.
+                        </p>
+                    </div>
+                    <div class="bh-divider" />
+                    <div class="bh-block">
+                        <div class="bh-head">
+                            <span class="bh-dot" style="background:#ef4444" />
+                            <span>Hasarlı</span>
+                            <strong>{{ vehicleStatusCounts.damaged ?? 0 }}</strong>
+                        </div>
+                        <p class="bh-hint">
+                            Hasarlı araçların detayı için
+                            <router-link to="/vehicles" class="link">Araçlar</router-link>
+                            sayfasını ziyaret edin.
+                        </p>
+                    </div>
+                </div>
+            </template>
+        </section>
+
+        <!-- ── Accounting Summary ─────────────────────────────────────────── -->
+        <section v-if="!loading && accounting" class="card">
+            <div class="card-head">
+                <h2 class="card-title">Muhasebe Özeti</h2>
+                <router-link to="/accounting/receivables" class="link">Detay →</router-link>
+            </div>
+            <div class="acc-grid">
+
+                <!-- Alacaklar -->
+                <div class="acc-block">
+                    <p class="acc-block-label" style="color:#10b981">Alacaklar</p>
+                    <div class="acc-big">{{ formatCurrency(accounting.totalReceivable) }}</div>
+                    <div class="acc-progress-wrap">
+                        <div
+                            class="acc-progress"
+                            :style="{ width: `${receivableCollectionRate}%`, background: '#10b981' }"
+                        />
+                    </div>
+                    <p class="acc-rate">%{{ receivableCollectionRate }} tahsil edildi</p>
+                    <div class="acc-rows">
+                        <div class="acc-row">
+                            <span>Tahsil Edilen</span>
+                            <strong class="text-success">{{ formatCurrency(accounting.paidReceivable) }}</strong>
+                        </div>
+                        <div class="acc-row">
+                            <span>Kalan</span>
+                            <strong>{{ formatCurrency(accounting.remainingReceivable) }}</strong>
+                        </div>
+                        <div v-if="accounting.overdueReceivableCount > 0" class="acc-row">
+                            <span>Vadesi Geçmiş</span>
+                            <strong class="text-danger">
+                                {{ formatCurrency(accounting.overdueReceivableAmount) }}
+                                <em>({{ accounting.overdueReceivableCount }})</em>
+                            </strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Net Pozisyon -->
+                <div class="acc-net">
+                    <p class="acc-net-label">Net Pozisyon</p>
+                    <div
+                        class="acc-net-value"
+                        :class="accounting.netPositive ? 'text-success' : 'text-danger'"
+                    >
+                        {{ formatCurrency(accounting.netPosition) }}
+                    </div>
+                    <p class="acc-net-sub">
+                        {{ accounting.netPositive ? 'Alacaklar fazla' : 'Verecekler fazla' }}
+                    </p>
+                </div>
+
+                <!-- Verecekler -->
+                <div class="acc-block">
+                    <p class="acc-block-label" style="color:#ef4444">Verecekler</p>
+                    <div class="acc-big">{{ formatCurrency(accounting.totalPayable) }}</div>
+                    <div class="acc-progress-wrap">
+                        <div
+                            class="acc-progress"
+                            :style="{
+                                width: accounting.totalPayable
+                                    ? `${Math.round((accounting.paidPayable / accounting.totalPayable) * 100)}%`
+                                    : '100%',
+                                background: '#ef4444',
+                            }"
+                        />
+                    </div>
+                    <p class="acc-rate">
+                        %{{
+                            accounting.totalPayable
+                                ? Math.round((accounting.paidPayable / accounting.totalPayable) * 100)
+                                : 100
+                        }} ödendi
+                    </p>
+                    <div class="acc-rows">
+                        <div class="acc-row">
+                            <span>Ödenen</span>
+                            <strong class="text-success">{{ formatCurrency(accounting.paidPayable) }}</strong>
+                        </div>
+                        <div class="acc-row">
+                            <span>Kalan</span>
+                            <strong>{{ formatCurrency(accounting.remainingPayable) }}</strong>
+                        </div>
+                        <div v-if="accounting.overduePayableCount > 0" class="acc-row">
+                            <span>Vadesi Geçmiş</span>
+                            <strong class="text-danger">
+                                {{ formatCurrency(accounting.overduePayableAmount) }}
+                                <em>({{ accounting.overduePayableCount }})</em>
+                            </strong>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ── Upcoming Returns ───────────────────────────────────────────── -->
+        <section class="card">
+            <div class="card-head">
+                <h2 class="card-title">Yaklaşan İadeler</h2>
+                <span class="badge-neutral">{{ sortedReturns.length }} kayıt</span>
+            </div>
+
+            <div v-if="loading" class="tbl-skel">
+                <div v-for="i in 3" :key="i" class="skel-row" />
+            </div>
+            <div v-else-if="sortedReturns.length === 0" class="empty-state">
+                Yaklaşan iade bulunmuyor.
+            </div>
+            <div v-else class="tbl-wrap">
+                <table class="dtbl">
+                    <thead>
+                        <tr>
+                            <th>Plaka</th>
+                            <th>Müşteri / Sürücü</th>
+                            <th>İade Tarihi</th>
+                            <th>Kalan</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr
+                            v-for="item in sortedReturns"
+                            :key="item.rentalId"
+                            :class="{ 'row-overdue': item.isOverdue }"
+                        >
+                            <td class="td-mono">{{ item.plateNumber }}</td>
+                            <td>
+                                <div class="person-cell">
+                                    <span>{{ item.customerName }}</span>
+                                    <small v-if="item.primaryDriverName" class="text-muted">
+                                        Sürücü: {{ item.primaryDriverName }}
+                                    </small>
+                                </div>
+                            </td>
+                            <td class="td-date">{{ formatDate(item.endDate) }}</td>
+                            <td>
+                                <span :class="formatReturnBadge(item).cls">
+                                    {{ formatReturnBadge(item).text }}
+                                </span>
+                            </td>
+                            <td>
+                                <button class="btn-sm" @click="openReturnModal(item.rentalId)">
+                                    İade Al
+                                </button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- ── Return Modal ───────────────────────────────────────────────── -->
+        <ReturnCompleteModal
+            :visible="showReturnModal"
+            :rental-id="selectedRentalId"
+            @close="showReturnModal = false"
+            @completed="handleReturnCompleted"
+        />
+
+    </div>
 </template>
 
 <style scoped>
+/* ─── Layout ──────────────────────────────────────────────────────────────── */
 .dashboard {
-  max-width: 1400px;
-  margin: 0 auto;
+    max-width: 1440px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    padding-bottom: 40px;
 }
 
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 32px;
-  flex-wrap: wrap;
-  gap: 16px;
+/* ─── Header ──────────────────────────────────────────────────────────────── */
+.db-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
 }
 
-.header h1 {
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--color-heading);
-  margin: 0;
+.db-title {
+    font-size: 24px;
+    font-weight: 700;
+    margin: 0;
+    color: var(--color-heading);
 }
 
-.subtitle {
-  color: var(--color-text-secondary);
-  font-size: 15px;
-  margin-top: 4px;
+.db-sub {
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    margin: 2px 0 0;
 }
 
-.actions {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 24px;
-  margin-bottom: 32px;
+/* ─── Stat Cards ──────────────────────────────────────────────────────────── */
+.stat-row {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 14px;
 }
 
 .stat-card {
-  background: var(--color-surface);
-  border-radius: 16px;
-  padding: 24px;
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-  border: 1px solid var(--color-border);
-  transition: transform 0.2s;
-  overflow: hidden;
-  position: relative;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-top: 3px solid var(--accent, #3b82f6);
+    border-radius: 12px;
+    padding: 18px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    transition: transform 0.15s, box-shadow 0.15s;
+    min-height: 100px;
 }
 
-.stat-card:hover {
-  transform: translateY(-2px);
+.stat-card.is-link {
+    cursor: pointer;
 }
 
-.stat-card.skeleton {
-  min-height: 120px;
+.stat-card.is-link:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
 }
 
-.skeleton-content {
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, #f0f0f0 25%, #f8f8f8 50%, #f0f0f0 75%);
-  background-size: 200% 100%;
-  animation: loading 1.5s infinite;
-  border-radius: 8px;
+.stat-card.skel {
+    background: var(--color-bg-secondary);
+    border-top-color: var(--color-border);
+    animation: shimmer 1.4s infinite;
 }
 
-.stat-content {
-  position: relative;
-  z-index: 1;
+.sc-left {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    flex: 1;
+    min-width: 0;
 }
 
-.stat-label {
-  display: block;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--color-text-secondary);
-  margin-bottom: 8px;
+.sc-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
 }
 
-.stat-value {
-  display: block;
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--color-heading);
-  margin-bottom: 8px;
+.sc-value {
+    font-size: 30px;
+    font-weight: 700;
+    color: var(--color-heading);
+    line-height: 1.1;
 }
 
-.stat-trend {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--color-text-secondary);
+.sc-sub {
+    font-size: 12px;
+    color: var(--color-text-muted);
 }
 
-.stat-icon-bg {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24px;
-  background: var(--color-bg-secondary);
+.sc-alert {
+    display: inline-block;
+    margin-top: 4px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    width: fit-content;
 }
 
-.stat-card.primary .stat-icon-bg { background: var(--color-primary-light); }
-.stat-card.success .stat-icon-bg { background: var(--color-success-light); }
-.stat-card.warning .stat-icon-bg { background: var(--color-warning-light); }
-.stat-card.info .stat-icon-bg { background: var(--color-info-light); }
-
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  grid-template-rows: auto auto;
-  gap: 24px;
+.sc-icon {
+    font-size: 26px;
+    opacity: 0.75;
+    flex-shrink: 0;
+    margin-left: 10px;
 }
 
+/* ─── Card Base ───────────────────────────────────────────────────────────── */
 .card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 16px;
-  overflow: hidden;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 14px;
+    overflow: hidden;
 }
 
-.card-header {
-  padding: 20px 24px;
-  border-bottom: 1px solid var(--color-border);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+.card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--color-border);
 }
 
-.card-header h3 {
-  font-size: 16px;
-  font-weight: 600;
-  margin: 0;
+.card-title {
+    font-size: 15px;
+    font-weight: 600;
+    margin: 0;
+    color: var(--color-heading);
 }
 
-.chart-filter {
-  padding: 6px 12px;
-  border-radius: 6px;
-  border: 1px solid var(--color-border);
-  background: var(--color-bg-secondary);
-  font-size: 13px;
-  color: var(--color-text);
-  cursor: pointer;
+.card-foot {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 20px;
+    border-top: 1px solid var(--color-border);
+    font-size: 13px;
+    color: var(--color-text-secondary);
 }
 
-.view-all {
-  font-size: 13px;
-  color: var(--color-primary);
-  text-decoration: none;
-  font-weight: 500;
+.card-foot strong {
+    color: var(--color-heading);
+    font-size: 15px;
 }
 
-.chart-body {
-  padding: 24px;
-  height: 350px;
+/* ─── Charts Row ──────────────────────────────────────────────────────────── */
+.charts-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 16px;
+    align-items: stretch;
 }
 
-.donut-body {
-  height: 350px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.chart-area {
+    padding: 20px;
+    height: 280px;
 }
 
-.table-card {
-  grid-column: 1 / -1;
+.skel-chart {
+    width: 100%;
+    height: 100%;
+    border-radius: 8px;
+    background: var(--color-bg-secondary);
+    animation: shimmer 1.4s infinite;
 }
 
-.revenue-chart {
-  grid-column: 1 / 2;
+/* ─── Vehicle Status List ─────────────────────────────────────────────────── */
+.status-list {
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
 }
 
-.status-chart {
-  grid-column: 2 / 3;
+.status-skel {
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
 }
 
-.simple-table {
-  width: 100%;
-  border-collapse: collapse;
+.status-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
 }
 
-.simple-table th {
-  text-align: left;
-  padding: 12px 24px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-text-secondary);
-  background: var(--color-bg-secondary);
-  border-bottom: 1px solid var(--color-border);
+.si-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 90px;
+    flex-shrink: 0;
 }
 
-.simple-table td {
-  padding: 16px 24px;
-  border-bottom: 1px solid var(--color-border);
-  font-size: 14px;
-  color: var(--color-text);
+.si-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
 }
 
-.simple-table tr:last-child td {
-  border-bottom: none;
+.si-label {
+    font-size: 13px;
+    color: var(--color-text-secondary);
 }
 
-.font-medium {
-  font-weight: 500;
+.si-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+}
+
+.si-bar-wrap {
+    flex: 1;
+    height: 6px;
+    background: var(--color-bg-secondary);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.si-bar {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.6s ease;
+}
+
+.si-count {
+    font-size: 14px;
+    font-weight: 700;
+    min-width: 24px;
+    text-align: right;
+}
+
+/* ─── Segment Control ─────────────────────────────────────────────────────── */
+.seg-ctrl {
+    display: flex;
+    background: var(--color-bg-secondary);
+    border-radius: 8px;
+    padding: 3px;
+    gap: 2px;
+}
+
+.seg-btn {
+    padding: 5px 14px;
+    border: none;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    background: transparent;
+    color: var(--color-text-secondary);
+    transition: all 0.15s;
+}
+
+.seg-btn.active {
+    background: var(--color-surface);
+    color: var(--color-primary);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* ─── Tab Bar ─────────────────────────────────────────────────────────────── */
+.tab-bar {
+    display: flex;
+    gap: 4px;
+}
+
+.tab-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    background: transparent;
+    color: var(--color-text-secondary);
+    transition: all 0.15s;
+}
+
+.tab-btn.active {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: white;
+}
+
+.tab-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 700;
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.tab-btn:not(.active) .tab-count {
+    background: var(--color-bg-secondary);
+    color: var(--color-text-secondary);
+}
+
+/* ─── Data Table ──────────────────────────────────────────────────────────── */
+.tbl-wrap {
+    overflow-x: auto;
+}
+
+.dtbl {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.dtbl th {
+    padding: 10px 20px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-text-secondary);
+    background: var(--color-bg-secondary);
+    border-bottom: 1px solid var(--color-border);
+    text-align: left;
+    white-space: nowrap;
+}
+
+.dtbl td {
+    padding: 13px 20px;
+    font-size: 13px;
+    border-bottom: 1px solid var(--color-border);
+    vertical-align: middle;
+}
+
+.dtbl tr:last-child td {
+    border-bottom: none;
+}
+
+.dtbl tr.row-overdue {
+    background: rgba(239, 68, 68, 0.03);
+}
+
+.dtbl tr:hover td {
+    background: var(--color-bg-secondary);
+}
+
+.td-mono {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    font-size: 13px;
+}
+
+.td-date {
+    color: var(--color-text-secondary);
+    white-space: nowrap;
 }
 
 .person-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
 }
 
-.person-sub {
-  color: var(--color-text-secondary);
-  font-size: 12px;
+.tbl-skel {
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }
 
-.status-dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  margin-right: 6px;
+.skel-row {
+    height: 40px;
+    border-radius: 6px;
+    background: var(--color-bg-secondary);
+    animation: shimmer 1.4s infinite;
 }
 
-.status-dot.success { background: var(--color-success); }
-.status-dot.danger { background: var(--color-danger); }
-
-.btn {
-  padding: 10px 20px;
-  border-radius: 8px;
-  font-weight: 500;
-  border: none;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  transition: all 0.2s;
+/* ─── Bakım & Hasar Block ─────────────────────────────────────────────────── */
+.bh-grid {
+    display: flex;
+    padding: 24px 20px;
+    gap: 0;
 }
 
-.btn-primary { background: var(--color-primary); color: white; }
-.btn-primary:hover { background: var(--color-primary-hover); }
-
-.btn-sm {
-  padding: 6px 12px;
-  font-size: 13px;
-  border-radius: 6px;
+.bh-block {
+    flex: 1;
 }
 
-.btn-outline {
-  background: transparent;
-  border: 1px solid var(--color-border);
-  color: var(--color-text);
-  cursor: pointer;
+.bh-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--color-heading);
 }
 
-.btn-outline:hover {
-  background: var(--color-bg-secondary);
+.bh-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
 }
 
-.loading-skeleton {
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, #f0f0f0 25%, #f8f8f8 50%, #f0f0f0 75%);
-  background-size: 200% 100%;
-  animation: loading 1.5s infinite;
-  border-radius: 8px;
+.bh-hint {
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    margin: 0;
 }
 
-.table-skeleton {
-  padding: 16px 24px;
+.bh-divider {
+    width: 1px;
+    background: var(--color-border);
+    margin: 0 24px;
 }
 
-.skeleton-row {
-  height: 48px;
-  background: linear-gradient(90deg, #f0f0f0 25%, #f8f8f8 50%, #f0f0f0 75%);
-  background-size: 200% 100%;
-  animation: loading 1.5s infinite;
-  border-radius: 4px;
-  margin-bottom: 12px;
+/* ─── Accounting ──────────────────────────────────────────────────────────── */
+.acc-grid {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 0;
+    padding: 24px 20px;
+    align-items: start;
 }
 
-.skeleton-row:last-child {
-  margin-bottom: 0;
+.acc-block {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
+
+.acc-block-label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 0;
+}
+
+.acc-big {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--color-heading);
+}
+
+.acc-progress-wrap {
+    height: 4px;
+    background: var(--color-bg-secondary);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.acc-progress {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.6s ease;
+}
+
+.acc-rate {
+    font-size: 12px;
+    color: var(--color-text-muted);
+    margin: 0;
+}
+
+.acc-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.acc-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 13px;
+    color: var(--color-text-secondary);
+}
+
+.acc-row strong {
+    font-weight: 600;
+    color: var(--color-heading);
+}
+
+.acc-row em {
+    font-style: normal;
+    font-size: 11px;
+    color: var(--color-text-muted);
+    margin-left: 4px;
+}
+
+.acc-net {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0 32px;
+    text-align: center;
+    border-left: 1px solid var(--color-border);
+    border-right: 1px solid var(--color-border);
+    min-width: 180px;
+}
+
+.acc-net-label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-text-secondary);
+    margin: 0 0 8px;
+}
+
+.acc-net-value {
+    font-size: 26px;
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+
+.acc-net-sub {
+    font-size: 12px;
+    color: var(--color-text-muted);
+    margin: 0;
+}
+
+/* ─── Badges ──────────────────────────────────────────────────────────────── */
+.badge-success,
+.badge-danger,
+.badge-warning,
+.badge-neutral {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.badge-success { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+.badge-danger  { background: rgba(239, 68, 68, 0.1);  color: #ef4444; }
+.badge-warning { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+.badge-neutral { background: var(--color-bg-secondary); color: var(--color-text-secondary); }
+
+/* ─── Utilities ───────────────────────────────────────────────────────────── */
+.text-success { color: #10b981 !important; }
+.text-danger  { color: #ef4444 !important; }
+.text-muted   { color: var(--color-text-muted); font-size: 12px; }
 
 .empty-state {
-  padding: 40px 24px;
-  text-align: center;
-  color: var(--color-text-secondary);
+    padding: 48px 20px;
+    text-align: center;
+    color: var(--color-text-muted);
+    font-size: 14px;
 }
 
-.empty-state p {
-  margin: 0;
+.link {
+    color: var(--color-primary);
+    text-decoration: none;
+    font-weight: 500;
 }
 
-@keyframes loading {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+.link:hover { text-decoration: underline; }
+
+/* ─── Buttons ─────────────────────────────────────────────────────────────── */
+.btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 20px;
+    background: var(--color-primary);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity 0.15s;
 }
 
-@media (max-width: 1024px) {
-  .dashboard-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .revenue-chart, .status-chart {
-    grid-column: 1 / -1;
-  }
+.btn-primary:hover { opacity: 0.9; }
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: 6px;
+    border: 1px solid var(--color-border);
+    background: transparent;
+    color: var(--color-text);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s;
+}
+
+.btn-sm:hover { background: var(--color-bg-secondary); }
+
+/* ─── Animation ───────────────────────────────────────────────────────────── */
+@keyframes shimmer {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.45; }
+}
+
+/* ─── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 1200px) {
+    .stat-row { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (max-width: 900px) {
+    .charts-row { grid-template-columns: 1fr; }
+    .acc-grid   { grid-template-columns: 1fr; }
+    .acc-net    { border: none; border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); padding: 20px 0; margin: 16px 0; }
+    .bh-grid    { flex-direction: column; }
+    .bh-divider { width: 100%; height: 1px; margin: 16px 0; }
 }
 
 @media (max-width: 640px) {
-  .header {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  
-  .actions {
-    flex-direction: column;
-  }
+    .stat-row { grid-template-columns: repeat(2, 1fr); }
+    .db-header { flex-direction: column; align-items: flex-start; }
+}
+
+@media (max-width: 400px) {
+    .stat-row { grid-template-columns: 1fr; }
 }
 </style>

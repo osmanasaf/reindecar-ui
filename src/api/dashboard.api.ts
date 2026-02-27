@@ -1,4 +1,5 @@
 import { BaseApi } from './client'
+import type { Rental } from '@/types'
 
 export interface RentalStats {
     draft: number
@@ -32,6 +33,21 @@ export interface PaymentStats {
     revenueByCurrency: Record<string, number>
 }
 
+export interface AccountingStats {
+    totalReceivable: number
+    paidReceivable: number
+    remainingReceivable: number
+    overdueReceivableCount: number
+    overdueReceivableAmount: number
+    totalPayable: number
+    paidPayable: number
+    remainingPayable: number
+    overduePayableCount: number
+    overduePayableAmount: number
+    netPosition: number
+    netPositive: boolean
+}
+
 export interface DashboardApiResponse {
     totalRentals: number
     totalVehicles: number
@@ -41,6 +57,7 @@ export interface DashboardApiResponse {
     vehicles: VehicleStats
     customers: CustomerStats
     payments: PaymentStats
+    accounting?: AccountingStats
 }
 
 export interface DashboardStats {
@@ -117,6 +134,8 @@ export interface DashboardResponse {
     revenue: RevenueData
     vehicleStatus: VehicleStatusData
     upcomingReturns: UpcomingReturn[]
+    accounting: AccountingStats
+    activeRentals: Rental[]
 }
 
 class DashboardApiService extends BaseApi {
@@ -234,7 +253,11 @@ class DashboardApiService extends BaseApi {
         return `${monthNames[monthIndex]} ${year.slice(2)}`
     }
 
-    async getAll(revenueMonths = 6, upcomingDays = 7): Promise<DashboardResponse> {
+    async getAll(
+        revenueMonths = 6,
+        upcomingDays = 7,
+        activeRentals: Rental[] = []
+    ): Promise<DashboardResponse> {
         try {
             const [raw, revenueData, upcomingReturns] = await Promise.all([
                 this.getRawStats(),
@@ -244,7 +267,7 @@ class DashboardApiService extends BaseApi {
 
             const todayReturns = upcomingReturns.filter(r => r.daysUntilReturn === 0).length
             const tomorrowReturns = upcomingReturns.filter(r => r.daysUntilReturn === 1).length
-            
+
             const stats: DashboardStats = {
                 activeRentals: raw.rentals?.active ?? 0,
                 availableVehicles: raw.vehicles?.available ?? 0,
@@ -265,20 +288,36 @@ class DashboardApiService extends BaseApi {
                 reserved: raw.vehicles?.reserved ?? 0,
                 damaged: raw.vehicles?.damaged ?? 0
             }
-            
-            return { 
-                stats, 
-                revenue: revenueData, 
-                vehicleStatus, 
-                upcomingReturns 
-            }
+
+            const accounting: AccountingStats = this.parseAccountingStats(raw.accounting)
+
+            return { stats, revenue: revenueData, vehicleStatus, upcomingReturns, accounting, activeRentals }
         } catch {
             return {
                 stats: this.getDefaultStats(),
                 revenue: this.getDefaultRevenue(),
                 vehicleStatus: this.getDefaultVehicleStatus(),
-                upcomingReturns: []
+                upcomingReturns: [],
+                accounting: this.getDefaultAccounting(),
+                activeRentals: []
             }
+        }
+    }
+
+    private parseAccountingStats(raw?: AccountingStats): AccountingStats {
+        return {
+            totalReceivable: raw?.totalReceivable ?? 0,
+            paidReceivable: raw?.paidReceivable ?? 0,
+            remainingReceivable: raw?.remainingReceivable ?? 0,
+            overdueReceivableCount: raw?.overdueReceivableCount ?? 0,
+            overdueReceivableAmount: raw?.overdueReceivableAmount ?? 0,
+            totalPayable: raw?.totalPayable ?? 0,
+            paidPayable: raw?.paidPayable ?? 0,
+            remainingPayable: raw?.remainingPayable ?? 0,
+            overduePayableCount: raw?.overduePayableCount ?? 0,
+            overduePayableAmount: raw?.overduePayableAmount ?? 0,
+            netPosition: raw?.netPosition ?? 0,
+            netPositive: raw?.netPositive ?? true
         }
     }
 
@@ -314,6 +353,23 @@ class DashboardApiService extends BaseApi {
             maintenance: 0,
             reserved: 0,
             damaged: 0
+        }
+    }
+
+    private getDefaultAccounting(): AccountingStats {
+        return {
+            totalReceivable: 0,
+            paidReceivable: 0,
+            remainingReceivable: 0,
+            overdueReceivableCount: 0,
+            overdueReceivableAmount: 0,
+            totalPayable: 0,
+            paidPayable: 0,
+            remainingPayable: 0,
+            overduePayableCount: 0,
+            overduePayableAmount: 0,
+            netPosition: 0,
+            netPositive: true
         }
     }
 }
