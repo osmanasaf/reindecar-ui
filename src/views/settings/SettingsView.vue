@@ -3,11 +3,15 @@ import { ref, onMounted } from 'vue'
 import { useAuthStore } from '@/stores'
 import { useToast } from '@/composables'
 import { usersApi } from '@/api'
+import BrandsManager from './BrandsManager.vue'
+import CitiesManager from './CitiesManager.vue'
+import ColorsManager from './ColorsManager.vue'
 
 const authStore = useAuthStore()
 const toast = useToast()
 
 const activeTab = ref('profile')
+const refDataSubTab = ref<'brands' | 'cities' | 'colors'>('brands')
 const loading = ref(false)
 const settingsLoading = ref(false)
 
@@ -154,6 +158,13 @@ async function handleNotificationSave() {
         >
           🔔 Bildirimler
         </button>
+        <button 
+          v-if="authStore.isAdmin"
+          :class="['nav-item', { active: activeTab === 'reference-data' }]"
+          @click="activeTab = 'reference-data'"
+        >
+          🗂️ Referans Veriler
+        </button>
       </nav>
 
       <div class="settings-content">
@@ -237,6 +248,32 @@ async function handleNotificationSave() {
               {{ loading ? 'Kaydediliyor...' : 'Kaydet' }}
             </button>
           </form>
+        </section>
+
+        <section v-if="activeTab === 'reference-data'" class="card reference-data-section">
+          <div class="ref-data-subnav">
+            <button
+              :class="['sub-nav-item', { active: refDataSubTab === 'brands' }]"
+              @click="refDataSubTab = 'brands'"
+            >
+              Markalar / Modeller
+            </button>
+            <button
+              :class="['sub-nav-item', { active: refDataSubTab === 'cities' }]"
+              @click="refDataSubTab = 'cities'"
+            >
+              İller / İlçeler
+            </button>
+            <button
+              :class="['sub-nav-item', { active: refDataSubTab === 'colors' }]"
+              @click="refDataSubTab = 'colors'"
+            >
+              Renkler
+            </button>
+          </div>
+          <BrandsManager v-if="refDataSubTab === 'brands'" />
+          <CitiesManager v-if="refDataSubTab === 'cities'" />
+          <ColorsManager v-if="refDataSubTab === 'colors'" />
         </section>
       </div>
     </div>
@@ -412,6 +449,40 @@ async function handleNotificationSave() {
 
 .btn-primary:hover:not(:disabled) {
   background: var(--color-primary-hover);
+}
+
+.reference-data-section {
+  padding: 24px;
+}
+
+.ref-data-subnav {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.sub-nav-item {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sub-nav-item:hover {
+  background: var(--color-border);
+  color: var(--color-text);
+}
+
+.sub-nav-item.active {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
 }
 
 @media (max-width: 768px) {

@@ -1,21 +1,24 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
+import { useAuthStore } from '@/stores'
 
 defineProps<{
   collapsed: boolean
 }>()
 
 const route = useRoute()
+const authStore = useAuthStore()
 
 interface NavItem {
   name: string
   label: string
   icon: string
+  adminOnly?: boolean
   children?: NavItem[]
 }
 
-const navItems: NavItem[] = [
+const allNavItems: NavItem[] = [
   { name: 'dashboard', label: 'Dashboard', icon: '📊' },
   { name: 'vehicles', label: 'Araçlar', icon: '🚗' },
   { name: 'customers', label: 'Müşteriler', icon: '👥' },
@@ -32,10 +35,15 @@ const navItems: NavItem[] = [
     ]
   },
   { name: 'installments-dashboard', label: 'Taksit Yönetimi', icon: '💳' },
-  { name: 'branches', label: 'Şubeler', icon: '🏢' },
-  { name: 'users', label: 'Kullanıcılar', icon: '👤' },
+  { name: 'branches', label: 'Şubeler', icon: '🏢', adminOnly: true },
+  { name: 'users', label: 'Kullanıcılar', icon: '👤', adminOnly: true },
   { name: 'settings', label: 'Ayarlar', icon: '⚙️' }
 ]
+
+const navItems = computed(() => {
+  if (authStore.isAdmin) return allNavItems
+  return allNavItems.filter(item => !item.adminOnly)
+})
 
 const expandedMenus = ref<Set<string>>(new Set())
 
