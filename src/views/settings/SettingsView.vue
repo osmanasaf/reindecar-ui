@@ -6,12 +6,13 @@ import { usersApi } from '@/api'
 import BrandsManager from './BrandsManager.vue'
 import CitiesManager from './CitiesManager.vue'
 import ColorsManager from './ColorsManager.vue'
+import CategoriesManager from './CategoriesManager.vue'
 
 const authStore = useAuthStore()
 const toast = useToast()
 
 const activeTab = ref('profile')
-const refDataSubTab = ref<'brands' | 'cities' | 'colors'>('brands')
+const refDataSubTab = ref<'brands' | 'cities' | 'colors' | 'categories'>('brands')
 const loading = ref(false)
 const settingsLoading = ref(false)
 
@@ -270,10 +271,17 @@ async function handleNotificationSave() {
             >
               Renkler
             </button>
+            <button
+              :class="['sub-nav-item', { active: refDataSubTab === 'categories' }]"
+              @click="refDataSubTab = 'categories'"
+            >
+              Kategoriler
+            </button>
           </div>
           <BrandsManager v-if="refDataSubTab === 'brands'" />
           <CitiesManager v-if="refDataSubTab === 'cities'" />
           <ColorsManager v-if="refDataSubTab === 'colors'" />
+          <CategoriesManager v-if="refDataSubTab === 'categories'" />
         </section>
       </div>
     </div>

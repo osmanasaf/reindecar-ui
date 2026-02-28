@@ -9,6 +9,7 @@ const props = defineProps<{
   modelValue: number[]
   primaryDriverId: number | null
   customerId: number
+  rentalEndDate?: string
 }>()
 
 const emit = defineEmits<{
@@ -38,6 +39,15 @@ function getDriverDisplayName(driver: Driver): string {
   return `${driver.firstName || ''} ${driver.lastName || ''}`.trim() || 'İsimsiz Sürücü'
 }
 
+function isLicenseExpiredForRental(driver: Driver): boolean {
+  if (!props.rentalEndDate || !driver.licenseExpiryDate) return false
+  return new Date(driver.licenseExpiryDate) < new Date(props.rentalEndDate)
+}
+
+function formatDate(date: string): string {
+  return new Date(date).toLocaleDateString('tr-TR')
+}
+
 const filteredDrivers = computed(() => {
   const query = searchQuery.value.toLowerCase()
   if (!query) return drivers.value
@@ -54,7 +64,9 @@ const isDriverSelected = (driverId: number) => {
   return props.modelValue.includes(driverId)
 }
 
-const toggleDriver = (driverId: number) => {
+const toggleDriver = (driver: Driver) => {
+  if (isLicenseExpiredForRental(driver)) return
+  const driverId = driver.id
   const currentSelection = [...props.modelValue]
   const index = currentSelection.indexOf(driverId)
   
@@ -73,9 +85,10 @@ const toggleDriver = (driverId: number) => {
   emit('update:modelValue', currentSelection)
 }
 
-const setPrimaryDriver = (driverId: number) => {
-  if (props.modelValue.includes(driverId)) {
-    emit('update:primaryDriverId', driverId)
+const setPrimaryDriver = (driver: Driver) => {
+  if (isLicenseExpiredForRental(driver)) return
+  if (props.modelValue.includes(driver.id)) {
+    emit('update:primaryDriverId', driver.id)
   }
 }
 
@@ -223,25 +236,32 @@ watch(() => props.customerId, (newCustomerId) => {
       <div
         v-for="driver in filteredDrivers"
         :key="driver.id"
-        :class="['driver-item', { selected: isDriverSelected(driver.id) }]"
-        @click="toggleDriver(driver.id)"
+        :class="['driver-item', { selected: isDriverSelected(driver.id), 'license-expired': isLicenseExpiredForRental(driver) }]"
+        @click="toggleDriver(driver)"
       >
         <div class="driver-checkbox">
           <input
             type="checkbox"
             :checked="isDriverSelected(driver.id)"
-            @click.stop="toggleDriver(driver.id)"
+            :disabled="isLicenseExpiredForRental(driver)"
+            @click.stop="toggleDriver(driver)"
           />
         </div>
         <div class="driver-info">
           <div class="driver-name">
             {{ getDriverDisplayName(driver) }}
             <span v-if="driver.customerId === customerId" class="badge">Müşteriye Ait</span>
+            <span v-if="isLicenseExpiredForRental(driver)" class="badge-expired">
+              Ehliyet geçersiz
+            </span>
           </div>
           <div class="driver-details">
             <span v-if="driver.licenseNumber">Ehliyet: {{ driver.licenseNumber }}</span>
             <span v-if="driver.licenseClass"> | Sınıf: {{ driver.licenseClass }}</span>
-          <span v-if="driver.nationalId"> | TC: {{ driver.nationalId.substring(0, 3) }}***</span>
+            <span v-if="driver.nationalId"> | TC: {{ driver.nationalId.substring(0, 3) }}***</span>
+            <span v-if="driver.licenseExpiryDate" :class="{ 'expiry-danger': isLicenseExpiredForRental(driver) }">
+              | Bitiş: {{ formatDate(driver.licenseExpiryDate) }}
+            </span>
           </div>
         </div>
       </div>
@@ -380,6 +400,18 @@ watch(() => props.customerId, (newCustomerId) => {
   background: var(--color-primary-light);
 }
 
+.driver-item.license-expired {
+  border-color: var(--color-danger, #dc2626);
+  background: var(--color-danger-light, #fee2e2);
+  cursor: not-allowed;
+  opacity: 0.75;
+}
+
+.driver-item.license-expired:hover {
+  border-color: var(--color-danger, #dc2626);
+  background: var(--color-danger-light, #fee2e2);
+}
+
 .driver-checkbox input[type="checkbox"] {
   width: 18px;
   height: 18px;
@@ -409,9 +441,24 @@ watch(() => props.customerId, (newCustomerId) => {
   border-radius: 4px;
 }
 
+.badge-expired {
+  display: inline-block;
+  padding: 2px 8px;
+  background: var(--color-danger-light, #fee2e2);
+  color: var(--color-danger, #b91c1c);
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 4px;
+}
+
 .driver-details {
   font-size: 13px;
   color: var(--color-text-secondary);
+}
+
+.expiry-danger {
+  color: var(--color-danger, #b91c1c);
+  font-weight: 500;
 }
 
 .driver-actions {

@@ -82,6 +82,14 @@ class VehicleCategoriesApiService extends BaseApi {
         return this.post('', category)
     }
 
+    async update(id: number, category: Partial<VehicleCategory>): Promise<VehicleCategory> {
+        return this.put(`/${id}`, category)
+    }
+
+    async deactivate(id: number): Promise<void> {
+        return this.patch(`/${id}/deactivate`, {})
+    }
+
     async deleteById(id: number): Promise<void> {
         return this.remove(`/${id}`)
     }

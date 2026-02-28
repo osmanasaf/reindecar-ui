@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { customersApi, driversApi } from '@/api'
 import { useToast } from '@/composables'
 import { formatPhoneInput } from '@/utils/phone'
-import type { Customer, CustomerType, Driver, CreateDriverForm, UpdateDriverForm } from '@/types'
+import type { Customer, CustomerType, CustomerStatus, CreditRating, CustomerStats, Driver, CreateDriverForm, UpdateDriverForm } from '@/types'
 import CompanyAuthorizedPersonsSection from '@/components/customers/CompanyAuthorizedPersonsSection.vue'
 
 const route = useRoute()
@@ -13,6 +13,8 @@ const toast = useToast()
 
 const customer = ref<Customer | null>(null)
 const loading = ref(true)
+const stats = ref<CustomerStats | null>(null)
+const loadingStats = ref(false)
 const drivers = ref<Driver[]>([])
 const loadingDrivers = ref(false)
 const showDriverForm = ref(false)
@@ -40,17 +42,60 @@ const typeLabels: Record<CustomerType, string> = {
   COMPANY: 'Kurumsal'
 }
 
+const statusLabels: Record<CustomerStatus, string> = {
+  ACTIVE: 'Aktif',
+  INACTIVE: 'Pasif',
+  BLACKLISTED: 'Kara Liste'
+}
+
+const creditRatingLabels: Record<CreditRating, string> = {
+  EXCELLENT: 'Çok İyi',
+  GOOD: 'İyi',
+  FAIR: 'Orta',
+  POOR: 'Zayıf',
+  BAD: 'Kötü'
+}
+
+async function fetchStats() {
+  loadingStats.value = true
+  try {
+    stats.value = await customersApi.getStats(customerId.value)
+  } catch {
+    stats.value = null
+  } finally {
+    loadingStats.value = false
+  }
+}
+
 async function fetchCustomer() {
   loading.value = true
   try {
     customer.value = await customersApi.getById(customerId.value)
     fetchDrivers()
+    fetchStats()
   } catch {
     toast.error('Müşteri bilgileri yüklenemedi')
     router.push('/customers')
   } finally {
     loading.value = false
   }
+}
+
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount)
+}
+
+function isLicenseExpiringSoon(expiryDate: string | undefined): boolean {
+  if (!expiryDate) return false
+  const expiry = new Date(expiryDate)
+  const in90Days = new Date()
+  in90Days.setDate(in90Days.getDate() + 90)
+  return expiry <= in90Days && expiry >= new Date()
+}
+
+function isLicenseExpired(expiryDate: string | undefined): boolean {
+  if (!expiryDate) return false
+  return new Date(expiryDate) < new Date()
 }
 
 async function fetchDrivers() {
@@ -113,6 +158,7 @@ function maskId(id: string): string {
 }
 
 const showBlacklistModal = ref(false)
+const showUnblacklistModal = ref(false)
 const blacklistReason = ref('')
 const processingBlacklist = ref(false)
 
@@ -133,6 +179,7 @@ async function confirmBlacklist() {
     toast.success('Müşteri kara listeye eklendi')
     showBlacklistModal.value = false
     await fetchCustomer()
+    await fetchStats()
   } catch (err) {
     toast.apiError(err, 'Kara listeye eklenemedi')
   } finally {
@@ -140,20 +187,48 @@ async function confirmBlacklist() {
   }
 }
 
-async function handleUnblacklist() {
-  if (!confirm('Bu müşteriyi kara listeden çıkarmak istediğinize emin misiniz?')) {
-    return
-  }
+function handleUnblacklist() {
+  showUnblacklistModal.value = true
+}
 
+async function confirmUnblacklist() {
   processingBlacklist.value = true
   try {
     await customersApi.removeFromBlacklist(customerId.value)
     toast.success('Müşteri kara listeden çıkarıldı')
+    showUnblacklistModal.value = false
     await fetchCustomer()
+    await fetchStats()
   } catch (err) {
     toast.apiError(err, 'Kara listeden çıkarılamadı')
   } finally {
     processingBlacklist.value = false
+  }
+}
+
+const showDeleteDriverModal = ref(false)
+const driverToDelete = ref<Driver | null>(null)
+
+function confirmDeleteDriver(driver: Driver) {
+  driverToDelete.value = driver
+  showDeleteDriverModal.value = true
+}
+
+function closeDeleteDriverModal() {
+  showDeleteDriverModal.value = false
+  driverToDelete.value = null
+}
+
+async function doDeleteDriver() {
+  if (!driverToDelete.value) return
+  const driver = driverToDelete.value
+  try {
+    await driversApi.delete(driver.id)
+    toast.success('Sürücü başarıyla silindi')
+    drivers.value = drivers.value.filter(d => d.id !== driver.id)
+    closeDeleteDriverModal()
+  } catch (err) {
+    toast.apiError(err, 'Sürücü silinemedi')
   }
 }
 
@@ -208,20 +283,6 @@ async function updateDriver() {
   }
 }
 
-async function confirmDeleteDriver(driver: Driver) {
-  if (!confirm(`${getDriverDisplayName(driver)} adlı sürücüyü silmek istediğinize emin misiniz?`)) {
-    return
-  }
-  
-  try {
-    await driversApi.delete(driver.id)
-    toast.success('Sürücü başarıyla silindi')
-    drivers.value = drivers.value.filter(d => d.id !== driver.id)
-  } catch (err) {
-    toast.apiError(err, 'Sürücü silinemedi')
-  }
-}
-
 onMounted(fetchCustomer)
 </script>
 
@@ -241,7 +302,11 @@ onMounted(fetchCustomer)
                 <span :class="['type-badge', customer.customerType.toLowerCase()]">
                   {{ typeLabels[customer.customerType] }}
                 </span>
+                <span :class="['status-badge', customer.status?.toLowerCase() ?? 'active']">
+                  {{ statusLabels[customer.status] ?? 'Aktif' }}
+                </span>
                 <span class="public-id">{{ customer.publicId }}</span>
+                <span v-if="customer.createdAt" class="created-at">Kayıt: {{ formatDate(customer.createdAt) }}</span>
               </div>
             </div>
           </div>
@@ -371,15 +436,31 @@ onMounted(fetchCustomer)
         </section>
 
         <section class="card stats-card">
-          <h2>İstatistikler</h2>
-          <div class="stats-grid">
+          <h2 class="card-title-with-icon">İstatistikler</h2>
+          <div v-if="loadingStats" class="stats-loading">Yükleniyor...</div>
+          <div v-else class="stats-grid">
             <div class="stat">
-              <span class="stat-value">{{ customer.totalRentals || 0 }}</span>
-              <span class="stat-label">Toplam Kiralama</span>
+              <span class="stat-value">{{ stats?.totalCompletedRentals ?? 0 }}</span>
+              <span class="stat-label">Tamamlanan Kiralama</span>
             </div>
             <div class="stat">
-              <span class="stat-value">{{ customer.activeRentals || 0 }}</span>
+              <span :class="['stat-value', 'stat-badge', stats?.hasActiveRental ? 'stat-active' : 'stat-none']">
+                {{ stats?.hasActiveRental ? 'Var' : 'Yok' }}
+              </span>
               <span class="stat-label">Aktif Kiralama</span>
+            </div>
+            <div class="stat">
+              <span class="stat-value">{{ formatCurrency(Number(stats?.totalSpending ?? 0)) }}</span>
+              <span class="stat-label">Toplam Harcama</span>
+            </div>
+            <div class="stat">
+              <span class="stat-value">{{ customer.creditScore ?? '-' }}</span>
+              <span class="stat-label">
+                Kredi Skoru
+                <span v-if="customer.creditRating" :class="['credit-badge', customer.creditRating.toLowerCase()]">
+                  {{ creditRatingLabels[customer.creditRating] }}
+                </span>
+              </span>
             </div>
           </div>
         </section>
@@ -464,26 +545,32 @@ onMounted(fetchCustomer)
             Henüz kayıtlı sürücü yok
           </div>
           <div v-else class="drivers-list">
-            <div v-for="driver in drivers" :key="driver.id" class="driver-item">
+            <div
+              v-for="driver in drivers"
+              :key="driver.id"
+              :class="['driver-item', { 'license-expiring': isLicenseExpiringSoon(driver.licenseExpiryDate), 'license-expired': isLicenseExpired(driver.licenseExpiryDate) }]"
+            >
               <div class="driver-avatar">{{ driver.firstName?.charAt(0) || '?' }}</div>
               <div class="driver-info">
                 <div class="driver-name">
                   {{ getDriverDisplayName(driver) }}
                   <span v-if="driver.primary" class="badge-primary">Ana Sürücü</span>
                   <span v-if="!driver.active" class="badge-inactive">Pasif</span>
+                  <span v-if="isLicenseExpired(driver.licenseExpiryDate)" class="badge-expired">Ehliyet süresi dolmuş</span>
+                  <span v-else-if="isLicenseExpiringSoon(driver.licenseExpiryDate)" class="badge-expiring">Ehliyet süresi yaklaşıyor</span>
                 </div>
                 <div class="driver-details">
-                  📞 {{ formatPhone(driver.phone || '') }} | 
-                  🪪 {{ driver.licenseNumber }} | 
-                  📅 {{ formatDate(driver.licenseExpiryDate) }}
+                  {{ formatPhone(driver.phone || '') }} |
+                  {{ driver.licenseNumber }} |
+                  {{ formatDate(driver.licenseExpiryDate) }}
                 </div>
               </div>
               <div class="driver-actions">
                 <button class="btn-icon" @click="openEditModal(driver)" title="Düzenle">
-                  ✏️
+                  Düzenle
                 </button>
                 <button class="btn-icon btn-danger" @click="confirmDeleteDriver(driver)" title="Sil">
-                  🗑️
+                  Sil
                 </button>
               </div>
             </div>
@@ -584,7 +671,7 @@ onMounted(fetchCustomer)
       <div class="modal">
         <div class="modal-header">
           <h3>Kara Listeye Ekle</h3>
-          <button class="close-btn" @click="showBlacklistModal = false">✕</button>
+          <button class="close-btn" @click="showBlacklistModal = false">×</button>
         </div>
         <div class="modal-body">
           <p class="modal-description">
@@ -610,6 +697,48 @@ onMounted(fetchCustomer)
           >
             {{ processingBlacklist ? 'İşleniyor...' : 'Kara Listeye Ekle' }}
           </button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="showUnblacklistModal" class="modal-overlay" @click.self="showUnblacklistModal = false">
+      <div class="modal modal-sm">
+        <div class="modal-header">
+          <h3>Kara Listeden Çıkar</h3>
+          <button class="close-btn" @click="showUnblacklistModal = false">×</button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-description">
+            <strong>{{ customer?.displayName }}</strong> adlı müşteriyi kara listeden çıkarmak istediğinize emin misiniz?
+          </p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" @click="showUnblacklistModal = false">Vazgeç</button>
+          <button 
+            class="btn btn-success" 
+            :disabled="processingBlacklist"
+            @click="confirmUnblacklist"
+          >
+            {{ processingBlacklist ? 'İşleniyor...' : 'Kara Listeden Çıkar' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="showDeleteDriverModal && driverToDelete" class="modal-overlay" @click.self="closeDeleteDriverModal">
+      <div class="modal modal-sm">
+        <div class="modal-header">
+          <h3>Sürücüyü Sil</h3>
+          <button class="close-btn" @click="closeDeleteDriverModal">×</button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-description">
+            <strong>{{ getDriverDisplayName(driverToDelete) }}</strong> adlı sürücüyü silmek istediğinize emin misiniz?
+          </p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" @click="closeDeleteDriverModal">Vazgeç</button>
+          <button class="btn btn-danger" @click="doDeleteDriver">Sil</button>
         </div>
       </div>
     </div>
@@ -679,6 +808,7 @@ onMounted(fetchCustomer)
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 .type-badge {
@@ -698,7 +828,30 @@ onMounted(fetchCustomer)
   color: #7c3aed;
 }
 
-.public-id {
+.status-badge {
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-badge.active {
+  background: var(--color-success-light, #dcfce7);
+  color: var(--color-success, #166534);
+}
+
+.status-badge.inactive {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-muted);
+}
+
+.status-badge.blacklisted {
+  background: var(--color-danger-light, #fee2e2);
+  color: var(--color-danger, #b91c1c);
+}
+
+.public-id,
+.created-at {
   color: var(--color-text-muted);
   font-size: 14px;
 }
@@ -802,13 +955,23 @@ onMounted(fetchCustomer)
   grid-column: span 2;
 }
 
-.authorized-persons-card {
-  grid-column: span 2;
+.card-title-with-icon {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 20px 0;
+  color: var(--color-text-secondary);
+}
+
+.stats-loading {
+  padding: 24px;
+  text-align: center;
+  color: var(--color-text-secondary);
 }
 
 .stats-grid {
-  display: flex;
-  gap: 48px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
 }
 
 .stat {
@@ -818,14 +981,48 @@ onMounted(fetchCustomer)
 }
 
 .stat-value {
-  font-size: 32px;
+  font-size: 28px;
   font-weight: 700;
   color: var(--color-primary);
+}
+
+.stat-value.stat-badge {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.stat-value.stat-active {
+  color: var(--color-success, #166534);
+}
+
+.stat-value.stat-none {
+  color: var(--color-text-muted);
 }
 
 .stat-label {
   font-size: 14px;
   color: var(--color-text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.credit-badge {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.credit-badge.excellent { background: #dcfce7; color: #166534; }
+.credit-badge.good { background: #dbeafe; color: #1d4ed8; }
+.credit-badge.fair { background: #fef3c7; color: #b45309; }
+.credit-badge.poor { background: #fed7aa; color: #c2410c; }
+.credit-badge.bad { background: #fee2e2; color: #b91c1c; }
+
+.authorized-persons-card {
+  grid-column: span 2;
 }
 
 .drivers-card {
@@ -1012,6 +1209,32 @@ onMounted(fetchCustomer)
   border-radius: 4px;
 }
 
+.badge-expiring {
+  padding: 2px 8px;
+  background: #fef3c7;
+  color: #b45309;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 4px;
+}
+
+.badge-expired {
+  padding: 2px 8px;
+  background: var(--color-danger-light, #fee2e2);
+  color: var(--color-danger, #b91c1c);
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 4px;
+}
+
+.driver-item.license-expiring {
+  border-left: 3px solid #f59e0b;
+}
+
+.driver-item.license-expired {
+  border-left: 3px solid var(--color-danger, #b91c1c);
+}
+
 .driver-expiry {
   display: flex;
   flex-direction: column;
@@ -1051,6 +1274,10 @@ onMounted(fetchCustomer)
   width: 100%;
   max-height: 90vh;
   overflow-y: auto;
+}
+
+.modal.modal-sm {
+  max-width: 420px;
 }
 
 .modal-header {
@@ -1129,6 +1356,11 @@ onMounted(fetchCustomer)
   .authorized-persons-card,
   .drivers-card {
     grid-column: span 1;
+  }
+  
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
   }
   
   .form-grid {

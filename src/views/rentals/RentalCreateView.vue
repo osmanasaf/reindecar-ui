@@ -440,6 +440,7 @@ onMounted(() => {
               v-model="selectedDriverIds"
               v-model:primary-driver-id="primaryDriverId"
               :customer-id="selectedCustomerId"
+              :rental-end-date="endDate"
             />
           </div>
         </div>

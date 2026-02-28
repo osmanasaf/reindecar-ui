@@ -58,9 +58,11 @@ export interface Branch {
 
 export interface VehicleCategory {
     id: number
+    code: string
     name: string
     description?: string
-    dailyPrice: number
+    defaultDailyPrice?: number
+    sortOrder: number
     active: boolean
 }
 
@@ -178,6 +180,11 @@ export interface Customer {
     createdAt: string
 }
 
+export interface CustomerStats {
+    totalCompletedRentals: number
+    totalSpending: number
+    hasActiveRental: boolean
+}
 
 export interface Rental {
     id: number

@@ -3,6 +3,7 @@ import type {
     PaginatedResponse,
     PaginationParams,
     Customer,
+    CustomerStats,
     CreatePersonalCustomerForm,
     CreateCompanyCustomerForm,
     UpdateCompanyCustomerForm,
@@ -42,6 +43,10 @@ class CustomersApiService extends BaseApi {
 
     async getById(id: number): Promise<Customer> {
         return this.get(`/${id}`)
+    }
+
+    async getStats(id: number): Promise<CustomerStats> {
+        return this.get(`/${id}/stats`)
     }
 
     async getByPublicId(publicId: string): Promise<Customer> {
