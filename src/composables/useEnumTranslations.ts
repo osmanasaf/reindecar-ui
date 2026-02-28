@@ -264,7 +264,7 @@ export function useEnumTranslations() {
   }
 
   const translateVehicleStatus = (status: string | undefined | null): string => {
-    if (!status) return 'Bilinmiyor'
+    if (!status) return '-'
     return vehicleStatuses[status as VehicleStatus] || status
   }
 

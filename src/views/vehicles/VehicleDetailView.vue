@@ -1,5 +1,5 @@
-﻿<script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+<script setup lang="ts">
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { vehiclesApi } from '@/api'
 import { useToast } from '@/composables'
@@ -12,6 +12,9 @@ import VehicleInsuranceList from '@/components/vehicles/insurance/VehicleInsuran
 import CreateInsuranceModal from '@/components/vehicles/insurance/CreateInsuranceModal.vue'
 import VehiclePaymentDetails from '@/components/installments/VehiclePaymentDetails.vue'
 
+type TabKey = 'info' | 'history' | 'damages' | 'maintenance' | 'insurance' | 'installments'
+const VALID_TABS = new Set<TabKey>(['info', 'history', 'damages', 'maintenance', 'insurance', 'installments'])
+
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
@@ -20,8 +23,26 @@ const vehicle = ref<Vehicle | null>(null)
 const loading = ref(true)
 const showEditModal = ref(false)
 const showCreateInsuranceModal = ref(false)
-const activeTab = ref<'info' | 'history' | 'damages' | 'maintenance' | 'insurance' | 'installments'>('info')
 const insuranceListRef = ref<InstanceType<typeof VehicleInsuranceList> | null>(null)
+
+function getTabFromQuery(): TabKey {
+  const q = route.query.tab as string
+  return VALID_TABS.has(q as TabKey) ? (q as TabKey) : 'info'
+}
+
+const activeTab = ref<TabKey>(getTabFromQuery())
+
+function setTab(tab: TabKey) {
+  activeTab.value = tab
+  router.replace({ query: { ...route.query, tab } })
+}
+
+watch(() => route.query.tab, (newTab) => {
+  const t = newTab as string
+  if (VALID_TABS.has(t as TabKey) && t !== activeTab.value) {
+    activeTab.value = t as TabKey
+  }
+})
 
 const vehicleId = computed(() => Number(route.params.id))
 
@@ -129,37 +150,37 @@ onMounted(fetchVehicle)
       <div class="tabs">
         <button
           :class="['tab', { active: activeTab === 'info' }]"
-          @click="activeTab = 'info'"
+          @click="setTab('info')"
         >
           Bilgiler
         </button>
         <button
           :class="['tab', { active: activeTab === 'history' }]"
-          @click="activeTab = 'history'"
+          @click="setTab('history')"
         >
           Araç Geçmişi
         </button>
         <button
           :class="['tab', { active: activeTab === 'damages' }]"
-          @click="activeTab = 'damages'"
+          @click="setTab('damages')"
         >
           Hasar Haritası
         </button>
         <button
           :class="['tab', { active: activeTab === 'maintenance' }]"
-          @click="activeTab = 'maintenance'"
+          @click="setTab('maintenance')"
         >
           Bakım Haritası
         </button>
         <button
           :class="['tab', { active: activeTab === 'insurance' }]"
-          @click="activeTab = 'insurance'"
+          @click="setTab('insurance')"
         >
           Sigorta Poliçeleri
         </button>
         <button
           :class="['tab', { active: activeTab === 'installments' }]"
-          @click="activeTab = 'installments'"
+          @click="setTab('installments')"
         >
           Taksit Yönetimi
         </button>
@@ -292,15 +313,18 @@ onMounted(fetchVehicle)
         @close="showEditModal = false"
         @saved="handleVehicleSaved"
       />
-
-      <CreateInsuranceModal
-        :show="showCreateInsuranceModal"
-        :vehicle-id="vehicleId"
-        @close="showCreateInsuranceModal = false"
-        @success="handleInsuranceCreated"
-      />
     </template>
   </div>
+
+  <Teleport to="body">
+    <CreateInsuranceModal
+      v-if="vehicle"
+      :show="showCreateInsuranceModal"
+      :vehicle-id="vehicleId"
+      @close="showCreateInsuranceModal = false"
+      @success="handleInsuranceCreated"
+    />
+  </Teleport>
 </template>
 
 <style scoped>

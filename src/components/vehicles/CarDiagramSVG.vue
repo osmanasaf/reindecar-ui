@@ -19,12 +19,13 @@ const getZoneStyle = (zoneId: number) => {
   const isSelected = props.selectedZone === zoneId
 
   return {
-    fill: zone?.color || '#f5f5f5',
-    stroke: isSelected ? 'var(--color-primary, #2563eb)' : '#333',
-    strokeWidth: isSelected ? '2.5' : '1',
+    fill: zone?.color || '#e8eaed',
+    stroke: isSelected ? 'var(--color-primary, #2563eb)' : 'rgba(0,0,0,0.18)',
+    strokeWidth: isSelected ? '2' : '1',
     cursor: zone?.onClick ? 'pointer' : 'default',
     transition: 'all 0.2s ease',
-    opacity: zone?.opacity ?? 1
+    opacity: zone?.opacity ?? 1,
+    filter: isSelected ? 'url(#selectedGlow)' : 'none'
   }
 }
 
@@ -37,179 +38,234 @@ const handleZoneClick = (zoneId: number) => {
 </script>
 
 <template>
+  <!--
+    Araç üstten görünüm (top-down) SVG haritası
+    viewBox: 0 0 240 480
+    Zone düzeni (yukarıdan aşağıya):
+      Ön (üst): Zone 3 (Kaput+Ön Tampon), Zone 1 (Sağ Ön), Zone 4 (Sol Ön), Zone 2 (Ön Cam)
+      Orta:     Zone 12 (Sağ Kapılar), Zone 13 (Tavan/İç), Zone 6 (Sol Kapılar)
+      Arka:     Zone 10 (Sağ Arka), Zone 8 (Bagaj), Zone 7 (Arka Tampon+Sol Arka), Zone 9 (Arka Cam)
+  -->
   <svg
-    viewBox="0 0 300 500"
+    viewBox="0 0 240 430"
     xmlns="http://www.w3.org/2000/svg"
     class="car-diagram"
     aria-label="Araç bölge haritası"
   >
     <defs>
-      <filter id="selectedGlow" x="-20%" y="-20%" width="140%" height="140%">
-        <feDropShadow dx="0" dy="0" stdDeviation="2" flood-color="var(--color-primary, #2563eb)" flood-opacity="0.5" />
+      <filter id="selectedGlow" x="-15%" y="-15%" width="130%" height="130%">
+        <feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="var(--color-primary, #2563eb)" flood-opacity="0.6" />
       </filter>
+      <filter id="cardShadow" x="-5%" y="-5%" width="110%" height="110%">
+        <feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#000" flood-opacity="0.12" />
+      </filter>
+      <clipPath id="bodyClip">
+        <path d="M 52 58 C 52 40 70 28 120 24 C 170 28 188 40 188 58 L 196 140 L 196 340 L 188 422 C 188 440 170 452 120 456 C 70 452 52 440 52 422 L 44 340 L 44 140 Z" />
+      </clipPath>
     </defs>
 
-    <g class="car-zones">
-      <path
-        :style="getZoneStyle(4)"
-        :filter="selectedZone === 4 ? 'url(#selectedGlow)' : ''"
-        d="M 30 60 L 80 40 L 80 100 L 30 100 Z"
-        @click="handleZoneClick(4)"
-        class="zone-path"
-      />
+    <!-- ===== ZONE PATH'LERİ ===== -->
 
-      <path
-        :style="getZoneStyle(3)"
-        :filter="selectedZone === 3 ? 'url(#selectedGlow)' : ''"
-        d="M 85 40 L 150 25 L 215 40 L 215 100 L 85 100 Z"
-        @click="handleZoneClick(3)"
-        class="zone-path"
-      />
+    <!-- Zone 4: Sol Ön Çamurluk & Tekerlek -->
+    <path
+      :style="getZoneStyle(4)"
+      d="M 52 58 C 52 40 70 28 120 24 L 120 90 L 68 90 L 52 100 Z"
+      @click="handleZoneClick(4)"
+      class="zone-path"
+    />
 
-      <path
-        :style="getZoneStyle(1)"
-        :filter="selectedZone === 1 ? 'url(#selectedGlow)' : ''"
-        d="M 220 40 L 270 60 L 270 100 L 220 100 Z"
-        @click="handleZoneClick(1)"
-        class="zone-path"
-      />
+    <!-- Zone 3: Kaput & Ön Tampon -->
+    <path
+      :style="getZoneStyle(3)"
+      d="M 68 90 L 120 90 L 172 90 L 188 100 L 188 140 L 52 140 L 52 100 Z"
+      @click="handleZoneClick(3)"
+      class="zone-path"
+    />
 
-      <path
-        :style="getZoneStyle(2)"
-        :filter="selectedZone === 2 ? 'url(#selectedGlow)' : ''"
-        d="M 60 105 L 95 75 L 205 75 L 240 105 L 240 145 L 60 145 Z"
-        @click="handleZoneClick(2)"
-        class="zone-path"
-      />
+    <!-- Zone 1: Sağ Ön Çamurluk & Tekerlek -->
+    <path
+      :style="getZoneStyle(1)"
+      d="M 120 24 C 170 28 188 40 188 58 L 188 100 L 172 90 L 120 90 Z"
+      @click="handleZoneClick(1)"
+      class="zone-path"
+    />
 
-      <path
-        :style="getZoneStyle(6)"
-        :filter="selectedZone === 6 ? 'url(#selectedGlow)' : ''"
-        d="M 20 105 L 55 105 L 55 245 L 20 245 Z"
-        @click="handleZoneClick(6)"
-        class="zone-path"
-      />
+    <!-- Zone 2: Ön Cam -->
+    <path
+      :style="getZoneStyle(2)"
+      d="M 52 140 L 188 140 L 188 185 L 52 185 Z"
+      @click="handleZoneClick(2)"
+      class="zone-path"
+    />
 
-      <path
-        :style="getZoneStyle(13)"
-        :filter="selectedZone === 13 ? 'url(#selectedGlow)' : ''"
-        d="M 60 150 L 240 150 L 240 340 L 60 340 Z"
-        @click="handleZoneClick(13)"
-        class="zone-path"
-      />
+    <!-- Zone 6: Sol Kapılar & Ayna -->
+    <path
+      :style="getZoneStyle(6)"
+      d="M 44 140 L 52 140 L 52 340 L 44 340 Z"
+      @click="handleZoneClick(6)"
+      class="zone-path"
+    />
 
-      <path
-        :style="getZoneStyle(12)"
-        :filter="selectedZone === 12 ? 'url(#selectedGlow)' : ''"
-        d="M 245 105 L 280 105 L 280 245 L 245 245 Z"
-        @click="handleZoneClick(12)"
-        class="zone-path"
-      />
+    <!-- Zone 13: Tavan & İç Mekan -->
+    <path
+      :style="getZoneStyle(13)"
+      d="M 52 185 L 188 185 L 188 295 L 52 295 Z"
+      @click="handleZoneClick(13)"
+      class="zone-path"
+    />
 
-      <path
-        :style="getZoneStyle(7)"
-        :filter="selectedZone === 7 ? 'url(#selectedGlow)' : ''"
-        d="M 20 250 L 55 250 L 55 395 L 20 395 Z"
-        @click="handleZoneClick(7)"
-        class="zone-path"
-      />
+    <!-- Zone 12: Sağ Kapılar & Ayna -->
+    <path
+      :style="getZoneStyle(12)"
+      d="M 188 140 L 196 140 L 196 340 L 188 340 Z"
+      @click="handleZoneClick(12)"
+      class="zone-path"
+    />
 
-      <path
-        :style="getZoneStyle(10)"
-        :filter="selectedZone === 10 ? 'url(#selectedGlow)' : ''"
-        d="M 245 250 L 280 250 L 280 395 L 245 395 Z"
-        @click="handleZoneClick(10)"
-        class="zone-path"
-      />
+    <!-- Zone 9: Arka Cam -->
+    <path
+      :style="getZoneStyle(9)"
+      d="M 52 295 L 188 295 L 188 340 L 52 340 Z"
+      @click="handleZoneClick(9)"
+      class="zone-path"
+    />
 
-      <path
-        :style="getZoneStyle(9)"
-        :filter="selectedZone === 9 ? 'url(#selectedGlow)' : ''"
-        d="M 60 345 L 240 345 L 240 395 L 205 425 L 95 425 L 60 395 Z"
-        @click="handleZoneClick(9)"
-        class="zone-path"
-      />
+    <!-- Zone 7: Sol Arka Çamurluk & Arka Tampon Sol -->
+    <path
+      :style="getZoneStyle(7)"
+      d="M 44 340 L 88 340 L 88 406 C 74 410 60 406 52 396 L 44 378 Z"
+      @click="handleZoneClick(7)"
+      class="zone-path"
+    />
 
-      <path
-        :style="getZoneStyle(8)"
-        :filter="selectedZone === 8 ? 'url(#selectedGlow)' : ''"
-        d="M 85 400 L 215 400 L 215 460 L 150 475 L 85 460 Z"
-        @click="handleZoneClick(8)"
-        class="zone-path"
-      />
+    <!-- Zone 8: Bagaj (arka merkez) -->
+    <path
+      :style="getZoneStyle(8)"
+      d="M 88 340 L 152 340 L 152 406 C 144 412 136 414 120 414 C 104 414 96 412 88 406 Z"
+      @click="handleZoneClick(8)"
+      class="zone-path"
+    />
+
+    <!-- Zone 10: Sağ Arka Çamurluk & Arka Tampon Sağ -->
+    <path
+      :style="getZoneStyle(10)"
+      d="M 152 340 L 196 340 L 196 378 L 188 396 C 180 406 166 410 152 406 Z"
+      @click="handleZoneClick(10)"
+      class="zone-path"
+    />
+
+    <!-- ===== DIŞ ÇERÇEVE (outline) ===== -->
+    <path
+      d="M 120 24 C 170 28 188 40 188 58 L 196 140 L 196 340 L 196 378 L 188 396 C 180 406 166 410 152 406 C 144 412 136 414 120 414 C 104 414 96 412 88 406 C 74 410 60 406 52 396 L 44 378 L 44 340 L 44 140 L 52 58 C 52 40 70 28 120 24 Z"
+      fill="none"
+      stroke="#1a1a2e"
+      stroke-width="2.5"
+      stroke-linejoin="round"
+      class="car-outline"
+    />
+
+    <!-- Ön cam çerçevesi -->
+    <rect x="60" y="143" width="120" height="39" rx="3"
+      fill="none" stroke="#1a1a2e" stroke-width="1.5" class="car-outline" />
+
+    <!-- Arka cam çerçevesi -->
+    <rect x="60" y="298" width="120" height="39" rx="3"
+      fill="none" stroke="#1a1a2e" stroke-width="1.5" class="car-outline" />
+
+    <!-- Zone 7/8/10 ayırıcı dikey çizgiler -->
+    <line x1="88" y1="340" x2="88" y2="406"
+      stroke="rgba(0,0,0,0.18)" stroke-width="1" class="car-outline" />
+    <line x1="152" y1="340" x2="152" y2="406"
+      stroke="rgba(0,0,0,0.18)" stroke-width="1" class="car-outline" />
+
+    <!-- Orta çizgi (araç ekseni) -->
+    <line x1="120" y1="28" x2="120" y2="410"
+      stroke="rgba(0,0,0,0.08)" stroke-width="1" stroke-dasharray="6,4" class="car-outline" />
+
+    <!-- ===== TEKERLEKLER ===== -->
+    <g class="wheels">
+      <!-- Sol Ön -->
+      <rect x="26" y="96" width="20" height="38" rx="5" fill="#2d3748" stroke="#1a202c" stroke-width="1.5" />
+      <rect x="29" y="102" width="14" height="26" rx="3" fill="#4a5568" />
+      <!-- Sağ Ön -->
+      <rect x="194" y="96" width="20" height="38" rx="5" fill="#2d3748" stroke="#1a202c" stroke-width="1.5" />
+      <rect x="197" y="102" width="14" height="26" rx="3" fill="#4a5568" />
+      <!-- Sol Arka -->
+      <rect x="26" y="348" width="20" height="38" rx="5" fill="#2d3748" stroke="#1a202c" stroke-width="1.5" />
+      <rect x="29" y="354" width="14" height="26" rx="3" fill="#4a5568" />
+      <!-- Sağ Arka -->
+      <rect x="194" y="348" width="20" height="38" rx="5" fill="#2d3748" stroke="#1a202c" stroke-width="1.5" />
+      <rect x="197" y="354" width="14" height="26" rx="3" fill="#4a5568" />
     </g>
 
-    <g class="car-outline" fill="none" stroke="#222" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M 150 20 C 100 20 60 35 45 55 L 25 95 L 20 105 L 20 395 L 25 405 L 45 445 C 60 465 100 480 150 480 C 200 480 240 465 255 445 L 275 405 L 280 395 L 280 105 L 275 95 L 255 55 C 240 35 200 20 150 20 Z" />
-      
-      <path d="M 55 100 L 95 70 L 205 70 L 245 100" />
-      <path d="M 55 100 L 55 145 L 245 145 L 245 100" />
-      
-      <path d="M 55 345 L 55 400 L 95 430 L 205 430 L 245 400 L 245 345" />
-      
-      <line x1="55" y1="245" x2="55" y2="250" />
-      <line x1="245" y1="245" x2="245" y2="250" />
-      
-      <line x1="150" y1="25" x2="150" y2="65" />
-      <line x1="150" y1="435" x2="150" y2="475" />
+    <!-- ===== AYNALAR ===== -->
+    <g class="mirrors">
+      <path d="M 44 158 C 36 158 32 163 32 170 C 32 177 36 182 44 182 Z"
+        fill="#718096" stroke="#4a5568" stroke-width="1" />
+      <path d="M 196 158 C 204 158 208 163 208 170 C 208 177 204 182 196 182 Z"
+        fill="#718096" stroke="#4a5568" stroke-width="1" />
     </g>
 
-    <g class="wheels" fill="#333" stroke="#222" stroke-width="1.5">
-      <ellipse cx="30" cy="75" rx="12" ry="25" />
-      <ellipse cx="270" cy="75" rx="12" ry="25" />
-      <ellipse cx="30" cy="420" rx="12" ry="25" />
-      <ellipse cx="270" cy="420" rx="12" ry="25" />
+    <!-- ===== ZONE ETİKETLERİ (her zaman görünür, küçük) ===== -->
+    <g class="zone-labels-always">
+      <text x="100" y="68" text-anchor="middle" font-size="9" fill="rgba(0,0,0,0.4)" font-weight="600" class="zone-label-text">4</text>
+      <text x="140" y="68" text-anchor="middle" font-size="9" fill="rgba(0,0,0,0.4)" font-weight="600" class="zone-label-text">1</text>
+      <text x="120" y="122" text-anchor="middle" font-size="9" fill="rgba(0,0,0,0.4)" font-weight="600" class="zone-label-text">3</text>
+      <text x="120" y="166" text-anchor="middle" font-size="9" fill="rgba(0,0,0,0.4)" font-weight="600" class="zone-label-text">2</text>
+      <text x="48" y="245" text-anchor="middle" font-size="9" fill="rgba(0,0,0,0.4)" font-weight="600" class="zone-label-text">6</text>
+      <text x="120" y="244" text-anchor="middle" font-size="9" fill="rgba(0,0,0,0.4)" font-weight="600" class="zone-label-text">13</text>
+      <text x="192" y="245" text-anchor="middle" font-size="9" fill="rgba(0,0,0,0.4)" font-weight="600" class="zone-label-text">12</text>
+      <text x="120" y="320" text-anchor="middle" font-size="9" fill="rgba(0,0,0,0.4)" font-weight="600" class="zone-label-text">9</text>
+      <text x="66" y="376" text-anchor="middle" font-size="9" fill="rgba(0,0,0,0.4)" font-weight="600" class="zone-label-text">7</text>
+      <text x="120" y="380" text-anchor="middle" font-size="9" fill="rgba(0,0,0,0.4)" font-weight="600" class="zone-label-text">8</text>
+      <text x="174" y="376" text-anchor="middle" font-size="9" fill="rgba(0,0,0,0.4)" font-weight="600" class="zone-label-text">10</text>
     </g>
 
-    <g class="mirrors" fill="#555" stroke="#333" stroke-width="1">
-      <ellipse cx="12" cy="130" rx="8" ry="14" />
-      <ellipse cx="288" cy="130" rx="8" ry="14" />
-    </g>
-
-    <g class="zone-labels" v-if="selectedZone">
-      <g v-if="selectedZone === 1">
-        <circle cx="245" cy="70" r="14" fill="var(--color-primary, #2563eb)" />
-        <text x="245" y="75" text-anchor="middle" font-size="12" fill="#fff" font-weight="600">1</text>
+    <!-- ===== SEÇİLİ ZONE ETİKETİ (büyük, vurgulu) ===== -->
+    <g class="zone-label-selected" v-if="selectedZone">
+      <g v-if="selectedZone === 4">
+        <circle cx="100" cy="62" r="11" fill="var(--color-primary, #2563eb)" />
+        <text x="100" y="67" text-anchor="middle" font-size="11" fill="#fff" font-weight="700">4</text>
       </g>
-      <g v-if="selectedZone === 2">
-        <circle cx="150" cy="115" r="14" fill="var(--color-primary, #2563eb)" />
-        <text x="150" y="120" text-anchor="middle" font-size="12" fill="#fff" font-weight="600">2</text>
+      <g v-if="selectedZone === 1">
+        <circle cx="140" cy="62" r="11" fill="var(--color-primary, #2563eb)" />
+        <text x="140" y="67" text-anchor="middle" font-size="11" fill="#fff" font-weight="700">1</text>
       </g>
       <g v-if="selectedZone === 3">
-        <circle cx="150" cy="65" r="14" fill="var(--color-primary, #2563eb)" />
-        <text x="150" y="70" text-anchor="middle" font-size="12" fill="#fff" font-weight="600">3</text>
+        <circle cx="120" cy="116" r="11" fill="var(--color-primary, #2563eb)" />
+        <text x="120" y="121" text-anchor="middle" font-size="11" fill="#fff" font-weight="700">3</text>
       </g>
-      <g v-if="selectedZone === 4">
-        <circle cx="55" cy="70" r="14" fill="var(--color-primary, #2563eb)" />
-        <text x="55" y="75" text-anchor="middle" font-size="12" fill="#fff" font-weight="600">4</text>
+      <g v-if="selectedZone === 2">
+        <circle cx="120" cy="162" r="11" fill="var(--color-primary, #2563eb)" />
+        <text x="120" y="167" text-anchor="middle" font-size="11" fill="#fff" font-weight="700">2</text>
       </g>
       <g v-if="selectedZone === 6">
-        <circle cx="38" cy="175" r="14" fill="var(--color-primary, #2563eb)" />
-        <text x="38" y="180" text-anchor="middle" font-size="12" fill="#fff" font-weight="600">6</text>
-      </g>
-      <g v-if="selectedZone === 7">
-        <circle cx="38" cy="320" r="14" fill="var(--color-primary, #2563eb)" />
-        <text x="38" y="325" text-anchor="middle" font-size="12" fill="#fff" font-weight="600">7</text>
-      </g>
-      <g v-if="selectedZone === 8">
-        <circle cx="150" cy="440" r="14" fill="var(--color-primary, #2563eb)" />
-        <text x="150" y="445" text-anchor="middle" font-size="12" fill="#fff" font-weight="600">8</text>
-      </g>
-      <g v-if="selectedZone === 9">
-        <circle cx="150" cy="380" r="14" fill="var(--color-primary, #2563eb)" />
-        <text x="150" y="385" text-anchor="middle" font-size="12" fill="#fff" font-weight="600">9</text>
-      </g>
-      <g v-if="selectedZone === 10">
-        <circle cx="262" cy="320" r="14" fill="var(--color-primary, #2563eb)" />
-        <text x="262" y="325" text-anchor="middle" font-size="12" fill="#fff" font-weight="600">10</text>
-      </g>
-      <g v-if="selectedZone === 12">
-        <circle cx="262" cy="175" r="14" fill="var(--color-primary, #2563eb)" />
-        <text x="262" y="180" text-anchor="middle" font-size="12" fill="#fff" font-weight="600">12</text>
+        <circle cx="48" cy="240" r="11" fill="var(--color-primary, #2563eb)" />
+        <text x="48" y="245" text-anchor="middle" font-size="11" fill="#fff" font-weight="700">6</text>
       </g>
       <g v-if="selectedZone === 13">
-        <circle cx="150" cy="245" r="14" fill="var(--color-primary, #2563eb)" />
-        <text x="150" y="250" text-anchor="middle" font-size="12" fill="#fff" font-weight="600">13</text>
+        <circle cx="120" cy="240" r="11" fill="var(--color-primary, #2563eb)" />
+        <text x="120" y="245" text-anchor="middle" font-size="11" fill="#fff" font-weight="700">13</text>
+      </g>
+      <g v-if="selectedZone === 12">
+        <circle cx="192" cy="240" r="11" fill="var(--color-primary, #2563eb)" />
+        <text x="192" y="245" text-anchor="middle" font-size="11" fill="#fff" font-weight="700">12</text>
+      </g>
+      <g v-if="selectedZone === 9">
+        <circle cx="120" cy="316" r="11" fill="var(--color-primary, #2563eb)" />
+        <text x="120" y="321" text-anchor="middle" font-size="11" fill="#fff" font-weight="700">9</text>
+      </g>
+      <g v-if="selectedZone === 7">
+        <circle cx="66" cy="371" r="11" fill="var(--color-primary, #2563eb)" />
+        <text x="66" y="376" text-anchor="middle" font-size="11" fill="#fff" font-weight="700">7</text>
+      </g>
+      <g v-if="selectedZone === 8">
+        <circle cx="120" cy="375" r="11" fill="var(--color-primary, #2563eb)" />
+        <text x="120" y="380" text-anchor="middle" font-size="11" fill="#fff" font-weight="700">8</text>
+      </g>
+      <g v-if="selectedZone === 10">
+        <circle cx="174" cy="371" r="11" fill="var(--color-primary, #2563eb)" />
+        <text x="174" y="376" text-anchor="middle" font-size="11" fill="#fff" font-weight="700">10</text>
       </g>
     </g>
   </svg>
@@ -218,10 +274,11 @@ const handleZoneClick = (zoneId: number) => {
 <style scoped>
 .car-diagram {
   width: 100%;
-  max-width: 280px;
+  max-width: 220px;
   height: auto;
   display: block;
   margin: 0 auto;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.1));
 }
 
 .zone-path {
@@ -229,18 +286,25 @@ const handleZoneClick = (zoneId: number) => {
 }
 
 .zone-path:hover {
-  filter: brightness(0.95);
-  stroke-width: 2;
+  filter: brightness(0.9);
+  stroke-width: 2 !important;
 }
 
 .car-outline,
 .wheels,
-.mirrors {
+.mirrors,
+.zone-labels-always,
+.zone-label-selected {
   pointer-events: none;
 }
 
-.zone-labels text {
+.zone-label-text {
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  pointer-events: none;
+  user-select: none;
+}
+
+.zone-label-selected text {
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  user-select: none;
 }
 </style>

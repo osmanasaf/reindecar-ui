@@ -41,46 +41,64 @@ const borderColor = computed(() => {
   <div class="insurance-card" :style="{ borderLeftColor: borderColor }">
     <div class="card-header">
       <div class="header-left">
-        <h3 class="insurance-type">{{ translateInsuranceType(insurance.insuranceType) }}</h3>
-        <span class="status-badge" :class="`status-${statusInfo.color}`">
-          {{ statusInfo.label }}
-        </span>
+        <div class="type-icon" :class="`icon-${statusInfo.color}`">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+          </svg>
+        </div>
+        <div>
+          <h3 class="insurance-type">{{ translateInsuranceType(insurance.insuranceType) }}</h3>
+          <p v-if="insurance.company" class="company-name">{{ insurance.company }}</p>
+        </div>
       </div>
+      <span class="status-badge" :class="`status-${statusInfo.color}`">
+        {{ statusInfo.label }}
+      </span>
+    </div>
+
+    <div v-if="insurance.isExpiringSoon && !insurance.isExpired && insurance.active" class="expiry-warning">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="warning-icon">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+      </svg>
+      Poliçe yakında sona erecek
     </div>
 
     <div class="card-body">
       <div class="info-row">
-        <span class="label">Poliçe No:</span>
+        <span class="label">Poliçe No</span>
         <span class="value">{{ insurance.policyNumber || '-' }}</span>
       </div>
       <div class="info-row">
-        <span class="label">Şirket:</span>
-        <span class="value">{{ insurance.company || '-' }}</span>
-      </div>
-      <div class="info-row">
-        <span class="label">Süre:</span>
-        <span class="value">
-          {{ formatDate(insurance.startDate) }} - {{ formatDate(insurance.endDate) }}
+        <span class="label">Geçerlilik</span>
+        <span class="value date-range">
+          <span>{{ formatDate(insurance.startDate) }}</span>
+          <span class="date-sep">→</span>
+          <span :class="{ 'text-danger': insurance.isExpired }">{{ formatDate(insurance.endDate) }}</span>
         </span>
       </div>
       
-      <div v-if="insurance.coverage" class="coverage-info">
-        <span class="label">Teminat:</span>
-        <span class="value-highlight">
-          {{ formatCurrency(insurance.coverage, insurance.coverageCurrency || 'TRY') }}
-        </span>
-      </div>
-      
-      <div v-if="insurance.premium" class="info-row">
-        <span class="label">Prim:</span>
-        <span class="value">
-          {{ formatCurrency(insurance.premium, insurance.premiumCurrency || 'TRY') }}
-        </span>
+      <div v-if="insurance.coverage || insurance.premium" class="financial-row">
+        <div v-if="insurance.coverage" class="financial-item">
+          <span class="fin-label">Teminat</span>
+          <span class="fin-value">
+            {{ formatCurrency(insurance.coverage, insurance.coverageCurrency || 'TRY') }}
+          </span>
+        </div>
+        <div v-if="insurance.premium" class="financial-item">
+          <span class="fin-label">Prim</span>
+          <span class="fin-value secondary">
+            {{ formatCurrency(insurance.premium, insurance.premiumCurrency || 'TRY') }}
+          </span>
+        </div>
       </div>
 
       <div v-if="insurance.contactPhone" class="info-row">
-        <span class="label">İletişim:</span>
+        <span class="label">İletişim</span>
         <span class="value">{{ formatPhoneInput(insurance.contactPhone) }}</span>
+      </div>
+
+      <div v-if="insurance.notes" class="notes-row">
+        <span class="notes-text">{{ insurance.notes }}</span>
       </div>
     </div>
   </div>
@@ -88,16 +106,20 @@ const borderColor = computed(() => {
 
 <style scoped>
 .insurance-card {
-  background: white;
+  background: var(--color-surface, white);
   border: 1px solid var(--color-border, #e5e7eb);
   border-left-width: 4px;
-  border-radius: 0.5rem;
+  border-radius: 0.75rem;
   padding: 1.25rem;
   transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
 }
 
 .insurance-card:hover {
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 8px 16px -4px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
 }
 
 .card-header {
@@ -105,7 +127,7 @@ const borderColor = computed(() => {
   justify-content: space-between;
   align-items: flex-start;
   margin-bottom: 1rem;
-  padding-bottom: 0.75rem;
+  padding-bottom: 0.875rem;
   border-bottom: 1px solid var(--color-border, #e5e7eb);
 }
 
@@ -115,54 +137,89 @@ const borderColor = computed(() => {
   gap: 0.75rem;
 }
 
+.type-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.type-icon svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.icon-green { background: #dcfce7; color: #15803d; }
+.icon-orange { background: #ffedd5; color: #c2410c; }
+.icon-red { background: #fee2e2; color: #b91c1c; }
+.icon-gray { background: #f3f4f6; color: #374151; }
+
 .insurance-type {
-  font-size: 1.125rem;
+  font-size: 1rem;
   font-weight: 600;
   color: var(--color-text, #111827);
+  margin: 0 0 0.125rem 0;
+}
+
+.company-name {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary, #6b7280);
   margin: 0;
 }
 
 .status-badge {
-  padding: 0.25rem 0.625rem;
+  padding: 0.25rem 0.75rem;
   border-radius: 9999px;
   font-size: 0.75rem;
-  font-weight: 500;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
-.status-green {
-  background: #dcfce7;
-  color: #166534;
+.status-green { background: #dcfce7; color: #166534; }
+.status-orange { background: #ffedd5; color: #9a3412; }
+.status-red { background: #fee2e2; color: #991b1b; }
+.status-gray { background: #f3f4f6; color: #4b5563; }
+
+.expiry-warning {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+  color: #92400e;
+  margin-bottom: 0.875rem;
 }
 
-.status-orange {
-  background: #ffedd5;
-  color: #9a3412;
-}
-
-.status-red {
-  background: #fee2e2;
-  color: #991b1b;
-}
-
-.status-gray {
-  background: #f3f4f6;
-  color: #4b5563;
+.warning-icon {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  color: #f59e0b;
 }
 
 .card-body {
   display: flex;
   flex-direction: column;
-  gap: 0.625rem;
+  gap: 0.5rem;
 }
 
 .info-row {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   font-size: 0.875rem;
+  gap: 0.5rem;
 }
 
 .info-row .label {
   color: var(--color-text-secondary, #6b7280);
+  flex-shrink: 0;
 }
 
 .info-row .value {
@@ -171,23 +228,62 @@ const borderColor = computed(() => {
   text-align: right;
 }
 
-.coverage-info {
+.date-range {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 0.375rem;
+}
+
+.date-sep {
+  color: var(--color-text-secondary, #9ca3af);
+  font-size: 0.75rem;
+}
+
+.text-danger {
+  color: #dc2626;
+}
+
+.financial-row {
+  display: flex;
+  gap: 1rem;
   margin-top: 0.5rem;
   padding-top: 0.75rem;
   border-top: 1px dashed var(--color-border, #e5e7eb);
 }
 
-.coverage-info .label {
-  font-size: 0.875rem;
+.financial-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  flex: 1;
+}
+
+.fin-label {
+  font-size: 0.75rem;
   color: var(--color-text-secondary, #6b7280);
 }
 
-.value-highlight {
+.fin-value {
   font-size: 1rem;
   font-weight: 700;
   color: var(--color-primary, #2563eb);
+}
+
+.fin-value.secondary {
+  font-size: 0.875rem;
+  color: var(--color-text, #374151);
+}
+
+.notes-row {
+  margin-top: 0.375rem;
+  padding-top: 0.625rem;
+  border-top: 1px solid var(--color-border, #e5e7eb);
+}
+
+.notes-text {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary, #6b7280);
+  line-height: 1.5;
+  font-style: italic;
 }
 </style>

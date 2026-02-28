@@ -22,7 +22,7 @@ const toast = useToast()
 const { insuranceTypes } = useEnumTranslations()
 
 const insuranceTypeOptions = computed(() =>
-  Object.entries(insuranceTypes.value).map(([value, label]) => ({ value, label: label as string }))
+  Object.entries(insuranceTypes).map(([value, label]) => ({ value, label: label as string }))
 )
 
 const initialValues: CreateVehicleInsuranceRequest = {

@@ -81,13 +81,17 @@ const allEvents = computed(() => {
   
 
   history.value.statusChanges.forEach(s => {
+    if (!s.newStatus) return
+    const title = s.oldStatus
+      ? `${translateVehicleStatus(s.oldStatus)} → ${translateVehicleStatus(s.newStatus)}`
+      : `Başlangıç Durumu: ${translateVehicleStatus(s.newStatus)}`
     events.push({
       id: `status-${s.id}`,
       type: 'status',
       date: s.changedAt,
       icon: '🔄',
       color: '#607D8B',
-      title: `${translateVehicleStatus(s.oldStatus)} → ${translateVehicleStatus(s.newStatus)}`,
+      title,
       subtitle: s.changedBy || 'Sistem',
       data: s
     })

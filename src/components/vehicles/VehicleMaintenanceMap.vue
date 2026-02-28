@@ -19,10 +19,10 @@ const showCreateForm = ref(false)
 
 const zoneConfigs = computed(() => {
   if (!maintenanceMap.value) return {}
-  
+
   const configs: Record<number, { color: string; onClick: () => void }> = {}
   const allZones = [1, 2, 3, 4, 6, 7, 8, 9, 10, 12, 13]
-  
+
   allZones.forEach(zoneId => {
     const zoneInfo = maintenanceMap.value!.zones[zoneId]
     configs[zoneId] = {
@@ -30,7 +30,7 @@ const zoneConfigs = computed(() => {
       onClick: () => selectZone(zoneId)
     }
   })
-  
+
   return configs
 })
 
@@ -41,6 +41,13 @@ const selectedZoneMaintenances = computed(() => {
   return maintenanceMap.value.maintenances.filter(m => zoneInfo.maintenanceIds.includes(m.id))
 })
 
+const allMaintenancesSorted = computed(() => {
+  if (!maintenanceMap.value) return []
+  return [...maintenanceMap.value.maintenances].sort((a, b) =>
+    new Date(b.maintenanceDate).getTime() - new Date(a.maintenanceDate).getTime()
+  )
+})
+
 const totalMaintenanceCost = computed(() => {
   if (!maintenanceMap.value) return 0
   return maintenanceMap.value.maintenances
@@ -49,7 +56,7 @@ const totalMaintenanceCost = computed(() => {
 
 const lastMaintenanceDate = computed(() => {
   if (!maintenanceMap.value || maintenanceMap.value.maintenances.length === 0) return null
-  const sorted = [...maintenanceMap.value.maintenances].sort((a, b) => 
+  const sorted = [...maintenanceMap.value.maintenances].sort((a, b) =>
     new Date(b.maintenanceDate).getTime() - new Date(a.maintenanceDate).getTime()
   )
   return sorted[0]?.maintenanceDate || null
@@ -67,7 +74,7 @@ async function fetchMaintenanceMap() {
 }
 
 function selectZone(zoneId: number) {
-  selectedZone.value = zoneId
+  selectedZone.value = selectedZone.value === zoneId ? undefined : zoneId
 }
 
 function clearSelection() {
@@ -102,139 +109,200 @@ onMounted(() => {
 
 <template>
   <div class="maintenance-map">
+    <!-- Başlık -->
     <div class="map-header">
-      <h2>Bakım Haritası</h2>
-      <div class="header-actions">
-        <button class="btn btn-primary" @click="showCreateForm = true">
-          + Bakım Ekle
-        </button>
-      </div>
+      <h2 class="map-title">Bakım Haritası</h2>
+      <button class="btn btn-primary" @click="showCreateForm = true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="btn-icon">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+        </svg>
+        Bakım Ekle
+      </button>
     </div>
 
-    <div v-if="loading" class="loading">Yükleniyor...</div>
+    <!-- Yükleniyor -->
+    <div v-if="loading" class="loading-state">
+      <div class="loading-spinner"></div>
+      <span>Bakım haritası yükleniyor...</span>
+    </div>
 
-    <div v-else-if="maintenanceMap" class="map-content">
-
-      <div class="stats-summary">
-        <div class="stat-card">
-          <div class="stat-icon maintenance-icon">🔧</div>
-          <div class="stat-info">
-            <span class="stat-value">{{ maintenanceMap.totalMaintenanceCount }}</span>
-            <span class="stat-label">Toplam Bakım</span>
-          </div>
+    <template v-else-if="maintenanceMap">
+      <!-- İstatistik Satırı -->
+      <div class="stats-row">
+        <div class="stat-pill">
+          <span class="stat-num">{{ maintenanceMap.totalMaintenanceCount }}</span>
+          <span class="stat-lbl">Toplam Bakım</span>
         </div>
-        <div class="stat-card">
-          <div class="stat-icon cost-icon">💰</div>
-          <div class="stat-info">
-            <span class="stat-value">{{ formatCurrency(totalMaintenanceCost, 'TRY') }}</span>
-            <span class="stat-label">Toplam Bakım Maliyeti</span>
-          </div>
+        <div class="stat-pill stat-cost">
+          <span class="stat-num stat-num-sm">{{ formatCurrency(totalMaintenanceCost, 'TRY') }}</span>
+          <span class="stat-lbl">Toplam Maliyet</span>
         </div>
-        <div class="stat-card">
-          <div class="stat-icon date-icon">📅</div>
-          <div class="stat-info">
-            <span class="stat-value">{{ lastMaintenanceDate ? formatDate(lastMaintenanceDate) : '-' }}</span>
-            <span class="stat-label">Son Bakım</span>
-          </div>
+        <div class="stat-pill stat-date">
+          <span class="stat-num stat-num-sm">{{ lastMaintenanceDate ? formatDate(lastMaintenanceDate) : '-' }}</span>
+          <span class="stat-lbl">Son Bakım</span>
         </div>
       </div>
 
-      <div class="map-section">
-        <div class="car-diagram-container">
-          <CarDiagramSVG :zones="zoneConfigs" :selected-zone="selectedZone" />
-        </div>
-
-        <div class="legend">
-          <h3>Bakım Tipleri</h3>
-          <div class="legend-items">
-            <div class="legend-item">
-              <span class="legend-color" :style="{ backgroundColor: MAINTENANCE_COLORS.REPAIR }"></span>
-              <span>Tamir</span>
-            </div>
-            <div class="legend-item">
-              <span class="legend-color" :style="{ backgroundColor: MAINTENANCE_COLORS.PAINT }"></span>
-              <span>Boyama</span>
-            </div>
-            <div class="legend-item">
-              <span class="legend-color" :style="{ backgroundColor: MAINTENANCE_COLORS.PART_REPLACEMENT }"></span>
-              <span>Parça Değişimi</span>
-            </div>
-            <div class="legend-item">
-              <span class="legend-color" :style="{ backgroundColor: MAINTENANCE_COLORS.SERVICE }"></span>
-              <span>Servis</span>
-            </div>
-            <div class="legend-item">
-              <span class="legend-color" :style="{ backgroundColor: MAINTENANCE_COLORS.OTHER }"></span>
-              <span>Diğer</span>
-            </div>
+      <!-- Ana İçerik: Sol (Araç) + Sağ (Detay) -->
+      <div class="map-body">
+        <!-- Sol Panel: Araç Görseli + Legend -->
+        <div class="left-panel">
+          <div class="diagram-wrap">
+            <CarDiagramSVG :zones="zoneConfigs" :selected-zone="selectedZone" />
           </div>
-        </div>
-      </div>
-
-      <div class="details-section">
-        <div v-if="selectedZone" class="zone-details">
-          <div class="zone-header">
-            <h3>{{ ZONE_NAMES[selectedZone] }}</h3>
-            <button class="btn-close" @click="clearSelection">×</button>
-          </div>
-
-          <div v-if="selectedZoneMaintenances.length === 0" class="no-maintenances">
-            Bu bölgede bakım kaydı bulunmuyor.
-          </div>
-
-          <div v-else class="maintenance-list">
-            <div
-              v-for="maintenance in selectedZoneMaintenances"
-              :key="maintenance.id"
-              class="maintenance-card"
-            >
-              <div class="maintenance-header">
-                <span class="maintenance-type">{{ maintenance.maintenanceTypeDisplayName }}</span>
-                <span 
-                  class="type-badge"
-                  :style="{ backgroundColor: maintenance.maintenanceTypeColorCode }"
-                >
-                  {{ maintenance.maintenanceTypeDisplayName }}
-                </span>
+          <div class="legend">
+            <p class="legend-title">Bakım Tipleri</p>
+            <div class="legend-grid">
+              <div class="legend-item">
+                <span class="legend-dot" :style="{ background: MAINTENANCE_COLORS.REPAIR }"></span>
+                <span>Tamir</span>
               </div>
-              <div class="maintenance-body">
-                <p><strong>Tarih:</strong> {{ formatDate(maintenance.maintenanceDate) }}</p>
-                <p><strong>KM:</strong> {{ formatKm(maintenance.currentKm) }}</p>
-                <p v-if="maintenance.costAmount">
-                  <strong>Maliyet:</strong> 
-                  {{ formatCurrency(maintenance.costAmount, maintenance.costCurrency) }}
-                </p>
-                <p v-if="maintenance.serviceProvider">
-                  <strong>Servis:</strong> {{ maintenance.serviceProvider }}
-                </p>
-                <p v-if="maintenance.description">
-                  <strong>Açıklama:</strong> {{ maintenance.description }}
-                </p>
-                <div v-if="maintenance.partsReplaced.length > 0" class="parts-list">
-                  <strong>Değiştirilen Parçalar:</strong>
-                  <ul>
-                    <li v-for="(part, idx) in maintenance.partsReplaced" :key="idx">{{ part }}</li>
-                  </ul>
+              <div class="legend-item">
+                <span class="legend-dot" :style="{ background: MAINTENANCE_COLORS.PAINT }"></span>
+                <span>Boyama</span>
+              </div>
+              <div class="legend-item">
+                <span class="legend-dot" :style="{ background: MAINTENANCE_COLORS.PART_REPLACEMENT }"></span>
+                <span>Parça</span>
+              </div>
+              <div class="legend-item">
+                <span class="legend-dot" :style="{ background: MAINTENANCE_COLORS.SERVICE }"></span>
+                <span>Servis</span>
+              </div>
+              <div class="legend-item">
+                <span class="legend-dot" :style="{ background: MAINTENANCE_COLORS.OIL_CHANGE }"></span>
+                <span>Yağ</span>
+              </div>
+              <div class="legend-item">
+                <span class="legend-dot" :style="{ background: MAINTENANCE_COLORS.TIRE_CHANGE }"></span>
+                <span>Lastik</span>
+              </div>
+              <div class="legend-item">
+                <span class="legend-dot" :style="{ background: MAINTENANCE_COLORS.BRAKE_SERVICE }"></span>
+                <span>Fren</span>
+              </div>
+              <div class="legend-item">
+                <span class="legend-dot" :style="{ background: MAINTENANCE_COLORS.OTHER }"></span>
+                <span>Diğer</span>
+              </div>
+            </div>
+            <p class="legend-hint">Bölgeye tıklayarak detay görün</p>
+          </div>
+        </div>
+
+        <!-- Sağ Panel: Detaylar -->
+        <div class="right-panel">
+          <!-- Zone seçili: o zone'un bakımları -->
+          <div v-if="selectedZone" class="detail-panel">
+            <div class="detail-header">
+              <div class="detail-title-group">
+                <span class="zone-badge">{{ selectedZone }}</span>
+                <h3 class="detail-title">{{ ZONE_NAMES[selectedZone] }}</h3>
+              </div>
+              <button class="close-btn" @click="clearSelection" title="Kapat">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div v-if="selectedZoneMaintenances.length === 0" class="no-records">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="no-records-icon">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              <p>Bu bölgede bakım kaydı bulunmuyor</p>
+            </div>
+
+            <div v-else class="maintenance-list">
+              <div
+                v-for="maintenance in selectedZoneMaintenances"
+                :key="maintenance.id"
+                class="maintenance-card"
+              >
+                <div class="maintenance-card-header">
+                  <div class="type-indicator" :style="{ background: maintenance.maintenanceTypeColorCode }"></div>
+                  <span class="maintenance-type-text">{{ maintenance.maintenanceTypeDisplayName }}</span>
+                  <span class="type-chip" :style="{ background: maintenance.maintenanceTypeColorCode }">
+                    {{ maintenance.maintenanceTypeDisplayName }}
+                  </span>
                 </div>
-                <p v-if="maintenance.paintColor">
-                  <strong>Boya Rengi:</strong> {{ maintenance.paintColor }}
-                </p>
+                <div class="maintenance-card-body">
+                  <div class="mi-row">
+                    <span class="mi-label">Tarih</span>
+                    <span class="mi-value">{{ formatDate(maintenance.maintenanceDate) }}</span>
+                  </div>
+                  <div class="mi-row">
+                    <span class="mi-label">KM</span>
+                    <span class="mi-value">{{ formatKm(maintenance.currentKm) }}</span>
+                  </div>
+                  <div v-if="maintenance.costAmount" class="mi-row">
+                    <span class="mi-label">Maliyet</span>
+                    <span class="mi-value highlight">{{ formatCurrency(maintenance.costAmount, maintenance.costCurrency) }}</span>
+                  </div>
+                  <div v-if="maintenance.serviceProvider" class="mi-row">
+                    <span class="mi-label">Servis</span>
+                    <span class="mi-value">{{ maintenance.serviceProvider }}</span>
+                  </div>
+                  <div v-if="maintenance.description" class="mi-row">
+                    <span class="mi-label">Açıklama</span>
+                    <span class="mi-value">{{ maintenance.description }}</span>
+                  </div>
+                  <div v-if="maintenance.paintColor" class="mi-row">
+                    <span class="mi-label">Boya Rengi</span>
+                    <span class="mi-value">{{ maintenance.paintColor }}</span>
+                  </div>
+                  <div v-if="maintenance.partsReplaced.length > 0" class="parts-block">
+                    <span class="mi-label">Değiştirilen Parçalar</span>
+                    <ul class="parts-list">
+                      <li v-for="(part, idx) in maintenance.partsReplaced" :key="idx">{{ part }}</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Zone seçili değil: tüm bakımlar listesi -->
+          <div v-else class="all-maintenances-panel">
+            <div class="all-header">
+              <h3 class="detail-title">Tüm Bakımlar</h3>
+              <span class="count-badge">{{ allMaintenancesSorted.length }}</span>
+            </div>
+
+            <div v-if="allMaintenancesSorted.length === 0" class="no-records">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="no-records-icon">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              <p>Bakım kaydı bulunmuyor</p>
+              <p class="no-records-hint">Araç bakımlarını buradan takip edebilirsiniz</p>
+            </div>
+
+            <div v-else class="all-maintenance-list">
+              <div
+                v-for="maintenance in allMaintenancesSorted"
+                :key="maintenance.id"
+                class="maintenance-row"
+                @click="selectZone(maintenance.affectedZones?.[0] ?? 13)"
+              >
+                <span class="type-dot" :style="{ background: maintenance.maintenanceTypeColorCode }"></span>
+                <div class="maintenance-row-info">
+                  <span class="maintenance-row-type">{{ maintenance.maintenanceTypeDisplayName }}</span>
+                  <span class="maintenance-row-km">{{ formatKm(maintenance.currentKm) }}</span>
+                </div>
+                <div class="maintenance-row-right">
+                  <span class="maintenance-row-date">{{ formatDate(maintenance.maintenanceDate) }}</span>
+                  <span v-if="maintenance.costAmount" class="maintenance-row-cost">
+                    {{ formatCurrency(maintenance.costAmount, maintenance.costCurrency) }}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
         </div>
-
-        <div v-else class="no-selection">
-          <p>Detayları görmek için harita üzerinde bir bölgeye tıklayın</p>
-          <div class="stats">
-            <div class="stat-item">
-              <span class="stat-value">{{ maintenanceMap.totalMaintenanceCount }}</span>
-              <span class="stat-label">Toplam Bakım Kaydı</span>
-            </div>
-          </div>
-        </div>
       </div>
-    </div>
+    </template>
 
     <CreateMaintenanceForm
       v-if="showCreateForm"
@@ -249,290 +317,40 @@ onMounted(() => {
 .maintenance-map {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 20px;
 }
 
 .map-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
 }
 
-.map-header h2 {
+.map-title {
   margin: 0;
-  font-size: 20px;
-  font-weight: 600;
-}
-
-.loading {
-  text-align: center;
-  padding: 60px;
-  color: var(--color-text-secondary);
-}
-
-.map-content {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 24px;
-}
-
-.stats-summary {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
-  margin-bottom: 8px;
-}
-
-.stat-card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  padding: 20px;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  transition: all 0.2s;
-}
-
-.stat-card:hover {
-  border-color: var(--color-primary);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.stat-icon {
-  font-size: 32px;
-  width: 56px;
-  height: 56px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 12px;
-  background: var(--color-bg-secondary);
-}
-
-.maintenance-icon {
-  background: #E3F2FD;
-}
-
-.cost-icon {
-  background: #FFE5E5;
-}
-
-.date-icon {
-  background: #F3E5F5;
-}
-
-.stat-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.stat-value {
-  font-size: 24px;
+  font-size: 1.25rem;
   font-weight: 700;
   color: var(--color-text);
 }
 
-.stat-label {
-  font-size: 13px;
-  color: var(--color-text-secondary);
-}
-
-.map-section {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 24px;
-}
-
-.car-diagram-container {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  padding: 24px;
-}
-
-.legend {
-  background: var(--color-bg-secondary);
-  border-radius: 12px;
-  padding: 16px;
-}
-
-.legend h3 {
-  margin: 0 0 12px 0;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.legend-items {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.legend-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-}
-
-.legend-color {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-  border: 1px solid var(--color-border);
-}
-
-.details-section {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  padding: 24px;
-  min-height: 400px;
-  max-height: 600px;
-  overflow-y: auto;
-}
-
-.zone-details {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.zone-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.zone-header h3 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.btn-close {
-  background: none;
-  border: none;
-  font-size: 24px;
-  cursor: pointer;
-  color: var(--color-text-secondary);
-  padding: 0;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-}
-
-.btn-close:hover {
-  background: var(--color-bg-secondary);
-}
-
-.no-maintenances {
-  text-align: center;
-  padding: 40px;
-  color: var(--color-text-secondary);
-}
-
-.maintenance-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.maintenance-card {
-  background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  padding: 16px;
-}
-
-.maintenance-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-.maintenance-type {
-  font-weight: 600;
-  font-size: 15px;
-}
-
-.type-badge {
-  padding: 4px 12px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 500;
-  color: white;
-}
-
-.maintenance-body p {
-  margin: 8px 0;
-  font-size: 14px;
-  color: var(--color-text-secondary);
-}
-
-.parts-list {
-  margin: 12px 0;
-}
-
-.parts-list ul {
-  margin: 4px 0 0 0;
-  padding-left: 20px;
-}
-
-.parts-list li {
-  font-size: 13px;
-  color: var(--color-text-secondary);
-}
-
-.no-selection {
-  text-align: center;
-  padding: 40px;
-}
-
-.no-selection p {
-  color: var(--color-text-secondary);
-  margin-bottom: 24px;
-}
-
-.stats {
-  display: flex;
-  justify-content: center;
-  gap: 24px;
-}
-
-.stat-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-}
-
-.stat-value {
-  font-size: 32px;
-  font-weight: 700;
-  color: var(--color-primary);
-}
-
-.stat-label {
-  font-size: 13px;
-  color: var(--color-text-secondary);
-}
-
 .btn {
-  padding: 10px 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 18px;
   border-radius: 8px;
+  font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
   border: none;
   transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn-icon {
+  width: 15px;
+  height: 15px;
 }
 
 .btn-primary {
@@ -541,16 +359,462 @@ onMounted(() => {
 }
 
 .btn-primary:hover {
-  background: var(--color-primary-hover);
+  background: var(--color-primary-hover, #1d4ed8);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(37,99,235,0.3);
 }
 
-@media (max-width: 1024px) {
-  .stats-summary {
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 60px;
+  color: var(--color-text-secondary);
+}
+
+.loading-spinner {
+  width: 2rem;
+  height: 2rem;
+  border: 3px solid var(--color-border, #e5e7eb);
+  border-top-color: var(--color-primary, #2563eb);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.stats-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.stat-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 12px 20px;
+  min-width: 120px;
+  transition: all 0.2s;
+}
+
+.stat-pill:hover {
+  border-color: var(--color-primary);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.stat-cost {
+  border-color: #fde68a;
+  background: #fffbeb;
+}
+
+.stat-date {
+  border-color: #c7d2fe;
+  background: #eef2ff;
+}
+
+.stat-num {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-text);
+  line-height: 1;
+}
+
+.stat-num-sm {
+  font-size: 1rem;
+}
+
+.stat-lbl {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  margin-top: 4px;
+  text-align: center;
+}
+
+.map-body {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.left-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.diagram-wrap {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  padding: 20px 16px;
+}
+
+.legend {
+  background: var(--color-bg-secondary, #f9fafb);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.legend-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin: 0 0 10px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.legend-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+}
+
+.legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  border: 1px solid rgba(0,0,0,0.1);
+}
+
+.legend-hint {
+  font-size: 0.75rem;
+  color: var(--color-text-muted, #9ca3af);
+  margin: 10px 0 0 0;
+  text-align: center;
+  font-style: italic;
+}
+
+.right-panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  overflow: hidden;
+  min-height: 400px;
+}
+
+.detail-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-secondary, #f9fafb);
+}
+
+.detail-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.zone-badge {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--color-primary);
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.detail-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.close-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  transition: all 0.15s;
+}
+
+.close-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.close-btn:hover {
+  background: var(--color-border);
+  color: var(--color-text);
+}
+
+.no-records {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  color: var(--color-text-secondary);
+  text-align: center;
+  gap: 8px;
+}
+
+.no-records-icon {
+  width: 3rem;
+  height: 3rem;
+  color: var(--color-text-muted, #9ca3af);
+  margin-bottom: 4px;
+}
+
+.no-records p {
+  margin: 0;
+  font-size: 0.9375rem;
+}
+
+.no-records-hint {
+  font-size: 0.8125rem !important;
+  color: var(--color-text-muted, #9ca3af) !important;
+}
+
+.maintenance-list {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 520px;
+  overflow-y: auto;
+}
+
+.maintenance-card {
+  background: var(--color-bg-secondary, #f9fafb);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.maintenance-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.type-indicator {
+  width: 4px;
+  height: 20px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.maintenance-type-text {
+  font-weight: 600;
+  font-size: 0.9375rem;
+  color: var(--color-text);
+  flex: 1;
+}
+
+.type-chip {
+  padding: 3px 10px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: white;
+}
+
+.maintenance-card-body {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mi-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.875rem;
+}
+
+.mi-label {
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+
+.mi-value {
+  color: var(--color-text);
+  font-weight: 500;
+  text-align: right;
+}
+
+.mi-value.highlight {
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+.parts-block {
+  margin-top: 6px;
+}
+
+.parts-list {
+  margin: 4px 0 0 0;
+  padding-left: 18px;
+}
+
+.parts-list li {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  margin-bottom: 2px;
+}
+
+.all-maintenances-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.all-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-secondary, #f9fafb);
+}
+
+.count-badge {
+  background: var(--color-primary);
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 9999px;
+}
+
+.all-maintenance-list {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 520px;
+  overflow-y: auto;
+}
+
+.maintenance-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+  border: 1px solid transparent;
+}
+
+.maintenance-row:hover {
+  background: var(--color-bg-secondary, #f9fafb);
+  border-color: var(--color-border);
+}
+
+.type-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1px solid rgba(0,0,0,0.1);
+}
+
+.maintenance-row-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.maintenance-row-type {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.maintenance-row-km {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  margin-top: 1px;
+}
+
+.maintenance-row-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.maintenance-row-date {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+.maintenance-row-cost {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+@media (max-width: 900px) {
+  .map-body {
     grid-template-columns: 1fr;
   }
 
-  .map-section {
-    grid-template-columns: 1fr;
+  .left-panel {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+
+  .diagram-wrap {
+    flex: 0 0 180px;
+  }
+
+  .legend {
+    flex: 1;
+  }
+}
+
+@media (max-width: 600px) {
+  .left-panel {
+    flex-direction: column;
+  }
+
+  .stats-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
   }
 }
 </style>

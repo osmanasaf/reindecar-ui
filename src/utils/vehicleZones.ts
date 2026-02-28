@@ -1,12 +1,12 @@
 import { DamageLocation, DamageSeverity, MaintenanceType } from '@/types'
 
 export const ZONE_LOCATION_MAP: Record<number, DamageLocation[]> = {
-  1: [DamageLocation.FRONT_BUMPER, DamageLocation.FRONT_RIGHT_FENDER, DamageLocation.WHEEL_FRONT_RIGHT],
+  1: [DamageLocation.FRONT_RIGHT_FENDER, DamageLocation.WHEEL_FRONT_RIGHT],
   2: [DamageLocation.WINDSHIELD],
-  3: [DamageLocation.HOOD],
+  3: [DamageLocation.FRONT_BUMPER, DamageLocation.HOOD],
   4: [DamageLocation.FRONT_LEFT_FENDER, DamageLocation.WHEEL_FRONT_LEFT],
   6: [DamageLocation.LEFT_FRONT_DOOR, DamageLocation.LEFT_REAR_DOOR, DamageLocation.LEFT_MIRROR],
-  7: [DamageLocation.WHEEL_REAR_LEFT],
+  7: [DamageLocation.REAR_BUMPER, DamageLocation.REAR_LEFT_FENDER, DamageLocation.WHEEL_REAR_LEFT],
   8: [DamageLocation.TRUNK],
   9: [DamageLocation.REAR_WINDOW],
   10: [DamageLocation.REAR_RIGHT_FENDER, DamageLocation.WHEEL_REAR_RIGHT],
@@ -46,15 +46,15 @@ export const MAINTENANCE_COLORS: Record<MaintenanceType, string> = {
 }
 
 export const ZONE_NAMES: Record<number, string> = {
-  1: 'Sağ Ön Köşe',
+  1: 'Sağ Ön Çamurluk & Tekerlek',
   2: 'Ön Cam',
-  3: 'Kaput',
-  4: 'Sol Ön Köşe',
-  6: 'Sol Kapılar',
-  7: 'Arka Sol Tekerlek',
+  3: 'Kaput & Ön Tampon',
+  4: 'Sol Ön Çamurluk & Tekerlek',
+  6: 'Sol Kapılar & Ayna',
+  7: 'Arka Tampon & Sol Arka',
   8: 'Bagaj',
   9: 'Arka Cam',
-  10: 'Sağ Arka Köşe',
-  12: 'Sağ Kapılar',
-  13: 'İç Mekan/Tavan'
+  10: 'Sağ Arka Çamurluk & Tekerlek',
+  12: 'Sağ Kapılar & Ayna',
+  13: 'Tavan & İç Mekan'
 }
