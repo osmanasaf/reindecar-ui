@@ -304,21 +304,35 @@ class DashboardApiService extends BaseApi {
         }
     }
 
-    private parseAccountingStats(raw?: AccountingStats): AccountingStats {
-        return {
-            totalReceivable: raw?.totalReceivable ?? 0,
-            paidReceivable: raw?.paidReceivable ?? 0,
-            remainingReceivable: raw?.remainingReceivable ?? 0,
-            overdueReceivableCount: raw?.overdueReceivableCount ?? 0,
-            overdueReceivableAmount: raw?.overdueReceivableAmount ?? 0,
-            totalPayable: raw?.totalPayable ?? 0,
-            paidPayable: raw?.paidPayable ?? 0,
-            remainingPayable: raw?.remainingPayable ?? 0,
-            overduePayableCount: raw?.overduePayableCount ?? 0,
-            overduePayableAmount: raw?.overduePayableAmount ?? 0,
-            netPosition: raw?.netPosition ?? 0,
-            netPositive: raw?.netPositive ?? true
+    private parseAccountingStats(raw?: Record<string, unknown> | AccountingStats): AccountingStats {
+        console.log('[Dashboard] Raw accounting from API:', JSON.stringify(raw))
+        const toNum = (v: unknown): number => {
+            if (v == null) return 0
+            const n = Number(v)
+            return Number.isFinite(n) ? n : 0
         }
+        const toBool = (v: unknown, fallback = true): boolean => {
+            if (v == null) return fallback
+            if (typeof v === 'boolean') return v
+            return fallback
+        }
+        const r = raw as Record<string, unknown> | undefined
+        const result = {
+            totalReceivable: toNum(r?.totalReceivable),
+            paidReceivable: toNum(r?.paidReceivable),
+            remainingReceivable: toNum(r?.remainingReceivable),
+            overdueReceivableCount: toNum(r?.overdueReceivableCount),
+            overdueReceivableAmount: toNum(r?.overdueReceivableAmount),
+            totalPayable: toNum(r?.totalPayable),
+            paidPayable: toNum(r?.paidPayable),
+            remainingPayable: toNum(r?.remainingPayable),
+            overduePayableCount: toNum(r?.overduePayableCount),
+            overduePayableAmount: toNum(r?.overduePayableAmount),
+            netPosition: toNum(r?.netPosition),
+            netPositive: toBool(r?.netPositive, true)
+        }
+        console.log('[Dashboard] Parsed accounting:', JSON.stringify(result))
+        return result
     }
 
     private getDefaultStats(): DashboardStats {

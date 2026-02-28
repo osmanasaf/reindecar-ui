@@ -221,6 +221,14 @@ export abstract class BaseApi {
         await apiClient.delete(this.buildUrl(path))
     }
 
+    protected async getBlob(path = '', params?: PaginationParams): Promise<Blob> {
+        const { data } = await apiClient.get(this.buildUrl(path), {
+            params,
+            responseType: 'blob'
+        })
+        return data
+    }
+
     protected async getList<T>(path = '', params?: PaginationParams): Promise<PaginatedResponse<T>> {
         return this.get<PaginatedResponse<T>>(path, params)
     }

@@ -52,17 +52,30 @@ const totalReceivable = computed(() =>
 const outstandingReceivable = computed(() =>
   receivables.value.reduce((s, r) => s + r.remainingAmount, 0)
 )
-const overdueReceivables = computed(() =>
-  receivables.value.filter(r => r.status === ReceivableStatus.OVERDUE)
-)
+const overdueReceivables = computed(() => {
+  const today = new Date().toISOString().split('T')[0]
+  return receivables.value.filter(r =>
+    (r.status === ReceivableStatus.OVERDUE) ||
+    ((r.status === ReceivableStatus.PENDING || r.status === ReceivableStatus.PARTIAL_PAID) && r.dueDate && r.dueDate < today)
+  )
+})
 const overdueReceivablesTotal = computed(() =>
   overdueReceivables.value.reduce((s, r) => s + r.remainingAmount, 0)
+)
+const paidReceivable = computed(() =>
+  receivables.value.reduce((s, r) => s + (r.paidAmount ?? 0), 0)
 )
 const collectionRate = computed(() => {
   const total = totalReceivable.value
   if (!total) return 0
-  const paid = receivables.value.reduce((s, r) => s + r.paidAmount, 0)
-  return Math.round((paid / total) * 100)
+  const remaining = outstandingReceivable.value
+  if (remaining > 0 && remaining < total) {
+    const rate = ((total - remaining) / total) * 100
+    const floored = Math.floor(rate * 10) / 10
+    return Math.min(99.9, Math.max(0, floored))
+  }
+  if (remaining <= 0) return 100
+  return 0
 })
 
 const selectedCustomer = computed(() =>
@@ -272,7 +285,11 @@ const customerOptions = computed(() =>
         <div class="stat-value">{{ formatCurrency(totalReceivable) }}</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Tahsil Edilecek</div>
+        <div class="stat-label">Tahsil Edilen</div>
+        <div class="stat-value text-green">{{ formatCurrency(paidReceivable) }}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Bekleyen (Kalan)</div>
         <div class="stat-value text-orange">{{ formatCurrency(outstandingReceivable) }}</div>
       </div>
       <div class="stat-card">
@@ -284,7 +301,9 @@ const customerOptions = computed(() =>
       </div>
       <div class="stat-card">
         <div class="stat-label">Tahsilat Oranı</div>
-        <div class="stat-value text-green">{{ collectionRate }}%</div>
+        <div :class="['stat-value', collectionRate >= 80 ? 'text-green' : collectionRate >= 50 ? 'text-orange' : 'text-red']">
+          {{ collectionRate }}%
+        </div>
       </div>
     </div>
 
@@ -523,9 +542,17 @@ const customerOptions = computed(() =>
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1.5rem;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 1rem;
   margin-bottom: 2rem;
+}
+
+@media (max-width: 1100px) {
+  .stats-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (max-width: 700px) {
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
 .stat-card {

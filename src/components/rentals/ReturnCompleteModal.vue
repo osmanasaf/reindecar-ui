@@ -20,9 +20,10 @@ const toast = useToast()
 const loading = ref(false)
 const calculating = ref(false)
 const saving = ref(false)
+const downloadingPdf = ref(false)
 const rental = ref<Rental | null>(null)
 const vehicle = ref<Vehicle | null>(null)
-const step = ref<'input' | 'preview'>('input')
+const step = ref<'input' | 'preview' | 'completed'>('input')
 const preview = ref<ReturnPreviewResponse | null>(null)
 
 const form = ref<{
@@ -136,11 +137,33 @@ async function completeReturn() {
     const updatedRental = await rentalsApi.complete(props.rentalId, completeRequest)
     toast.success('Kiralama başarıyla sonlandırıldı')
     emit('completed', updatedRental)
-    handleClose()
+    step.value = 'completed'
   } catch (err) {
     toast.apiError(err, 'Kiralama sonlandırılamadı')
   } finally {
     saving.value = false
+  }
+}
+
+async function downloadCompletionPdf() {
+  if (!props.rentalId || !rental.value) return
+
+  downloadingPdf.value = true
+  try {
+    const blob = await rentalsApi.downloadCompletionPdf(props.rentalId)
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `kiralama-teslim-tutanagi-${rental.value.rentalNumber}.pdf`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+    toast.success('Teslim tutanağı indirildi')
+  } catch (err) {
+    toast.apiError(err, 'PDF indirilemedi')
+  } finally {
+    downloadingPdf.value = false
   }
 }
 
@@ -385,10 +408,33 @@ watch(() => props.visible, (isVisible) => {
                 </div>
               </div>
             </template>
+
+            <template v-else-if="step === 'completed'">
+              <div class="divider"></div>
+
+              <div class="completed-section">
+                <div class="completed-icon">✅</div>
+                <h3>Kiralama Başarıyla Sonlandırıldı</h3>
+                <p>Teslim tutanağını PDF olarak indirip müşteriye imzalatabilirsiniz.</p>
+
+                <button
+                  type="button"
+                  class="btn btn-pdf"
+                  :disabled="downloadingPdf"
+                  @click="downloadCompletionPdf"
+                >
+                  <span v-if="downloadingPdf" class="spinner-sm"></span>
+                  <span v-else>📄</span>
+                  {{ downloadingPdf ? 'İndiriliyor...' : 'Teslim Tutanağı İndir (PDF)' }}
+                </button>
+              </div>
+            </template>
           </div>
 
           <footer class="modal-footer">
-            <button type="button" class="btn btn-outline" @click="handleClose">İptal</button>
+            <button type="button" class="btn btn-outline" @click="handleClose">
+              {{ step === 'completed' ? 'Kapat' : 'İptal' }}
+            </button>
             
             <button 
               v-if="step === 'input'"
@@ -759,6 +805,63 @@ watch(() => props.visible, (isVisible) => {
 
 .btn-outline:hover {
   background: var(--color-bg-secondary);
+}
+
+.spinner-sm {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  display: inline-block;
+}
+
+.completed-section {
+  text-align: center;
+  padding: 24px 0;
+}
+
+.completed-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.completed-section h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0 0 8px 0;
+}
+
+.completed-section p {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  margin: 0 0 24px 0;
+}
+
+.btn-pdf {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-pdf:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.btn-pdf:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 @media (max-width: 500px) {

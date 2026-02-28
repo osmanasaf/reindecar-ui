@@ -38,6 +38,7 @@ const {
     accounting,
     activeRentals,
     loading,
+    error,
     fetchAll,
     fetchRevenue,
 } = useDashboardStats()
@@ -119,6 +120,15 @@ const statCards = computed<StatCard[]>(() => {
             route: '/vehicles',
         },
         {
+            id: 'customers',
+            label: 'Müşteriler',
+            value: String(safeNum(s.totalCustomers)),
+            sub: 'kayıtlı müşteri',
+            icon: '👥',
+            color: '#06b6d4',
+            route: '/customers',
+        },
+        {
             id: 'returns',
             label: 'Bugün İade',
             value: String(safeNum(s.todayReturns)),
@@ -127,19 +137,10 @@ const statCards = computed<StatCard[]>(() => {
             color: '#f59e0b',
         },
         {
-            id: 'payments',
-            label: 'Bekleyen Ödeme',
-            value: String(safeNum(s.pendingPayments)),
-            sub: formatCurrency(s.pendingPaymentAmount),
-            icon: '💳',
-            color: '#8b5cf6',
-            route: '/accounting/receivables',
-        },
-        {
             id: 'net',
             label: 'Net Pozisyon',
             value: a ? formatCurrency(a.netPosition) : '—',
-            sub: a ? netPositionLabel(a.netPositive) : '',
+            sub: a ? netPositionLabel(a.netPositive) : 'Yükleniyor...',
             icon: '📊',
             color: a?.netPositive ? '#10b981' : '#ef4444',
         },
@@ -230,9 +231,15 @@ const sortedReturns = computed<UpcomingReturn[]>(() =>
 
 const receivableCollectionRate = computed(() => {
     if (!accounting.value) return 0
-    const { totalReceivable, paidReceivable } = accounting.value
-    if (totalReceivable === 0) return 100
-    return Math.round((paidReceivable / totalReceivable) * 100)
+    const { totalReceivable, remainingReceivable } = accounting.value
+    if (totalReceivable === 0) return 0
+    if (remainingReceivable > 0 && remainingReceivable < totalReceivable) {
+        const rate = ((totalReceivable - remainingReceivable) / totalReceivable) * 100
+        const floored = Math.floor(rate * 10) / 10
+        return Math.min(99.9, Math.max(0, floored))
+    }
+    if (remainingReceivable <= 0) return 100
+    return 0
 })
 
 // ─── Actions ──────────────────────────────────────────────────────────────────
@@ -267,8 +274,20 @@ onMounted(() => fetchAll(revenuePeriod.value))
                 <h1 class="db-title">Dashboard</h1>
                 <p class="db-sub">Operasyonel ve finansal özet</p>
             </div>
-            <button class="btn-primary" @click="go('/rentals/create')">+ Yeni Kiralama</button>
+            <div class="db-header-actions">
+                <button class="btn-refresh" :disabled="loading" @click="fetchAll(revenuePeriod)">
+                    <span :class="{ 'spin': loading }">↻</span>
+                    {{ loading ? 'Yükleniyor...' : 'Yenile' }}
+                </button>
+                <button class="btn-primary" @click="go('/rentals/create')">+ Yeni Kiralama</button>
+            </div>
         </header>
+
+        <!-- ── Error Banner ───────────────────────────────────────────────── -->
+        <div v-if="error" class="error-banner">
+            <span>⚠ {{ error }}</span>
+            <button class="btn-retry" @click="fetchAll(revenuePeriod)">Tekrar Dene</button>
+        </div>
 
         <!-- ── Stat Cards ─────────────────────────────────────────────────── -->
         <section class="stat-row">
@@ -467,98 +486,145 @@ onMounted(() => fetchAll(revenuePeriod.value))
         </section>
 
         <!-- ── Accounting Summary ─────────────────────────────────────────── -->
-        <section v-if="!loading && accounting" class="card">
+        <section class="card">
             <div class="card-head">
                 <h2 class="card-title">Muhasebe Özeti</h2>
-                <router-link to="/accounting/receivables" class="link">Detay →</router-link>
+                <div class="card-head-actions">
+                    <router-link to="/accounting/receivables" class="link-btn">Alacaklar →</router-link>
+                    <router-link to="/accounting/payables" class="link-btn">Verecekler →</router-link>
+                </div>
             </div>
-            <div class="acc-grid">
 
-                <!-- Alacaklar -->
-                <div class="acc-block">
-                    <p class="acc-block-label" style="color:#10b981">Alacaklar</p>
-                    <div class="acc-big">{{ formatCurrency(accounting.totalReceivable) }}</div>
-                    <div class="acc-progress-wrap">
+            <div v-if="loading" class="acc-skel">
+                <div v-for="i in 3" :key="i" class="skel-row" style="height:80px" />
+            </div>
+
+            <template v-else-if="accounting">
+                <!-- Overdue alert -->
+                <div
+                    v-if="accounting.overdueReceivableCount > 0 || accounting.overduePayableCount > 0"
+                    class="acc-alert-bar"
+                >
+                    <span v-if="accounting.overdueReceivableCount > 0">
+                        ⚠ {{ accounting.overdueReceivableCount }} vadesi geçmiş alacak —
+                        <strong>{{ formatCurrency(accounting.overdueReceivableAmount) }}</strong>
+                    </span>
+                    <span v-if="accounting.overduePayableCount > 0" style="margin-left:16px">
+                        ⚠ {{ accounting.overduePayableCount }} vadesi geçmiş verecek —
+                        <strong>{{ formatCurrency(accounting.overduePayableAmount) }}</strong>
+                    </span>
+                </div>
+
+                <div class="acc-grid">
+
+                    <!-- Alacaklar -->
+                    <div class="acc-block">
+                        <p class="acc-block-label" style="color:#10b981">Alacaklar</p>
+                        <div class="acc-big">{{ formatCurrency(accounting.totalReceivable) }}</div>
+                        <div class="acc-progress-wrap">
+                            <div
+                                class="acc-progress"
+                                :style="{ width: `${receivableCollectionRate}%`, background: '#10b981' }"
+                            />
+                        </div>
+                        <p class="acc-rate">%{{ receivableCollectionRate }} tahsil edildi</p>
+                        <div class="acc-rows">
+                            <div class="acc-row">
+                                <span>Tahsil Edilen</span>
+                                <strong class="text-success">{{ formatCurrency(accounting.paidReceivable) }}</strong>
+                            </div>
+                            <div class="acc-row">
+                                <span>Bekleyen</span>
+                                <strong>{{ formatCurrency(accounting.remainingReceivable) }}</strong>
+                            </div>
+                            <div v-if="accounting.overdueReceivableCount > 0" class="acc-row">
+                                <span>Vadesi Geçmiş</span>
+                                <strong class="text-danger">
+                                    {{ formatCurrency(accounting.overdueReceivableAmount) }}
+                                    <em>({{ accounting.overdueReceivableCount }} kayıt)</em>
+                                </strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Net Pozisyon -->
+                    <div class="acc-net">
+                        <p class="acc-net-label">Net Pozisyon</p>
                         <div
-                            class="acc-progress"
-                            :style="{ width: `${receivableCollectionRate}%`, background: '#10b981' }"
-                        />
-                    </div>
-                    <p class="acc-rate">%{{ receivableCollectionRate }} tahsil edildi</p>
-                    <div class="acc-rows">
-                        <div class="acc-row">
-                            <span>Tahsil Edilen</span>
-                            <strong class="text-success">{{ formatCurrency(accounting.paidReceivable) }}</strong>
+                            class="acc-net-value"
+                            :class="accounting.netPositive ? 'text-success' : 'text-danger'"
+                        >
+                            {{ formatCurrency(accounting.netPosition) }}
                         </div>
-                        <div class="acc-row">
-                            <span>Kalan</span>
-                            <strong>{{ formatCurrency(accounting.remainingReceivable) }}</strong>
-                        </div>
-                        <div v-if="accounting.overdueReceivableCount > 0" class="acc-row">
-                            <span>Vadesi Geçmiş</span>
-                            <strong class="text-danger">
-                                {{ formatCurrency(accounting.overdueReceivableAmount) }}
-                                <em>({{ accounting.overdueReceivableCount }})</em>
-                            </strong>
+                        <p class="acc-net-sub">
+                            {{ accounting.netPositive ? '✓ Alacaklar fazla' : '✗ Verecekler fazla' }}
+                        </p>
+                        <div class="acc-net-badges">
+                            <div class="acc-net-badge acc-net-badge--green">
+                                <span class="acc-net-badge-label">Alacak</span>
+                                <span class="acc-net-badge-val">{{ formatCurrency(accounting.remainingReceivable) }}</span>
+                            </div>
+                            <div class="acc-net-badge acc-net-badge--red">
+                                <span class="acc-net-badge-label">Verecek</span>
+                                <span class="acc-net-badge-val">{{ formatCurrency(accounting.remainingPayable) }}</span>
+                            </div>
                         </div>
                     </div>
+
+                    <!-- Verecekler -->
+                    <div class="acc-block">
+                        <p class="acc-block-label" style="color:#ef4444">Verecekler</p>
+                        <div class="acc-big">{{ formatCurrency(accounting.totalPayable) }}</div>
+                        <div class="acc-progress-wrap">
+                            <div
+                                class="acc-progress"
+                                :style="{
+                                    width: accounting.totalPayable
+                                        ? `${Math.round((accounting.paidPayable / accounting.totalPayable) * 100)}%`
+                                        : '0%',
+                                    background: '#ef4444',
+                                }"
+                            />
+                        </div>
+                        <p class="acc-rate">
+                            %{{
+                                accounting.totalPayable
+                                    ? Math.round((accounting.paidPayable / accounting.totalPayable) * 100)
+                                    : 0
+                            }} ödendi
+                        </p>
+                        <div class="acc-rows">
+                            <div class="acc-row">
+                                <span>Ödenen</span>
+                                <strong class="text-success">{{ formatCurrency(accounting.paidPayable) }}</strong>
+                            </div>
+                            <div class="acc-row">
+                                <span>Bekleyen</span>
+                                <strong>{{ formatCurrency(accounting.remainingPayable) }}</strong>
+                            </div>
+                            <div v-if="accounting.overduePayableCount > 0" class="acc-row">
+                                <span>Vadesi Geçmiş</span>
+                                <strong class="text-danger">
+                                    {{ formatCurrency(accounting.overduePayableAmount) }}
+                                    <em>({{ accounting.overduePayableCount }} kayıt)</em>
+                                </strong>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
 
-                <!-- Net Pozisyon -->
-                <div class="acc-net">
-                    <p class="acc-net-label">Net Pozisyon</p>
-                    <div
-                        class="acc-net-value"
-                        :class="accounting.netPositive ? 'text-success' : 'text-danger'"
-                    >
-                        {{ formatCurrency(accounting.netPosition) }}
-                    </div>
-                    <p class="acc-net-sub">
-                        {{ accounting.netPositive ? 'Alacaklar fazla' : 'Verecekler fazla' }}
-                    </p>
+                <!-- Tüm değerler sıfırsa bilgi mesajı -->
+                <div
+                    v-if="accounting.totalReceivable === 0 && accounting.totalPayable === 0"
+                    class="acc-empty"
+                >
+                    Henüz muhasebe kaydı bulunmuyor. Kiralama oluşturulduğunda alacaklar burada görünecek.
                 </div>
+            </template>
 
-                <!-- Verecekler -->
-                <div class="acc-block">
-                    <p class="acc-block-label" style="color:#ef4444">Verecekler</p>
-                    <div class="acc-big">{{ formatCurrency(accounting.totalPayable) }}</div>
-                    <div class="acc-progress-wrap">
-                        <div
-                            class="acc-progress"
-                            :style="{
-                                width: accounting.totalPayable
-                                    ? `${Math.round((accounting.paidPayable / accounting.totalPayable) * 100)}%`
-                                    : '100%',
-                                background: '#ef4444',
-                            }"
-                        />
-                    </div>
-                    <p class="acc-rate">
-                        %{{
-                            accounting.totalPayable
-                                ? Math.round((accounting.paidPayable / accounting.totalPayable) * 100)
-                                : 100
-                        }} ödendi
-                    </p>
-                    <div class="acc-rows">
-                        <div class="acc-row">
-                            <span>Ödenen</span>
-                            <strong class="text-success">{{ formatCurrency(accounting.paidPayable) }}</strong>
-                        </div>
-                        <div class="acc-row">
-                            <span>Kalan</span>
-                            <strong>{{ formatCurrency(accounting.remainingPayable) }}</strong>
-                        </div>
-                        <div v-if="accounting.overduePayableCount > 0" class="acc-row">
-                            <span>Vadesi Geçmiş</span>
-                            <strong class="text-danger">
-                                {{ formatCurrency(accounting.overduePayableAmount) }}
-                                <em>({{ accounting.overduePayableCount }})</em>
-                            </strong>
-                        </div>
-                    </div>
-                </div>
-
+            <div v-else class="empty-state">
+                Muhasebe verileri yüklenemedi.
             </div>
         </section>
 
@@ -649,6 +715,12 @@ onMounted(() => fetchAll(revenuePeriod.value))
     gap: 12px;
 }
 
+.db-header-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
 .db-title {
     font-size: 24px;
     font-weight: 700;
@@ -661,6 +733,55 @@ onMounted(() => fetchAll(revenuePeriod.value))
     color: var(--color-text-secondary);
     margin: 2px 0 0;
 }
+
+.btn-refresh {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    color: var(--color-text-secondary);
+    transition: all 0.15s;
+}
+
+.btn-refresh:hover:not(:disabled) {
+    background: var(--color-bg-secondary);
+    color: var(--color-text);
+}
+
+.btn-refresh:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.spin { display: inline-block; animation: spin 1s linear infinite; }
+
+.error-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    border-radius: 10px;
+    color: #dc2626;
+    font-size: 14px;
+}
+
+.btn-retry {
+    padding: 6px 14px;
+    background: #dc2626;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.btn-retry:hover { background: #b91c1c; }
 
 /* ─── Stat Cards ──────────────────────────────────────────────────────────── */
 .stat-row {
@@ -1057,6 +1178,56 @@ onMounted(() => fetchAll(revenuePeriod.value))
     margin: 0 24px;
 }
 
+/* ─── Card Head Actions ───────────────────────────────────────────────────── */
+.card-head-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.link-btn {
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--color-primary);
+    text-decoration: none;
+    transition: all 0.15s;
+}
+
+.link-btn:hover {
+    background: var(--color-bg-secondary);
+}
+
+/* ─── Accounting Alert Bar ────────────────────────────────────────────────── */
+.acc-alert-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 20px;
+    background: rgba(239, 68, 68, 0.06);
+    border-bottom: 1px solid rgba(239, 68, 68, 0.15);
+    font-size: 13px;
+    color: #dc2626;
+}
+
+.acc-skel {
+    padding: 20px;
+    display: flex;
+    gap: 16px;
+}
+
+.acc-empty {
+    padding: 24px 20px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--color-text-muted);
+    border-top: 1px solid var(--color-border);
+}
+
 /* ─── Accounting ──────────────────────────────────────────────────────────── */
 .acc-grid {
     display: grid;
@@ -1162,7 +1333,42 @@ onMounted(() => fetchAll(revenuePeriod.value))
 .acc-net-sub {
     font-size: 12px;
     color: var(--color-text-muted);
-    margin: 0;
+    margin: 0 0 12px;
+}
+
+.acc-net-badges {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+    margin-top: 4px;
+}
+
+.acc-net-badge {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+}
+
+.acc-net-badge--green {
+    background: rgba(16, 185, 129, 0.08);
+    color: #059669;
+}
+
+.acc-net-badge--red {
+    background: rgba(239, 68, 68, 0.08);
+    color: #dc2626;
+}
+
+.acc-net-badge-label {
+    font-weight: 500;
+}
+
+.acc-net-badge-val {
+    font-weight: 600;
 }
 
 /* ─── Badges ──────────────────────────────────────────────────────────────── */
@@ -1240,6 +1446,10 @@ onMounted(() => fetchAll(revenuePeriod.value))
 @keyframes shimmer {
     0%, 100% { opacity: 1; }
     50%       { opacity: 0.45; }
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
 }
 
 /* ─── Responsive ──────────────────────────────────────────────────────────── */

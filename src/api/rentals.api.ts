@@ -71,6 +71,10 @@ class RentalsApiService extends BaseApi {
         return this.post(`/${id}/close`, {})
     }
 
+    async downloadCompletionPdf(id: number): Promise<Blob> {
+        return this.getBlob(`/${id}/completion-pdf`)
+    }
+
     async getDrivers(rentalId: number): Promise<RentalDriver[]> {
         return this.get(`/${rentalId}/drivers`)
     }

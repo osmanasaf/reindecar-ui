@@ -489,20 +489,11 @@ async function handleCloseRental() {
 async function generatePdf() {
   if (!rental.value) return
   generatingPdf.value = true
-  
+
   try {
-    const content = buildPdfContent()
-    const blob = new Blob([content], { type: 'text/html;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    
-    const printWindow = window.open(url, '_blank')
-    if (printWindow) {
-      printWindow.onload = () => {
-        printWindow.print()
-      }
-    }
-    
-    toast.success('PDF hazırlandı')
+    const blob = await rentalsApi.downloadCompletionPdf(rental.value.id)
+    downloadBlob(blob, `kiralama-teslim-tutanagi-${rental.value.rentalNumber}.pdf`)
+    toast.success('Teslim tutanağı PDF indirildi')
   } catch (err) {
     toast.apiError(err, 'PDF oluşturulamadı')
   } finally {
@@ -510,171 +501,15 @@ async function generatePdf() {
   }
 }
 
-function buildPdfContent(): string {
-  if (!rental.value) return ''
-  
-  const r = rental.value
-  const statusLabel = statusConfig[r.status]?.label || r.status
-  const typeLabel = typeConfig[r.rentalType]?.label || r.rentalType
-  
-  return `
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-  <meta charset="UTF-8">
-  <title>Kiralama Sözleşmesi - ${r.rentalNumber}</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; line-height: 1.5; color: #333; padding: 40px; }
-    .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #1a56db; padding-bottom: 20px; }
-    .header h1 { font-size: 24px; color: #1a56db; margin-bottom: 5px; }
-    .header p { color: #666; }
-    .contract-number { font-size: 14px; font-weight: bold; background: #f0f4ff; padding: 8px 16px; border-radius: 4px; display: inline-block; margin-top: 10px; }
-    .section { margin-bottom: 25px; }
-    .section-title { font-size: 14px; font-weight: 600; color: #1a56db; margin-bottom: 12px; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; }
-    .info-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-    .info-item { display: flex; flex-direction: column; }
-    .info-label { font-size: 10px; color: #666; text-transform: uppercase; }
-    .info-value { font-size: 13px; font-weight: 500; }
-    .price-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-    .price-table th, .price-table td { padding: 10px; text-align: left; border-bottom: 1px solid #e5e7eb; }
-    .price-table th { background: #f9fafb; font-weight: 600; }
-    .price-table .total { font-size: 16px; font-weight: bold; color: #1a56db; background: #f0f4ff; }
-    .signatures { display: grid; grid-template-columns: repeat(2, 1fr); gap: 40px; margin-top: 50px; }
-    .signature-box { border-top: 1px solid #333; padding-top: 10px; text-align: center; }
-    .footer { margin-top: 40px; text-align: center; font-size: 10px; color: #999; }
-    @media print { body { padding: 20px; } }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <h1>ARAÇ KİRALAMA SÖZLEŞMESİ</h1>
-    <p>ReindeCar Araç Kiralama</p>
-    <div class="contract-number">${r.rentalNumber}</div>
-  </div>
-
-  <div class="section">
-    <div class="section-title">Kiralama Bilgileri</div>
-    <div class="info-grid">
-      <div class="info-item">
-        <span class="info-label">Kiralama Tipi</span>
-        <span class="info-value">${typeLabel}</span>
-      </div>
-      <div class="info-item">
-        <span class="info-label">Durum</span>
-        <span class="info-value">${statusLabel}</span>
-      </div>
-      <div class="info-item">
-        <span class="info-label">Başlangıç Tarihi</span>
-        <span class="info-value">${formatDate(r.startDate)}</span>
-      </div>
-      <div class="info-item">
-        <span class="info-label">Bitiş Tarihi</span>
-        <span class="info-value">${formatDate(r.endDate)}</span>
-      </div>
-      <div class="info-item">
-        <span class="info-label">Toplam Süre</span>
-        <span class="info-value">${r.totalDays} Gün</span>
-      </div>
-      <div class="info-item">
-        <span class="info-label">Oluşturulma</span>
-        <span class="info-value">${formatDateTime(r.createdAt)}</span>
-      </div>
-    </div>
-  </div>
-
-  <div class="section">
-    <div class="section-title">Müşteri Bilgileri</div>
-    <div class="info-grid">
-      <div class="info-item">
-        <span class="info-label">Müşteri Adı</span>
-        <span class="info-value">${customer.value?.displayName || '-'}</span>
-      </div>
-      <div class="info-item">
-        <span class="info-label">Telefon</span>
-        <span class="info-value">${customer.value?.phone || '-'}</span>
-      </div>
-      <div class="info-item">
-        <span class="info-label">E-posta</span>
-        <span class="info-value">${customer.value?.email || '-'}</span>
-      </div>
-      <div class="info-item">
-        <span class="info-label">Adres</span>
-        <span class="info-value">${customer.value?.address || '-'}</span>
-      </div>
-    </div>
-  </div>
-
-  <div class="section">
-    <div class="section-title">Araç Bilgileri</div>
-    <div class="info-grid">
-      <div class="info-item">
-        <span class="info-label">Plaka</span>
-        <span class="info-value">${vehicle.value?.plateNumber || '-'}</span>
-      </div>
-      <div class="info-item">
-        <span class="info-label">Marka / Model</span>
-        <span class="info-value">${vehicle.value ? `${vehicle.value.brand} ${vehicle.value.model}` : '-'}</span>
-      </div>
-      <div class="info-item">
-        <span class="info-label">Başlangıç KM</span>
-        <span class="info-value">${r.startKm ? formatKm(r.startKm) : '-'}</span>
-      </div>
-      <div class="info-item">
-        <span class="info-label">Bitiş KM</span>
-        <span class="info-value">${r.endKm ? formatKm(r.endKm) : '-'}</span>
-      </div>
-    </div>
-  </div>
-
-  <div class="section">
-    <div class="section-title">Ücretlendirme</div>
-    <table class="price-table">
-      <tr>
-        <th>Açıklama</th>
-        <th style="text-align: right;">Tutar</th>
-      </tr>
-      <tr>
-        <td>Günlük Birim Fiyat</td>
-        <td style="text-align: right;">${formatCurrency(r.dailyPrice)}</td>
-      </tr>
-      <tr>
-        <td>Ara Toplam (${r.totalDays} gün)</td>
-        <td style="text-align: right;">${formatCurrency(r.totalPrice)}</td>
-      </tr>
-      ${r.discountAmount > 0 ? `<tr><td>İndirim</td><td style="text-align: right; color: green;">-${formatCurrency(r.discountAmount)}</td></tr>` : ''}
-      ${r.extraKmCharge > 0 ? `<tr><td>Ekstra KM Ücreti</td><td style="text-align: right;">${formatCurrency(r.extraKmCharge)}</td></tr>` : ''}
-      <tr class="total">
-        <td>Genel Toplam</td>
-        <td style="text-align: right;">${formatCurrency((r.totalPrice || 0) + (r.extraKmCharge || 0) - (r.discountAmount || 0))}</td>
-      </tr>
-    </table>
-  </div>
-
-  ${r.notes ? `
-  <div class="section">
-    <div class="section-title">Notlar</div>
-    <p>${r.notes}</p>
-  </div>
-  ` : ''}
-
-  <div class="signatures">
-    <div class="signature-box">
-      <p><strong>Kiralayan</strong></p>
-      <p>ReindeCar Araç Kiralama</p>
-    </div>
-    <div class="signature-box">
-      <p><strong>Kiracı</strong></p>
-      <p>${customer.value?.displayName || '-'}</p>
-    </div>
-  </div>
-
-  <div class="footer">
-    <p>Bu belge ${formatDateTime(new Date().toISOString())} tarihinde oluşturulmuştur.</p>
-  </div>
-</body>
-</html>
-  `
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
 }
 
 function formatDate(date: string): string {
@@ -744,10 +579,15 @@ onActivated(() => {
             <span>Geri</span>
           </button>
           <div class="header-actions">
-            <button class="btn btn-outline" :disabled="generatingPdf" @click="generatePdf">
+            <button
+              v-if="rental.status === 'RETURN_PENDING' || rental.status === 'PENDING_PAYMENT' || rental.status === 'CLOSED'"
+              class="btn btn-outline"
+              :disabled="generatingPdf"
+              @click="generatePdf"
+            >
               <span v-if="generatingPdf" class="spinner-sm"></span>
               <span v-else>📄</span>
-              PDF İndir
+              Teslim Tutanağı
             </button>
             <button 
               v-if="rental.status === 'DRAFT'" 
