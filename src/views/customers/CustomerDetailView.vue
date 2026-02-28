@@ -6,6 +6,7 @@ import { useToast } from '@/composables'
 import { formatPhoneInput } from '@/utils/phone'
 import type { Customer, CustomerType, CustomerStatus, CreditRating, CustomerStats, Driver, CreateDriverForm, UpdateDriverForm } from '@/types'
 import CompanyAuthorizedPersonsSection from '@/components/customers/CompanyAuthorizedPersonsSection.vue'
+import DocumentsSection from '@/components/shared/DocumentsSection.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -153,6 +154,14 @@ function formatDate(date: string): string {
 function maskId(id: string): string {
   if (id.length >= 11) {
     return `${id.slice(0, 3)}****${id.slice(-2)}`
+  }
+  return '***'
+}
+
+function maskTaxNumber(taxNo: string): string {
+  if (!taxNo) return '-'
+  if (taxNo.length >= 6) {
+    return `${taxNo.slice(0, 3)}****${taxNo.slice(-2)}`
   }
   return '***'
 }
@@ -402,7 +411,7 @@ onMounted(fetchCustomer)
             </div>
             <div class="info-item">
               <span class="label">Vergi No</span>
-              <span class="value mono">{{ customer.companyInfo?.taxNumber || customer.taxNumber || '-' }}</span>
+              <span class="value mono">{{ maskTaxNumber(customer.companyInfo?.taxNumber || customer.taxNumber || '') }}</span>
             </div>
             <div class="info-item">
               <span class="label">Vergi Dairesi</span>
@@ -433,6 +442,14 @@ onMounted(fetchCustomer)
 
         <section v-if="customer.customerType === 'COMPANY'" class="authorized-persons-card">
           <CompanyAuthorizedPersonsSection :customer-id="customer.id" />
+        </section>
+
+        <section class="card documents-card">
+          <DocumentsSection
+            reference-type="CUSTOMER"
+            :reference-id="customer.id"
+            title="Belgeler"
+          />
         </section>
 
         <section class="card stats-card">

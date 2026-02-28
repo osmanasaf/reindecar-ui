@@ -8,6 +8,7 @@ import CreateDamageForm from '@/components/vehicles/CreateDamageForm.vue'
 import CreatePenaltyModal from '@/components/penalties/CreatePenaltyModal.vue'
 import CreateTollModal from '@/components/tolls/CreateTollModal.vue'
 import type { Rental, RentalStatus, RentalType, Vehicle, Customer, Branch, RentalDriver, KmPackage, Driver, Payment, PenaltyResponse, DamageReport, TollRecord } from '@/types'
+import DocumentsSection from '@/components/shared/DocumentsSection.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -1151,6 +1152,14 @@ onActivated(() => {
         @created="handleTollCreated"
       />
     </template>
+
+    <div v-if="rental" class="rental-documents-section">
+      <DocumentsSection
+        reference-type="RENTAL"
+        :reference-id="rental.id"
+        title="Kiralama Belgeleri"
+      />
+    </div>
   </div>
 </template>
 

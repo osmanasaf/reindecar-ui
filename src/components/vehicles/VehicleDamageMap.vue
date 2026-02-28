@@ -7,6 +7,7 @@ import { SEVERITY_COLORS, ZONE_NAMES } from '@/utils/vehicleZones'
 import CarDiagramSVG from './CarDiagramSVG.vue'
 import CreateDamageForm from './CreateDamageForm.vue'
 import CompletionModal from '@/components/CompletionModal.vue'
+import DocumentsSection from '@/components/shared/DocumentsSection.vue'
 
 const props = defineProps<{
   vehicleId: number
@@ -375,6 +376,14 @@ onMounted(() => {
         </div>
       </div>
     </template>
+
+    <div class="damage-documents-section">
+      <DocumentsSection
+        reference-type="VEHICLE"
+        :reference-id="vehicleId"
+        title="Hasar Belgeleri"
+      />
+    </div>
 
     <CreateDamageForm
       v-if="showCreateForm"

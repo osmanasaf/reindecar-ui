@@ -1,4 +1,4 @@
-﻿import { type ErrorResponse, ErrorCategory } from '@/types'
+import { type ErrorResponse, ErrorCategory } from '@/types'
 
 export function isErrorResponse(obj: unknown): obj is ErrorResponse {
     return (
@@ -79,6 +79,7 @@ export const errorMessageMap: Record<string, string> = {
     F001: 'Dosya bulunamadı',
     F002: 'Dosya yükleme başarısız',
     F003: 'Dosya tipi desteklenmiyor',
+    F004: 'Dosya boyutu çok büyük. Maksimum 50MB yükleyebilirsiniz',
     A001: 'Giriş yapmanız gerekiyor',
     A002: 'Bu işlem için yetkiniz bulunmuyor',
     A003: 'Oturumunuzun süresi doldu, lütfen tekrar giriş yapın',
@@ -147,7 +148,13 @@ export function getApiErrorMessage(err: unknown, fallback = 'Bir hata oluştu'):
             return resolveBackendMessage(err)
         }
 
-        const e = err as { message?: string; response?: { data?: unknown } }
+        const e = err as { message?: string; status?: number; response?: { status?: number; data?: unknown } }
+
+        const httpStatus = e.status || e.response?.status
+        if (httpStatus === 413) {
+            return 'Dosya boyutu çok büyük. Maksimum 50MB yükleyebilirsiniz'
+        }
+
         if (e.response?.data && isErrorResponse(e.response.data)) {
             return resolveBackendMessage(e.response.data)
         }

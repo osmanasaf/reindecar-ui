@@ -11,9 +11,10 @@ import VehicleHistory from '@/components/vehicles/VehicleHistory.vue'
 import VehicleInsuranceList from '@/components/vehicles/insurance/VehicleInsuranceList.vue'
 import CreateInsuranceModal from '@/components/vehicles/insurance/CreateInsuranceModal.vue'
 import VehiclePaymentDetails from '@/components/installments/VehiclePaymentDetails.vue'
+import DocumentsSection from '@/components/shared/DocumentsSection.vue'
 
-type TabKey = 'info' | 'history' | 'damages' | 'maintenance' | 'insurance' | 'installments'
-const VALID_TABS = new Set<TabKey>(['info', 'history', 'damages', 'maintenance', 'insurance', 'installments'])
+type TabKey = 'info' | 'history' | 'damages' | 'maintenance' | 'insurance' | 'installments' | 'documents'
+const VALID_TABS = new Set<TabKey>(['info', 'history', 'damages', 'maintenance', 'insurance', 'installments', 'documents'])
 
 const route = useRoute()
 const router = useRouter()
@@ -184,6 +185,12 @@ onMounted(fetchVehicle)
         >
           Taksit Yönetimi
         </button>
+        <button
+          :class="['tab', { active: activeTab === 'documents' }]"
+          @click="setTab('documents')"
+        >
+          Belgeler
+        </button>
       </div>
 
       <div v-if="activeTab === 'info'" class="tab-content">
@@ -305,6 +312,14 @@ onMounted(fetchVehicle)
 
       <div v-else-if="activeTab === 'installments'" class="tab-content">
         <VehiclePaymentDetails :vehicle-id="vehicleId" />
+      </div>
+
+      <div v-else-if="activeTab === 'documents'" class="tab-content">
+        <DocumentsSection
+          reference-type="VEHICLE"
+          :reference-id="vehicleId"
+          title="Araç Belgeleri"
+        />
       </div>
 
       <VehicleEditModal

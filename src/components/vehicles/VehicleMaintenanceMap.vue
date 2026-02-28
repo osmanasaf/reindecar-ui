@@ -6,6 +6,7 @@ import type { VehicleMaintenanceMap } from '@/types'
 import { MAINTENANCE_COLORS, ZONE_NAMES } from '@/utils/vehicleZones'
 import CarDiagramSVG from './CarDiagramSVG.vue'
 import CreateMaintenanceForm from './CreateMaintenanceForm.vue'
+import DocumentsSection from '@/components/shared/DocumentsSection.vue'
 
 const props = defineProps<{
   vehicleId: number
@@ -303,6 +304,14 @@ onMounted(() => {
         </div>
       </div>
     </template>
+
+    <div class="maintenance-documents-section">
+      <DocumentsSection
+        reference-type="VEHICLE"
+        :reference-id="vehicleId"
+        title="Bakım Belgeleri"
+      />
+    </div>
 
     <CreateMaintenanceForm
       v-if="showCreateForm"
