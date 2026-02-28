@@ -47,12 +47,14 @@ const showCreatePenaltyModal = ref(false)
 const showCreateTollModal = ref(false)
 
 const rentalId = computed(() => Number(route.params.id))
+const closingRental = ref(false)
 
 const statusConfig: Record<RentalStatus, { label: string; color: string; icon: string }> = {
   DRAFT: { label: 'Taslak', color: 'secondary', icon: '📝' },
   RESERVED: { label: 'Rezerve', color: 'info', icon: '📅' },
   ACTIVE: { label: 'Aktif', color: 'success', icon: '🚗' },
   RETURN_PENDING: { label: 'İade Bekliyor', color: 'warning', icon: '🔄' },
+  PENDING_PAYMENT: { label: 'Ödeme Bekleniyor', color: 'orange', icon: '💳' },
   CLOSED: { label: 'Tamamlandı', color: 'muted', icon: '✅' },
   CANCELLED: { label: 'İptal', color: 'danger', icon: '❌' },
   OVERDUE: { label: 'Gecikmiş', color: 'danger', icon: '⚠️' }
@@ -180,8 +182,11 @@ const paymentStatus = computed(() => {
 
 const showPenaltiesAndDamages = computed(() => {
   const s = rental.value?.status
-  return s === 'ACTIVE' || s === 'OVERDUE' || s === 'RETURN_PENDING' || s === 'CLOSED'
+  return s === 'ACTIVE' || s === 'OVERDUE' || s === 'RETURN_PENDING' || s === 'CLOSED' || s === 'PENDING_PAYMENT'
 })
+
+const isPendingPayment = computed(() => rental.value?.status === 'PENDING_PAYMENT')
+const canCloseRental = computed(() => isPendingPayment.value && remainingAmount.value === 0)
 
 function getDriverDisplayName(driver: Driver): string {
   if (driver.fullName) return driver.fullName
@@ -463,6 +468,21 @@ async function handleCancel() {
     fetchRental()
   } catch (err) {
     toast.apiError(err, 'İşlem başarısız')
+  }
+}
+
+async function handleCloseRental() {
+  if (!rental.value) return
+  if (!confirm('Tüm alacaklar ödenmiş durumda. Kiralamayı kapatmak istediğinizden emin misiniz?')) return
+  closingRental.value = true
+  try {
+    await rentalsApi.closeRental(rental.value.id)
+    toast.success('Kiralama başarıyla kapatıldı')
+    fetchRental()
+  } catch (err) {
+    toast.apiError(err, 'Kiralama kapatılamadı')
+  } finally {
+    closingRental.value = false
   }
 }
 
@@ -750,6 +770,17 @@ onActivated(() => {
             >
               🔄 Kiralamayı Sonlandır
             </button>
+            <button
+              v-if="isPendingPayment"
+              class="btn btn-close-rental"
+              :disabled="!canCloseRental || closingRental"
+              :title="!canCloseRental ? 'Ödenmemiş alacaklar bulunuyor' : 'Kiralamayı kapat'"
+              @click="handleCloseRental"
+            >
+              <span v-if="closingRental" class="spinner-sm"></span>
+              <span v-else>🔒</span>
+              Kiralamayı Kapat
+            </button>
             <button 
               v-if="rental.status === 'DRAFT' || rental.status === 'RESERVED'"
               class="btn btn-danger-outline"
@@ -785,6 +816,22 @@ onActivated(() => {
           </div>
         </div>
       </header>
+
+      <div v-if="isPendingPayment" class="pending-payment-banner">
+        <div class="banner-icon">💳</div>
+        <div class="banner-content">
+          <strong>Ödeme Bekleniyor</strong>
+          <p>
+            Araç iade alındı. Kiralamayı kapatmak için tüm alacakların ödenmesi gerekmektedir.
+            <template v-if="remainingAmount > 0">
+              Kalan tutar: <strong>{{ formatCurrency(remainingAmount) }}</strong>
+            </template>
+            <template v-else>
+              Tüm alacaklar ödendi. Kiralamayı kapatabilirsiniz.
+            </template>
+          </p>
+        </div>
+      </div>
 
       <div class="content-grid">
         <section class="main-content">
@@ -1456,6 +1503,54 @@ onActivated(() => {
   color: white;
 }
 
+.btn-close-rental {
+  background: #ea580c;
+  color: white;
+  border: none;
+}
+.btn-close-rental:hover:not(:disabled) {
+  background: #c2410c;
+}
+.btn-close-rental:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pending-payment-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 16px 20px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 12px;
+  margin-bottom: 24px;
+}
+
+.banner-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.banner-content {
+  flex: 1;
+}
+
+.banner-content strong {
+  display: block;
+  font-size: 15px;
+  color: #9a3412;
+  margin-bottom: 4px;
+}
+
+.banner-content p {
+  font-size: 13px;
+  color: #c2410c;
+  margin: 0;
+  line-height: 1.5;
+}
+
 .header-main {
   display: flex;
   justify-content: space-between;
@@ -1510,6 +1605,7 @@ onActivated(() => {
 .status-badge.danger { background: #fee2e2; color: #991b1b; }
 .status-badge.muted { background: #f3f4f6; color: #6b7280; }
 .status-badge.secondary { background: #f3f4f6; color: #4b5563; }
+.status-badge.orange { background: #fff7ed; color: #c2410c; }
 
 .type-badge {
   font-size: 14px;

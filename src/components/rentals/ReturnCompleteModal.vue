@@ -36,6 +36,24 @@ const form = ref<{
 const startKmRef = computed(() => rental.value?.startKm || 0)
 const { validateForm, getError, hasError, touch, reset } = useValidation()
 
+const minReturnDate = computed(() => rental.value?.startDate ?? '')
+const plannedEndDate = computed(() => rental.value?.endDate ?? '')
+
+const returnDateStatus = computed(() => {
+  if (!form.value.actualReturnDate || !plannedEndDate.value) return null
+  const actual = new Date(form.value.actualReturnDate)
+  const planned = new Date(plannedEndDate.value)
+  if (actual > planned) {
+    const days = Math.ceil((actual.getTime() - planned.getTime()) / (1000 * 60 * 60 * 24))
+    return { type: 'late', days }
+  }
+  if (actual < planned) {
+    const days = Math.ceil((planned.getTime() - actual.getTime()) / (1000 * 60 * 60 * 24))
+    return { type: 'early', days }
+  }
+  return { type: 'ontime', days: 0 }
+})
+
 const inputRules = computed(() => ({
   endKm: { 
     value: form.value.endKm, 
@@ -46,7 +64,13 @@ const inputRules = computed(() => ({
   },
   actualReturnDate: { 
     value: form.value.actualReturnDate, 
-    rules: [rules.required()] 
+    rules: [
+      rules.required(),
+      {
+        validate: (v: unknown) => !v || !minReturnDate.value || String(v) >= minReturnDate.value,
+        message: `İade tarihi kiralama başlangıç tarihinden (${formatDate(minReturnDate.value)}) önce olamaz`
+      }
+    ]
   }
 }))
 
@@ -244,8 +268,23 @@ watch(() => props.visible, (isVisible) => {
                       v-model="form.actualReturnDate" 
                       @blur="handleBlur('actualReturnDate')"
                       type="date"
+                      :min="minReturnDate"
                     />
                     <span class="error-text">{{ getError('actualReturnDate') }}</span>
+                    <span
+                      v-if="returnDateStatus && !hasError('actualReturnDate')"
+                      :class="['return-date-hint', returnDateStatus.type]"
+                    >
+                      <template v-if="returnDateStatus.type === 'late'">
+                        ⚠️ Planlanan tarihten {{ returnDateStatus.days }} gün geç — geç iade ücreti uygulanacak
+                      </template>
+                      <template v-else-if="returnDateStatus.type === 'early'">
+                        ✓ Planlanan tarihten {{ returnDateStatus.days }} gün erken iade
+                      </template>
+                      <template v-else>
+                        ✓ Planlanan tarihte iade
+                      </template>
+                    </span>
                   </div>
                 </div>
               </form>
@@ -572,6 +611,23 @@ watch(() => props.visible, (isVisible) => {
 .helper-text {
   font-size: 12px;
   color: var(--color-text-muted);
+}
+
+.return-date-hint {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.return-date-hint.late {
+  color: #b45309;
+}
+
+.return-date-hint.early {
+  color: #059669;
+}
+
+.return-date-hint.ontime {
+  color: #059669;
 }
 
 .preview-section {

@@ -117,7 +117,7 @@ async function createDriver() {
     toast.success('Sürücü başarıyla oluşturuldu')
     
     drivers.value.push(created)
-    toggleDriver(created.id)
+    toggleDriver(created)
     
     resetForm()
     showNewDriverForm.value = false

@@ -67,6 +67,10 @@ class RentalsApiService extends BaseApi {
         return this.post(`/${id}/cancel`)
     }
 
+    async closeRental(id: number): Promise<Rental> {
+        return this.post(`/${id}/close`, {})
+    }
+
     async getDrivers(rentalId: number): Promise<RentalDriver[]> {
         return this.get(`/${rentalId}/drivers`)
     }
