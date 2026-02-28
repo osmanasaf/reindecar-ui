@@ -22,6 +22,7 @@ const statusOptions: { value: RentalStatus | '', label: string }[] = [
   { value: 'RESERVED', label: 'Rezerve' },
   { value: 'ACTIVE', label: 'Aktif' },
   { value: 'RETURN_PENDING', label: 'İade Bekliyor' },
+  { value: 'PENDING_PAYMENT', label: 'Ödeme Bekliyor' },
   { value: 'OVERDUE', label: 'Gecikmiş' },
   { value: 'CLOSED', label: 'Tamamlandı' },
   { value: 'CANCELLED', label: 'İptal' }
@@ -40,6 +41,7 @@ const statusLabels: Record<RentalStatus, string> = {
   RESERVED: 'Rezerve',
   ACTIVE: 'Aktif',
   RETURN_PENDING: 'İade Bekliyor',
+  PENDING_PAYMENT: 'Ödeme Bekliyor',
   OVERDUE: 'Gecikmiş',
   CLOSED: 'Tamamlandı',
   CANCELLED: 'İptal'
@@ -50,6 +52,7 @@ const statusColors: Record<RentalStatus, string> = {
   RESERVED: 'info',
   ACTIVE: 'success',
   RETURN_PENDING: 'warning',
+  PENDING_PAYMENT: 'pending-payment',
   OVERDUE: 'danger',
   CLOSED: 'muted',
   CANCELLED: 'danger'
@@ -202,14 +205,14 @@ onMounted(fetchRentals)
             <td class="rental-id">{{ rental.rentalNumber || `#${rental.id}` }}</td>
             <td>
               <div class="customer-cell">
-                <strong>{{ getCustomer(rental)?.displayName || '-' }}</strong>
+                <strong>{{ rental.customerName || getCustomer(rental)?.displayName || '-' }}</strong>
                 <span class="customer-type">{{ getCustomer(rental)?.customerType === 'COMPANY' ? 'Kurumsal' : 'Bireysel' }}</span>
               </div>
             </td>
             <td>
               <div class="vehicle-cell">
-                <strong>{{ getVehicle(rental)?.plateNumber || '-' }}</strong>
-                <span>{{ getVehicle(rental) ? `${getVehicle(rental)?.brand} ${getVehicle(rental)?.model}` : '-' }}</span>
+                <strong>{{ rental.vehiclePlate || getVehicle(rental)?.plateNumber || '-' }}</strong>
+                <span>{{ rental.vehicleName || (getVehicle(rental) ? `${getVehicle(rental)?.brand} ${getVehicle(rental)?.model}` : '-') }}</span>
               </div>
             </td>
             <td>
@@ -415,6 +418,7 @@ tbody tr:last-child td {
 .status-badge.danger { background: var(--color-danger-light); color: var(--color-danger); }
 .status-badge.muted { background: var(--color-bg-secondary); color: var(--color-text-muted); }
 .status-badge.secondary { background: #f3f4f6; color: #4b5563; }
+.status-badge.pending-payment { background: #ede9fe; color: #6d28d9; }
 
 .pagination {
   display: flex;

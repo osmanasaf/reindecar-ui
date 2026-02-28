@@ -159,16 +159,41 @@ watch(searchQuery, () => {
 
     <div class="stats-grid">
       <div class="stat-card">
-        <span class="stat-value">{{ stats.total }}</span>
-        <span class="stat-label">Toplam</span>
+        <div class="stat-icon">🏢</div>
+        <div class="stat-body">
+          <span class="stat-value">{{ stats.total }}</span>
+          <span class="stat-label">Toplam Sağlayıcı</span>
+        </div>
       </div>
-      <div class="stat-card active">
-        <span class="stat-value">{{ stats.active }}</span>
-        <span class="stat-label">Aktif</span>
+      <div class="stat-card stat-card--active">
+        <div class="stat-icon">✅</div>
+        <div class="stat-body">
+          <span class="stat-value text-green">{{ stats.active }}</span>
+          <span class="stat-label">Aktif</span>
+        </div>
       </div>
-      <div class="stat-card inactive">
-        <span class="stat-value">{{ stats.inactive }}</span>
-        <span class="stat-label">Pasif</span>
+      <div class="stat-card stat-card--inactive">
+        <div class="stat-icon">⏸️</div>
+        <div class="stat-body">
+          <span class="stat-value text-gray">{{ stats.inactive }}</span>
+          <span class="stat-label">Pasif</span>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="stats.total > 0" class="type-breakdown">
+      <h3 class="breakdown-title">Tip Dağılımı</h3>
+      <div class="breakdown-grid">
+        <div
+          v-for="(count, type) in stats.byType"
+          :key="type"
+          class="breakdown-chip"
+          :class="{ 'breakdown-chip--active': selectedType === type }"
+          @click="selectedType = selectedType === type ? '' : type as ProviderType"
+        >
+          <span class="chip-label">{{ translateProviderType(type) }}</span>
+          <span class="chip-count">{{ count }}</span>
+        </div>
       </div>
     </div>
 
@@ -284,25 +309,38 @@ watch(searchQuery, () => {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 1rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
 }
 
 .stat-card {
   background: white;
   border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.stat-card--active { border-left: 3px solid #22c55e; }
+.stat-card--inactive { border-left: 3px solid #9ca3af; }
+
+.stat-icon {
+  font-size: 1.5rem;
+  width: 2.75rem;
+  height: 2.75rem;
+  background: #f3f4f6;
   border-radius: 0.5rem;
-  padding: 1rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.stat-body {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-}
-
-.stat-card.active {
-  border-left: 3px solid #22c55e;
-}
-
-.stat-card.inactive {
-  border-left: 3px solid #6b7280;
+  gap: 0.125rem;
 }
 
 .stat-value {
@@ -312,8 +350,71 @@ watch(searchQuery, () => {
 }
 
 .stat-label {
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   color: var(--color-text-secondary, #6b7280);
+}
+
+.text-green { color: #15803d !important; }
+.text-gray { color: #6b7280 !important; }
+
+.type-breakdown {
+  background: white;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 0.75rem;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.breakdown-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-secondary, #6b7280);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 0.75rem 0;
+}
+
+.breakdown-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.breakdown-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.3125rem 0.75rem;
+  background: #f3f4f6;
+  border: 1px solid transparent;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-size: 0.8125rem;
+}
+
+.breakdown-chip:hover {
+  background: #e5e7eb;
+}
+
+.breakdown-chip--active {
+  background: #eff6ff;
+  border-color: #93c5fd;
+  color: #1d4ed8;
+}
+
+.chip-label { font-weight: 500; color: inherit; }
+
+.chip-count {
+  background: white;
+  border-radius: 9999px;
+  padding: 0 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-text, #111827);
+  min-width: 1.25rem;
+  text-align: center;
+  border: 1px solid var(--color-border, #e5e7eb);
 }
 
 .filters-section {

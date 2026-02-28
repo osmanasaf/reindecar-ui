@@ -2,27 +2,31 @@
 import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAccountingStore } from '@/stores'
-import { usePagination, useToast } from '@/composables'
+import { usePagination, useToast, useEnumTranslations } from '@/composables'
 import { SearchableSelect } from '@/components/common'
 import { ReceivableCard, PaymentModal } from '@/components/accounting'
 import { formatCurrency } from '@/utils/format'
-import { receivablesApi, rentalsApi, vehiclesApi } from '@/api'
-import type { RecordPaymentRequest, ReceivableFilters, CreateReceivableRequest, Rental, Vehicle } from '@/types'
+import { receivablesApi, rentalsApi, vehiclesApi, customersApi } from '@/api'
+import type { RecordPaymentRequest, ReceivableFilters, CreateReceivableRequest, Rental, Vehicle, Customer } from '@/types'
 import { ReceivableStatus, ReceivableType } from '@/types'
 
 const router = useRouter()
 const accountingStore = useAccountingStore()
 const toast = useToast()
-const { page, size, setPage, setTotal, getParams } = usePagination()
+const { page, setPage, setTotal, getParams } = usePagination()
+const { receivableTypes, receivableStatuses } = useEnumTranslations()
 
-type ViewMode = 'all' | 'rental' | 'vehicle'
+type ViewMode = 'all' | 'customer' | 'rental' | 'vehicle'
 const viewMode = ref<ViewMode>('all')
 const selectedRentalId = ref<number | null>(null)
 const selectedVehicleId = ref<number | null>(null)
+const selectedCustomerId = ref<number | null>(null)
 const rentalsList = ref<Rental[]>([])
 const vehiclesList = ref<Vehicle[]>([])
+const customersList = ref<Customer[]>([])
 const loadingRentals = ref(false)
 const loadingVehicles = ref(false)
+const loadingCustomers = ref(false)
 
 const filters = ref<ReceivableFilters>({})
 const showPaymentModal = ref(false)
@@ -61,6 +65,15 @@ const collectionRate = computed(() => {
   return Math.round((paid / total) * 100)
 })
 
+const selectedCustomer = computed(() =>
+  customersList.value.find(c => c.id === selectedCustomerId.value) ?? null
+)
+
+const getCustomerDisplayName = (customer: Customer | null): string => {
+  if (!customer) return ''
+  return customer.displayName || `Müşteri #${customer.id}`
+}
+
 onMounted(() => {
   loadReceivables()
 })
@@ -68,15 +81,23 @@ onMounted(() => {
 watch(viewMode, (mode) => {
   if (mode === 'rental') {
     selectedVehicleId.value = null
+    selectedCustomerId.value = null
     accountingStore.clearReceivables()
     loadRentalsList()
   } else if (mode === 'vehicle') {
     selectedRentalId.value = null
+    selectedCustomerId.value = null
     accountingStore.clearReceivables()
     loadVehiclesList()
+  } else if (mode === 'customer') {
+    selectedRentalId.value = null
+    selectedVehicleId.value = null
+    accountingStore.clearReceivables()
+    loadCustomersList()
   } else {
     selectedRentalId.value = null
     selectedVehicleId.value = null
+    selectedCustomerId.value = null
     setPage(0)
     loadReceivables()
   }
@@ -88,6 +109,10 @@ watch(selectedRentalId, (id) => {
 
 watch(selectedVehicleId, (id) => {
   if (viewMode.value === 'vehicle' && id != null) loadReceivables()
+})
+
+watch(selectedCustomerId, (id) => {
+  if (viewMode.value === 'customer' && id != null) loadReceivables()
 })
 
 const loadRentalsList = async () => {
@@ -105,12 +130,24 @@ const loadRentalsList = async () => {
 const loadVehiclesList = async () => {
   loadingVehicles.value = true
   try {
-    const res = await vehiclesApi.getAll({ page: 0, size: 500, sort: 'plate', direction: 'ASC' })
+    const res = await vehiclesApi.getAll({ page: 0, size: 500, sort: 'plateNumber', direction: 'ASC' })
     vehiclesList.value = res.content
   } catch {
     vehiclesList.value = []
   } finally {
     loadingVehicles.value = false
+  }
+}
+
+const loadCustomersList = async () => {
+  loadingCustomers.value = true
+  try {
+    const res = await customersApi.getAll({ page: 0, size: 500, sort: 'createdAt', direction: 'DESC' })
+    customersList.value = res.content
+  } catch {
+    customersList.value = []
+  } finally {
+    loadingCustomers.value = false
   }
 }
 
@@ -121,6 +158,9 @@ const loadReceivables = async () => {
       setTotal(receivables.value.length, 1)
     } else if (viewMode.value === 'vehicle' && selectedVehicleId.value != null) {
       await accountingStore.fetchReceivablesByVehicle(selectedVehicleId.value)
+      setTotal(receivables.value.length, 1)
+    } else if (viewMode.value === 'customer' && selectedCustomerId.value != null) {
+      await accountingStore.fetchReceivables({ customerId: selectedCustomerId.value }, { page: 0, size: 500, sort: 'createdAt', direction: 'DESC' })
       setTotal(receivables.value.length, 1)
     } else if (viewMode.value === 'all') {
       const response = await accountingStore.fetchReceivables(filters.value, getParams())
@@ -189,19 +229,31 @@ const handlePageChange = (newPage: number) => {
   loadReceivables()
 }
 
-const statusOptions = Object.values(ReceivableStatus).map(s => ({ value: s, label: s }))
-const typeOptions = Object.values(ReceivableType).map(t => ({ value: t, label: t }))
+const statusOptions = Object.values(ReceivableStatus).map(s => ({
+  value: s,
+  label: receivableStatuses[s] ?? s
+}))
+const typeOptions = Object.values(ReceivableType).map(t => ({
+  value: t,
+  label: receivableTypes[t] ?? t
+}))
 const rentalOptions = computed(() =>
-  rentalsList.value.map(r => ({ value: r.id as number, label: `${r.rentalNumber} (${r.startDate} - ${r.endDate})` }))
+  rentalsList.value.map(r => ({
+    value: r.id as number,
+    label: r.customerName
+      ? `${r.rentalNumber} — ${r.customerName} (${r.startDate} - ${r.endDate})`
+      : `${r.rentalNumber} (${r.startDate} - ${r.endDate})`
+  }))
 )
 const vehicleOptions = computed(() =>
-  vehiclesList.value.map(v => ({ value: v.id as number, label: `${v.plate} – ${v.brand} ${v.model}` }))
+  vehiclesList.value.map(v => ({ value: v.id as number, label: `${v.plateNumber} – ${v.brand} ${v.model}` }))
 )
-const viewModeOptions = [
-  { value: 'all', label: 'Tümü' },
-  { value: 'rental', label: 'Kiralama bazlı' },
-  { value: 'vehicle', label: 'Araç bazlı' }
-]
+const customerOptions = computed(() =>
+  customersList.value.map(c => ({
+    value: c.id as number,
+    label: c.displayName || `Müşteri #${c.id}`
+  }))
+)
 </script>
 
 <template>
@@ -236,19 +288,34 @@ const viewModeOptions = [
       </div>
     </div>
 
-    <div class="filter-bar">
-      <div class="view-mode-group">
-        <span class="filter-label">Görünüm:</span>
+    <div class="view-tabs">
+      <button :class="['tab-btn', { active: viewMode === 'all' }]" @click="viewMode = 'all'">
+        <span class="tab-icon">⊞</span> Tümü
+      </button>
+      <button :class="['tab-btn', { active: viewMode === 'customer' }]" @click="viewMode = 'customer'">
+        <span class="tab-icon">👤</span> Müşteri Bazlı
+      </button>
+      <button :class="['tab-btn', { active: viewMode === 'rental' }]" @click="viewMode = 'rental'">
+        <span class="tab-icon">🚗</span> Kiralama Bazlı
+      </button>
+      <button :class="['tab-btn', { active: viewMode === 'vehicle' }]" @click="viewMode = 'vehicle'">
+        <span class="tab-icon">🔑</span> Araç Bazlı
+      </button>
+    </div>
+
+    <div class="filter-bar" v-if="viewMode !== 'all' || true">
+      <template v-if="viewMode === 'customer'">
         <SearchableSelect
-          :model-value="viewMode"
-          :options="viewModeOptions"
-          placeholder="Tümü"
-          search-placeholder="Ara..."
-          class="filter-searchable"
-          @update:model-value="(v) => { if (v) viewMode = v as ViewMode }"
+          v-model="selectedCustomerId"
+          :options="customerOptions"
+          placeholder="Müşteri seçin"
+          search-placeholder="Müşteri ara..."
+          clearable
+          :loading="loadingCustomers"
+          class="filter-searchable customer-select"
         />
-      </div>
-      <template v-if="viewMode === 'rental'">
+      </template>
+      <template v-else-if="viewMode === 'rental'">
         <SearchableSelect
           v-model="selectedRentalId"
           :options="rentalOptions"
@@ -299,7 +366,53 @@ const viewModeOptions = [
       </template>
     </div>
 
-    <div v-if="loading" class="loading">Yükleniyor...</div>
+    <div v-if="viewMode === 'customer' && selectedCustomerId" class="customer-summary-card">
+      <div class="customer-summary-header">
+        <div class="customer-name">
+          <span class="customer-avatar">👤</span>
+          <span>{{ getCustomerDisplayName(selectedCustomer) }}</span>
+        </div>
+        <span class="customer-badge">Müşteri Alacak Özeti</span>
+      </div>
+      <div class="customer-summary-stats">
+        <div class="summary-stat">
+          <span class="summary-stat-label">Toplam Alacak</span>
+          <span class="summary-stat-value">{{ formatCurrency(totalReceivable) }}</span>
+        </div>
+        <div class="summary-stat">
+          <span class="summary-stat-label">Tahsil Edilecek</span>
+          <span class="summary-stat-value text-orange">{{ formatCurrency(outstandingReceivable) }}</span>
+        </div>
+        <div class="summary-stat">
+          <span class="summary-stat-label">Vadesi Geçmiş</span>
+          <span class="summary-stat-value text-red">{{ formatCurrency(overdueReceivablesTotal) }}</span>
+        </div>
+        <div class="summary-stat">
+          <span class="summary-stat-label">Tahsilat Oranı</span>
+          <span class="summary-stat-value text-green">{{ collectionRate }}%</span>
+          <div class="mini-progress-bar">
+            <div class="mini-progress-fill" :style="{ width: `${collectionRate}%` }"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="viewMode === 'customer' && !selectedCustomerId" class="empty-state-hint">
+      <div class="hint-icon">👤</div>
+      <p>Alacakları görüntülemek için yukarıdan bir müşteri seçin.</p>
+    </div>
+
+    <div v-else-if="viewMode === 'rental' && !selectedRentalId" class="empty-state-hint">
+      <div class="hint-icon">🚗</div>
+      <p>Alacakları görüntülemek için yukarıdan bir kiralama seçin.</p>
+    </div>
+
+    <div v-else-if="viewMode === 'vehicle' && !selectedVehicleId" class="empty-state-hint">
+      <div class="hint-icon">🔑</div>
+      <p>Alacakları görüntülemek için yukarıdan bir araç seçin.</p>
+    </div>
+
+    <div v-else-if="loading" class="loading">Yükleniyor...</div>
 
     <div v-else-if="receivables.length === 0" class="empty-state">
       <p>Henüz alacak kaydı bulunmamaktadır.</p>
@@ -320,6 +433,9 @@ const viewModeOptions = [
     </div>
     <div v-else-if="!loading && receivables.length > 0 && viewMode === 'vehicle'" class="list-info">
       Bu araca ait {{ receivables.length }} alacak kaydı.
+    </div>
+    <div v-else-if="!loading && receivables.length > 0 && viewMode === 'customer'" class="list-info">
+      Bu müşteriye ait {{ receivables.length }} alacak kaydı.
     </div>
     <div v-if="!loading && receivables.length > 0 && viewMode === 'all'" class="pagination">
       <button
@@ -441,6 +557,48 @@ const viewModeOptions = [
 .text-red { color: #b91c1c !important; }
 .text-green { color: #15803d !important; }
 
+.view-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  background: white;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 0.75rem;
+  padding: 0.375rem;
+}
+
+.tab-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  padding: 0.625rem 1rem;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  background: transparent;
+  color: var(--color-text-secondary, #6b7280);
+  transition: all 0.2s;
+}
+
+.tab-btn:hover {
+  background: var(--color-background, #f9fafb);
+  color: var(--color-text, #111827);
+}
+
+.tab-btn.active {
+  background: var(--color-primary, #2563eb);
+  color: white;
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.3);
+}
+
+.tab-icon {
+  font-size: 1rem;
+}
+
 .filter-bar {
   display: flex;
   flex-wrap: wrap;
@@ -453,21 +611,118 @@ const viewModeOptions = [
   margin-bottom: 1.5rem;
 }
 
-.view-mode-group {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
 .filter-label {
   font-size: 0.875rem;
   font-weight: 500;
   color: var(--color-text-secondary, #6b7280);
 }
 
+.customer-select,
 .rental-select,
 .vehicle-select {
-  min-width: 220px;
+  min-width: 280px;
+}
+
+.customer-summary-card {
+  background: white;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.customer-summary-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
+}
+
+.customer-name {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-text, #111827);
+}
+
+.customer-avatar {
+  font-size: 1.5rem;
+}
+
+.customer-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-primary, #2563eb);
+  background: #eff6ff;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  border: 1px solid #bfdbfe;
+}
+
+.customer-summary-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+}
+
+.summary-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.summary-stat-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-secondary, #6b7280);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.summary-stat-value {
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: var(--color-text, #111827);
+}
+
+.mini-progress-bar {
+  height: 4px;
+  background: #e5e7eb;
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 0.375rem;
+}
+
+.mini-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981, #059669);
+  border-radius: 2px;
+  transition: width 0.4s ease;
+}
+
+.empty-state-hint {
+  text-align: center;
+  padding: 4rem 2rem;
+  background: white;
+  border: 2px dashed var(--color-border, #e5e7eb);
+  border-radius: 0.75rem;
+  color: var(--color-text-secondary, #6b7280);
+  margin-bottom: 1.5rem;
+}
+
+.hint-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.empty-state-hint p {
+  font-size: 0.9375rem;
+  margin: 0;
 }
 
 .list-info {

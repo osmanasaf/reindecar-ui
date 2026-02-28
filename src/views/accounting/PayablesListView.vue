@@ -2,7 +2,7 @@
 import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAccountingStore } from '@/stores'
-import { usePagination, useToast } from '@/composables'
+import { usePagination, useToast, useEnumTranslations } from '@/composables'
 import { SearchableSelect } from '@/components/common'
 import { PayableCard, CreatePayableModal, PaymentModal } from '@/components/accounting'
 import { formatCurrency } from '@/utils/format'
@@ -13,7 +13,8 @@ import { PayableStatus, PayableType } from '@/types'
 const router = useRouter()
 const accountingStore = useAccountingStore()
 const toast = useToast()
-const { page, size, setPage, setTotal, getParams } = usePagination()
+const { page, setPage, setTotal, getParams } = usePagination()
+const { payableTypes, payableStatuses } = useEnumTranslations()
 
 type ViewMode = 'all' | 'rental' | 'vehicle'
 const viewMode = ref<ViewMode>('all')
@@ -91,7 +92,7 @@ const loadRentalsList = async () => {
 const loadVehiclesList = async () => {
   loadingVehicles.value = true
   try {
-    const res = await vehiclesApi.getAll({ page: 0, size: 500, sort: 'plate', direction: 'ASC' })
+    const res = await vehiclesApi.getAll({ page: 0, size: 500, sort: 'plateNumber', direction: 'ASC' })
     vehiclesList.value = res.content
   } catch {
     vehiclesList.value = []
@@ -174,19 +175,23 @@ const handlePageChange = (newPage: number) => {
   loadPayables()
 }
 
-const statusOptions = Object.values(PayableStatus).map(s => ({ value: s, label: s }))
-const typeOptions = Object.values(PayableType).map(t => ({ value: t, label: t }))
+const statusOptions = computed(() =>
+  Object.values(PayableStatus).map(s => ({ value: s, label: payableStatuses[s] ?? s }))
+)
+const typeOptions = computed(() =>
+  Object.values(PayableType).map(t => ({ value: t, label: payableTypes[t] ?? t }))
+)
 const rentalOptions = computed(() =>
-  rentalsList.value.map(r => ({ value: r.id as number, label: `${r.rentalNumber} (${r.startDate} - ${r.endDate})` }))
+  rentalsList.value.map(r => ({
+    value: r.id as number,
+    label: r.customerName
+      ? `${r.rentalNumber} — ${r.customerName} (${r.startDate} - ${r.endDate})`
+      : `${r.rentalNumber} (${r.startDate} - ${r.endDate})`
+  }))
 )
 const vehicleOptions = computed(() =>
-  vehiclesList.value.map(v => ({ value: v.id as number, label: `${v.plate} – ${v.brand} ${v.model}` }))
+  vehiclesList.value.map(v => ({ value: v.id as number, label: `${v.plateNumber} – ${v.brand} ${v.model}` }))
 )
-const viewModeOptions = [
-  { value: 'all', label: 'Tümü' },
-  { value: 'rental', label: 'Kiralama bazlı' },
-  { value: 'vehicle', label: 'Araç bazlı' }
-]
 </script>
 
 <template>
@@ -221,70 +226,93 @@ const viewModeOptions = [
       </div>
     </div>
 
-    <div class="filter-bar">
-      <div class="view-mode-group">
-        <span class="filter-label">Görünüm:</span>
-        <SearchableSelect
-          :model-value="viewMode"
-          :options="viewModeOptions"
-          placeholder="Tümü"
-          search-placeholder="Ara..."
-          class="filter-searchable"
-          @update:model-value="(v) => { if (v) viewMode = v as ViewMode }"
-        />
-      </div>
-      <template v-if="viewMode === 'rental'">
-        <SearchableSelect
-          v-model="selectedRentalId"
-          :options="rentalOptions"
-          placeholder="Kiralama seçin"
-          search-placeholder="Kiralama ara..."
-          clearable
-          :loading="loadingRentals"
-          class="filter-searchable rental-select"
-        />
-      </template>
-      <template v-else-if="viewMode === 'vehicle'">
-        <SearchableSelect
-          v-model="selectedVehicleId"
-          :options="vehicleOptions"
-          placeholder="Araç seçin"
-          search-placeholder="Araç ara..."
-          clearable
-          :loading="loadingVehicles"
-          class="filter-searchable vehicle-select"
-        />
-      </template>
-      <template v-if="viewMode === 'all'">
-        <SearchableSelect
-          :model-value="filters.status ?? null"
-          :options="statusOptions"
-          placeholder="Tüm Durumlar"
-          search-placeholder="Durum ara..."
-          clearable
-          class="filter-searchable"
-          @update:model-value="(v) => filters.status = v ?? undefined"
-        />
-        <SearchableSelect
-          :model-value="filters.type ?? null"
-          :options="typeOptions"
-          placeholder="Tüm Tipler"
-          search-placeholder="Tip ara..."
-          clearable
-          class="filter-searchable"
-          @update:model-value="(v) => filters.type = v ?? undefined"
-        />
-        <input v-model="filters.startDate" type="date" class="filter-input" />
-        <input v-model="filters.endDate" type="date" class="filter-input" />
-        <label class="filter-check">
-          <input type="checkbox" v-model="filters.overdue" /> Yalnızca Vadesi Geçmiş
-        </label>
-        <button class="btn btn-secondary" @click="applyFilters">Filtrele</button>
-        <button class="btn btn-ghost" @click="clearFilters">Temizle</button>
-      </template>
+    <div class="view-tabs">
+      <button
+        :class="['tab-btn', { active: viewMode === 'all' }]"
+        @click="viewMode = 'all'"
+      >
+        Tümü
+      </button>
+      <button
+        :class="['tab-btn', { active: viewMode === 'rental' }]"
+        @click="viewMode = 'rental'"
+      >
+        Kiralama Bazlı
+      </button>
+      <button
+        :class="['tab-btn', { active: viewMode === 'vehicle' }]"
+        @click="viewMode = 'vehicle'"
+      >
+        Araç Bazlı
+      </button>
     </div>
 
-    <div v-if="loading" class="loading">Yükleniyor...</div>
+    <div v-if="viewMode === 'rental'" class="filter-bar">
+      <SearchableSelect
+        v-model="selectedRentalId"
+        :options="rentalOptions"
+        placeholder="Kiralama seçin"
+        search-placeholder="Kiralama ara..."
+        clearable
+        :loading="loadingRentals"
+        class="filter-searchable rental-select"
+      />
+    </div>
+
+    <div v-else-if="viewMode === 'vehicle'" class="filter-bar">
+      <SearchableSelect
+        v-model="selectedVehicleId"
+        :options="vehicleOptions"
+        placeholder="Araç seçin"
+        search-placeholder="Araç ara..."
+        clearable
+        :loading="loadingVehicles"
+        class="filter-searchable vehicle-select"
+      />
+    </div>
+
+    <div v-else-if="viewMode === 'all'" class="filter-bar">
+      <SearchableSelect
+        :model-value="filters.status ?? null"
+        :options="statusOptions"
+        placeholder="Tüm Durumlar"
+        search-placeholder="Durum ara..."
+        clearable
+        class="filter-searchable"
+        @update:model-value="(v) => filters.status = v ?? undefined"
+      />
+      <SearchableSelect
+        :model-value="filters.type ?? null"
+        :options="typeOptions"
+        placeholder="Tüm Tipler"
+        search-placeholder="Tip ara..."
+        clearable
+        class="filter-searchable"
+        @update:model-value="(v) => filters.type = v ?? undefined"
+      />
+      <input v-model="filters.startDate" type="date" class="filter-input" />
+      <input v-model="filters.endDate" type="date" class="filter-input" />
+      <label class="filter-check">
+        <input type="checkbox" v-model="filters.overdue" /> Yalnızca Vadesi Geçmiş
+      </label>
+      <button class="btn btn-secondary" @click="applyFilters">Filtrele</button>
+      <button class="btn btn-ghost" @click="clearFilters">Temizle</button>
+    </div>
+
+    <div
+      v-if="viewMode === 'rental' && !selectedRentalId"
+      class="empty-state-hint"
+    >
+      Verecekleri görüntülemek için yukarıdan bir kiralama seçin.
+    </div>
+    <div
+      v-else-if="viewMode === 'vehicle' && !selectedVehicleId"
+      class="empty-state-hint"
+    >
+      Verecekleri görüntülemek için yukarıdan bir araç seçin.
+    </div>
+
+    <div v-else-if="loading" class="loading">Yükleniyor...</div>
 
     <div v-else-if="payables.length === 0" class="empty-state">
       <p>Henüz verecek kaydı bulunmamaktadır.</p>
@@ -300,11 +328,8 @@ const viewModeOptions = [
       />
     </div>
 
-    <div v-if="!loading && payables.length > 0 && viewMode === 'rental'" class="list-info">
-      Bu kiralamaya ait {{ payables.length }} verecek kaydı.
-    </div>
-    <div v-else-if="!loading && payables.length > 0 && viewMode === 'vehicle'" class="list-info">
-      Bu araca ait {{ payables.length }} verecek kaydı.
+    <div v-if="!loading && payables.length > 0 && (viewMode === 'rental' || viewMode === 'vehicle')" class="list-info">
+      {{ payables.length }} verecek kaydı listeleniyor.
     </div>
     <div v-if="!loading && payables.length > 0 && viewMode === 'all'" class="pagination">
       <button class="page-btn" :disabled="page === 0" @click="handlePageChange(page - 1)">‹ Önceki</button>
@@ -341,15 +366,48 @@ const viewModeOptions = [
 .text-orange { color: #c2410c !important; }
 .text-red { color: #b91c1c !important; }
 .text-green { color: #15803d !important; }
+
+.view-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  background: white;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 0.5rem;
+  padding: 0.375rem;
+  width: fit-content;
+}
+.tab-btn {
+  padding: 0.5rem 1.25rem;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary, #6b7280);
+  transition: all 0.2s;
+}
+.tab-btn:hover { background: var(--color-background, #f3f4f6); color: var(--color-text, #111827); }
+.tab-btn.active { background: var(--color-primary, #2563eb); color: white; }
+
 .filter-bar { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; background: white; border: 1px solid var(--color-border, #e5e7eb); border-radius: 0.5rem; padding: 1rem 1.25rem; margin-bottom: 1.5rem; }
-.view-mode-group { display: flex; align-items: center; gap: 0.5rem; }
-.filter-label { font-size: 0.875rem; font-weight: 500; color: var(--color-text-secondary, #6b7280); }
-.rental-select, .vehicle-select { min-width: 220px; }
+.rental-select, .vehicle-select { min-width: 300px; }
 .list-info { font-size: 0.875rem; color: var(--color-text-secondary, #6b7280); margin-top: 1rem; }
 .filter-select, .filter-input { padding: 0.4rem 0.75rem; border: 1px solid var(--color-border, #e5e7eb); border-radius: 0.375rem; font-size: 0.875rem; background: white; }
 .filter-check { font-size: 0.875rem; display: flex; align-items: center; gap: 0.375rem; cursor: pointer; }
 .loading { text-align: center; padding: 3rem; color: var(--color-text-secondary, #6b7280); }
 .empty-state { text-align: center; padding: 3rem; background: white; border: 1px solid var(--color-border, #e5e7eb); border-radius: 0.5rem; color: var(--color-text-secondary, #6b7280); }
+.empty-state-hint {
+  text-align: center;
+  padding: 2.5rem;
+  background: #f8fafc;
+  border: 2px dashed var(--color-border, #e5e7eb);
+  border-radius: 0.5rem;
+  color: var(--color-text-secondary, #6b7280);
+  font-size: 0.9375rem;
+  margin-bottom: 1.5rem;
+}
 .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 1.5rem; }
 .pagination { display: flex; justify-content: center; align-items: center; gap: 1rem; margin-top: 2rem; }
 .page-btn { padding: 0.5rem 1rem; border: 1px solid var(--color-border, #e5e7eb); border-radius: 0.375rem; background: white; cursor: pointer; font-size: 0.875rem; }

@@ -904,7 +904,15 @@ onActivated(() => {
             <div class="km-grid">
               <div class="km-item">
                 <span class="label">Başlangıç KM</span>
-                <span class="value">{{ rental.startKm !== undefined && rental.startKm !== null ? formatKm(rental.startKm) : '-' }}</span>
+                <span class="value">
+                  <template v-if="['DRAFT', 'RESERVED', 'ACTIVE'].includes(rental.status)">
+                    {{ vehicle?.currentKm ? formatKm(vehicle.currentKm) : '-' }}
+                    <span v-if="rental.status !== 'ACTIVE'" class="km-hint">(araç mevcut KM)</span>
+                  </template>
+                  <template v-else>
+                    {{ rental.startKm ? formatKm(rental.startKm) : '-' }}
+                  </template>
+                </span>
               </div>
               <div class="km-item">
                 <span class="label">Bitiş KM</span>
@@ -1345,6 +1353,12 @@ onActivated(() => {
 .detail-item .value {
     font-weight: 500;
     font-size: 14px;
+}
+
+.km-hint {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-left: 4px;
 }
 
 .text-danger {
