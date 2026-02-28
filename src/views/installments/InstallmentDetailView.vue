@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { installmentsApi } from '@/api'
+import { installmentsApi, vehiclesApi } from '@/api'
 import { useToast } from '@/composables'
-import type { VehicleInstallmentResponse } from '@/types'
+import type { VehicleInstallmentResponse, Vehicle } from '@/types'
 import { formatCurrency, calculateProgress } from '@/utils/installmentHelpers'
 import PaymentScheduleTable from '@/components/installments/PaymentScheduleTable.vue'
 import InstallmentEarlyClosureModal from '@/components/InstallmentEarlyClosureModal.vue'
@@ -14,14 +14,29 @@ const toast = useToast()
 
 const loading = ref(false)
 const installment = ref<VehicleInstallmentResponse | null>(null)
+const vehicle = ref<Vehicle | null>(null)
 const showCloseModal = ref(false)
 
 const installmentId = computed(() => Number(route.params.id))
 const payments = computed(() => installment.value?.payments ?? [])
 const paidCount = computed(() => payments.value.filter(p => p.status === 'PAID').length)
+const overdueCount = computed(() => payments.value.filter(p => p.isOverdue).length)
 const progress = computed(() => {
   if (!installment.value) return 0
   return calculateProgress(paidCount.value, installment.value.numberOfInstallments)
+})
+
+const progressColor = computed(() => {
+  if (progress.value >= 75) return '#22c55e'
+  if (progress.value >= 40) return '#3b82f6'
+  return '#f59e0b'
+})
+
+const vehicleLabel = computed(() => {
+  if (vehicle.value) {
+    return `${vehicle.value.plateNumber} — ${vehicle.value.brand} ${vehicle.value.model}`
+  }
+  return `Araç #${installment.value?.vehicleId ?? ''}`
 })
 
 async function loadInstallment(): Promise<void> {
@@ -34,6 +49,13 @@ async function loadInstallment(): Promise<void> {
   loading.value = true
   try {
     installment.value = await installmentsApi.getById(installmentId.value)
+    if (installment.value?.vehicleId) {
+      try {
+        vehicle.value = await vehiclesApi.getById(installment.value.vehicleId)
+      } catch {
+        vehicle.value = null
+      }
+    }
   } catch (err) {
     installment.value = null
     toast.apiError(err, 'Taksit planı yüklenemedi')
@@ -78,11 +100,14 @@ watch(() => route.params.id, loadInstallment)
     <div class="page-header">
       <div>
         <h1>Taksit Planı Detayı</h1>
-        <p v-if="installment">Plan #{{ installment.id }}</p>
+        <p v-if="installment" class="page-subtitle">
+          Plan #{{ installment.id }}
+          <span v-if="vehicle" class="vehicle-badge">{{ vehicleLabel }}</span>
+        </p>
       </div>
       <div class="header-actions">
         <button type="button" class="btn btn-outline" @click="router.push({ name: 'installments-dashboard' })">
-          Dashboard
+          ← Dashboard
         </button>
         <button v-if="installment" type="button" class="btn btn-outline" @click="goToVehicle">
           Araca Git
@@ -98,13 +123,21 @@ watch(() => route.params.id, loadInstallment)
       </div>
     </div>
 
-    <div v-if="loading" class="loading">Yükleniyor...</div>
+    <div v-if="loading" class="loading">
+      <div class="loading-spinner"></div>
+      <span>Yükleniyor...</span>
+    </div>
 
     <template v-else-if="installment">
+      <div v-if="overdueCount > 0" class="overdue-banner">
+        <span>⚠️</span>
+        <span>Bu planda <strong>{{ overdueCount }}</strong> adet gecikmiş ödeme bulunmaktadır.</span>
+      </div>
+
       <div class="summary-grid">
         <div class="summary-item">
-          <span class="label">Araç ID</span>
-          <span class="value">#{{ installment.vehicleId }}</span>
+          <span class="label">Araç</span>
+          <span class="value vehicle-value" @click="goToVehicle">{{ vehicleLabel }}</span>
         </div>
         <div class="summary-item">
           <span class="label">Toplam Tutar</span>
@@ -118,7 +151,7 @@ watch(() => route.params.id, loadInstallment)
           <span class="label">Kalan Taksit</span>
           <span class="value">{{ installment.remainingInstallments }} / {{ installment.numberOfInstallments }}</span>
         </div>
-        <div class="summary-item">
+        <div class="summary-item" :class="{ 'summary-item--warning': installment.outstandingBalance > 0 }">
           <span class="label">Kalan Bakiye</span>
           <span class="value">{{ formatCurrency(installment.outstandingBalance, installment.outstandingCurrency) }}</span>
         </div>
@@ -129,10 +162,19 @@ watch(() => route.params.id, loadInstallment)
       </div>
 
       <div class="progress-box">
-        <div class="progress-bar">
-          <div class="progress-fill" :style="{ width: `${progress}%` }"></div>
+        <div class="progress-header">
+          <span class="progress-label">Ödeme İlerlemesi</span>
+          <span class="progress-percent">{{ progress }}%</span>
         </div>
-        <p>{{ paidCount }} / {{ installment.numberOfInstallments }} ödeme tamamlandı (%{{ progress }})</p>
+        <div class="progress-bar">
+          <div
+            class="progress-fill"
+            :style="{ width: `${progress}%`, background: progressColor }"
+          ></div>
+        </div>
+        <p class="progress-text">
+          {{ paidCount }} / {{ installment.numberOfInstallments }} ödeme tamamlandı
+        </p>
       </div>
 
       <div class="schedule-box">
@@ -142,7 +184,10 @@ watch(() => route.params.id, loadInstallment)
     </template>
 
     <div v-else class="empty-state">
-      Taksit planı bulunamadı.
+      <p>Taksit planı bulunamadı.</p>
+      <button class="btn btn-outline" @click="router.push({ name: 'installments-dashboard' })">
+        Dashboard'a Dön
+      </button>
     </div>
 
     <teleport to="body">
@@ -161,115 +206,229 @@ watch(() => route.params.id, loadInstallment)
 .installment-detail-view {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 24px;
+  padding: 2rem;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 1.25rem;
 }
 
 .page-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 16px;
+  gap: 1rem;
 }
 
 .page-header h1 {
   margin: 0;
-  font-size: 28px;
+  font-size: 1.875rem;
+  font-weight: 700;
+  color: var(--color-text, #111827);
 }
 
-.page-header p {
-  margin: 6px 0 0;
-  color: var(--color-text-secondary);
+.page-subtitle {
+  margin: 0.375rem 0 0;
+  color: var(--color-text-secondary, #6b7280);
+  font-size: 0.9375rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.vehicle-badge {
+  display: inline-block;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-radius: 9999px;
+  padding: 0.125rem 0.625rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
 }
 
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 0.5rem;
+  flex-shrink: 0;
 }
 
-.loading,
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 4rem;
+  color: var(--color-text-secondary, #6b7280);
+}
+
+.loading-spinner {
+  width: 2rem;
+  height: 2rem;
+  border: 3px solid var(--color-border, #e5e7eb);
+  border-top-color: var(--color-primary, #2563eb);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.overdue-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 0.5rem;
+  padding: 0.875rem 1.25rem;
+  font-size: 0.9375rem;
+  color: #991b1b;
+}
+
 .empty-state {
   text-align: center;
-  padding: 48px;
-  color: var(--color-text-secondary);
+  padding: 4rem;
+  background: white;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 0.75rem;
+  color: var(--color-text-secondary, #6b7280);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
 }
 
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
 }
 
 .summary-item {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  padding: 14px;
+  background: white;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 0.625rem;
+  padding: 0.875rem 1rem;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 0.375rem;
+}
+
+.summary-item--warning {
+  border-color: #fcd34d;
+  background: #fffbeb;
 }
 
 .summary-item .label {
-  font-size: 12px;
-  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  color: var(--color-text-secondary, #6b7280);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 500;
 }
 
 .summary-item .value {
-  font-size: 18px;
+  font-size: 1.125rem;
   font-weight: 600;
+  color: var(--color-text, #111827);
 }
 
-.progress-box,
-.schedule-box {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  padding: 20px;
+.vehicle-value {
+  cursor: pointer;
+  color: var(--color-primary, #2563eb) !important;
+  font-size: 0.9375rem !important;
 }
 
-.progress-box p {
-  margin: 10px 0 0;
-  color: var(--color-text-secondary);
-  font-size: 13px;
+.vehicle-value:hover {
+  text-decoration: underline;
+}
+
+.progress-box {
+  background: white;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 0.75rem;
+  padding: 1.25rem 1.5rem;
+}
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.625rem;
+}
+
+.progress-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text, #111827);
+}
+
+.progress-percent {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--color-text-secondary, #6b7280);
 }
 
 .progress-bar {
-  height: 8px;
-  background: var(--color-bg-secondary);
-  border-radius: 4px;
+  height: 0.625rem;
+  background: var(--color-background, #f3f4f6);
+  border-radius: 9999px;
   overflow: hidden;
 }
 
 .progress-fill {
   height: 100%;
-  background: var(--color-success);
+  border-radius: 9999px;
+  transition: width 0.4s ease;
+}
+
+.progress-text {
+  margin: 0.5rem 0 0;
+  color: var(--color-text-secondary, #6b7280);
+  font-size: 0.8125rem;
+}
+
+.schedule-box {
+  background: white;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 0.75rem;
+  padding: 1.5rem;
 }
 
 .schedule-box h2 {
-  margin: 0 0 16px;
-  font-size: 18px;
+  margin: 0 0 1rem;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--color-text, #111827);
 }
 
 .btn {
   border: none;
-  border-radius: 8px;
-  padding: 9px 14px;
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
   cursor: pointer;
   font-weight: 500;
+  font-size: 0.875rem;
+  transition: all 0.2s;
 }
 
 .btn-outline {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  color: var(--color-text);
+  background: white;
+  border: 1px solid var(--color-border, #e5e7eb);
+  color: var(--color-text, #111827);
+}
+
+.btn-outline:hover {
+  background: var(--color-background, #f3f4f6);
 }
 
 .btn-danger {
-  background: var(--color-danger);
+  background: #dc2626;
   color: white;
+}
+
+.btn-danger:hover {
+  background: #b91c1c;
 }
 </style>
