@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { vehiclesApi, vehicleCategoriesApi, branchesApi } from '@/api'
+import { vehiclesApi, vehicleCategoriesApi, branchesApi, referenceDataApi } from '@/api'
 import { useValidation, rules, useToast, useReferenceData } from '@/composables'
 import { SearchableSelect } from '@/components/common'
 import type { CarModel } from '@/types/reference'
@@ -9,6 +9,7 @@ import { formatPlateInput } from '@/utils'
 import { isErrorResponse } from '@/utils/error'
 import { FuelType, Transmission } from '@/types'
 import type { CreateVehicleForm, UpdateVehicleForm, VehicleCategory, Branch, Vehicle } from '@/types'
+import type { VehicleRecognitionResult } from '@/api/vehicles.api'
 
 interface VehicleFormModel {
   plateNumber: string
@@ -49,7 +50,8 @@ const {
   loadBrands,
   loadModelsByBrand,
   loadColors,
-  getModelsForBrand
+  getModelsForBrand,
+  invalidateModelsCache
 } = useReferenceData()
 const selectedBrandId = ref<number | null>(null)
 const selectedModelId = ref<number | null>(null)
@@ -355,6 +357,99 @@ function handleBlur(field: string) {
   touch(field)
 }
 
+const photoFile = ref<File | null>(null)
+const photoPreview = ref<string | null>(null)
+const recognizing = ref(false)
+const recognitionResult = ref<VehicleRecognitionResult | null>(null)
+const photoInputRef = ref<HTMLInputElement | null>(null)
+
+function handlePhotoChange(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  photoFile.value = file
+  photoPreview.value = URL.createObjectURL(file)
+  recognitionResult.value = null
+}
+
+function removePhoto() {
+  photoFile.value = null
+  photoPreview.value = null
+  recognitionResult.value = null
+  if (photoInputRef.value) photoInputRef.value.value = ''
+}
+
+async function recognizePhoto() {
+  if (!photoFile.value) return
+  recognizing.value = true
+  try {
+    const result = await vehiclesApi.recognizeFromPhoto(photoFile.value)
+    recognitionResult.value = result
+    if (result.recognized) {
+      await applyRecognitionResult(result)
+      toast.success('Araç bilgileri fotoğraftan otomatik dolduruldu. Lütfen kontrol edin.')
+    } else {
+      toast.error('Araç fotoğraftan tanınamadı. Lütfen daha net bir fotoğraf deneyin.')
+    }
+  } catch {
+    toast.error('Fotoğraf analizi sırasında hata oluştu')
+  } finally {
+    recognizing.value = false
+  }
+}
+
+async function applyRecognitionResult(result: VehicleRecognitionResult) {
+  if (result.brand) {
+    const brandMatch = brands.value.find(b =>
+      b.name.toLowerCase() === result.brand!.toLowerCase()
+    )
+    if (brandMatch) {
+      const loadedModels = await loadModelsByBrand(brandMatch.id)
+      selectedBrandId.value = brandMatch.id
+
+      if (result.model) {
+        await nextTick()
+        const modelMatch = loadedModels.find(m =>
+          m.name.toLowerCase() === result.model!.toLowerCase()
+        )
+        if (modelMatch) {
+          selectedModelId.value = modelMatch.id
+        } else {
+          try {
+            const newModel = await referenceDataApi.createModel({
+              brandId: brandMatch.id,
+              name: result.model
+            })
+            invalidateModelsCache(brandMatch.id)
+            const fresh = await loadModelsByBrand(brandMatch.id)
+            models.value = fresh
+            await nextTick()
+            selectedModelId.value = newModel.id
+            toast.info(`"${result.model}" modeli sisteme eklendi`)
+          } catch {
+            toast.error(`"${result.model}" modeli eklenemedi, lütfen elle seçin`)
+          }
+        }
+      }
+    }
+  }
+
+  if (result.color) {
+    const colorMatch = colors.value.find(c =>
+      c.name.toLowerCase() === result.color!.toLowerCase()
+    )
+    if (colorMatch) selectedColorId.value = colorMatch.id
+  }
+
+  if (result.year) {
+    form.value.year = result.year
+  }
+
+  if (result.plateNumber) {
+    form.value.plateNumber = formatPlateInput(result.plateNumber)
+  }
+}
+
 onMounted(fetchData)
 </script>
 
@@ -370,6 +465,50 @@ onMounted(fetchData)
     <div v-if="loading && !form.plateNumber" class="loading">Yükleniyor...</div>
 
     <form v-else class="form-container" @submit.prevent="handleSubmit">
+
+      <section v-if="!isEditMode" class="form-section photo-recognition-section">
+        <h3>Fotoğraftan Otomatik Doldur</h3>
+        <div class="photo-upload-area">
+          <div v-if="!photoPreview" class="photo-dropzone" @click="photoInputRef?.click()">
+            <svg class="photo-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909"/>
+              <path d="M3.75 20.25h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12.75c0 .828.672 1.5 1.5 1.5z"/>
+              <circle cx="8.25" cy="10.5" r="1.5"/>
+            </svg>
+            <span class="photo-hint">Araç fotoğrafı yükleyin</span>
+            <span class="photo-hint-sub">Marka, model, yıl ve renk otomatik doldurulur</span>
+          </div>
+          <div v-else class="photo-preview-container">
+            <img :src="photoPreview" class="photo-preview-img" alt="Araç fotoğrafı" />
+            <div class="photo-actions">
+              <button
+                type="button"
+                class="btn btn-primary btn-recognize"
+                :disabled="recognizing"
+                @click="recognizePhoto"
+              >
+                {{ recognizing ? 'Analiz ediliyor...' : 'Bilgileri Tanı' }}
+              </button>
+              <button type="button" class="btn btn-secondary" @click="removePhoto">
+                Fotoğrafı Kaldır
+              </button>
+            </div>
+            <div v-if="recognitionResult" class="recognition-badge" :class="recognitionResult.recognized ? 'badge-success' : 'badge-warning'">
+              {{ recognitionResult.recognized
+                ? `Tanındı (${Math.round(recognitionResult.confidence * 100)}% güven)`
+                : 'Araç tanınamadı' }}
+            </div>
+          </div>
+          <input
+            ref="photoInputRef"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            class="photo-file-input"
+            @change="handlePhotoChange"
+          />
+        </div>
+      </section>
+
       <section class="form-section">
         <h3>Temel Bilgiler</h3>
         <div class="form-grid">
@@ -828,6 +967,99 @@ onMounted(fetchData)
 textarea {
   resize: vertical;
   min-height: 100px;
+}
+
+.photo-recognition-section {
+  background: var(--color-bg-secondary);
+  border: 1px dashed var(--color-primary);
+  border-radius: 10px;
+  padding: 24px;
+}
+
+.photo-upload-area {
+  position: relative;
+}
+
+.photo-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 36px;
+  border: 2px dashed var(--color-border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.photo-dropzone:hover {
+  border-color: var(--color-primary);
+  background: var(--color-surface);
+}
+
+.photo-icon {
+  width: 40px;
+  height: 40px;
+  color: var(--color-text-secondary);
+}
+
+.photo-hint {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.photo-hint-sub {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.photo-preview-container {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.photo-preview-img {
+  width: 200px;
+  height: 140px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+}
+
+.photo-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.btn-recognize {
+  min-width: 160px;
+}
+
+.recognition-badge {
+  align-self: flex-end;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.badge-success {
+  background: color-mix(in srgb, var(--color-success, #22c55e) 15%, transparent);
+  color: var(--color-success, #22c55e);
+}
+
+.badge-warning {
+  background: color-mix(in srgb, var(--color-warning, #f59e0b) 15%, transparent);
+  color: var(--color-warning, #f59e0b);
+}
+
+.photo-file-input {
+  display: none;
 }
 </style>
 

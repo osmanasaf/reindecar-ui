@@ -80,6 +80,10 @@ export function useReferenceData() {
         return modelsCache.value.get(brandId) ?? []
     }
 
+    function invalidateModelsCache(brandId: number) {
+        modelsCache.value.delete(brandId)
+    }
+
     function getDistrictsForCity(cityId: number): District[] {
         return districtsCache.value.get(cityId) ?? []
     }
@@ -99,6 +103,7 @@ export function useReferenceData() {
         loadDistrictsByCity,
         loadColors,
         getModelsForBrand,
-        getDistrictsForCity
+        getDistrictsForCity,
+        invalidateModelsCache
     }
 }

@@ -10,6 +10,17 @@ import type {
     VehicleHistory
 } from '@/types'
 
+export interface VehicleRecognitionResult {
+    brand: string | null
+    model: string | null
+    year: number | null
+    color: string | null
+    bodyType: string | null
+    plateNumber: string | null
+    confidence: number
+    recognized: boolean
+}
+
 class VehiclesApiService extends BaseApi {
     protected readonly basePath = '/vehicles'
 
@@ -64,6 +75,12 @@ class VehiclesApiService extends BaseApi {
 
     async getHistory(id: number): Promise<VehicleHistory> {
         return this.get(`/${id}/full-history`)
+    }
+
+    async recognizeFromPhoto(file: File): Promise<VehicleRecognitionResult> {
+        const formData = new FormData()
+        formData.append('file', file)
+        return this.postFormData(formData, '/recognize')
     }
 }
 
