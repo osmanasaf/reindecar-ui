@@ -20,7 +20,9 @@ export type FileUploadType =
     | 'LEASE_CONTRACT'
     | 'DAMAGE_PHOTO'
     | 'REPAIR_INVOICE'
+    | 'REPAIR_ESTIMATE'
     | 'ACCIDENT_REPORT'
+    | 'POLICE_REPORT'
     | 'MAINTENANCE_INVOICE'
     | 'PROFILE_PHOTO'
     | 'OTHER'
@@ -43,7 +45,9 @@ export const FILE_UPLOAD_TYPE_LABELS: Record<FileUploadType, string> = {
     LEASE_CONTRACT: 'Leasing Sözleşmesi',
     DAMAGE_PHOTO: 'Hasar Fotoğrafı',
     REPAIR_INVOICE: 'Tamir Faturası',
+    REPAIR_ESTIMATE: 'Tamir Keşif',
     ACCIDENT_REPORT: 'Kaza Tutanağı',
+    POLICE_REPORT: 'Trafik Kazası Tespit Tutanağı',
     MAINTENANCE_INVOICE: 'Bakım Faturası',
     PROFILE_PHOTO: 'Profil Fotoğrafı',
     OTHER: 'Diğer',
@@ -56,7 +60,7 @@ export const ALLOWED_TYPES_BY_REFERENCE: Record<FileReferenceType, FileUploadTyp
     LEASING: ['LEASE_CONTRACT', 'SIGNED_CONTRACT', 'HANDOVER_PHOTO', 'RETURN_PHOTO', 'OTHER'],
     DAMAGE: ['DAMAGE_PHOTO', 'ACCIDENT_REPORT', 'REPAIR_INVOICE', 'OTHER'],
     MAINTENANCE: ['MAINTENANCE_INVOICE', 'OTHER'],
-    INSURANCE: ['INSURANCE_POLICY', 'ACCIDENT_REPORT', 'OTHER'],
+    INSURANCE: ['INSURANCE_POLICY', 'ACCIDENT_REPORT', 'DAMAGE_PHOTO', 'POLICE_REPORT', 'REPAIR_ESTIMATE', 'OTHER'],
     USER: ['PROFILE_PHOTO', 'OTHER'],
 }
 
@@ -103,16 +107,31 @@ class FilesApiService extends BaseApi {
     }
 
     async getPresignedUrl(id: number): Promise<string> {
-        return this.get(`/${id}/presigned-url`)
+        const result = await this.get<string>(`/${id}/presigned-url`)
+        // Backend returns URL in data; handle both direct string and wrapped shape
+        if (typeof result === 'string') return result
+        const obj = result as { data?: string; message?: string } | null
+        return obj?.data ?? obj?.message ?? ''
     }
 
     async delete(id: number): Promise<void> {
         return this.remove(`/${id}`)
     }
 
-    async openFile(id: number): Promise<void> {
+    /**
+     * Opens file in a new tab. Caller should open the window synchronously on user click
+     * (to avoid popup blocker), then pass it here to set the URL when ready.
+     * If no window is passed, opens a new window (may be blocked by browser).
+     */
+    async openFile(id: number, openedWindow?: Window | null): Promise<void> {
         const url = await this.getPresignedUrl(id)
-        window.open(url, '_blank', 'noopener,noreferrer')
+        const urlStr = typeof url === 'string' ? url : ''
+        if (!urlStr.trim()) return
+        if (openedWindow && !openedWindow.closed) {
+            openedWindow.location.href = urlStr
+        } else {
+            window.open(urlStr, '_blank', 'noopener,noreferrer')
+        }
     }
 
     async downloadFile(id: number, fileName: string): Promise<void> {

@@ -1,9 +1,13 @@
 <script setup lang="ts">
 import { useEnumTranslations } from '@/composables'
-import type { DamageHistoryItem } from '@/types'
+import DocumentsSection from '@/components/shared/DocumentsSection.vue'
+import type { DamageHistoryItem, DamageReport } from '@/types'
+
+/** Hasar detayı: geçmiş satırı veya hasar haritası kartından gelebilir */
+type DamageDetail = DamageHistoryItem | DamageReport
 
 interface Props {
-  damage: DamageHistoryItem | null
+  damage: DamageDetail | null
   visible: boolean
 }
 
@@ -71,6 +75,12 @@ function formatDate(date: string): string {
                 </div>
               </div>
             </div>
+
+            <DocumentsSection
+              reference-type="DAMAGE"
+              :reference-id="damage.id"
+              title="Hasar Belgeleri"
+            />
           </div>
         </div>
       </div>

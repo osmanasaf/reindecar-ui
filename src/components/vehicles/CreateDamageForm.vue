@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { damagesApi, rentalsApi, customersApi } from '@/api'
 import { useToast } from '@/composables'
 import { SearchableSelect } from '@/components/common'
+import DocumentsSection from '@/components/shared/DocumentsSection.vue'
 import { DamageType, DamageLocation, DamageSeverity } from '@/types'
 import type { CreateDamageReportForm, Customer, Rental } from '@/types'
 
@@ -18,6 +19,7 @@ const emit = defineEmits<{
 
 const toast = useToast()
 const submitting = ref(false)
+const createdDamageId = ref<number | null>(null)
 
 const vehicleRentals = ref<Rental[]>([])
 const loadingRentals = ref(false)
@@ -154,14 +156,19 @@ async function handleSubmit() {
 
   submitting.value = true
   try {
-    await damagesApi.create(form.value)
+    const created = await damagesApi.create(form.value)
     toast.success('Hasar raporu oluşturuldu')
-    emit('created')
+    createdDamageId.value = created.id
   } catch (err) {
     toast.apiError(err, 'Hasar raporu oluşturulamadı')
   } finally {
     submitting.value = false
   }
+}
+
+function finishWithDocuments() {
+  emit('created')
+  emit('close')
 }
 
 onMounted(async () => {
@@ -185,11 +192,27 @@ onMounted(async () => {
   <div class="modal-overlay" @click.self="emit('close')">
     <div class="modal-content">
       <div class="modal-header">
-        <h2>Yeni Hasar Raporu</h2>
+        <h2>{{ createdDamageId ? 'Hasar Raporu - Belgeler' : 'Yeni Hasar Raporu' }}</h2>
         <button class="close-btn" @click="emit('close')">&times;</button>
       </div>
 
-      <form @submit.prevent="handleSubmit" class="damage-form">
+      <template v-if="createdDamageId">
+        <div class="documents-step">
+          <p class="step-message">Hasar raporu kaydedildi. İsterseniz aşağıdan bu hasara ait belgeleri ekleyebilirsiniz.</p>
+          <DocumentsSection
+            reference-type="DAMAGE"
+            :reference-id="createdDamageId"
+            title="Hasar Belgeleri"
+          />
+          <div class="form-actions">
+            <button type="button" class="btn btn-primary" @click="finishWithDocuments">
+              Bitir
+            </button>
+          </div>
+        </div>
+      </template>
+
+      <form v-else @submit.prevent="handleSubmit" class="damage-form">
         <div class="form-grid">
 
           <div class="form-group full-width">
@@ -393,6 +416,15 @@ onMounted(async () => {
 
 .close-btn:hover {
   background: var(--color-bg-secondary);
+}
+
+.documents-step {
+  padding: 24px;
+}
+
+.step-message {
+  margin: 0 0 20px;
+  color: var(--color-text-secondary);
 }
 
 .damage-form {

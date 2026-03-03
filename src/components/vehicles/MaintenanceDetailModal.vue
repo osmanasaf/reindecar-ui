@@ -1,9 +1,13 @@
 <script setup lang="ts">
 import { useEnumTranslations } from '@/composables'
-import type { MaintenanceHistoryItem } from '@/types'
+import DocumentsSection from '@/components/shared/DocumentsSection.vue'
+import type { MaintenanceHistoryItem, MaintenanceRecord } from '@/types'
+
+/** Bakım detayı: geçmiş satırı veya bakım haritası kartından gelebilir */
+type MaintenanceDetail = MaintenanceHistoryItem | MaintenanceRecord
 
 interface Props {
-  maintenance: MaintenanceHistoryItem | null
+  maintenance: MaintenanceDetail | null
   visible: boolean
 }
 
@@ -33,6 +37,13 @@ function formatCurrency(amount: number | null): string {
 
 function formatKm(km: number): string {
   return new Intl.NumberFormat('tr-TR').format(km) + ' km'
+}
+
+/** API bazen serviceProvider, bazen serviceProviderName döndürüyor */
+function serviceProviderDisplay(m: MaintenanceDetail | null): string | null {
+  if (!m) return null
+  const r = m as Record<string, unknown>
+  return (r.serviceProvider as string) ?? (r.serviceProviderName as string) ?? null
 }
 </script>
 
@@ -72,15 +83,21 @@ function formatKm(km: number): string {
               </div>
             </div>
 
-            <div v-if="maintenance.serviceProvider" class="detail-section">
+            <div v-if="serviceProviderDisplay(maintenance)" class="detail-section">
               <h3>Servis Bilgileri</h3>
               <div class="detail-grid">
                 <div class="detail-item">
                   <span class="label">Servis Sağlayıcı</span>
-                  <span class="value">{{ maintenance.serviceProvider }}</span>
+                  <span class="value">{{ serviceProviderDisplay(maintenance) }}</span>
                 </div>
               </div>
             </div>
+
+            <DocumentsSection
+              reference-type="MAINTENANCE"
+              :reference-id="maintenance.id"
+              title="Bakım Belgeleri"
+            />
           </div>
         </div>
       </div>

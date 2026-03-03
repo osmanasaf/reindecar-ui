@@ -7,7 +7,7 @@ import { SEVERITY_COLORS, ZONE_NAMES } from '@/utils/vehicleZones'
 import CarDiagramSVG from './CarDiagramSVG.vue'
 import CreateDamageForm from './CreateDamageForm.vue'
 import CompletionModal from '@/components/CompletionModal.vue'
-import DocumentsSection from '@/components/shared/DocumentsSection.vue'
+import DamageDetailModal from './DamageDetailModal.vue'
 
 const props = defineProps<{
   vehicleId: number
@@ -21,6 +21,7 @@ const showCreateForm = ref(false)
 const includeRepaired = ref(false)
 const showRepairModal = ref(false)
 const selectedDamage = ref<DamageReport | null>(null)
+const damageForDetailModal = ref<DamageReport | null>(null)
 const serviceProviders = ref<Array<{ id: number; name: string }>>([])
 
 const zoneConfigs = computed(() => {
@@ -326,8 +327,23 @@ onMounted(() => {
                     </div>
                   </div>
                 </div>
-                <div v-if="!damage.repaired" class="damage-card-footer">
-                  <button class="btn btn-success btn-sm" @click="handleMarkRepaired(damage.id)">
+                <div class="damage-card-footer">
+                  <button
+                    type="button"
+                    class="btn btn-outline btn-sm"
+                    title="Belgeleri ve detayı görüntüle"
+                    @click.stop="damageForDetailModal = damage"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon" style="width:14px;height:14px">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Belgeleri Gör
+                  </button>
+                  <button
+                    v-if="!damage.repaired"
+                    class="btn btn-success btn-sm"
+                    @click.stop="handleMarkRepaired(damage.id)"
+                  >
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="btn-icon">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
                     </svg>
@@ -369,6 +385,14 @@ onMounted(() => {
                 <div class="damage-row-right">
                   <span class="damage-row-date">{{ formatDate(damage.reportDate) }}</span>
                   <span v-if="damage.repaired" class="repaired-tag">Onarıldı</span>
+                  <button
+                    type="button"
+                    class="btn-doc-inline"
+                    title="Belgeleri gör"
+                    @click.stop="damageForDetailModal = damage"
+                  >
+                    Belgeler
+                  </button>
                 </div>
               </div>
             </div>
@@ -376,14 +400,6 @@ onMounted(() => {
         </div>
       </div>
     </template>
-
-    <div class="damage-documents-section">
-      <DocumentsSection
-        reference-type="VEHICLE"
-        :reference-id="vehicleId"
-        title="Hasar Belgeleri"
-      />
-    </div>
 
     <CreateDamageForm
       v-if="showCreateForm"
@@ -404,6 +420,12 @@ onMounted(() => {
         @submit="handleRepairSubmit"
       />
     </teleport>
+
+    <DamageDetailModal
+      :damage="damageForDetailModal"
+      :visible="damageForDetailModal !== null"
+      @close="damageForDetailModal = null"
+    />
   </div>
 </template>
 
@@ -876,9 +898,23 @@ onMounted(() => {
 }
 
 .damage-card-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
   padding: 10px 14px;
   border-top: 1px solid var(--color-border);
   background: var(--color-surface);
+}
+
+.btn-outline {
+  background: transparent;
+  color: var(--color-primary, #2563eb);
+  border: 1px solid var(--color-primary, #2563eb);
+}
+
+.btn-outline:hover {
+  background: rgba(37, 99, 235, 0.08);
 }
 
 /* Tüm Hasarlar Paneli */
@@ -964,10 +1000,26 @@ onMounted(() => {
 
 .damage-row-right {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 3px;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
   flex-shrink: 0;
+}
+
+.btn-doc-inline {
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  background: var(--color-primary, #2563eb);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-doc-inline:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
 }
 
 .damage-row-date {

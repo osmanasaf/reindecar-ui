@@ -215,6 +215,8 @@ async function confirmUnblacklist() {
   }
 }
 
+const activeTab = ref<'info' | 'drivers' | 'documents'>('info')
+
 const showDeleteDriverModal = ref(false)
 const driverToDelete = ref<Driver | null>(null)
 
@@ -345,7 +347,34 @@ onMounted(fetchCustomer)
         ⚠️ Bu müşteri kara listede: {{ customer.blacklistReason }}
       </div>
 
-      <div class="detail-grid">
+      <!-- Tab Navigasyonu -->
+      <nav class="tab-nav">
+        <button
+          :class="['tab-btn', { active: activeTab === 'info' }]"
+          @click="activeTab = 'info'"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+          Genel Bilgiler
+        </button>
+        <button
+          :class="['tab-btn', { active: activeTab === 'drivers' }]"
+          @click="activeTab = 'drivers'"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          Sürücüler
+          <span v-if="drivers.length > 0" class="tab-count">{{ drivers.length }}</span>
+        </button>
+        <button
+          :class="['tab-btn', { active: activeTab === 'documents' }]"
+          @click="activeTab = 'documents'"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Belgeler
+        </button>
+      </nav>
+
+      <!-- Genel Bilgiler Sekmesi -->
+      <div v-show="activeTab === 'info'" class="detail-grid">
         <section class="card">
           <h2>İletişim Bilgileri</h2>
           <div class="info-grid">
@@ -444,14 +473,6 @@ onMounted(fetchCustomer)
           <CompanyAuthorizedPersonsSection :customer-id="customer.id" />
         </section>
 
-        <section class="card documents-card">
-          <DocumentsSection
-            reference-type="CUSTOMER"
-            :reference-id="customer.id"
-            title="Belgeler"
-          />
-        </section>
-
         <section class="card stats-card">
           <h2 class="card-title-with-icon">İstatistikler</h2>
           <div v-if="loadingStats" class="stats-loading">Yükleniyor...</div>
@@ -481,7 +502,10 @@ onMounted(fetchCustomer)
             </div>
           </div>
         </section>
+      </div>
 
+      <!-- Sürücüler Sekmesi -->
+      <div v-show="activeTab === 'drivers'" class="tab-panel">
         <section class="card drivers-card">
           <div class="card-header">
             <h2>Sürücüler</h2>
@@ -593,6 +617,16 @@ onMounted(fetchCustomer)
             </div>
           </div>
         </section>
+      </div>
+
+      <!-- Belgeler Sekmesi -->
+      <div v-show="activeTab === 'documents'" class="tab-panel documents-panel">
+        <DocumentsSection
+          reference-type="CUSTOMER"
+          :reference-id="customer.id"
+          title="Belgeler"
+        />
+      </div>
 
         <div v-if="showEditModal" class="modal-overlay" @click.self="closeEditModal">
           <div class="modal">
@@ -681,7 +715,6 @@ onMounted(fetchCustomer)
             </div>
           </div>
         </div>
-      </div>
     </template>
 
     <div v-if="showBlacklistModal" class="modal-overlay" @click.self="showBlacklistModal = false">
@@ -916,6 +949,71 @@ onMounted(fetchCustomer)
 .alert-danger {
   background: var(--color-danger-light);
   color: var(--color-danger);
+}
+
+.tab-nav {
+  display: flex;
+  gap: 4px;
+  border-bottom: 2px solid var(--color-border);
+  margin-bottom: 24px;
+}
+
+.tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border: none;
+  background: none;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  border-radius: 6px 6px 0 0;
+  transition: all 0.2s;
+}
+
+.tab-btn:hover {
+  color: var(--color-text);
+  background: var(--color-bg-secondary);
+}
+
+.tab-btn.active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+  background: none;
+}
+
+.tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  background: var(--color-primary);
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 10px;
+}
+
+.tab-panel {
+  width: 100%;
+}
+
+.tab-panel .drivers-card {
+  grid-column: unset;
+}
+
+.documents-panel :deep(.documents-section) {
+  border-radius: 12px;
+}
+
+.documents-panel :deep(.file-grid) {
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
 }
 
 .detail-grid {

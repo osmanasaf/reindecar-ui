@@ -5,9 +5,10 @@ import { rentalsApi, vehiclesApi, customersApi, branchesApi, kmPackagesApi, paym
 import { useToast } from '@/composables'
 import ReturnCompleteModal from '@/components/rentals/ReturnCompleteModal.vue'
 import CreateDamageForm from '@/components/vehicles/CreateDamageForm.vue'
+import DamageDetailModal from '@/components/vehicles/DamageDetailModal.vue'
 import CreatePenaltyModal from '@/components/penalties/CreatePenaltyModal.vue'
 import CreateTollModal from '@/components/tolls/CreateTollModal.vue'
-import type { Rental, RentalStatus, RentalType, Vehicle, Customer, Branch, RentalDriver, KmPackage, Driver, Payment, PenaltyResponse, DamageReport, TollRecord } from '@/types'
+import type { Rental, RentalStatus, RentalType, Vehicle, Customer, Branch, RentalDriver, KmPackage, Driver, Payment, PenaltyResponse, DamageReport, TollRecord, DamageHistoryItem } from '@/types'
 import DocumentsSection from '@/components/shared/DocumentsSection.vue'
 
 const route = useRoute()
@@ -24,6 +25,7 @@ const kmPackage = ref<KmPackage | null>(null)
 const drivers = ref<RentalDriver[]>([])
 const loading = ref(true)
 const generatingPdf = ref(false)
+const generatingOfferPdf = ref(false)
 const showDriverModal = ref(false)
 const newDriverId = ref<number | null>(null)
 
@@ -44,6 +46,7 @@ const loadingPenalties = ref(false)
 const loadingDamages = ref(false)
 const loadingTolls = ref(false)
 const showCreateDamageForm = ref(false)
+const selectedDamage = ref<DamageReport | null>(null)
 const showCreatePenaltyModal = ref(false)
 const showCreateTollModal = ref(false)
 
@@ -351,6 +354,19 @@ async function fetchTolls() {
   }
 }
 
+function damageForModal(d: DamageReport | null): DamageHistoryItem | null {
+  if (!d) return null
+  return {
+    id: d.id,
+    reportDate: d.reportDate,
+    damageType: d.damageType,
+    location: d.location,
+    severity: d.severity,
+    repaired: d.repaired,
+    repairedDate: d.repairedDate
+  }
+}
+
 function handleDamageCreated() {
   showCreateDamageForm.value = false
   fetchDamages()
@@ -502,6 +518,21 @@ async function generatePdf() {
   }
 }
 
+async function generateOfferPdf() {
+  if (!rental.value) return
+  generatingOfferPdf.value = true
+
+  try {
+    const blob = await rentalsApi.downloadOfferPdf(rental.value.id)
+    downloadBlob(blob, `kiralama-teklif-${rental.value.rentalNumber}.pdf`)
+    toast.success('Kiralama teklif PDF indirildi')
+  } catch (err) {
+    toast.apiError(err, 'Teklif PDF oluşturulamadı')
+  } finally {
+    generatingOfferPdf.value = false
+  }
+}
+
 function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
@@ -589,6 +620,16 @@ onActivated(() => {
               <span v-if="generatingPdf" class="spinner-sm"></span>
               <span v-else>📄</span>
               Teslim Tutanağı
+            </button>
+            <button
+              v-if="rental.status === 'DRAFT' || rental.status === 'RESERVED'"
+              class="btn btn-outline"
+              :disabled="generatingOfferPdf"
+              @click="generateOfferPdf"
+            >
+              <span v-if="generatingOfferPdf" class="spinner-sm"></span>
+              <span v-else>📋</span>
+              Teklif PDF
             </button>
             <button 
               v-if="rental.status === 'DRAFT'" 
@@ -884,7 +925,16 @@ onActivated(() => {
             <div v-if="loadingDamages" class="loading-placeholder">Yükleniyor...</div>
             <div v-else-if="damages.length === 0" class="empty-list">Bu kiralamaya ait hasar kaydı bulunmuyor.</div>
             <div v-else class="damage-list">
-              <div v-for="d in damages" :key="d.id" class="list-row">
+              <div
+                v-for="d in damages"
+                :key="d.id"
+                class="list-row list-row-clickable"
+                role="button"
+                tabindex="0"
+                @click="selectedDamage = d"
+                @keydown.enter="selectedDamage = d"
+                @keydown.space.prevent="selectedDamage = d"
+              >
                 <div class="list-row-main">
                   <span class="list-row-title">{{ d.description || d.damageTypeDisplayName || d.damageType }}</span>
                   <span class="list-row-meta">
@@ -893,6 +943,7 @@ onActivated(() => {
                   </span>
                 </div>
                 <span class="list-row-value">{{ formatCurrency(d.repaired && d.repairCostAmount != null ? d.repairCostAmount : (d.estimatedCostAmount ?? 0)) }}</span>
+                <span class="list-row-arrow" aria-hidden="true">→</span>
               </div>
             </div>
           </div>
@@ -921,6 +972,14 @@ onActivated(() => {
                 <span class="list-row-value">{{ formatCurrency(t.tollAmount) }}</span>
               </div>
             </div>
+          </div>
+
+          <div class="card documents-card">
+            <DocumentsSection
+              reference-type="RENTAL"
+              :reference-id="rental.id"
+              title="Kiralama Belgeleri"
+            />
           </div>
 
           <div v-if="rental.notes" class="card">
@@ -1133,6 +1192,12 @@ onActivated(() => {
         @created="handleDamageCreated"
       />
 
+      <DamageDetailModal
+        :damage="damageForModal(selectedDamage)"
+        :visible="selectedDamage !== null"
+        @close="selectedDamage = null"
+      />
+
       <CreatePenaltyModal
         v-if="rental"
         :show="showCreatePenaltyModal"
@@ -1153,13 +1218,6 @@ onActivated(() => {
       />
     </template>
 
-    <div v-if="rental" class="rental-documents-section">
-      <DocumentsSection
-        reference-type="RENTAL"
-        :reference-id="rental.id"
-        title="Kiralama Belgeleri"
-      />
-    </div>
   </div>
 </template>
 
@@ -1534,6 +1592,12 @@ onActivated(() => {
   padding: 24px;
 }
 
+.documents-card :deep(.documents-section) {
+  border: none;
+  border-radius: 0;
+  padding: 0;
+}
+
 .card h3 {
   font-size: 14px;
   font-weight: 600;
@@ -1762,6 +1826,21 @@ onActivated(() => {
   font-size: 14px;
   font-weight: 600;
   color: var(--color-text);
+}
+
+.list-row-clickable {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.list-row-clickable:hover {
+  background: var(--color-border);
+}
+
+.list-row-arrow {
+  margin-left: 8px;
+  font-size: 14px;
+  color: var(--color-text-muted);
 }
 
 .drivers-list {

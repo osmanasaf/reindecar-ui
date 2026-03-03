@@ -493,6 +493,7 @@ export interface DamageReport {
     customerId: number | null
     customerName: string | null
     customerResponsible?: boolean
+    attachments?: { id: number; fileName: string; viewUrl: string; downloadUrl: string; extension?: string; uploadType: string }[]
     createdAt: string
     updatedAt: string
 }
@@ -508,11 +509,13 @@ export interface MaintenanceRecord {
     currentKm: number
     costAmount: number | null
     costCurrency: string | null
-    serviceProvider: string | null
+    serviceProvider?: string | null
+    serviceProviderName?: string | null
     description: string | null
-    affectedZones: number[]
+    affectedZones?: number[]
     partsReplaced: string[]
     paintColor: string | null
+    attachments?: { id: number; fileName: string; viewUrl: string; downloadUrl: string; extension?: string; uploadType: string }[]
     createdAt: string
     updatedAt: string
 }
@@ -590,19 +593,36 @@ export interface DamageHistoryItem {
     id: number
     reportDate: string
     damageType: string
+    damageTypeDisplayName?: string
     location: string
+    locationDisplayName?: string
+    zoneId?: number
     severity: string
+    severityDisplayName?: string
+    description?: string
+    estimatedCostAmount?: number | null
+    estimatedCostCurrency?: string | null
     repaired: boolean
     repairedDate: string | null
+    repairCostAmount?: number | null
+    repairCostCurrency?: string | null
+    attachmentCount?: number
+    createdAt?: string
 }
 
 export interface MaintenanceHistoryItem {
     id: number
     maintenanceDate: string
     maintenanceType: string
+    maintenanceTypeDisplayName?: string
     currentKm: number
     costAmount: number | null
+    costCurrency?: string | null
     serviceProvider: string | null
+    description?: string | null
+    affectedZones?: number[]
+    attachmentCount?: number
+    createdAt?: string
 }
 
 export interface StatusChangeItem {

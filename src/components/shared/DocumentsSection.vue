@@ -125,9 +125,11 @@ function resetUploadForm() {
 
 async function openFile(file: FileRecord) {
   openingId.value = file.id
+  const w = window.open('', '_blank', 'noopener,noreferrer')
   try {
-    await filesApi.openFile(file.id)
+    await filesApi.openFile(file.id, w)
   } catch (err) {
+    if (w && !w.closed) w.close()
     toast.apiError(err, 'Dosya açılamadı')
   } finally {
     openingId.value = null
@@ -175,11 +177,12 @@ onMounted(loadFiles)
     <div class="section-header">
       <div class="header-left">
         <h3 class="section-title">{{ title }}</h3>
-        <span class="file-count">{{ files.length }} belge</span>
+        <span v-if="files.length > 0" class="file-count">{{ files.length }} belge</span>
       </div>
       <button
         v-if="!readonly"
         class="btn-upload-toggle"
+        :class="{ 'btn-cancel': showUploadForm }"
         @click="showUploadForm = !showUploadForm"
       >
         <svg v-if="!showUploadForm" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -196,8 +199,8 @@ onMounted(loadFiles)
     <div v-if="showUploadForm && !readonly" class="upload-form">
       <div class="form-row">
         <div class="form-group">
-          <label for="doc-upload-type" class="form-label">Belge Tipi</label>
-          <select id="doc-upload-type" v-model="selectedUploadType" class="form-select">
+          <label for="doc-upload-type" class="form-label">Belge Tipi <span class="required">*</span></label>
+          <select id="doc-upload-type" v-model="selectedUploadType" class="form-select" aria-describedby="upload-hint">
             <option value="">Seçiniz...</option>
             <option v-for="type in allowedTypes" :key="type" :value="type">
               {{ FILE_UPLOAD_TYPE_LABELS[type] }}
@@ -252,6 +255,9 @@ onMounted(loadFiles)
         </button>
         <button class="btn-secondary" @click="resetUploadForm">İptal</button>
       </div>
+      <p v-if="(!selectedFile || !selectedUploadType) && !uploading" id="upload-hint" class="upload-hint">
+        Yüklemek için önce <strong>belge tipi</strong> seçin ve <strong>dosya</strong> ekleyin.
+      </p>
     </div>
 
     <!-- Loading -->
@@ -262,28 +268,32 @@ onMounted(loadFiles)
 
     <!-- Empty State -->
     <div v-else-if="!loading && files.length === 0" class="empty-state">
-      <svg width="40" height="40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-      </svg>
-      <p>Henüz belge yüklenmemiş</p>
+      <div class="empty-state-icon">
+        <svg width="48" height="48" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+      </div>
+      <p class="empty-state-title">Henüz belge yüklenmemiş</p>
+      <p class="empty-state-desc">Sözleşme, kimlik veya diğer belgeleri eklemek için yukarıdaki <strong>Belge Ekle</strong> butonuna tıklayın.</p>
     </div>
 
-    <!-- File List -->
-    <div v-else class="file-list">
-      <div v-for="file in files" :key="file.id" class="file-card">
-        <div class="file-card-icon">
-          {{ getFileIcon(file.extension) }}
+    <!-- File Grid -->
+    <div v-else class="file-grid">
+      <div v-for="file in files" :key="file.id" class="file-tile">
+        <div class="file-tile-preview">
+          <span class="file-tile-icon">{{ getFileIcon(file.extension) }}</span>
+          <span class="file-ext-badge">{{ file.extension?.toUpperCase() }}</span>
         </div>
-        <div class="file-card-info">
-          <span class="file-card-name" :title="file.fileName">{{ file.fileName }}</span>
-          <div class="file-card-meta">
+        <div class="file-tile-body">
+          <span class="file-tile-name" :title="file.fileName">{{ file.fileName }}</span>
+          <div class="file-tile-meta">
             <span class="file-type-badge">{{ FILE_UPLOAD_TYPE_LABELS[file.uploadType] }}</span>
             <span class="file-size">{{ filesApi.formatFileSize(file.size) }}</span>
-            <span class="file-date">{{ formatDate(file.uploadedAt) }}</span>
           </div>
+          <span class="file-date">{{ formatDate(file.uploadedAt) }}</span>
         </div>
-        <div class="file-card-actions">
+        <div class="file-tile-actions">
           <button
             class="action-btn view-btn"
             :disabled="openingId === file.id"
@@ -291,7 +301,7 @@ onMounted(loadFiles)
             @click="openFile(file)"
           >
             <span v-if="openingId === file.id" class="spinner spinner-sm" />
-            <svg v-else width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg v-else width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                 d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -303,7 +313,7 @@ onMounted(loadFiles)
             title="İndir"
             @click="downloadFile(file)"
           >
-            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                 d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
@@ -316,7 +326,7 @@ onMounted(loadFiles)
             @click="confirmDelete(file.id)"
           >
             <span v-if="deletingId === file.id" class="spinner spinner-sm" />
-            <svg v-else width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg v-else width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                 d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
             </svg>
@@ -352,20 +362,20 @@ onMounted(loadFiles)
   background: var(--color-surface, #fff);
   border: 1px solid var(--color-border, #e5e7eb);
   border-radius: 0.75rem;
-  padding: 1.25rem;
+  padding: 1.5rem;
 }
 
 .section-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 1rem;
+  margin-bottom: 1.25rem;
 }
 
 .header-left {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.625rem;
 }
 
 .section-title {
@@ -377,17 +387,18 @@ onMounted(loadFiles)
 
 .file-count {
   font-size: 0.75rem;
-  color: var(--color-text-secondary, #6b7280);
-  background: var(--color-background, #f3f4f6);
-  padding: 0.125rem 0.5rem;
+  font-weight: 600;
+  color: var(--color-primary, #2563eb);
+  background: rgba(37, 99, 235, 0.08);
+  padding: 0.125rem 0.625rem;
   border-radius: 9999px;
 }
 
 .btn-upload-toggle {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 0.375rem;
-  padding: 0.4rem 0.875rem;
+  padding: 0.5rem 1rem;
   background: var(--color-primary, #2563eb);
   color: #fff;
   border: none;
@@ -395,11 +406,21 @@ onMounted(loadFiles)
   font-size: 0.8125rem;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: all 0.15s;
 }
 
 .btn-upload-toggle:hover {
   background: var(--color-primary-dark, #1d4ed8);
+}
+
+.btn-upload-toggle.btn-cancel {
+  background: var(--color-bg-secondary, #f3f4f6);
+  color: var(--color-text, #374151);
+  border: 1px solid var(--color-border, #e5e7eb);
+}
+
+.btn-upload-toggle.btn-cancel:hover {
+  background: var(--color-border, #e5e7eb);
 }
 
 /* Upload Form */
@@ -545,6 +566,21 @@ onMounted(loadFiles)
   gap: 0.5rem;
 }
 
+.upload-hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary, #6b7280);
+}
+
+.upload-hint strong {
+  font-weight: 600;
+  color: var(--color-text, #374151);
+}
+
+.form-label .required {
+  color: var(--color-danger, #dc2626);
+}
+
 /* Buttons */
 .btn-primary {
   display: flex;
@@ -608,49 +644,100 @@ onMounted(loadFiles)
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
-  padding: 2rem;
-  color: var(--color-text-secondary, #9ca3af);
-  font-size: 0.875rem;
+  gap: 0.75rem;
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  background: var(--color-background, #f9fafb);
+  border-radius: 0.5rem;
+  border: 1px dashed var(--color-border, #e5e7eb);
 }
 
-/* File List */
-.file-list {
+.empty-state-icon {
+  color: var(--color-text-muted, #9ca3af);
+  line-height: 0;
+}
+
+.empty-state-title {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--color-text, #374151);
+}
+
+.empty-state-desc {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary, #6b7280);
+  max-width: 280px;
+  line-height: 1.45;
+}
+
+.empty-state-desc strong {
+  color: var(--color-primary, #2563eb);
+  font-weight: 600;
+}
+
+/* File Grid */
+.file-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.file-tile {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  background: var(--color-bg-secondary, #f9fafb);
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 0.75rem;
+  overflow: hidden;
+  transition: all 0.2s;
 }
 
-.file-card {
+.file-tile:hover {
+  border-color: var(--color-primary, #2563eb);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.08);
+  transform: translateY(-1px);
+}
+
+.file-tile-preview {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem;
-  background: var(--color-background, #f9fafb);
-  border: 1px solid var(--color-border, #e5e7eb);
-  border-radius: 0.5rem;
-  transition: border-color 0.15s;
+  justify-content: center;
+  height: 80px;
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.05) 0%, rgba(37, 99, 235, 0.1) 100%);
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
 }
 
-.file-card:hover {
-  border-color: var(--color-primary, #93c5fd);
+.file-tile-icon {
+  font-size: 2.25rem;
 }
 
-.file-card-icon {
-  font-size: 1.5rem;
-  flex-shrink: 0;
+.file-ext-badge {
+  position: absolute;
+  bottom: 6px;
+  right: 8px;
+  font-size: 0.625rem;
+  font-weight: 700;
+  color: var(--color-primary, #2563eb);
+  background: rgba(37, 99, 235, 0.12);
+  padding: 1px 5px;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
 }
 
-.file-card-info {
+.file-tile-body {
   flex: 1;
-  min-width: 0;
+  padding: 0.625rem 0.75rem 0.5rem;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+  min-width: 0;
 }
 
-.file-card-name {
-  font-size: 0.875rem;
+.file-tile-name {
+  font-size: 0.8125rem;
   font-weight: 500;
   color: var(--color-text, #111827);
   overflow: hidden;
@@ -658,10 +745,10 @@ onMounted(loadFiles)
   white-space: nowrap;
 }
 
-.file-card-meta {
+.file-tile-meta {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.375rem;
   flex-wrap: wrap;
 }
 
@@ -674,17 +761,23 @@ onMounted(loadFiles)
   border-radius: 9999px;
 }
 
-.file-size,
+.file-size {
+  font-size: 0.6875rem;
+  color: var(--color-text-secondary, #9ca3af);
+}
+
 .file-date {
   font-size: 0.6875rem;
   color: var(--color-text-secondary, #9ca3af);
 }
 
-.file-card-actions {
+.file-tile-actions {
   display: flex;
   align-items: center;
   gap: 0.25rem;
-  flex-shrink: 0;
+  padding: 0.375rem 0.5rem;
+  border-top: 1px solid var(--color-border, #e5e7eb);
+  background: var(--color-surface, #fff);
 }
 
 .action-btn {

@@ -2,11 +2,11 @@
 import { ref, computed, onMounted } from 'vue'
 import { maintenancesApi } from '@/api'
 import { useToast } from '@/composables'
-import type { VehicleMaintenanceMap } from '@/types'
+import type { VehicleMaintenanceMap, MaintenanceRecord } from '@/types'
 import { MAINTENANCE_COLORS, ZONE_NAMES } from '@/utils/vehicleZones'
 import CarDiagramSVG from './CarDiagramSVG.vue'
 import CreateMaintenanceForm from './CreateMaintenanceForm.vue'
-import DocumentsSection from '@/components/shared/DocumentsSection.vue'
+import MaintenanceDetailModal from './MaintenanceDetailModal.vue'
 
 const props = defineProps<{
   vehicleId: number
@@ -17,6 +17,7 @@ const maintenanceMap = ref<VehicleMaintenanceMap | null>(null)
 const loading = ref(false)
 const selectedZone = ref<number | undefined>(undefined)
 const showCreateForm = ref(false)
+const maintenanceForDetailModal = ref<MaintenanceRecord | null>(null)
 
 const zoneConfigs = computed(() => {
   if (!maintenanceMap.value) return {}
@@ -260,6 +261,19 @@ onMounted(() => {
                     </ul>
                   </div>
                 </div>
+                <div class="maintenance-card-footer">
+                  <button
+                    type="button"
+                    class="btn btn-outline btn-sm"
+                    title="Belgeleri görüntüle"
+                    @click.stop="maintenanceForDetailModal = maintenance"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon" style="width:14px;height:14px">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Belgeleri Gör
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -297,6 +311,14 @@ onMounted(() => {
                   <span v-if="maintenance.costAmount" class="maintenance-row-cost">
                     {{ formatCurrency(maintenance.costAmount, maintenance.costCurrency) }}
                   </span>
+                  <button
+                    type="button"
+                    class="btn-doc-inline"
+                    title="Belgeleri gör"
+                    @click.stop="maintenanceForDetailModal = maintenance"
+                  >
+                    Belgeler
+                  </button>
                 </div>
               </div>
             </div>
@@ -305,13 +327,11 @@ onMounted(() => {
       </div>
     </template>
 
-    <div class="maintenance-documents-section">
-      <DocumentsSection
-        reference-type="VEHICLE"
-        :reference-id="vehicleId"
-        title="Bakım Belgeleri"
-      />
-    </div>
+    <MaintenanceDetailModal
+      :maintenance="maintenanceForDetailModal"
+      :visible="maintenanceForDetailModal !== null"
+      @close="maintenanceForDetailModal = null"
+    />
 
     <CreateMaintenanceForm
       v-if="showCreateForm"
@@ -664,6 +684,30 @@ onMounted(() => {
   gap: 6px;
 }
 
+.maintenance-card-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.btn-outline {
+  background: transparent;
+  color: var(--color-primary, #2563eb);
+  border: 1px solid var(--color-primary, #2563eb);
+}
+
+.btn-outline:hover {
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 0.8125rem;
+}
+
 .mi-row {
   display: flex;
   justify-content: space-between;
@@ -780,10 +824,26 @@ onMounted(() => {
 
 .maintenance-row-right {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 3px;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
   flex-shrink: 0;
+}
+
+.btn-doc-inline {
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  background: var(--color-primary, #2563eb);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-doc-inline:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
 }
 
 .maintenance-row-date {

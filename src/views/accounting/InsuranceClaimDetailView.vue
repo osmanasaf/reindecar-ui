@@ -5,13 +5,11 @@ import { useAccountingStore } from '@/stores'
 import { insuranceClaimsApi } from '@/api'
 import { useToast, useEnumTranslations } from '@/composables'
 import { ClaimStatusBadge } from '@/components/accounting'
-import ClaimDocumentList from '@/components/accounting/insurance-claims/ClaimDocumentList.vue'
-import ClaimDocumentUploadModal from '@/components/accounting/insurance-claims/ClaimDocumentUploadModal.vue'
+import DocumentsSection from '@/components/shared/DocumentsSection.vue'
 import ApproveClaimModal from '@/components/accounting/insurance-claims/ApproveClaimModal.vue'
 import RejectClaimModal from '@/components/accounting/insurance-claims/RejectClaimModal.vue'
 import RecordPaymentModal from '@/components/accounting/insurance-claims/RecordPaymentModal.vue'
 import { formatCurrency, formatDate } from '@/utils/format'
-import type { ClaimStatus } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -25,8 +23,6 @@ const loading = computed(() => accountingStore.claimsLoading)
 const showApproveModal = ref(false)
 const showRejectModal = ref(false)
 const showPaymentModal = ref(false)
-const showDocumentUploadModal = ref(false)
-const documentListRef = ref<InstanceType<typeof ClaimDocumentList> | null>(null)
 
 const availableActions = computed(() => {
   if (!claim.value) return []
@@ -97,10 +93,6 @@ const handleRejectSuccess = async () => {
 const handlePaymentSuccess = async () => {
   if (!claim.value) return
   await accountingStore.fetchClaimById(claim.value.id)
-}
-
-const handleDocumentUploadSuccess = () => {
-  documentListRef.value?.refresh()
 }
 
 onMounted(() => {
@@ -219,10 +211,10 @@ onMounted(() => {
       </div>
 
       <div class="detail-card">
-        <ClaimDocumentList
-          ref="documentListRef"
-          :claim-id="claim.id"
-          @upload-new="showDocumentUploadModal = true"
+        <DocumentsSection
+          reference-type="INSURANCE"
+          :reference-id="claim.id"
+          title="Sigorta Belgeleri"
         />
       </div>
 
@@ -250,14 +242,6 @@ onMounted(() => {
         :remaining-amount="remainingAmount"
         @close="showPaymentModal = false"
         @success="handlePaymentSuccess"
-      />
-
-      <ClaimDocumentUploadModal
-        v-if="claim"
-        :show="showDocumentUploadModal"
-        :claim-id="claim.id"
-        @close="showDocumentUploadModal = false"
-        @success="handleDocumentUploadSuccess"
       />
     </div>
   </div>

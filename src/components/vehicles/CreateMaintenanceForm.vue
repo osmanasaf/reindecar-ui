@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { maintenancesApi, serviceProvidersApi } from '@/api'
 import { useToast } from '@/composables'
 import { SearchableSelect } from '@/components/common'
+import DocumentsSection from '@/components/shared/DocumentsSection.vue'
 import { MaintenanceType } from '@/types'
 import type { CreateMaintenanceRecordForm, ServiceProvider } from '@/types'
 
@@ -17,6 +18,7 @@ const emit = defineEmits<{
 
 const toast = useToast()
 const submitting = ref(false)
+const createdMaintenanceId = ref<number | null>(null)
 const serviceProviders = ref<ServiceProvider[]>([])
 const loadingProviders = ref(false)
 
@@ -115,14 +117,19 @@ async function handleSubmit() {
 
   submitting.value = true
   try {
-    await maintenancesApi.create(form.value)
+    const created = await maintenancesApi.create(form.value)
     toast.success('Bakım kaydı oluşturuldu')
-    emit('created')
+    createdMaintenanceId.value = created.id
   } catch (err) {
     toast.apiError(err, 'Bakım kaydı oluşturulamadı')
   } finally {
     submitting.value = false
   }
+}
+
+function finishWithDocuments() {
+  emit('created')
+  emit('close')
 }
 
 onMounted(() => {
@@ -134,11 +141,27 @@ onMounted(() => {
   <div class="modal-overlay" @click.self="emit('close')">
     <div class="modal-content">
       <div class="modal-header">
-        <h2>Yeni Bakım Kaydı</h2>
+        <h2>{{ createdMaintenanceId ? 'Bakım Kaydı - Belgeler' : 'Yeni Bakım Kaydı' }}</h2>
         <button class="close-btn" @click="emit('close')">×</button>
       </div>
 
-      <form @submit.prevent="handleSubmit" class="maintenance-form">
+      <template v-if="createdMaintenanceId">
+        <div class="documents-step">
+          <p class="step-message">Bakım kaydı kaydedildi. İsterseniz aşağıdan bu bakıma ait belgeleri ekleyebilirsiniz.</p>
+          <DocumentsSection
+            reference-type="MAINTENANCE"
+            :reference-id="createdMaintenanceId"
+            title="Bakım Belgeleri"
+          />
+          <div class="form-actions">
+            <button type="button" class="btn btn-primary" @click="finishWithDocuments">
+              Bitir
+            </button>
+          </div>
+        </div>
+      </template>
+
+      <form v-else @submit.prevent="handleSubmit" class="maintenance-form">
         <div class="form-grid">
           <div class="form-group">
             <label>Bakım Tipi *</label>
@@ -346,6 +369,15 @@ onMounted(() => {
 
 .close-btn:hover {
   background: var(--color-bg-secondary);
+}
+
+.documents-step {
+  padding: 24px;
+}
+
+.step-message {
+  margin: 0 0 20px;
+  color: var(--color-text-secondary);
 }
 
 .maintenance-form {
