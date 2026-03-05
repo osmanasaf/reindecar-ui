@@ -148,6 +148,7 @@ export interface CreateRentalForm {
     contractSignerName?: string
     extraItems?: any[]
     discountAmount?: number
+    totalAmount?: number
     discountReason?: string
     notes?: string
 }
@@ -164,7 +165,7 @@ export interface CreateDriverForm {
     lastName: string
     phone: string
     licenseNumber: string
-    licenseClass: string
+    licenseClassId?: number
     licenseExpiryDate: string
     primary?: boolean
 }
@@ -175,7 +176,7 @@ export interface UpdateDriverForm {
     lastName?: string
     phone?: string
     licenseNumber?: string
-    licenseClass?: string
+    licenseClassId?: number
     licenseExpiryDate?: string
     active?: boolean
 }

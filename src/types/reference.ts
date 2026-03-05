@@ -2,6 +2,7 @@ export interface CarBrand {
     id: number
     name: string
     logoUrl: string | null
+    active?: boolean
 }
 
 export interface CarModel {
@@ -86,4 +87,10 @@ export interface UpdateColorRequest {
     name?: string
     hexCode?: string
     sortOrder?: number
+}
+
+export interface LicenseClass {
+    id: number
+    code: string
+    description?: string
 }

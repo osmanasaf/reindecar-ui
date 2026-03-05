@@ -7,6 +7,7 @@ import type { CarBrand, CarModel } from '@/types/reference'
 const toast = useToast()
 const brands = ref<CarBrand[]>([])
 const loading = ref(true)
+const showInactive = ref(false)
 const expandedBrandId = ref<number | null>(null)
 const modelsByBrand = ref<Map<number, CarModel[]>>(new Map())
 const loadingModels = ref<Set<number>>(new Set())
@@ -26,11 +27,32 @@ const deactivateTarget = ref<{ type: 'brand' | 'model'; id: number; name: string
 async function fetchBrands() {
     loading.value = true
     try {
-        brands.value = await referenceDataApi.getBrands()
+        brands.value = showInactive.value
+            ? await referenceDataApi.getBrandsAll()
+            : await referenceDataApi.getBrands()
     } catch {
         toast.error('Markalar yüklenemedi')
     } finally {
         loading.value = false
+    }
+}
+
+async function handleToggleShowInactive() {
+    showInactive.value = !showInactive.value
+    await fetchBrands()
+}
+
+async function doActivateBrand(brand: CarBrand) {
+    try {
+        await referenceDataApi.activateBrand(brand.id)
+        toast.success(`"${brand.name}" tekrar aktif edildi`)
+        await fetchBrands()
+        if (expandedBrandId.value === brand.id) {
+            expandedBrandId.value = null
+            modelsByBrand.value.delete(brand.id)
+        }
+    } catch (err) {
+        toast.apiError(err, 'Aktif edilemedi')
     }
 }
 
@@ -179,7 +201,20 @@ onMounted(fetchBrands)
   <div class="brands-manager">
     <div class="section-header">
       <h2>Markalar ve Modeller</h2>
-      <button class="btn btn-primary" @click="openAddBrand">Yeni Marka</button>
+      <div class="header-actions">
+        <button
+          type="button"
+          class="toggle-label"
+          :aria-pressed="showInactive"
+          @click="handleToggleShowInactive"
+        >
+          <span class="toggle-track" :class="{ active: showInactive }">
+            <span class="toggle-thumb"></span>
+          </span>
+          <span class="toggle-text">Pasifleri göster</span>
+        </button>
+        <button class="btn btn-primary" @click="openAddBrand">Yeni Marka</button>
+      </div>
     </div>
 
     <div v-if="loading" class="loading">Yükleniyor...</div>
@@ -189,6 +224,7 @@ onMounted(fetchBrands)
           v-for="brand in brands"
           :key="brand.id"
           class="accordion-item"
+          :class="{ 'accordion-item--inactive': brand.active === false }"
         >
           <div
             class="accordion-header"
@@ -196,10 +232,16 @@ onMounted(fetchBrands)
           >
             <span class="accordion-arrow">{{ expandedBrandId === brand.id ? '▼' : '▶' }}</span>
             <span class="brand-name">{{ brand.name }}</span>
+            <span v-if="brand.active === false" class="inactive-badge">Pasif</span>
             <div class="header-actions" @click.stop>
-              <button class="btn-sm btn-outline" @click="openEditBrand(brand)">Düzenle</button>
-              <button class="btn-sm btn-danger" @click="confirmDeactivate('brand', brand.id, brand.name)">
-                Pasif yap
+              <template v-if="brand.active !== false">
+                <button class="btn-sm btn-outline" @click="openEditBrand(brand)">Düzenle</button>
+                <button class="btn-sm btn-danger" @click="confirmDeactivate('brand', brand.id, brand.name)">
+                  Pasif yap
+                </button>
+              </template>
+              <button v-else class="btn-sm btn-success" @click="doActivateBrand(brand)">
+                Aktif et
               </button>
             </div>
           </div>
@@ -310,6 +352,88 @@ onMounted(fetchBrands)
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  user-select: none;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+}
+
+.toggle-track {
+  position: relative;
+  display: inline-block;
+  width: 2.25rem;
+  height: 1.25rem;
+  background: var(--color-border, #d1d5db);
+  border-radius: 9999px;
+  transition: background 0.2s;
+}
+
+.toggle-track.active {
+  background: var(--color-primary, #2563eb);
+}
+
+.toggle-thumb {
+  position: absolute;
+  top: 0.125rem;
+  left: 0.125rem;
+  width: 1rem;
+  height: 1rem;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.toggle-track.active .toggle-thumb {
+  transform: translateX(1rem);
+}
+
+.toggle-text {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary, #6b7280);
+}
+
+.accordion-item--inactive {
+  opacity: 0.85;
+}
+
+.accordion-item--inactive .accordion-header {
+  background: var(--color-bg-secondary, #f3f4f6);
+}
+
+.inactive-badge {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+  background: #e5e7eb;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.btn-success {
+  background: var(--color-success, #059669);
+  color: white;
+  border: none;
+}
+
+.btn-success:hover {
+  opacity: 0.9;
 }
 
 .section-header h2 {
@@ -344,7 +468,7 @@ onMounted(fetchBrands)
 
 .accordion-arrow { font-size: 12px; color: var(--color-text-muted); width: 20px; }
 .brand-name { flex: 1; font-weight: 500; }
-.header-actions { display: flex; gap: 8px; }
+.accordion-header .header-actions { display: flex; gap: 8px; }
 
 .accordion-body { padding: 12px 16px 16px 48px; background: var(--color-bg-secondary); }
 

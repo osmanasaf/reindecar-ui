@@ -261,7 +261,8 @@ async function handleSubmit() {
       kmPackageId: selectedKmPackageId.value || undefined,
       customIncludedKm: customIncludedKm.value && customIncludedKm.value > 0 ? customIncludedKm.value : undefined,
       customExtraKmPrice: customExtraKmPrice.value && customExtraKmPrice.value > 0 ? customExtraKmPrice.value : undefined,
-      discountAmount: appliedDiscountAmount.value > 0 ? appliedDiscountAmount.value : undefined
+      discountAmount: appliedDiscountAmount.value > 0 ? appliedDiscountAmount.value : undefined,
+      totalAmount: finalTotalWithDiscount.value
     }
 
     const rental = await rentalsApi.create(payload)

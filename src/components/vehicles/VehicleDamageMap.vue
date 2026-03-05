@@ -47,12 +47,20 @@ const selectedZoneDamages = computed(() => {
   if (!selectedZone.value || !damageMap.value) return []
   const zoneInfo = damageMap.value.zones[selectedZone.value]
   if (!zoneInfo) return []
-  return damageMap.value.damages.filter(d => zoneInfo.damageIds.includes(d.id))
+  let list = damageMap.value.damages.filter(d => zoneInfo.damageIds.includes(d.id))
+  if (includeRepaired.value) {
+    list = list.filter(d => d.repaired)
+  }
+  return list
 })
 
 const allDamagesSorted = computed(() => {
   if (!damageMap.value) return []
-  return [...damageMap.value.damages].sort((a, b) =>
+  let list = damageMap.value.damages
+  if (includeRepaired.value) {
+    list = list.filter(d => d.repaired)
+  }
+  return [...list].sort((a, b) =>
     new Date(b.reportDate).getTime() - new Date(a.reportDate).getTime()
   )
 })

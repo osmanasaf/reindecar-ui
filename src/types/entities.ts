@@ -108,7 +108,8 @@ export interface PersonalInfo {
     lastName: string
     birthDate: string
     licenseNumber: string
-    licenseClass: string
+    licenseClass?: string
+    licenseClassName?: string
     licenseExpiryDate: string
 }
 
@@ -458,6 +459,8 @@ export interface Driver {
     licenseNumber: string
     licenseExpiryDate: string
     licenseClass?: string
+    licenseClassId?: number
+    licenseClassName?: string
     phone?: string
     customerId?: number
     primary?: boolean

@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
-import { customersApi } from '@/api'
+import { ref, computed, watch, onMounted } from 'vue'
+import { customersApi, referenceDataApi } from '@/api'
 import { useToast } from '@/composables'
 import { formatPhoneInput } from '@/utils/phone'
+import { SearchableSelect } from '@/components/common'
 import type { Driver, CreateDriverForm } from '@/types'
 
 const props = defineProps<{
@@ -22,6 +23,7 @@ const drivers = ref<Driver[]>([])
 const loading = ref(false)
 const searchQuery = ref('')
 const showNewDriverForm = ref(false)
+const licenseClassOptions = ref<{ value: number; label: string }[]>([])
 
 const newDriver = ref<CreateDriverForm>({
   nationalId: '',
@@ -29,10 +31,19 @@ const newDriver = ref<CreateDriverForm>({
   lastName: '',
   licenseNumber: '',
   licenseExpiryDate: '',
-  licenseClass: '',
+  licenseClassId: undefined,
   phone: '',
   customerId: props.customerId
 })
+
+async function fetchLicenseClasses() {
+  try {
+    const list = await referenceDataApi.getLicenseClasses()
+    licenseClassOptions.value = list.map(lc => ({ value: lc.id, label: lc.code }))
+  } catch {
+    licenseClassOptions.value = []
+  }
+}
 
 function getDriverDisplayName(driver: Driver): string {
   if (driver.fullName) return driver.fullName
@@ -133,7 +144,7 @@ function resetForm() {
     lastName: '',
     licenseNumber: '',
     licenseExpiryDate: '',
-    licenseClass: '',
+    licenseClassId: undefined,
     phone: '',
     customerId: props.customerId
   }
@@ -150,6 +161,10 @@ function handlePhoneInput(event: Event) {
   const target = event.target as HTMLInputElement
   newDriver.value.phone = formatPhoneInput(target.value)
 }
+
+onMounted(() => {
+  fetchLicenseClasses()
+})
 
 watch(() => props.customerId, (newCustomerId) => {
   newDriver.value.customerId = newCustomerId
@@ -210,8 +225,14 @@ watch(() => props.customerId, (newCustomerId) => {
           <input id="licenseNumber" v-model="newDriver.licenseNumber" type="text" required />
         </div>
         <div class="form-group">
-          <label for="licenseClass">Ehliyet Sınıfı</label>
-          <input id="licenseClass" v-model="newDriver.licenseClass" type="text" placeholder="B" />
+          <label>Ehliyet Sınıfı</label>
+          <SearchableSelect
+            v-model="newDriver.licenseClassId"
+            :options="licenseClassOptions"
+            placeholder="Sınıf seçin"
+            search-placeholder="Ara..."
+            clearable
+          />
         </div>
         <div class="form-group full-width">
           <label for="licenseExpiryDate">Ehliyet Geçerlilik Tarihi *</label>
@@ -257,7 +278,7 @@ watch(() => props.customerId, (newCustomerId) => {
           </div>
           <div class="driver-details">
             <span v-if="driver.licenseNumber">Ehliyet: {{ driver.licenseNumber }}</span>
-            <span v-if="driver.licenseClass"> | Sınıf: {{ driver.licenseClass }}</span>
+            <span v-if="driver.licenseClassName || driver.licenseClass"> | Sınıf: {{ driver.licenseClassName || driver.licenseClass }}</span>
             <span v-if="driver.nationalId"> | TC: {{ driver.nationalId.substring(0, 3) }}***</span>
             <span v-if="driver.licenseExpiryDate" :class="{ 'expiry-danger': isLicenseExpiredForRental(driver) }">
               | Bitiş: {{ formatDate(driver.licenseExpiryDate) }}

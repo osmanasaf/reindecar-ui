@@ -1,6 +1,6 @@
 import apiClient, { BaseApi } from './client'
 
-export type FileReferenceType = 'CUSTOMER' | 'VEHICLE' | 'RENTAL' | 'LEASING' | 'DAMAGE' | 'MAINTENANCE' | 'INSURANCE' | 'USER'
+export type FileReferenceType = 'CUSTOMER' | 'VEHICLE' | 'RENTAL' | 'LEASING' | 'DAMAGE' | 'MAINTENANCE' | 'INSURANCE' | 'INSTALLMENT' | 'USER'
 
 export type FileUploadType =
     | 'DRIVER_LICENSE_FRONT'
@@ -61,6 +61,7 @@ export const ALLOWED_TYPES_BY_REFERENCE: Record<FileReferenceType, FileUploadTyp
     DAMAGE: ['DAMAGE_PHOTO', 'ACCIDENT_REPORT', 'REPAIR_INVOICE', 'OTHER'],
     MAINTENANCE: ['MAINTENANCE_INVOICE', 'OTHER'],
     INSURANCE: ['INSURANCE_POLICY', 'ACCIDENT_REPORT', 'DAMAGE_PHOTO', 'POLICE_REPORT', 'REPAIR_ESTIMATE', 'OTHER'],
+    INSTALLMENT: ['LEASE_CONTRACT', 'SIGNED_CONTRACT', 'OTHER'],
     USER: ['PROFILE_PHOTO', 'OTHER'],
 }
 

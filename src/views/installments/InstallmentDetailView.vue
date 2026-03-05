@@ -7,6 +7,7 @@ import type { VehicleInstallmentResponse, Vehicle } from '@/types'
 import { formatCurrency, calculateProgress } from '@/utils/installmentHelpers'
 import PaymentScheduleTable from '@/components/installments/PaymentScheduleTable.vue'
 import InstallmentEarlyClosureModal from '@/components/InstallmentEarlyClosureModal.vue'
+import DocumentsSection from '@/components/shared/DocumentsSection.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -23,7 +24,27 @@ const paidCount = computed(() => payments.value.filter(p => p.status === 'PAID')
 const overdueCount = computed(() => payments.value.filter(p => p.isOverdue).length)
 const progress = computed(() => {
   if (!installment.value) return 0
-  return calculateProgress(paidCount.value, installment.value.numberOfInstallments)
+  const total = installment.value.numberOfInstallments ?? 0
+  const paid = total > 0 && (installment.value.remainingInstallments === 0 || installment.value.outstandingBalance <= 0)
+    ? total
+    : paidCount.value
+  return calculateProgress(paid, total)
+})
+
+const displayPaidCount = computed(() => {
+  if (!installment.value) return 0
+  const total = installment.value.numberOfInstallments ?? 0
+  if (total > 0 && (installment.value.remainingInstallments === 0 || installment.value.outstandingBalance <= 0)) return total
+  return paidCount.value
+})
+
+const nextPaymentDisplay = computed(() => {
+  if (installment.value?.remainingInstallments === 0) return 'Tamamlandı'
+  const date = installment.value?.nextPaymentDueDate
+  if (!date) return '—'
+  const d = new Date(date)
+  if (Number.isNaN(d.getTime()) || d.getFullYear() < 1980) return '—'
+  return d.toLocaleDateString('tr-TR')
 })
 
 const progressColor = computed(() => {
@@ -149,7 +170,10 @@ watch(() => route.params.id, loadInstallment)
         </div>
         <div class="summary-item">
           <span class="label">Kalan Taksit</span>
-          <span class="value">{{ installment.remainingInstallments }} / {{ installment.numberOfInstallments }}</span>
+          <span class="value">
+            {{ installment.remainingInstallments === 0 ? installment.numberOfInstallments : installment.remainingInstallments }} / {{ installment.numberOfInstallments }}
+            <span v-if="installment.remainingInstallments === 0" class="badge-done">(Tamamlandı)</span>
+          </span>
         </div>
         <div class="summary-item" :class="{ 'summary-item--warning': installment.outstandingBalance > 0 }">
           <span class="label">Kalan Bakiye</span>
@@ -157,7 +181,7 @@ watch(() => route.params.id, loadInstallment)
         </div>
         <div class="summary-item">
           <span class="label">Sonraki Ödeme</span>
-          <span class="value">{{ new Date(installment.nextPaymentDueDate).toLocaleDateString('tr-TR') }}</span>
+          <span class="value">{{ nextPaymentDisplay }}</span>
         </div>
       </div>
 
@@ -173,13 +197,21 @@ watch(() => route.params.id, loadInstallment)
           ></div>
         </div>
         <p class="progress-text">
-          {{ paidCount }} / {{ installment.numberOfInstallments }} ödeme tamamlandı
+          {{ displayPaidCount }} / {{ installment.numberOfInstallments }} ödeme tamamlandı
         </p>
       </div>
 
       <div class="schedule-box">
         <h2>Ödeme Planı</h2>
         <PaymentScheduleTable :payments="payments" @payment-recorded="loadInstallment" />
+      </div>
+
+      <div v-if="installment?.id" class="documents-box">
+        <DocumentsSection
+          reference-type="INSTALLMENT"
+          :reference-id="installment.id"
+          title="Taksit Belgeleri"
+        />
       </div>
     </template>
 
@@ -332,6 +364,13 @@ watch(() => route.params.id, loadInstallment)
   font-size: 1.125rem;
   font-weight: 600;
   color: var(--color-text, #111827);
+}
+
+.badge-done {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-success, #059669);
+  margin-left: 0.25rem;
 }
 
 .vehicle-value {

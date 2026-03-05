@@ -374,7 +374,11 @@ function handleDamageCreated() {
 
 function handlePenaltyCreated() {
   showCreatePenaltyModal.value = false
-  fetchPenalties()
+  if (rental.value?.id) {
+    fetchPenalties().catch(err => {
+      toast.apiError(err, 'Ceza listesi yenilenemedi')
+    })
+  }
 }
 
 function handleTollCreated() {

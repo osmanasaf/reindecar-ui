@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { penaltiesApi, rentalsApi, vehiclesApi, customersApi } from '@/api'
 import { useToast, useEnumTranslations } from '@/composables'
 import { SearchableSelect } from '@/components/common'
@@ -173,13 +173,17 @@ function validate(): boolean {
 
 async function handleSubmit() {
   if (!validate()) return
+  if (selectedVehicleId.value == null || selectedCustomerId.value == null) {
+    toast.error('Kiralama seçildikten sonra araç ve müşteri bilgisi yüklenene kadar bekleyin')
+    return
+  }
 
   isSubmitting.value = true
   try {
     await penaltiesApi.create({
       rentalId: selectedRentalId.value!,
-      vehicleId: selectedVehicleId.value!,
-      customerId: selectedCustomerId.value!,
+      vehicleId: selectedVehicleId.value,
+      customerId: selectedCustomerId.value,
       driverId: selectedDriverId.value,
       violationType: violationType.value as ViolationType,
       violationDate: violationDate.value,
@@ -191,8 +195,9 @@ async function handleSubmit() {
       notes: notes.value || undefined,
     })
     toast.success('Trafik cezası başarıyla oluşturuldu')
-    emit('success')
     emit('close')
+    emit('success')
+    await nextTick()
     resetForm()
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Ceza oluşturulurken hata oluştu'
@@ -221,8 +226,8 @@ function resetForm() {
 }
 
 function handleClose() {
-  resetForm()
   emit('close')
+  nextTick(() => resetForm())
 }
 
 watch(() => props.show, async (newVal) => {
@@ -262,7 +267,7 @@ watch(() => props.show, async (newVal) => {
               @update:model-value="(v) => selectedRentalId = v ?? undefined"
             />
             <div v-else class="locked-field">
-              {{ selectedRental?.rentalNumber || `Kiralama #${selectedRentalId}` }}
+              {{ selectedRental?.rentalNumber ?? (selectedRentalId != null ? `Kiralama #${selectedRentalId}` : '—') }}
             </div>
             <div v-if="loadingRentals" class="field-hint">Kiralamalar yükleniyor...</div>
           </div>

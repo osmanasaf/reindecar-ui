@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { customersApi, driversApi } from '@/api'
+import { customersApi, driversApi, referenceDataApi } from '@/api'
 import { useToast } from '@/composables'
 import { formatPhoneInput } from '@/utils/phone'
 import type { Customer, CustomerType, CustomerStatus, CreditRating, CustomerStats, Driver, CreateDriverForm, UpdateDriverForm } from '@/types'
 import CompanyAuthorizedPersonsSection from '@/components/customers/CompanyAuthorizedPersonsSection.vue'
 import DocumentsSection from '@/components/shared/DocumentsSection.vue'
+import { SearchableSelect } from '@/components/common'
 
 const route = useRoute()
 const router = useRouter()
@@ -30,9 +31,11 @@ const newDriver = ref<CreateDriverForm>({
   lastName: '',
   licenseNumber: '',
   licenseExpiryDate: '',
-  licenseClass: '',
+  licenseClassId: undefined,
   phone: ''
 })
+
+const licenseClassOptions = ref<{ value: number; label: string }[]>([])
 
 const editDriverForm = ref<UpdateDriverForm>({})
 
@@ -68,10 +71,20 @@ async function fetchStats() {
   }
 }
 
+async function fetchLicenseClasses() {
+  try {
+    const list = await referenceDataApi.getLicenseClasses()
+    licenseClassOptions.value = list.map(lc => ({ value: lc.id, label: lc.code }))
+  } catch {
+    licenseClassOptions.value = []
+  }
+}
+
 async function fetchCustomer() {
   loading.value = true
   try {
     customer.value = await customersApi.getById(customerId.value)
+    fetchLicenseClasses()
     fetchDrivers()
     fetchStats()
   } catch {
@@ -132,7 +145,7 @@ function resetDriverForm() {
     lastName: '',
     licenseNumber: '',
     licenseExpiryDate: '',
-    licenseClass: '',
+    licenseClassId: undefined,
     phone: ''
   }
 }
@@ -251,7 +264,7 @@ function openEditModal(driver: Driver) {
     nationalId: driver.nationalId,
     phone: formatPhoneInput(driver.phone || ''),
     licenseNumber: driver.licenseNumber,
-    licenseClass: driver.licenseClass,
+    licenseClassId: driver.licenseClassId,
     licenseExpiryDate: driver.licenseExpiryDate,
     active: driver.active
   }
@@ -418,7 +431,7 @@ onMounted(fetchCustomer)
             </div>
             <div class="info-item">
               <span class="label">Ehliyet Sınıfı</span>
-              <span class="value">{{ customer.personalInfo?.licenseClass || customer.licenseClass || '-' }}</span>
+              <span class="value">{{ customer.personalInfo?.licenseClassName || customer.personalInfo?.licenseClass || customer.licenseClass || '-' }}</span>
             </div>
             <div class="info-item">
               <span class="label">Ehliyet Bitiş</span>
@@ -556,12 +569,13 @@ onMounted(fetchCustomer)
                 />
               </div>
               <div class="form-group">
-                <label for="new-driver-license-class">Ehliyet Sınıfı</label>
-                <input
-                  id="new-driver-license-class"
-                  v-model="newDriver.licenseClass"
-                  type="text"
-                  placeholder="B"
+                <label>Ehliyet Sınıfı</label>
+                <SearchableSelect
+                  v-model="newDriver.licenseClassId"
+                  :options="licenseClassOptions"
+                  placeholder="Sınıf seçin"
+                  search-placeholder="Ara..."
+                  clearable
                 />
               </div>
               <div class="form-group full">
@@ -676,12 +690,13 @@ onMounted(fetchCustomer)
                   />
                 </div>
                 <div class="form-group">
-                  <label for="edit-driver-license-class">Ehliyet Sınıfı</label>
-                  <input
-                    id="edit-driver-license-class"
-                    v-model="editDriverForm.licenseClass"
-                    type="text"
-                    placeholder="B"
+                  <label>Ehliyet Sınıfı</label>
+                  <SearchableSelect
+                    v-model="editDriverForm.licenseClassId"
+                    :options="licenseClassOptions"
+                    placeholder="Sınıf seçin"
+                    search-placeholder="Ara..."
+                    clearable
                   />
                 </div>
                 <div class="form-group full">

@@ -5,6 +5,7 @@ import type {
     City,
     District,
     VehicleColor,
+    LicenseClass,
     CreateBrandRequest,
     UpdateBrandRequest,
     CreateModelRequest,
@@ -22,6 +23,10 @@ class ReferenceDataApiService extends BaseApi {
 
     async getBrands(): Promise<CarBrand[]> {
         return this.get<CarBrand[]>('/brands')
+    }
+
+    async getBrandsAll(): Promise<CarBrand[]> {
+        return this.get<CarBrand[]>('/brands/all')
     }
 
     async getModelsByBrand(brandId: number): Promise<CarModel[]> {
@@ -49,7 +54,11 @@ class ReferenceDataApiService extends BaseApi {
     }
 
     async deactivateBrand(id: number): Promise<void> {
-        await this.remove(`/brands/${id}`)
+        await this.patch(`/brands/${id}/deactivate`)
+    }
+
+    async activateBrand(id: number): Promise<void> {
+        await this.patch(`/brands/${id}/activate`)
     }
 
     async createModel(data: CreateModelRequest): Promise<CarModel> {
@@ -98,6 +107,10 @@ class ReferenceDataApiService extends BaseApi {
 
     async deactivateColor(id: number): Promise<void> {
         await this.remove(`/colors/${id}`)
+    }
+
+    async getLicenseClasses(): Promise<LicenseClass[]> {
+        return this.get<LicenseClass[]>('/license-classes')
     }
 }
 

@@ -46,6 +46,18 @@
             />
             <span class="hint">0-100 arası bir değer giriniz</span>
           </div>
+          <div class="form-group">
+            <label>İndirim Tutarı (₺)</label>
+            <input 
+              v-model.number="discountAmountInput" 
+              type="number" 
+              min="0"
+              :max="installment.outstandingBalance"
+              step="0.01"
+              placeholder="0"
+            />
+            <span class="hint">Tutar girerseniz oran otomatik hesaplanır</span>
+          </div>
         </div>
 
         <!-- Calculation Preview -->
@@ -56,7 +68,7 @@
             <span class="value">{{ formatCurrency(installment.outstandingBalance) }}</span>
           </div>
           <div v-if="discountAmount > 0" class="calc-row discount">
-            <span>İndirim ({{ discountPercentage }}%):</span>
+            <span>İndirim ({{ effectiveDiscountPercentage.toFixed(1) }}%):</span>
             <span class="value">-{{ formatCurrency(discountAmount) }}</span>
           </div>
           <div class="calc-row total">
@@ -120,20 +132,61 @@ const emit = defineEmits<{
 
 const processing = ref(false)
 const discountPercentage = ref(0)
+const discountAmountInput = ref<number | ''>('')
 const notes = ref('')
 
+const outstandingBalance = computed(() => Number(props.installment?.outstandingBalance ?? 0))
+
 const discountAmount = computed(() => {
-  if (!discountPercentage.value || discountPercentage.value <= 0) return 0
-  return props.installment.outstandingBalance * (discountPercentage.value / 100)
+  if (discountAmountInput.value !== '' && typeof discountAmountInput.value === 'number' && discountAmountInput.value > 0) {
+    return Math.min(discountAmountInput.value, outstandingBalance.value)
+  }
+  if (discountPercentage.value > 0) {
+    return outstandingBalance.value * (discountPercentage.value / 100)
+  }
+  return 0
 })
 
 const finalAmount = computed(() => {
-  return props.installment.outstandingBalance - discountAmount.value
+  return Math.max(0, outstandingBalance.value - discountAmount.value)
+})
+
+const effectiveDiscountPercentage = computed(() => {
+  if (outstandingBalance.value <= 0 || discountAmount.value <= 0) return 0
+  return Math.min(100, (discountAmount.value / outstandingBalance.value) * 100)
+})
+
+let skipSync = false
+watch(discountPercentage, (pct) => {
+  if (skipSync) return
+  skipSync = true
+  if (pct > 0 && outstandingBalance.value > 0) {
+    discountAmountInput.value = Math.round(outstandingBalance.value * (pct / 100) * 100) / 100
+  } else {
+    discountAmountInput.value = ''
+  }
+  skipSync = false
+})
+
+watch(discountAmountInput, (val) => {
+  if (skipSync) return
+  if (val === '' || val <= 0) {
+    skipSync = true
+    discountPercentage.value = 0
+    skipSync = false
+    return
+  }
+  if (outstandingBalance.value > 0) {
+    skipSync = true
+    discountPercentage.value = Math.min(100, (Number(val) / outstandingBalance.value) * 100)
+    skipSync = false
+  }
 })
 
 watch(() => props.show, (show) => {
   if (show) {
     discountPercentage.value = 0
+    discountAmountInput.value = ''
     notes.value = ''
   }
 })
@@ -146,7 +199,7 @@ function formatCurrency(amount: number): string {
 }
 
 function handleSubmit() {
-  const discount = discountPercentage.value > 0 ? discountPercentage.value : undefined
+  const discount = discountAmount.value > 0 ? effectiveDiscountPercentage.value : undefined
   emit('submit', finalAmount.value, discount, notes.value)
 }
 </script>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { maintenancesApi, serviceProvidersApi } from '@/api'
+import { maintenancesApi, serviceProvidersApi, vehiclesApi } from '@/api'
 import { useToast } from '@/composables'
 import { SearchableSelect } from '@/components/common'
 import DocumentsSection from '@/components/shared/DocumentsSection.vue'
@@ -37,6 +37,7 @@ const form = ref<CreateMaintenanceRecordForm>({
 })
 
 const newPart = ref('')
+
 
 const maintenanceTypes = [
   { value: MaintenanceType.REPAIR, label: 'Tamir' },
@@ -132,8 +133,16 @@ function finishWithDocuments() {
   emit('close')
 }
 
-onMounted(() => {
+onMounted(async () => {
   fetchServiceProviders()
+  try {
+    const v = await vehiclesApi.getById(props.vehicleId)
+    if (v?.currentKm != null) {
+      form.value.currentKm = v.currentKm
+    }
+  } catch {
+    // keep default 0
+  }
 })
 </script>
 

@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { watch, computed } from 'vue'
+import { watch, computed, ref } from 'vue'
 import { vehicleInsurancesApi } from '@/api'
 import { useForm, useToast, useEnumTranslations } from '@/composables'
 import { SearchableSelect } from '@/components/common'
+import DocumentsSection from '@/components/shared/DocumentsSection.vue'
 import { formatPhoneInput, isValidPhoneNumber, normalizePhoneDigits } from '@/utils/phone'
 import type { CreateVehicleInsuranceRequest } from '@/types'
 
@@ -20,6 +21,8 @@ const emit = defineEmits<{
 
 const toast = useToast()
 const { insuranceTypes } = useEnumTranslations()
+const step = ref<'form' | 'documents'>('form')
+const createdInsuranceId = ref<number | null>(null)
 
 const insuranceTypeOptions = computed(() =>
   Object.entries(insuranceTypes).map(([value, label]) => ({ value, label: label as string }))
@@ -69,13 +72,13 @@ const { values, errors, touched, handleSubmit, validateField, reset, isSubmittin
   validate,
   async onSubmit(data) {
     try {
-      await vehicleInsurancesApi.create({
+      const created = await vehicleInsurancesApi.create({
         ...data,
         contactPhone: data.contactPhone ? normalizePhoneDigits(data.contactPhone) : ''
       })
       toast.success('Sigorta poliçesi başarıyla eklendi')
-      emit('success')
-      emit('close')
+      createdInsuranceId.value = created.id
+      step.value = 'documents'
       reset()
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Poliçe oluşturulurken hata oluştu')
@@ -86,7 +89,14 @@ const { values, errors, touched, handleSubmit, validateField, reset, isSubmittin
 
 const handleClose = () => {
   reset()
+  step.value = 'form'
+  createdInsuranceId.value = null
   emit('close')
+}
+
+const handleDocumentsDone = () => {
+  emit('success')
+  handleClose()
 }
 
 function handleContactPhoneInput(event: Event) {
@@ -97,6 +107,8 @@ function handleContactPhoneInput(event: Event) {
 watch(() => props.show, (newVal) => {
   if (newVal) {
     values.vehicleId = props.vehicleId
+    step.value = 'form'
+    createdInsuranceId.value = null
   }
 })
 </script>
@@ -105,11 +117,26 @@ watch(() => props.show, (newVal) => {
   <div v-if="show" class="modal-overlay" @click.self="handleClose">
     <div class="modal-content">
       <div class="modal-header">
-        <h2 class="modal-title">Yeni Sigorta Poliçesi</h2>
+        <h2 class="modal-title">{{ step === 'form' ? 'Yeni Sigorta Poliçesi' : 'Poliçe Belgeleri' }}</h2>
         <button class="close-btn" @click="handleClose">×</button>
       </div>
 
-      <form @submit.prevent="handleSubmit">
+      <template v-if="step === 'documents' && createdInsuranceId">
+        <div class="modal-body documents-step">
+          <DocumentsSection
+            reference-type="INSURANCE"
+            :reference-id="createdInsuranceId"
+            title="Poliçe belgeleri (isteğe bağlı)"
+          />
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-primary" @click="handleDocumentsDone">
+            Tamamla
+          </button>
+        </div>
+      </template>
+
+      <form v-else @submit.prevent="handleSubmit">
         <div class="modal-body">
           <div class="form-row">
             <div class="form-group full-width">
@@ -334,6 +361,11 @@ watch(() => props.show, (newVal) => {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
+}
+
+.modal-body.documents-step {
+  max-height: 60vh;
+  overflow-y: auto;
 }
 
 .form-row {

@@ -79,6 +79,20 @@ const statusColors: Record<VehicleStatus, string> = {
   SOLD: 'danger'
 }
 
+const fuelTypeLabels: Record<string, string> = {
+  GASOLINE: 'Benzin',
+  DIESEL: 'Dizel',
+  ELECTRIC: 'Elektrikli',
+  HYBRID: 'Hibrit',
+  LPG: 'LPG'
+}
+
+const transmissionLabels: Record<string, string> = {
+  MANUAL: 'Manuel',
+  AUTOMATIC: 'Otomatik',
+  SEMI_AUTOMATIC: 'Yarı Otomatik'
+}
+
 async function fetchVehicle() {
   loading.value = true
   try {
@@ -216,11 +230,11 @@ onMounted(fetchVehicle)
               </div>
               <div class="info-item">
                 <span class="label">Yakıt Tipi</span>
-                <span class="value">{{ vehicle.fuelType }}</span>
+                <span class="value">{{ fuelTypeLabels[vehicle.fuelType] ?? vehicle.fuelType }}</span>
               </div>
               <div class="info-item">
                 <span class="label">Vites</span>
-                <span class="value">{{ vehicle.transmission }}</span>
+                <span class="value">{{ transmissionLabels[vehicle.transmission] ?? vehicle.transmission }}</span>
               </div>
               <div class="info-item">
                 <span class="label">Motor Hacmi</span>
