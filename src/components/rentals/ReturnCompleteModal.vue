@@ -3,6 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { rentalsApi, vehiclesApi } from '@/api'
 import { useValidation, rules, useToast } from '@/composables'
 import type { Rental, Vehicle, VehicleReturnForm, ReturnPreviewResponse } from '@/types'
+import DatePicker from '@/components/base/DatePicker.vue'
 
 interface Props {
   visible: boolean
@@ -285,13 +286,12 @@ watch(() => props.visible, (isVisible) => {
                   </div>
 
                   <div class="form-group" :class="{ error: hasError('actualReturnDate') }">
-                    <label for="actualReturnDate">Gerçek İade Tarihi <span class="required">*</span></label>
-                    <input 
-                      id="actualReturnDate"
-                      v-model="form.actualReturnDate" 
-                      @blur="handleBlur('actualReturnDate')"
-                      type="date"
+                    <DatePicker
+                      v-model="form.actualReturnDate"
+                      label="Gerçek İade Tarihi *"
+                      placeholder="İade tarihi"
                       :min="minReturnDate"
+                      @closed="handleBlur('actualReturnDate')"
                     />
                     <span class="error-text">{{ getError('actualReturnDate') }}</span>
                     <span

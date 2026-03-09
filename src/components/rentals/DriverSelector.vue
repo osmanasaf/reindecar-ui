@@ -4,6 +4,7 @@ import { customersApi, referenceDataApi } from '@/api'
 import { useToast } from '@/composables'
 import { formatPhoneInput } from '@/utils/phone'
 import { SearchableSelect } from '@/components/common'
+import DatePicker from '@/components/base/DatePicker.vue'
 import type { Driver, CreateDriverForm } from '@/types'
 
 const props = defineProps<{
@@ -235,8 +236,11 @@ watch(() => props.customerId, (newCustomerId) => {
           />
         </div>
         <div class="form-group full-width">
-          <label for="licenseExpiryDate">Ehliyet Geçerlilik Tarihi *</label>
-          <input id="licenseExpiryDate" v-model="newDriver.licenseExpiryDate" type="date" required />
+          <DatePicker
+            v-model="newDriver.licenseExpiryDate"
+            label="Ehliyet Geçerlilik Tarihi *"
+            placeholder="Ehliyet geçerlilik tarihi"
+          />
         </div>
       </div>
       <div class="form-actions">

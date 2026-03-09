@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import type { CreatePayableRequest, PayableType, ServiceProviderResponse } from '@/types'
 import { useForm, useToast } from '@/composables'
 import { SearchableSelect } from '@/components/common'
+import DatePicker from '@/components/base/DatePicker.vue'
 import { useAccountingStore } from '@/stores'
 import { onMounted } from 'vue'
 
@@ -199,21 +200,19 @@ const handleClose = () => {
             </div>
 
             <div class="form-group">
-              <label class="form-label">Fatura Tarihi</label>
-              <input
+              <DatePicker
                 v-model="values.invoiceDate"
-                type="date"
-                class="form-input"
+                label="Fatura Tarihi"
+                placeholder="Fatura tarihi"
               />
             </div>
           </div>
 
           <div class="form-group">
-            <label class="form-label">Vade Tarihi</label>
-            <input
+            <DatePicker
               v-model="values.dueDate"
-              type="date"
-              class="form-input"
+              label="Vade Tarihi"
+              placeholder="Vade tarihi"
             />
           </div>
         </div>

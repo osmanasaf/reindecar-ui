@@ -3,6 +3,7 @@ import { ref, watch, computed } from 'vue'
 import { vehiclesApi, vehicleCategoriesApi, branchesApi } from '@/api'
 import { useValidation, rules, useToast, useReferenceData } from '@/composables'
 import { SearchableSelect } from '@/components/common'
+import DatePicker from '@/components/base/DatePicker.vue'
 import { formatPlateInput } from '@/utils'
 import { isErrorResponse } from '@/utils/error'
 import type { Vehicle, VehicleCategory, Branch, UpdateVehicleForm } from '@/types'
@@ -501,18 +502,27 @@ watch(() => props.visible, (isVisible) => {
               </div>
 
               <div class="form-group">
-                <label>Tescil Tarihi</label>
-                <input v-model="form.registrationDate" type="date" />
+                <DatePicker
+                  v-model="form.registrationDate"
+                  label="Tescil Tarihi"
+                  placeholder="Tescil tarihi"
+                />
               </div>
 
               <div class="form-group">
-                <label>Sigorta Bitiş</label>
-                <input v-model="form.insuranceExpiryDate" type="date" />
+                <DatePicker
+                  v-model="form.insuranceExpiryDate"
+                  label="Sigorta Bitiş"
+                  placeholder="Sigorta bitiş tarihi"
+                />
               </div>
 
               <div class="form-group">
-                <label>Muayene Bitiş</label>
-                <input v-model="form.inspectionExpiryDate" type="date" />
+                <DatePicker
+                  v-model="form.inspectionExpiryDate"
+                  label="Muayene Bitiş"
+                  placeholder="Muayene bitiş tarihi"
+                />
               </div>
             </div>
           </section>

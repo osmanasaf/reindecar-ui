@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useAccountingStore } from '@/stores'
 import { usePagination, useToast, useEnumTranslations } from '@/composables'
 import { SearchableSelect } from '@/components/common'
+import DatePicker from '@/components/base/DatePicker.vue'
 import { ReceivableCard, PaymentModal } from '@/components/accounting'
 import { formatCurrency } from '@/utils/format'
 import { receivablesApi, rentalsApi, vehiclesApi, customersApi } from '@/api'
@@ -375,8 +376,8 @@ const customerOptions = computed(() =>
           class="filter-searchable"
           @update:model-value="(v) => filters.type = v ?? undefined"
         />
-        <input v-model="filters.startDate" type="date" class="filter-input" placeholder="Başlangıç" />
-        <input v-model="filters.endDate" type="date" class="filter-input" placeholder="Bitiş" />
+        <DatePicker v-model="filters.startDate" placeholder="Başlangıç" />
+        <DatePicker v-model="filters.endDate" placeholder="Bitiş" />
         <label class="filter-check">
           <input type="checkbox" v-model="filters.overdue" /> Yalnızca Vadesi Geçmiş
         </label>
@@ -502,8 +503,11 @@ const customerOptions = computed(() =>
           <input v-model.number="createForm.amount" type="number" class="form-control" />
         </div>
         <div class="form-group">
-          <label>Vade Tarihi</label>
-          <input v-model="createForm.dueDate" type="date" class="form-control" />
+          <DatePicker
+            v-model="createForm.dueDate"
+            label="Vade Tarihi"
+            placeholder="Vade tarihi"
+          />
         </div>
         <div class="modal-actions">
           <button class="btn btn-ghost" @click="showCreateModal = false">İptal</button>

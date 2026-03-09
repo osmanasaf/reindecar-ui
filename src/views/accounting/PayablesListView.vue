@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useAccountingStore } from '@/stores'
 import { usePagination, useToast, useEnumTranslations } from '@/composables'
 import { SearchableSelect } from '@/components/common'
+import DatePicker from '@/components/base/DatePicker.vue'
 import { PayableCard, CreatePayableModal, PaymentModal } from '@/components/accounting'
 import { formatCurrency } from '@/utils/format'
 import { rentalsApi, vehiclesApi } from '@/api'
@@ -290,8 +291,8 @@ const vehicleOptions = computed(() =>
         class="filter-searchable"
         @update:model-value="(v) => filters.type = v ?? undefined"
       />
-      <input v-model="filters.startDate" type="date" class="filter-input" />
-      <input v-model="filters.endDate" type="date" class="filter-input" />
+      <DatePicker v-model="filters.startDate" placeholder="Başlangıç" />
+      <DatePicker v-model="filters.endDate" placeholder="Bitiş" />
       <label class="filter-check">
         <input type="checkbox" v-model="filters.overdue" /> Yalnızca Vadesi Geçmiş
       </label>

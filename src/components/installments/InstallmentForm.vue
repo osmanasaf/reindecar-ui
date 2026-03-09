@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { useInstallmentStore } from '@/stores/installment.store'
 import { validateStartDate, validatePositiveNumber, validateInstallmentCount } from '@/utils/installmentHelpers'
 import type { CreateVehicleInstallmentRequest } from '@/types'
+import DatePicker from '@/components/base/DatePicker.vue'
 
 interface Props {
   vehicleId: number
@@ -182,15 +183,11 @@ function onInstallmentCountChange(): void {
         </div>
 
         <div class="form-group full-width">
-          <label for="startDate" class="form-label">
-            Başlangıç Tarihi <span class="required">*</span>
-          </label>
-          <input
-            id="startDate"
+          <DatePicker
             v-model="formData.startDate"
-            type="date"
-            class="form-input"
-            :class="{ 'has-error': errors.startDate }"
+            label="Başlangıç Tarihi *"
+            placeholder="Başlangıç tarihi"
+            :class="{ 'error': errors.startDate }"
           />
           <span v-if="errors.startDate" class="error-message">{{ errors.startDate }}</span>
         </div>

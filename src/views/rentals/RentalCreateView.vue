@@ -16,6 +16,7 @@ import QuickCustomerModal from '@/components/customers/QuickCustomerModal.vue'
 import RentalTypeSelector from '@/components/rentals/RentalTypeSelector.vue'
 import TermSelector from '@/components/rentals/TermSelector.vue'
 import ExtraItemsManager from '@/components/rentals/ExtraItemsManager.vue'
+import DatePicker from '@/components/base/DatePicker.vue'
 
 const router = useRouter()
 const toast = useToast()
@@ -370,24 +371,22 @@ onMounted(() => {
             <div class="date-section-full">
               <div class="form-grid">
                 <div class="form-group" :class="{ error: hasError('startDate') }">
-                  <label for="start-date-input">Başlangıç Tarihi</label>
-                  <input 
-                    id="start-date-input"
-                    type="date" 
+                  <DatePicker
                     v-model="startDate"
-                    @blur="touch('startDate')"
+                    label="Başlangıç Tarihi"
                     :min="new Date().toISOString().split('T')[0]"
+                    placeholder="Başlangıç tarihi"
+                    @closed="touch('startDate')"
                   />
                   <span class="error-text">{{ getError('startDate') }}</span>
                 </div>
                 <div class="form-group" :class="{ error: hasError('endDate') }">
-                  <label for="end-date-input">Bitiş Tarihi</label>
-                  <input 
-                    id="end-date-input"
-                    type="date" 
+                  <DatePicker
                     v-model="endDate"
-                    @blur="touch('endDate')"
+                    label="Bitiş Tarihi"
                     :min="startDate || new Date().toISOString().split('T')[0]"
+                    placeholder="Bitiş tarihi"
+                    @closed="touch('endDate')"
                   />
                   <span class="error-text">{{ getError('endDate') }}</span>
                 </div>

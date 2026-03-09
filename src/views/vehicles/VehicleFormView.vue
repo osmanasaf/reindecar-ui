@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { vehiclesApi, vehicleCategoriesApi, branchesApi, referenceDataApi } from '@/api'
 import { useValidation, rules, useToast, useReferenceData } from '@/composables'
 import { SearchableSelect } from '@/components/common'
+import DatePicker from '@/components/base/DatePicker.vue'
 import type { CarModel } from '@/types/reference'
 import { formatPlateInput } from '@/utils'
 import { isErrorResponse } from '@/utils/error'
@@ -735,31 +736,31 @@ onMounted(fetchData)
         <h3>Tarihler</h3>
         <div class="form-grid">
           <div class="form-group" :class="{ error: hasError('registrationDate') }">
-            <label>Tescil Tarihi <span class="required">*</span></label>
-            <input 
-              v-model="form.registrationDate" 
-              type="date"
-              @blur="handleBlur('registrationDate')"
+            <DatePicker
+              v-model="form.registrationDate"
+              label="Tescil Tarihi *"
+              placeholder="Tescil tarihi"
+              @closed="handleBlur('registrationDate')"
             />
             <span class="error-text">{{ getError('registrationDate') }}</span>
           </div>
 
           <div class="form-group" :class="{ error: hasError('insuranceExpiryDate') }">
-            <label>Sigorta Bitiş Tarihi <span class="required">*</span></label>
-            <input 
-              v-model="form.insuranceExpiryDate" 
-              type="date"
-              @blur="handleBlur('insuranceExpiryDate')"
+            <DatePicker
+              v-model="form.insuranceExpiryDate"
+              label="Sigorta Bitiş Tarihi *"
+              placeholder="Sigorta bitiş tarihi"
+              @closed="handleBlur('insuranceExpiryDate')"
             />
             <span class="error-text">{{ getError('insuranceExpiryDate') }}</span>
           </div>
 
           <div class="form-group" :class="{ error: hasError('inspectionExpiryDate') }">
-            <label>Muayene Bitiş Tarihi <span class="required">*</span></label>
-            <input 
-              v-model="form.inspectionExpiryDate" 
-              type="date"
-              @blur="handleBlur('inspectionExpiryDate')"
+            <DatePicker
+              v-model="form.inspectionExpiryDate"
+              label="Muayene Bitiş Tarihi *"
+              placeholder="Muayene bitiş tarihi"
+              @closed="handleBlur('inspectionExpiryDate')"
             />
             <span class="error-text">{{ getError('inspectionExpiryDate') }}</span>
           </div>

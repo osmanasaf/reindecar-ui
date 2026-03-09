@@ -3,6 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { customersApi } from '@/api'
 import { useValidation, rules, useToast } from '@/composables'
 import { SearchableSelect } from '@/components/common'
+import DatePicker from '@/components/base/DatePicker.vue'
 import { formatPhoneInput } from '@/utils/phone'
 import type { Customer, CreatePersonalCustomerForm } from '@/types'
 
@@ -188,11 +189,11 @@ watch(() => props.visible, (isVisible) => {
             </div>
 
             <div class="form-group" :class="{ error: hasError('birthDate') }">
-              <label>Doğum Tarihi <span class="required">*</span></label>
-              <input 
-                v-model="form.birthDate" 
-                @blur="handleBlur('birthDate')" 
-                type="date"
+              <DatePicker
+                v-model="form.birthDate"
+                label="Doğum Tarihi *"
+                placeholder="Doğum tarihi"
+                @closed="handleBlur('birthDate')"
               />
               <span class="error-text">{{ getError('birthDate') }}</span>
             </div>
@@ -221,11 +222,11 @@ watch(() => props.visible, (isVisible) => {
             </div>
 
             <div class="form-group" :class="{ error: hasError('licenseExpiryDate') }">
-              <label>Ehliyet Geçerlilik <span class="required">*</span></label>
-              <input 
-                v-model="form.licenseExpiryDate" 
-                @blur="handleBlur('licenseExpiryDate')" 
-                type="date"
+              <DatePicker
+                v-model="form.licenseExpiryDate"
+                label="Ehliyet Geçerlilik *"
+                placeholder="Ehliyet geçerlilik tarihi"
+                @closed="handleBlur('licenseExpiryDate')"
               />
               <span class="error-text">{{ getError('licenseExpiryDate') }}</span>
             </div>

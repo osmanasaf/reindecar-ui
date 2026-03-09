@@ -8,6 +8,7 @@ import type { Customer, CustomerType, CustomerStatus, CreditRating, CustomerStat
 import CompanyAuthorizedPersonsSection from '@/components/customers/CompanyAuthorizedPersonsSection.vue'
 import DocumentsSection from '@/components/shared/DocumentsSection.vue'
 import { SearchableSelect } from '@/components/common'
+import DatePicker from '@/components/base/DatePicker.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -579,11 +580,10 @@ onMounted(fetchCustomer)
                 />
               </div>
               <div class="form-group full">
-                <label for="new-driver-license-expiry">Ehliyet Geçerlilik Tarihi *</label>
-                <input
-                  id="new-driver-license-expiry"
+                <DatePicker
                   v-model="newDriver.licenseExpiryDate"
-                  type="date"
+                  label="Ehliyet Geçerlilik Tarihi *"
+                  placeholder="Ehliyet geçerlilik tarihi"
                 />
               </div>
             </div>
@@ -700,11 +700,10 @@ onMounted(fetchCustomer)
                   />
                 </div>
                 <div class="form-group full">
-                  <label for="edit-driver-license-expiry">Ehliyet Geçerlilik Tarihi *</label>
-                  <input
-                    id="edit-driver-license-expiry"
+                  <DatePicker
                     v-model="editDriverForm.licenseExpiryDate"
-                    type="date"
+                    label="Ehliyet Geçerlilik Tarihi *"
+                    placeholder="Ehliyet geçerlilik tarihi"
                   />
                 </div>
                 <div class="form-group full">

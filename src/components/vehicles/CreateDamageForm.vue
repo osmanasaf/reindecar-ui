@@ -4,6 +4,7 @@ import { damagesApi, rentalsApi, customersApi } from '@/api'
 import { useToast } from '@/composables'
 import { SearchableSelect } from '@/components/common'
 import DocumentsSection from '@/components/shared/DocumentsSection.vue'
+import DatePicker from '@/components/base/DatePicker.vue'
 import { DamageType, DamageLocation, DamageSeverity } from '@/types'
 import type { CreateDamageReportForm, Customer, Rental } from '@/types'
 
@@ -285,12 +286,10 @@ onMounted(async () => {
           </div>
 
           <div class="form-group">
-            <label for="reportDate">Rapor Tarihi *</label>
-            <input
-              id="reportDate"
-              type="date"
+            <DatePicker
               v-model="form.reportDate"
-              required
+              label="Rapor Tarihi *"
+              placeholder="Rapor tarihi"
             />
           </div>
 

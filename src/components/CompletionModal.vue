@@ -49,10 +49,10 @@
             </div>
 
             <div class="form-group">
-              <label>Tamamlanma Tarihi <span class="required">*</span></label>
-              <input 
-                v-model="form.completionDate" 
-                type="date"
+              <DatePicker
+                v-model="form.completionDate"
+                label="Tamamlanma Tarihi *"
+                placeholder="Tamamlanma tarihi"
                 :max="today"
               />
             </div>
@@ -97,13 +97,19 @@
 
             <div class="form-row">
               <div class="form-group">
-                <label>Fatura Tarihi</label>
-                <input v-model="form.invoiceDate" type="date" />
+                <DatePicker
+                  v-model="form.invoiceDate"
+                  label="Fatura Tarihi"
+                  placeholder="Fatura tarihi"
+                />
               </div>
 
               <div class="form-group">
-                <label>Ödeme Vadesi</label>
-                <input v-model="form.paymentDueDate" type="date" />
+                <DatePicker
+                  v-model="form.paymentDueDate"
+                  label="Ödeme Vadesi"
+                  placeholder="Ödeme vadesi"
+                />
               </div>
             </div>
           </div>
@@ -167,6 +173,7 @@
 import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { SearchableSelect } from '@/components/common'
+import DatePicker from '@/components/base/DatePicker.vue'
 import type { CompleteMaintenanceForm, MarkDamageRepairedForm } from '@/types'
 
 interface Props {

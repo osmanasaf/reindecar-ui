@@ -4,6 +4,7 @@ import { maintenancesApi, serviceProvidersApi, vehiclesApi } from '@/api'
 import { useToast } from '@/composables'
 import { SearchableSelect } from '@/components/common'
 import DocumentsSection from '@/components/shared/DocumentsSection.vue'
+import DatePicker from '@/components/base/DatePicker.vue'
 import { MaintenanceType } from '@/types'
 import type { CreateMaintenanceRecordForm, ServiceProvider } from '@/types'
 
@@ -183,12 +184,10 @@ onMounted(async () => {
           </div>
 
           <div class="form-group">
-            <label for="maintenanceDate">Bakım Tarihi *</label>
-            <input
-              id="maintenanceDate"
-              type="date"
+            <DatePicker
               v-model="form.maintenanceDate"
-              required
+              label="Bakım Tarihi *"
+              placeholder="Bakım tarihi"
             />
           </div>
 

@@ -2,15 +2,20 @@
 import { ref, watch, computed } from 'vue'
 import { validators, validate, type ValidationRule } from '@/utils/validation'
 import { formatPhoneInput, PHONE_INPUT_MAX_LENGTH } from '@/utils/phone'
+import DatePicker from '@/components/base/DatePicker.vue'
 
 interface Props {
   modelValue: string
   label: string
-  type?: 'text' | 'email' | 'tel' | 'password' | 'number'
+  type?: 'text' | 'email' | 'tel' | 'password' | 'number' | 'date'
   placeholder?: string
   required?: boolean
   rules?: ValidationRule[]
   disabled?: boolean
+  /** Sadece type="date" için: minimum tarih (YYYY-MM-DD) */
+  min?: string
+  /** Sadece type="date" için: maksimum tarih (YYYY-MM-DD) */
+  max?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -75,6 +80,13 @@ function handleBlur() {
   emit('blur')
 }
 
+function handleDateInput(value: string) {
+  emit('update:modelValue', value)
+  if (touched.value) {
+    validateInput()
+  }
+}
+
 watch(() => props.modelValue, () => {
   if (touched.value) {
     validateInput()
@@ -100,7 +112,19 @@ defineExpose({
       {{ label }}
       <span v-if="required" class="required">*</span>
     </label>
+    <DatePicker
+      v-if="type === 'date'"
+      :model-value="modelValue"
+      :min="min"
+      :max="max"
+      :placeholder="placeholder"
+      :disabled="disabled"
+      :class="['date-field', { error: touched && errorMessage }]"
+      @update:model-value="handleDateInput"
+      @closed="handleBlur"
+    />
     <input
+      v-else
       :value="modelValue"
       :type="type"
       :placeholder="placeholder"
@@ -159,6 +183,11 @@ defineExpose({
   background: var(--color-bg-secondary);
   cursor: not-allowed;
   opacity: 0.6;
+}
+
+.validated-input :deep(.error .dp__input) {
+  border-color: var(--color-danger);
+  background: rgba(239, 68, 68, 0.05);
 }
 
 .error-message {

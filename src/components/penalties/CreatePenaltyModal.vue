@@ -3,6 +3,7 @@ import { ref, computed, watch, nextTick } from 'vue'
 import { penaltiesApi, rentalsApi, vehiclesApi, customersApi } from '@/api'
 import { useToast, useEnumTranslations } from '@/composables'
 import { SearchableSelect } from '@/components/common'
+import DatePicker from '@/components/base/DatePicker.vue'
 import type { Rental, Vehicle, Customer, RentalDriver, ViolationType } from '@/types'
 
 interface Props {
@@ -316,11 +317,10 @@ watch(() => props.show, async (newVal) => {
               <label class="form-label">
                 İhlal Tarihi <span class="required">*</span>
               </label>
-              <input
+              <DatePicker
                 v-model="violationDate"
-                type="date"
-                class="form-input"
                 :max="new Date().toISOString().split('T')[0]"
+                placeholder="İhlal tarihi"
               />
             </div>
           </div>
@@ -352,10 +352,9 @@ watch(() => props.show, async (newVal) => {
 
             <div class="form-group">
               <label class="form-label">Ödeme Vadesi</label>
-              <input
+              <DatePicker
                 v-model="dueDate"
-                type="date"
-                class="form-input"
+                placeholder="Ödeme vadesi"
               />
             </div>
           </div>

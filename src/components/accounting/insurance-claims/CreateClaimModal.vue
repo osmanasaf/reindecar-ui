@@ -4,6 +4,7 @@ import { vehicleInsurancesApi } from '@/api'
 import type { CreateClaimRequest, ClaimType, VehicleInsuranceResponse } from '@/types'
 import { useForm, useToast } from '@/composables'
 import { SearchableSelect } from '@/components/common'
+import DatePicker from '@/components/base/DatePicker.vue'
 
 interface Props {
   show: boolean
@@ -198,16 +199,13 @@ watch(() => props.show, (newVal) => {
             </div>
 
             <div class="form-group">
-              <label class="form-label">
-                Olay Tarihi <span class="required">*</span>
-              </label>
-              <input
+              <DatePicker
                 v-model="values.incidentDate"
-                type="date"
-                class="form-input"
-                :class="{ 'error': touched.incidentDate && errors.incidentDate }"
+                label="Olay Tarihi *"
+                placeholder="Olay tarihi"
                 :max="new Date().toISOString().split('T')[0]"
-                @blur="validateField('incidentDate')"
+                :class="{ 'error': touched.incidentDate && errors.incidentDate }"
+                @closed="validateField('incidentDate')"
               />
               <span v-if="touched.incidentDate && errors.incidentDate" class="error-text">
                 {{ errors.incidentDate }}

@@ -4,6 +4,7 @@ import { vehicleInsurancesApi } from '@/api'
 import { useForm, useToast, useEnumTranslations } from '@/composables'
 import { SearchableSelect } from '@/components/common'
 import DocumentsSection from '@/components/shared/DocumentsSection.vue'
+import DatePicker from '@/components/base/DatePicker.vue'
 import { formatPhoneInput, isValidPhoneNumber, normalizePhoneDigits } from '@/utils/phone'
 import type { CreateVehicleInsuranceRequest } from '@/types'
 
@@ -191,15 +192,12 @@ watch(() => props.show, (newVal) => {
 
           <div class="form-row">
             <div class="form-group">
-              <label class="form-label">
-                Başlangıç Tarihi <span class="required">*</span>
-              </label>
-              <input
+              <DatePicker
                 v-model="values.startDate"
-                type="date"
-                class="form-input"
+                label="Başlangıç Tarihi *"
+                placeholder="Başlangıç tarihi"
                 :class="{ 'error': touched.startDate && errors.startDate }"
-                @blur="validateField('startDate')"
+                @closed="validateField('startDate')"
               />
               <span v-if="touched.startDate && errors.startDate" class="error-text">
                 {{ errors.startDate }}
@@ -207,15 +205,12 @@ watch(() => props.show, (newVal) => {
             </div>
 
             <div class="form-group">
-              <label class="form-label">
-                Bitiş Tarihi <span class="required">*</span>
-              </label>
-              <input
+              <DatePicker
                 v-model="values.endDate"
-                type="date"
-                class="form-input"
+                label="Bitiş Tarihi *"
+                placeholder="Bitiş tarihi"
                 :class="{ 'error': touched.endDate && errors.endDate }"
-                @blur="validateField('endDate')"
+                @closed="validateField('endDate')"
               />
               <span v-if="touched.endDate && errors.endDate" class="error-text">
                 {{ errors.endDate }}

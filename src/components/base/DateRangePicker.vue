@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import DatePicker from './DatePicker.vue'
 
 interface DateRange {
   start: string
@@ -55,7 +56,7 @@ function formatDisplayDate(dateStr: string): string {
 }
 
 function formatInputDate(date: Date): string {
-  return date.toISOString().split('T')[0]
+  return date.toISOString().split('T')[0] ?? ''
 }
 
 function applyPreset(preset: Preset) {
@@ -144,19 +145,19 @@ watch(showDropdown, (isOpen) => {
       <div class="custom-range">
         <div class="range-inputs">
           <div class="input-group">
-            <label>Başlangıç</label>
-            <input 
-              type="date" 
+            <DatePicker
               v-model="localStart"
+              label="Başlangıç"
               :max="localEnd || undefined"
+              placeholder="Başlangıç tarihi"
             />
           </div>
           <div class="input-group">
-            <label>Bitiş</label>
-            <input 
-              type="date" 
+            <DatePicker
               v-model="localEnd"
+              label="Bitiş"
               :min="localStart || undefined"
+              placeholder="Bitiş tarihi"
             />
           </div>
         </div>
@@ -287,24 +288,10 @@ watch(showDropdown, (isOpen) => {
   gap: 6px;
 }
 
-.input-group label {
+.input-group :deep(.date-picker-label) {
   font-size: 12px;
   font-weight: 500;
   color: var(--color-text-secondary);
-}
-
-.input-group input {
-  padding: 10px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  font-size: 14px;
-  background: var(--color-bg-secondary);
-}
-
-.input-group input:focus {
-  outline: none;
-  border-color: var(--color-primary);
-  background: var(--color-surface);
 }
 
 .range-actions {
