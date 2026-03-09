@@ -125,11 +125,9 @@ function resetUploadForm() {
 
 async function openFile(file: FileRecord) {
   openingId.value = file.id
-  const w = window.open('', '_blank', 'noopener,noreferrer')
   try {
-    await filesApi.openFile(file.id, w)
+    await filesApi.openFile(file.id)
   } catch (err) {
-    if (w && !w.closed) w.close()
     toast.apiError(err, 'Dosya açılamadı')
   } finally {
     openingId.value = null

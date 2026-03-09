@@ -25,6 +25,7 @@ const loading = ref(false)
 const searchQuery = ref('')
 const showNewDriverForm = ref(false)
 const licenseClassOptions = ref<{ value: number; label: string }[]>([])
+const loadingLicenseClasses = ref(false)
 
 const newDriver = ref<CreateDriverForm>({
   nationalId: '',
@@ -38,11 +39,14 @@ const newDriver = ref<CreateDriverForm>({
 })
 
 async function fetchLicenseClasses() {
+  loadingLicenseClasses.value = true
   try {
     const list = await referenceDataApi.getLicenseClasses()
     licenseClassOptions.value = list.map(lc => ({ value: lc.id, label: lc.code }))
   } catch {
     licenseClassOptions.value = []
+  } finally {
+    loadingLicenseClasses.value = false
   }
 }
 
@@ -233,6 +237,7 @@ watch(() => props.customerId, (newCustomerId) => {
             placeholder="Sınıf seçin"
             search-placeholder="Ara..."
             clearable
+            :loading="loadingLicenseClasses"
           />
         </div>
         <div class="form-group full-width">

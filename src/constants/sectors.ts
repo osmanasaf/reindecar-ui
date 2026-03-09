@@ -1,0 +1,21 @@
+export const SECTOR_OPTIONS: { value: string; label: string }[] = [
+  { value: 'Otomotiv', label: 'Otomotiv' },
+  { value: 'Lojistik', label: 'Lojistik' },
+  { value: 'İnşaat', label: 'İnşaat' },
+  { value: 'Perakende', label: 'Perakende' },
+  { value: 'Sağlık', label: 'Sağlık' },
+  { value: 'Eğitim', label: 'Eğitim' },
+  { value: 'Teknoloji', label: 'Teknoloji' },
+  { value: 'Finans', label: 'Finans' },
+  { value: 'Enerji', label: 'Enerji' },
+  { value: 'Tarım', label: 'Tarım' },
+  { value: 'Gıda', label: 'Gıda' },
+  { value: 'Turizm', label: 'Turizm' },
+  { value: 'Üretim', label: 'Üretim' },
+  { value: 'Danışmanlık', label: 'Danışmanlık' },
+  { value: 'Medya', label: 'Medya' },
+  { value: 'İlaç', label: 'İlaç' },
+  { value: 'Kimya', label: 'Kimya' },
+  { value: 'Tekstil', label: 'Tekstil' },
+  { value: 'Diğer', label: 'Diğer' }
+]

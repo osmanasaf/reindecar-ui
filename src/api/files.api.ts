@@ -120,19 +120,18 @@ class FilesApiService extends BaseApi {
     }
 
     /**
-     * Opens file in a new tab. Caller should open the window synchronously on user click
-     * (to avoid popup blocker), then pass it here to set the URL when ready.
-     * If no window is passed, opens a new window (may be blocked by browser).
+     * Opens file in a new tab. Uses a temporary link so only one tab opens
+     * with the content directly (no blank page, no double tab).
      */
-    async openFile(id: number, openedWindow?: Window | null): Promise<void> {
+    async openFile(id: number): Promise<void> {
         const url = await this.getPresignedUrl(id)
         const urlStr = typeof url === 'string' ? url : ''
         if (!urlStr.trim()) return
-        if (openedWindow && !openedWindow.closed) {
-            openedWindow.location.href = urlStr
-        } else {
-            window.open(urlStr, '_blank', 'noopener,noreferrer')
-        }
+        const link = document.createElement('a')
+        link.href = urlStr
+        link.target = '_blank'
+        link.rel = 'noopener noreferrer'
+        link.click()
     }
 
     async downloadFile(id: number, fileName: string): Promise<void> {

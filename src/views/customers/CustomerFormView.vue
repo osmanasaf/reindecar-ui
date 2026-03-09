@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { customersApi } from '@/api'
+import { customersApi, referenceDataApi } from '@/api'
 import { useValidation, rules, useToast, useReferenceData } from '@/composables'
 import { SearchableSelect } from '@/components/common'
 import DatePicker from '@/components/base/DatePicker.vue'
+import { SECTOR_OPTIONS } from '@/constants/sectors'
 import { formatPhoneInput } from '@/utils/phone'
 import type { ValidationRule } from '@/composables/useValidation'
 import type {
@@ -84,7 +85,45 @@ const commonTitles = [
   { value: 'İnsan Kaynakları Müdürü', label: 'İnsan Kaynakları Müdürü' }
 ]
 
-const licenseClasses = ['A1', 'A2', 'A', 'B1', 'B', 'BE', 'C1', 'C1E', 'C', 'CE', 'D1', 'D1E', 'D', 'DE'].map(cls => ({ value: cls, label: cls }))
+const licenseClassesList = ref<{ id: number; code: string }[]>([])
+const licenseClassOptions = computed(() =>
+  licenseClassesList.value.map(lc => ({ value: lc.code, label: lc.code }))
+)
+
+async function fetchLicenseClasses() {
+  try {
+    const list = await referenceDataApi.getLicenseClasses()
+    licenseClassesList.value = list.map(lc => ({ id: lc.id, code: lc.code }))
+  } catch {
+    licenseClassesList.value = []
+  }
+}
+
+function resolveLicenseClassCode(data: { personalInfo?: { licenseClass?: string; licenseClassId?: number }; licenseClass?: string }): string {
+  const code = data.personalInfo?.licenseClass || data.licenseClass || ''
+  if (code) return code
+  const id = data.personalInfo?.licenseClassId
+  if (id == null) return ''
+  const found = licenseClassesList.value.find(lc => lc.id === id)
+  return found?.code ?? ''
+}
+
+/** Kurumsal müşteri çalışan sayısı aralıkları (backend’e üst sınır sayı gider) */
+const EMPLOYEE_COUNT_OPTIONS = [
+  { value: '', label: 'Seçiniz' },
+  { value: '20', label: '1-20' },
+  { value: '200', label: '21-200' },
+  { value: '500', label: '201-500' },
+  { value: '9999', label: '501+' }
+] as const
+
+function employeeCountFromApi(n: number | undefined): string {
+  if (n == null || Number.isNaN(n)) return ''
+  if (n <= 20) return '20'
+  if (n <= 200) return '200'
+  if (n <= 500) return '500'
+  return '9999'
+}
 
 function addAuthorizedPerson() {
   authorizedPersons.value.push({ firstName: '', lastName: '', nationalId: '', phone: '', email: '', title: '', isPrimary: false })
@@ -208,6 +247,7 @@ async function fetchCustomer() {
   loading.value = true
   try {
     await loadCities()
+    await fetchLicenseClasses()
     if (!isEditMode.value) return
     const data = await customersApi.getById(Number(route.params.id))
     customerType.value = data.customerType
@@ -239,7 +279,7 @@ async function fetchCustomer() {
       nationalId: data.personalInfo?.nationalId || data.nationalId || '',
       birthDate: data.personalInfo?.birthDate ? (data.personalInfo.birthDate.split('T')[0] ?? '') : (data.birthDate ? (data.birthDate.split('T')[0] ?? '') : ''),
       licenseNumber: data.personalInfo?.licenseNumber || data.licenseNumber || '',
-      licenseClass: data.personalInfo?.licenseClass || data.licenseClass || '',
+      licenseClass: resolveLicenseClassCode(data),
       licenseExpiryDate: data.personalInfo?.licenseExpiryDate ? (data.personalInfo.licenseExpiryDate.split('T')[0] ?? '') : (data.licenseExpiryDate ? (data.licenseExpiryDate.split('T')[0] ?? '') : ''),
       
       companyName: data.companyInfo?.companyName || data.displayName || '',
@@ -248,7 +288,7 @@ async function fetchCustomer() {
       tradeRegisterNo: data.tradeRegisterNo || data.tradeRegistryNumber || '',
       invoiceAddress,
       sector: data.sector || '',
-      employeeCount: typeof data.employeeCount === 'number' ? String(data.employeeCount) : '',
+      employeeCount: employeeCountFromApi(data.employeeCount ?? data.companyInfo?.employeeCount),
       creditScore: typeof data.creditScore === 'number' ? String(data.creditScore) : ''
     }
     const cityMatch = cities.value.find(c => c.name === (data.city || ''))
@@ -435,7 +475,7 @@ watch(customerType, () => reset())
                 <label>Sınıf <span class="required">*</span></label>
                 <SearchableSelect
                   v-model="form.licenseClass"
-                  :options="licenseClasses"
+                  :options="licenseClassOptions"
                   placeholder="Sınıf seçin"
                   search-placeholder="Ara..."
                   :error="hasError('licenseClass')"
@@ -487,12 +527,27 @@ watch(customerType, () => reset())
 
               <div class="form-group">
                 <label>Sektör</label>
-                <input v-model="form.sector" type="text" />
+                <SearchableSelect
+                  :model-value="form.sector || null"
+                  :options="SECTOR_OPTIONS"
+                  placeholder="Sektör seçin"
+                  search-placeholder="Sektör ara..."
+                  clearable
+                  @update:model-value="form.sector = $event ?? ''"
+                />
               </div>
 
               <div class="form-group">
                 <label>Çalışan Sayısı</label>
-                <input v-model="form.employeeCount" type="number" min="0" />
+                <select v-model="form.employeeCount" class="form-select">
+                  <option
+                    v-for="opt in EMPLOYEE_COUNT_OPTIONS"
+                    :key="opt.value || 'empty'"
+                    :value="opt.value"
+                  >
+                    {{ opt.label }}
+                  </option>
+                </select>
               </div>
 
               <div class="form-group">

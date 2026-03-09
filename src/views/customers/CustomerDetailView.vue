@@ -53,6 +53,13 @@ const statusLabels: Record<CustomerStatus, string> = {
   BLACKLISTED: 'Kara Liste'
 }
 
+/** Backend’de üst sınır olarak saklanan çalışan sayısını aralık etiketine çevirir */
+function formatEmployeeCount(n: number | undefined | null): string {
+  if (n == null) return '-'
+  const map: Record<number, string> = { 20: '1-20', 200: '21-200', 500: '201-500', 9999: '501+' }
+  return map[n] ?? String(n)
+}
+
 const creditRatingLabels: Record<CreditRating, string> = {
   EXCELLENT: 'Çok İyi',
   GOOD: 'İyi',
@@ -84,8 +91,8 @@ async function fetchLicenseClasses() {
 async function fetchCustomer() {
   loading.value = true
   try {
+    await fetchLicenseClasses()
     customer.value = await customersApi.getById(customerId.value)
-    fetchLicenseClasses()
     fetchDrivers()
     fetchStats()
   } catch {
@@ -466,7 +473,7 @@ onMounted(fetchCustomer)
             </div>
             <div class="info-item">
               <span class="label">Çalışan Sayısı</span>
-              <span class="value">{{ customer.companyInfo?.employeeCount ?? customer.employeeCount ?? '-' }}</span>
+              <span class="value">{{ formatEmployeeCount(customer.companyInfo?.employeeCount ?? customer.employeeCount ?? undefined) }}</span>
             </div>
             <div class="info-item">
               <span class="label">Ticaret Sicil No</span>

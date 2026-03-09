@@ -110,6 +110,7 @@ export interface PersonalInfo {
     licenseNumber: string
     licenseClass?: string
     licenseClassName?: string
+    licenseClassId?: number
     licenseExpiryDate: string
 }
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { customersApi } from '@/api'
+import { customersApi, referenceDataApi } from '@/api'
 import { useValidation, rules, useToast } from '@/composables'
 import { SearchableSelect } from '@/components/common'
 import DatePicker from '@/components/base/DatePicker.vue'
@@ -55,7 +55,16 @@ const formRules = computed(() => ({
   }
 }))
 
-const licenseClassOptions = ['A1', 'A2', 'A', 'B1', 'B', 'BE', 'C1', 'C1E', 'C', 'CE', 'D1', 'D1E', 'D', 'DE'].map(cls => ({ value: cls, label: cls }))
+const licenseClassOptions = ref<{ value: string; label: string }[]>([])
+
+async function fetchLicenseClasses() {
+  try {
+    const list = await referenceDataApi.getLicenseClasses()
+    licenseClassOptions.value = list.map(lc => ({ value: lc.code, label: lc.code }))
+  } catch {
+    licenseClassOptions.value = []
+  }
+}
 
 async function handleSubmit() {
   if (!validateForm(formRules.value)) {
@@ -121,6 +130,7 @@ function handlePhoneInput(event: Event) {
 watch(() => props.visible, (isVisible) => {
   if (isVisible) {
     resetForm()
+    fetchLicenseClasses()
   }
 })
 </script>
