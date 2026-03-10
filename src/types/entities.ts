@@ -23,6 +23,7 @@ import type {
     TollStatus,
     TollSource
 } from './enums'
+import type { PenaltyResponse } from './penalties'
 
 
 export interface User {
@@ -696,6 +697,23 @@ export interface ReturnPreviewResponse {
 export interface RentalPaymentSummaryResponse {
     totalPaid: number
     currency: string
+}
+
+/** Kiralama detay sayfası için tek istekte dönen toplu yanıt (backend GET /rentals/:id/detail) */
+export interface RentalDetailResponse {
+    rental: Rental
+    vehicle: Vehicle | null
+    customer: Customer | null
+    branch: Branch | null
+    returnBranch: Branch | null
+    kmPackage: KmPackage | null
+    drivers: RentalDriver[]
+    paymentSummary: RentalPaymentSummaryResponse
+    payments: Payment[]
+    extraItems: RentalExtraItem[]
+    penalties: PenaltyResponse[]
+    damages: DamageReport[]
+    tolls: TollRecord[]
 }
 
 export interface TollRecord {

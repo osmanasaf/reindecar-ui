@@ -207,7 +207,24 @@ const selectedKmPackage = computed(() => {
 })
 
 const baseTotal = computed(() => priceData.value?.finalTotal || 0)
-const subtotalWithExtras = computed(() => baseTotal.value + extraItemsTotal.value)
+
+/** Ek kalem toplamı: hem @total-changed ile gelen değer hem de extraItems listesinden hesaplanan değer kullanılır; özet her zaman listeye göre hesaplansın diye listeyi kullanıyoruz. */
+const effectiveTermMonths = computed(() => (isLeasing.value ? selectedTermMonths.value : 1))
+function calcExtraItemTotal(item: RentalExtraItem): number {
+  switch (item.calculationType) {
+    case 'PER_MONTH':
+      return item.amount * effectiveTermMonths.value
+    case 'FIXED':
+    case 'PERCENTAGE':
+    default:
+      return item.amount
+  }
+}
+const extraItemsTotalComputed = computed(() =>
+  extraItems.value.reduce((sum, item) => sum + calcExtraItemTotal(item), 0)
+)
+
+const subtotalWithExtras = computed(() => baseTotal.value + extraItemsTotalComputed.value)
 const rawDiscount = computed(() => Math.max(0, discountAmount.value || 0))
 const appliedDiscountAmount = computed(() => Math.min(rawDiscount.value, subtotalWithExtras.value))
 const finalTotalWithDiscount = computed(() => Math.max(0, subtotalWithExtras.value - appliedDiscountAmount.value))
@@ -590,28 +607,29 @@ onMounted(() => {
                 <span>Özel Fazla KM</span>
                 <strong>{{ formatCurrency(customExtraKmPrice) }}/KM</strong>
               </div>
-              <div class="summary-row">
-                <span>Teslim Şubesi</span>
-                <div class="branch-selector-inline">
-                  <SearchableSelect
-                    v-model="selectedBranchId"
-                    :options="branchOptions"
-                    placeholder="Şube seçiniz"
-                    search-placeholder="Şube ara..."
-                    class="branch-select-searchable"
-                  />
-                </div>
-              </div>
-              <div class="summary-row">
-                <span>İade Şubesi</span>
-                <div class="branch-selector-inline">
-                  <SearchableSelect
-                    v-model="selectedReturnBranchId"
-                    :options="branchOptions"
-                    placeholder="Şube seçiniz"
-                    search-placeholder="Şube ara..."
-                    class="branch-select-searchable"
-                  />
+              <div class="summary-section summary-section--branches">
+                <h5 class="summary-section-title">Şubeler</h5>
+                <div class="branch-fields">
+                  <div class="branch-field">
+                    <label class="branch-label">Teslim Şubesi</label>
+                    <SearchableSelect
+                      v-model="selectedBranchId"
+                      :options="branchOptions"
+                      placeholder="Şube seçiniz"
+                      search-placeholder="Şube ara..."
+                      class="branch-select-searchable"
+                    />
+                  </div>
+                  <div class="branch-field">
+                    <label class="branch-label">İade Şubesi</label>
+                    <SearchableSelect
+                      v-model="selectedReturnBranchId"
+                      :options="branchOptions"
+                      placeholder="Şube seçiniz"
+                      search-placeholder="Şube ara..."
+                      class="branch-select-searchable"
+                    />
+                  </div>
                 </div>
               </div>
               <div v-if="extraItems.length > 0" class="summary-row">
@@ -667,7 +685,7 @@ onMounted(() => {
                 </div>
                 <div class="summary-row">
                   <span>Ek Kalemler</span>
-                  <strong>{{ formatCurrency(extraItemsTotal) }}</strong>
+                  <strong>{{ formatCurrency(extraItemsTotalComputed) }}</strong>
                 </div>
                 <div v-if="appliedDiscountAmount > 0" class="summary-row">
                   <span>İndirim</span>
@@ -954,9 +972,48 @@ onMounted(() => {
   color: var(--color-text-secondary);
 }
 
+.summary-section {
+  margin-top: 12px;
+}
+
+.summary-section:first-of-type {
+  margin-top: 0;
+}
+
+.summary-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin: 0 0 8px 0;
+}
+
+.summary-section--branches .branch-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  width: 100%;
+  max-width: 100%;
+}
+
 .branch-selector-inline {
   flex: 1;
   text-align: right;
+}
+
+.branch-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.branch-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+.branch-field :deep(.branch-select-searchable) {
+  min-width: 0;
 }
 
 .branch-select {
@@ -1298,6 +1355,11 @@ onMounted(() => {
   
   .summary-grid {
     grid-template-columns: 1fr;
+  }
+  
+  .summary-section--branches .branch-fields {
+    grid-template-columns: 1fr;
+    max-width: none;
   }
   
   .form-grid {

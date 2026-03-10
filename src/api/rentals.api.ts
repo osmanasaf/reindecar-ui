@@ -4,6 +4,7 @@ import type {
     PaginationParams,
     Rental,
     RentalDriver,
+    RentalDetailResponse,
     KmPackage,
     CreateRentalForm,
     VehicleDeliveryForm,
@@ -33,6 +34,11 @@ class RentalsApiService extends BaseApi {
 
     async getById(id: number): Promise<Rental> {
         return this.get(`/${id}`)
+    }
+
+    /** Tek istekte kiralama + araç, müşteri, şubeler, sürücüler, ödemeler, ek kalemler, cezalar, hasar, geçiş */
+    async getDetail(id: number): Promise<RentalDetailResponse> {
+        return this.get(`/${id}/detail`)
     }
 
     async getPaymentSummary(id: number): Promise<import('@/types').RentalPaymentSummaryResponse> {

@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onActivated, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { rentalsApi, vehiclesApi, customersApi, branchesApi, kmPackagesApi, paymentApi, penaltiesApi, damagesApi, tollsApi } from '@/api'
+import { rentalsApi, customersApi } from '@/api'
 import { useToast } from '@/composables'
 import ReturnCompleteModal from '@/components/rentals/ReturnCompleteModal.vue'
 import CreateDamageForm from '@/components/vehicles/CreateDamageForm.vue'
 import DamageDetailModal from '@/components/vehicles/DamageDetailModal.vue'
 import CreatePenaltyModal from '@/components/penalties/CreatePenaltyModal.vue'
 import CreateTollModal from '@/components/tolls/CreateTollModal.vue'
-import type { Rental, RentalStatus, RentalType, Vehicle, Customer, Branch, RentalDriver, KmPackage, Driver, Payment, PenaltyResponse, DamageReport, TollRecord, DamageHistoryItem } from '@/types'
+import type { Rental, RentalStatus, RentalType, Vehicle, Customer, Branch, RentalDriver, KmPackage, Driver, Payment, PenaltyResponse, DamageReport, TollRecord, DamageHistoryItem, RentalExtraItem } from '@/types'
 import DocumentsSection from '@/components/shared/DocumentsSection.vue'
 
 const route = useRoute()
@@ -49,6 +49,8 @@ const showCreateDamageForm = ref(false)
 const selectedDamage = ref<DamageReport | null>(null)
 const showCreatePenaltyModal = ref(false)
 const showCreateTollModal = ref(false)
+
+const rentalExtraItems = ref<RentalExtraItem[]>([])
 
 const rentalId = computed(() => Number(route.params.id))
 const closingRental = ref(false)
@@ -174,6 +176,28 @@ const grandTotal = computed(() => {
   return total + extraKm - discount + penaltyTotalAmount.value + damageTotalAmount.value + tollTotalAmount.value
 })
 
+function getExtraItemTotal(item: RentalExtraItem): number {
+  if (item.calculatedTotal != null) return Number(item.calculatedTotal)
+  const r = rental.value
+  if (!r) return item.amount ?? 0
+  switch (item.calculationType) {
+    case 'PER_MONTH': {
+      const months = Math.ceil((r.totalDays || 0) / 30) || 1
+      return (item.amount ?? 0) * months
+    }
+    case 'FIXED':
+    case 'PERCENTAGE':
+    default:
+      return item.amount ?? 0
+  }
+}
+
+const safeRentalExtraItems = computed(() => rentalExtraItems.value ?? [])
+
+const extraItemsTotalDisplay = computed(() =>
+  safeRentalExtraItems.value.reduce((sum, item) => sum + getExtraItemTotal(item), 0)
+)
+
 const remainingAmount = computed(() => {
   return Math.max(0, grandTotal.value - totalPaid.value)
 })
@@ -214,143 +238,25 @@ const filteredCustomerDrivers = computed(() => {
 async function fetchRental() {
   loading.value = true
   try {
-    rental.value = await rentalsApi.getById(rentalId.value)
-    await Promise.all([
-      fetchRelatedData(),
-      fetchDrivers(),
-      fetchPayments(),
-      fetchPaymentSummary(),
-      fetchPenalties(),
-      fetchDamages(),
-      fetchTolls()
-    ])
+    const detail = await rentalsApi.getDetail(rentalId.value)
+    rental.value = detail.rental
+    vehicle.value = detail.vehicle ?? null
+    customer.value = detail.customer ?? null
+    branch.value = detail.branch ?? null
+    returnBranch.value = detail.returnBranch ?? null
+    kmPackage.value = detail.kmPackage ?? null
+    drivers.value = detail.drivers ?? []
+    paymentSummary.value = detail.paymentSummary ?? null
+    payments.value = detail.payments ?? []
+    rentalExtraItems.value = detail.extraItems ?? []
+    penalties.value = detail.penalties ?? []
+    damages.value = detail.damages ?? []
+    tolls.value = detail.tolls ?? []
   } catch {
     toast.error('Kiralama bilgileri yüklenemedi')
     router.push('/rentals')
   } finally {
     loading.value = false
-  }
-}
-
-async function fetchRelatedData() {
-  if (!rental.value) return
-
-  const promises: Promise<void>[] = []
-
-  if (rental.value.vehicleId && !rental.value.vehicle) {
-    promises.push(
-      vehiclesApi.getById(rental.value.vehicleId)
-        .then(v => { vehicle.value = v })
-        .catch(() => { vehicle.value = null })
-    )
-  } else if (rental.value.vehicle) {
-    vehicle.value = rental.value.vehicle
-  }
-
-  if (rental.value.customerId && !rental.value.customer) {
-    promises.push(
-      customersApi.getById(rental.value.customerId)
-        .then(c => { customer.value = c })
-        .catch(() => { customer.value = null })
-    )
-  } else if (rental.value.customer) {
-    customer.value = rental.value.customer
-  }
-
-  if (rental.value.branchId && !rental.value.branch) {
-    promises.push(
-      branchesApi.getById(rental.value.branchId)
-        .then(b => { branch.value = b })
-        .catch(() => { branch.value = null })
-    )
-  } else if (rental.value.branch) {
-    branch.value = rental.value.branch
-  }
-
-  if (rental.value.returnBranchId && !rental.value.returnBranch) {
-    promises.push(
-      branchesApi.getById(rental.value.returnBranchId)
-        .then(b => { returnBranch.value = b })
-        .catch(() => { returnBranch.value = null })
-    )
-  } else if (rental.value.returnBranch) {
-    returnBranch.value = rental.value.returnBranch
-  }
-
-  if (rental.value.kmPackageId) {
-    promises.push(
-      kmPackagesApi.getById(rental.value.kmPackageId)
-        .then(p => { kmPackage.value = p })
-        .catch(() => { kmPackage.value = null })
-    )
-  }
-
-  await Promise.all(promises)
-}
-
-async function fetchDrivers() {
-  if (!rental.value) return
-  try {
-    drivers.value = await rentalsApi.getDrivers(rental.value.id)
-  } catch {
-    drivers.value = []
-  }
-}
-
-async function fetchPayments() {
-  if (!rental.value) return
-  loadingPayments.value = true
-  try {
-    payments.value = await paymentApi.getByRentalId(rental.value.id)
-  } catch {
-    payments.value = []
-  } finally {
-    loadingPayments.value = false
-  }
-}
-
-async function fetchPaymentSummary() {
-  if (!rental.value) return
-  try {
-    paymentSummary.value = await rentalsApi.getPaymentSummary(rental.value.id)
-  } catch {
-    paymentSummary.value = null
-  }
-}
-
-async function fetchPenalties() {
-  if (!rental.value || !showPenaltiesAndDamages.value) return
-  loadingPenalties.value = true
-  try {
-    penalties.value = await penaltiesApi.getByRental(rental.value.id)
-  } catch {
-    penalties.value = []
-  } finally {
-    loadingPenalties.value = false
-  }
-}
-
-async function fetchDamages() {
-  if (!rental.value || !showPenaltiesAndDamages.value) return
-  loadingDamages.value = true
-  try {
-    damages.value = await damagesApi.getRentalDamages(rental.value.id)
-  } catch {
-    damages.value = []
-  } finally {
-    loadingDamages.value = false
-  }
-}
-
-async function fetchTolls() {
-  if (!rental.value || !showPenaltiesAndDamages.value) return
-  loadingTolls.value = true
-  try {
-    tolls.value = await tollsApi.getByRental(rental.value.id)
-  } catch {
-    tolls.value = []
-  } finally {
-    loadingTolls.value = false
   }
 }
 
@@ -369,21 +275,19 @@ function damageForModal(d: DamageReport | null): DamageHistoryItem | null {
 
 function handleDamageCreated() {
   showCreateDamageForm.value = false
-  fetchDamages()
+  fetchRental()
 }
 
 function handlePenaltyCreated() {
   showCreatePenaltyModal.value = false
-  if (rental.value?.id) {
-    fetchPenalties().catch(err => {
-      toast.apiError(err, 'Ceza listesi yenilenemedi')
-    })
-  }
+  fetchRental().catch(err => {
+    toast.apiError(err, 'Ceza listesi yenilenemedi')
+  })
 }
 
 function handleTollCreated() {
   showCreateTollModal.value = false
-  fetchTolls()
+  fetchRental()
 }
 
 async function fetchCustomerDrivers() {
@@ -416,7 +320,7 @@ async function addDriver() {
     newDriverId.value = null
     selectedDriverId.value = null
     driverSearch.value = ''
-    fetchDrivers()
+    fetchRental()
   } catch (err) {
     toast.apiError(err, 'Sürücü eklenemedi')
   }
@@ -428,7 +332,7 @@ async function removeDriver(driverId: number) {
   try {
     await rentalsApi.removeDriver(rental.value.id, driverId)
     toast.success('Sürücü kaldırıldı')
-    fetchDrivers()
+    fetchRental()
   } catch (err) {
     toast.apiError(err, 'İşlem başarısız')
   }
@@ -439,7 +343,7 @@ async function setPrimaryDriver(driverId: number) {
   try {
     await rentalsApi.setPrimaryDriver(rental.value.id, driverId)
     toast.success('Ana sürücü güncellendi')
-    fetchDrivers()
+    fetchRental()
   } catch (err) {
     toast.apiError(err, 'İşlem başarısız')
   }
@@ -587,15 +491,15 @@ watch(showDriverModal, (isOpen) => {
   }
 })
 
-const hasMounted = ref(false)
+const lastFetchedRentalId = ref<number | null>(null)
 onMounted(async () => {
   await fetchRental()
-  hasMounted.value = true
+  lastFetchedRentalId.value = rentalId.value
 })
 
 onActivated(() => {
-  if (hasMounted.value && rental.value?.id === rentalId.value) {
-    fetchRental()
+  if (lastFetchedRentalId.value !== rentalId.value) {
+    fetchRental().then(() => { lastFetchedRentalId.value = rentalId.value })
   }
 })
 </script>
@@ -1003,6 +907,10 @@ onActivated(() => {
               <div class="price-item">
                 <span class="label">Ara Toplam</span>
                 <span class="value">{{ formatCurrency(rental.totalPrice) }}</span>
+              </div>
+              <div v-if="safeRentalExtraItems.length > 0" class="price-item">
+                <span class="label">Ek Kalemler ({{ safeRentalExtraItems.length }} kalem)</span>
+                <span class="value">{{ formatCurrency(extraItemsTotalDisplay) }}</span>
               </div>
               <div v-if="rental.discountAmount > 0" class="price-item discount">
                 <span class="label">İndirim</span>
