@@ -109,7 +109,6 @@ class FilesApiService extends BaseApi {
 
     async getPresignedUrl(id: number): Promise<string> {
         const result = await this.get<string>(`/${id}/presigned-url`)
-        // Backend returns URL in data; handle both direct string and wrapped shape
         if (typeof result === 'string') return result
         const obj = result as { data?: string; message?: string } | null
         return obj?.data ?? obj?.message ?? ''
@@ -119,10 +118,6 @@ class FilesApiService extends BaseApi {
         return this.remove(`/${id}`)
     }
 
-    /**
-     * Opens file in a new tab. Uses a temporary link so only one tab opens
-     * with the content directly (no blank page, no double tab).
-     */
     async openFile(id: number): Promise<void> {
         const url = await this.getPresignedUrl(id)
         const urlStr = typeof url === 'string' ? url : ''

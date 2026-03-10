@@ -5,7 +5,6 @@ import { tr } from 'date-fns/locale'
 import '@vuepic/vue-datepicker/dist/main.css'
 
 interface Props {
-  /** YYYY-MM-DD; filtre gibi opsiyonel kullanımda boş/undefined olabilir */
   modelValue: string | undefined
   min?: string
   max?: string
@@ -68,10 +67,11 @@ function onUpdateModelValue(value: Date | null) {
       :disabled="disabled"
       :locale="tr"
       format="dd.MM.yyyy"
+      :formats="{ input: 'dd.MM.yyyy', preview: 'dd.MM.yyyy' }"
       :enable-time-picker="false"
       auto-apply
-      :teleport="true"
-      class="date-picker-input"
+      :teleport="false"
+      class="date-picker-input date-picker-date-only"
       @update:model-value="onUpdateModelValue"
       @closed="emit('closed')"
     />
@@ -92,14 +92,12 @@ function onUpdateModelValue(value: Date | null) {
   color: var(--color-text);
 }
 
-/* Proje variables.css ile uyumlu tema */
 .date-picker-wrap :deep(.dp__input) {
   background-color: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   color: var(--color-text);
   font-size: var(--font-size-sm);
-  /* Sol padding: takvim ikonu (≈28px) + boşluk; metin ikonla çakışmasın */
   padding: 10px 14px 10px 40px;
   transition: border-color var(--transition-fast);
 }
@@ -150,5 +148,15 @@ function onUpdateModelValue(value: Date | null) {
 
 .date-picker-wrap :deep(.dp__input_icon) {
   color: var(--color-text-muted);
+}
+
+.date-picker-wrap :deep(.dp--tp-wrap > button:first-of-type) {
+  display: none !important;
+}
+</style>
+
+<style>
+.dp__menu .dp--tp-wrap > button:first-of-type {
+  display: none !important;
 }
 </style>
