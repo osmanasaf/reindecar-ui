@@ -5,11 +5,18 @@ import { useEnumTranslations } from '@/composables'
 import { formatCurrency, formatDate } from '@/utils/format'
 import { formatPhoneInput } from '@/utils/phone'
 
-interface Props {
-  insurance: VehicleInsuranceResponse
-}
+const props = withDefaults(
+  defineProps<{
+    insurance: VehicleInsuranceResponse
+    disabled?: boolean
+  }>(),
+  { disabled: false }
+)
 
-const props = defineProps<Props>()
+const emit = defineEmits<{
+  activate: [id: number]
+  deactivate: [id: number]
+}>()
 
 const { translateInsuranceType } = useEnumTranslations()
 
@@ -99,6 +106,27 @@ const borderColor = computed(() => {
 
       <div v-if="insurance.notes" class="notes-row">
         <span class="notes-text">{{ insurance.notes }}</span>
+      </div>
+
+      <div class="card-actions">
+        <button
+          v-if="insurance.active"
+          type="button"
+          class="btn btn-outline btn-sm"
+          :disabled="disabled"
+          @click="emit('deactivate', insurance.id)"
+        >
+          Pasife al
+        </button>
+        <button
+          v-else
+          type="button"
+          class="btn btn-primary btn-sm"
+          :disabled="disabled"
+          @click="emit('activate', insurance.id)"
+        >
+          Aktife al
+        </button>
       </div>
     </div>
   </div>
@@ -285,5 +313,50 @@ const borderColor = computed(() => {
   color: var(--color-text-secondary, #6b7280);
   line-height: 1.5;
   font-style: italic;
+}
+
+.card-actions {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--color-border, #e5e7eb);
+}
+
+.btn {
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+}
+
+.btn-sm {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.75rem;
+}
+
+.btn-outline {
+  background: transparent;
+  border: 1px solid var(--color-border, #e5e7eb);
+  color: var(--color-text, #374151);
+}
+
+.btn-outline:hover {
+  background: var(--color-bg-secondary, #f3f4f6);
+}
+
+.btn-primary {
+  background: var(--color-primary, #2563eb);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: var(--color-primary-hover, #1d4ed8);
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 </style>

@@ -10,6 +10,8 @@ import MaintenanceDetailModal from './MaintenanceDetailModal.vue'
 
 const props = defineProps<{
   vehicleId: number
+  /** Aracın o anki km'si; yeni bakım formunda Güncel KM alanına otomatik doldurulur. */
+  initialCurrentKm?: number
 }>()
 
 const toast = useToast()
@@ -336,6 +338,7 @@ onMounted(() => {
     <CreateMaintenanceForm
       v-if="showCreateForm"
       :vehicle-id="vehicleId"
+      :initial-current-km="initialCurrentKm"
       @close="showCreateForm = false"
       @created="handleMaintenanceCreated"
     />

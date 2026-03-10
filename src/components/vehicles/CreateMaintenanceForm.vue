@@ -10,6 +10,8 @@ import type { CreateMaintenanceRecordForm, ServiceProvider } from '@/types'
 
 const props = defineProps<{
   vehicleId: number
+  /** Aracın o anki km'si; verilirse form açıldığında Güncel KM alanı buna göre doldurulur (isteğe bağlı değiştirilebilir). */
+  initialCurrentKm?: number
 }>()
 
 const emit = defineEmits<{
@@ -27,7 +29,7 @@ const form = ref<CreateMaintenanceRecordForm>({
   vehicleId: props.vehicleId,
   maintenanceType: MaintenanceType.SERVICE,
   maintenanceDate: new Date().toISOString().split('T')[0],
-  currentKm: 0,
+  currentKm: props.initialCurrentKm ?? 0,
   costAmount: undefined,
   costCurrency: 'TRY',
   serviceProviderId: undefined,
@@ -136,13 +138,17 @@ function finishWithDocuments() {
 
 onMounted(async () => {
   fetchServiceProviders()
+  const kmFromParent = props.initialCurrentKm
+  if (kmFromParent != null && kmFromParent >= 0) {
+    form.value.currentKm = kmFromParent
+  }
   try {
     const v = await vehiclesApi.getById(props.vehicleId)
     if (v?.currentKm != null) {
       form.value.currentKm = v.currentKm
     }
   } catch {
-    // keep default 0
+    // initialCurrentKm veya 0 kalsın
   }
 })
 </script>

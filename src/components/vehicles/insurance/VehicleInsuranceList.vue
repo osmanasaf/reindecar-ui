@@ -5,11 +5,9 @@ import { useToast } from '@/composables'
 import type { VehicleInsuranceResponse } from '@/types'
 import VehicleInsuranceCard from './VehicleInsuranceCard.vue'
 
-interface Props {
+const props = defineProps<{
   vehicleId: number
-}
-
-const props = defineProps<Props>()
+}>()
 
 const emit = defineEmits<{
   createNew: []
@@ -19,6 +17,7 @@ const toast = useToast()
 const insurances = ref<VehicleInsuranceResponse[]>([])
 const loading = ref(true)
 const showAll = ref(false)
+const actionLoadingId = ref<number | null>(null)
 
 const activeInsurances = computed(() => {
   return insurances.value.filter(ins => ins.active)
@@ -31,9 +30,8 @@ const displayInsurances = computed(() => {
 const loadInsurances = async () => {
   loading.value = true
   try {
-    insurances.value = showAll.value 
-      ? await vehicleInsurancesApi.getAllByVehicle(props.vehicleId)
-      : await vehicleInsurancesApi.getByVehicle(props.vehicleId)
+    // Her zaman tüm poliçeleri (aktif + pasif) çek; filtreleme gösterimde yapılıyor
+    insurances.value = await vehicleInsurancesApi.getAllByVehicle(props.vehicleId)
   } catch (error: any) {
     toast.error(error.message || 'Sigorta poliçeleri yüklenemedi')
   } finally {
@@ -41,9 +39,38 @@ const loadInsurances = async () => {
   }
 }
 
-const handleToggleShowAll = async () => {
+const handleToggleShowAll = () => {
   showAll.value = !showAll.value
-  await loadInsurances()
+}
+
+async function handleActivate(id: number) {
+  if (actionLoadingId.value !== null) return
+  actionLoadingId.value = id
+  try {
+    await vehicleInsurancesApi.activate(id)
+    toast.success('Poliçe aktif edildi')
+    await loadInsurances()
+  } catch (err: unknown) {
+    toast.apiError(err, 'Poliçe aktif edilemedi')
+  } finally {
+    actionLoadingId.value = null
+  }
+}
+
+async function handleDeactivate(id: number) {
+  if (actionLoadingId.value !== null) return
+  const confirmed = window.confirm('Bu poliçeyi pasife almak istediğinize emin misiniz? Listede pasif olarak görünecektir.')
+  if (!confirmed) return
+  actionLoadingId.value = id
+  try {
+    await vehicleInsurancesApi.deactivate(id)
+    toast.success('Poliçe pasife alındı')
+    await loadInsurances()
+  } catch (err: unknown) {
+    toast.apiError(err, 'Poliçe pasife alınamadı')
+  } finally {
+    actionLoadingId.value = null
+  }
 }
 
 onMounted(() => {
@@ -110,6 +137,9 @@ defineExpose({
         v-for="insurance in displayInsurances"
         :key="insurance.id"
         :insurance="insurance"
+        :disabled="actionLoadingId !== null"
+        @activate="handleActivate"
+        @deactivate="handleDeactivate"
       />
     </div>
   </div>

@@ -290,6 +290,10 @@ class VehicleInsurancesApiService extends BaseApi {
     return this.post('', payload)
   }
 
+  async activate(id: number): Promise<void> {
+    return this.put(`/${id}/activate`)
+  }
+
   async deactivate(id: number): Promise<void> {
     return this.remove(`/${id}`)
   }

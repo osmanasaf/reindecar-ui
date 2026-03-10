@@ -35,6 +35,7 @@ const selectedModelId = ref<number | null>(null)
 const selectedColorId = ref<number | null>(null)
 const models = ref<CarModel[]>([])
 const modelsLoading = ref(false)
+const isPopulatingForEdit = ref(false)
 
 const form = ref<UpdateVehicleForm>({
   plateNumber: '',
@@ -108,6 +109,7 @@ watch(selectedBrandId, async (brandId) => {
   }
   const b = brands.value.find(x => x.id === brandId)
   form.value.brand = b ? b.name : ''
+  if (isPopulatingForEdit.value) return
   modelsLoading.value = true
   try {
     models.value = await loadModelsByBrand(brandId)
@@ -170,6 +172,7 @@ async function fetchVehicle() {
   if (!props.vehicleId) return
 
   loading.value = true
+  isPopulatingForEdit.value = true
   try {
     await Promise.all([loadBrands(), loadColors()])
     const vehicle = await vehiclesApi.getById(props.vehicleId)
@@ -178,6 +181,7 @@ async function fetchVehicle() {
     if (brandMatch) {
       selectedBrandId.value = brandMatch.id
       const modelsList = await loadModelsByBrand(brandMatch.id)
+      models.value = modelsList
       const modelMatch = modelsList.find(m => m.name === vehicle.model)
       if (modelMatch) selectedModelId.value = modelMatch.id
     }
@@ -210,6 +214,7 @@ async function fetchVehicle() {
     emit('close')
   } finally {
     loading.value = false
+    isPopulatingForEdit.value = false
   }
 }
 
