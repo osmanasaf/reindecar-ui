@@ -36,6 +36,8 @@ export interface VehicleInstallmentResponse {
     outstandingBalance: number
     outstandingCurrency: string
     nextPaymentDueDate: string
+    /** Taksit erken kapatıldıysa bu tarih dolu olur */
+    earlyClosedAt?: string | null
 }
 
 export interface PaymentDashboardResponse {

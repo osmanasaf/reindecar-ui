@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useInstallmentStore } from '@/stores/installment.store'
-import { formatCurrency, calculateProgress } from '@/utils/installmentHelpers'
+import { formatCurrency, formatDate, calculateProgress } from '@/utils/installmentHelpers'
 import PaymentScheduleTable from './PaymentScheduleTable.vue'
 import InstallmentForm from './InstallmentForm.vue'
 import CloseInstallmentEarlyModal from './CloseInstallmentEarlyModal.vue'
@@ -24,6 +24,39 @@ const paidCount = computed(() => payments.value.filter((p: any) => p.status === 
 const progress = computed(() => {
   if (!installment.value) return 0
   return calculateProgress(paidCount.value, installment.value.numberOfInstallments)
+})
+
+function isInvalidOrEpochDate(date: string | number | null | undefined): boolean {
+  if (date === null || date === undefined) return true
+  if (typeof date === 'string' && (date === '' || date.startsWith('1970-01-01') || date.startsWith('1970'))) return true
+  if (typeof date === 'number' && (date === 0 || date < 86400000)) return true
+  const d = new Date(date as string)
+  if (Number.isNaN(d.getTime())) return true
+  const y = d.getUTCFullYear()
+  return y < 1980 || y === 1970
+}
+
+const isCompleted = computed(() => {
+  if (!installment.value) return false
+  const rem = Number(installment.value.remainingInstallments)
+  const bal = Number(installment.value.outstandingBalance ?? 0)
+  return rem === 0 || bal <= 0
+})
+
+const nextPaymentDisplay = computed(() => {
+  if (!installment.value) return '—'
+  if (isCompleted.value) return 'Tamamlandı'
+  const date = installment.value.nextPaymentDueDate
+  if (isInvalidOrEpochDate(date ?? undefined)) return '—'
+  return formatDate(date)
+})
+
+const remainingDisplay = computed(() => {
+  if (!installment.value) return '0 / 0'
+  const total = Number(installment.value.numberOfInstallments) || 0
+  const rem = Number(installment.value.remainingInstallments) ?? 0
+  if (rem === 0 || Number(installment.value.outstandingBalance ?? 0) <= 0) return `${total} / ${total}`
+  return `${rem} / ${total}`
 })
 
 onMounted(async () => {
@@ -77,7 +110,7 @@ function handleCloseSuccess(): void {
           </div>
           <div class="summary-item">
             <span class="label">Kalan Taksit</span>
-            <span class="value">{{ installment.remainingInstallments }} / {{ installment.numberOfInstallments }}</span>
+            <span class="value">{{ remainingDisplay }}</span>
           </div>
           <div class="summary-item">
             <span class="label">Kalan Bakiye</span>
@@ -93,7 +126,7 @@ function handleCloseSuccess(): void {
           </div>
           <div class="summary-item highlight">
             <span class="label">Sonraki Ödeme</span>
-            <span class="value next-payment">{{ new Date(installment.nextPaymentDueDate).toLocaleDateString('tr-TR') }}</span>
+            <span class="value next-payment">{{ nextPaymentDisplay }}</span>
           </div>
         </div>
         <div class="progress-bar">

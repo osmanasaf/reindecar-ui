@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { installmentsApi, vehiclesApi } from '@/api'
 import { useToast } from '@/composables'
 import type { VehicleInstallmentResponse, Vehicle } from '@/types'
-import { formatCurrency, calculateProgress } from '@/utils/installmentHelpers'
+import { formatCurrency, formatDate, calculateProgress } from '@/utils/installmentHelpers'
 import PaymentScheduleTable from '@/components/installments/PaymentScheduleTable.vue'
 import InstallmentEarlyClosureModal from '@/components/InstallmentEarlyClosureModal.vue'
 import DocumentsSection from '@/components/shared/DocumentsSection.vue'
@@ -31,20 +31,44 @@ const progress = computed(() => {
   return calculateProgress(paid, total)
 })
 
+const isCompleted = computed(() => {
+  if (!installment.value) return false
+  const rem = Number(installment.value.remainingInstallments)
+  const bal = Number(installment.value.outstandingBalance)
+  return rem === 0 || bal <= 0
+})
+
 const displayPaidCount = computed(() => {
   if (!installment.value) return 0
   const total = installment.value.numberOfInstallments ?? 0
-  if (total > 0 && (installment.value.remainingInstallments === 0 || installment.value.outstandingBalance <= 0)) return total
+  if (total > 0 && isCompleted.value) return total
   return paidCount.value
 })
 
+const remainingDisplay = computed(() => {
+  if (!installment.value) return '0 / 0'
+  const total = Number(installment.value.numberOfInstallments) || 0
+  const rem = Number(installment.value.remainingInstallments) ?? 0
+  if (rem === 0 || Number(installment.value.outstandingBalance) <= 0) return `${total} / ${total}`
+  return `${rem} / ${total}`
+})
+
+function isInvalidOrEpochDate(date: string | number | null | undefined): boolean {
+  if (date === null || date === undefined) return true
+  if (typeof date === 'string' && (date === '' || date.startsWith('1970-01-01') || date.startsWith('1970'))) return true
+  if (typeof date === 'number' && (date === 0 || date < 86400000)) return true // 0 veya 1 günden küçük ms
+  const d = new Date(date as string)
+  if (Number.isNaN(d.getTime())) return true
+  const y = d.getUTCFullYear()
+  return y < 1980 || y === 1970
+}
+
 const nextPaymentDisplay = computed(() => {
-  if (installment.value?.remainingInstallments === 0) return 'Tamamlandı'
-  const date = installment.value?.nextPaymentDueDate
-  if (!date) return '—'
-  const d = new Date(date)
-  if (Number.isNaN(d.getTime()) || d.getFullYear() < 1980) return '—'
-  return d.toLocaleDateString('tr-TR')
+  if (!installment.value) return '—'
+  if (isCompleted.value) return 'Tamamlandı'
+  const date = installment.value.nextPaymentDueDate
+  if (isInvalidOrEpochDate(date ?? undefined)) return '—'
+  return new Date(date as string).toLocaleDateString('tr-TR')
 })
 
 const progressColor = computed(() => {
@@ -171,8 +195,8 @@ watch(() => route.params.id, loadInstallment)
         <div class="summary-item">
           <span class="label">Kalan Taksit</span>
           <span class="value">
-            {{ installment.remainingInstallments === 0 ? installment.numberOfInstallments : installment.remainingInstallments }} / {{ installment.numberOfInstallments }}
-            <span v-if="installment.remainingInstallments === 0" class="badge-done">(Tamamlandı)</span>
+            {{ remainingDisplay }}
+            <span v-if="isCompleted" class="badge-done">(Tamamlandı)</span>
           </span>
         </div>
         <div class="summary-item" :class="{ 'summary-item--warning': installment.outstandingBalance > 0 }">
@@ -182,6 +206,10 @@ watch(() => route.params.id, loadInstallment)
         <div class="summary-item">
           <span class="label">Sonraki Ödeme</span>
           <span class="value">{{ nextPaymentDisplay }}</span>
+        </div>
+        <div v-if="installment.earlyClosedAt" class="summary-item summary-item--highlight">
+          <span class="label">Erken kapatılma tarihi</span>
+          <span class="value">{{ formatDate(installment.earlyClosedAt) }}</span>
         </div>
       </div>
 
@@ -350,6 +378,11 @@ watch(() => route.params.id, loadInstallment)
 .summary-item--warning {
   border-color: #fcd34d;
   background: #fffbeb;
+}
+
+.summary-item--highlight {
+  border-color: #86efac;
+  background: #f0fdf4;
 }
 
 .summary-item .label {
