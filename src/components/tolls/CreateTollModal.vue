@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { tollsApi } from '@/api'
 import { useToast } from '@/composables'
 import { SearchableSelect } from '@/components/common'
+import DatePicker from '@/components/base/DatePicker.vue'
 import { TollType } from '@/types'
 import type { CreateTollRecordRequest } from '@/api'
 
@@ -30,7 +31,7 @@ const tollTypes = [
 
 const form = ref({
   tollType: TollType.HGS as TollType,
-  passageDate: new Date().toISOString().slice(0, 16),
+  passageDate: new Date().toISOString().slice(0, 10),
   passageLocation: '',
   tollAmount: null as number | null,
   hgsTagNumber: '',
@@ -50,7 +51,7 @@ async function handleSubmit() {
       vehicleId: props.vehicleId,
       customerId: props.customerId,
       tollType: form.value.tollType,
-      passageDate: form.value.passageDate,
+      passageDate: form.value.passageDate ? `${form.value.passageDate}T00:00:00` : '',
       passageLocation: form.value.passageLocation || undefined,
       tollAmount: form.value.tollAmount,
       hgsTagNumber: form.value.hgsTagNumber || undefined,
@@ -88,12 +89,10 @@ async function handleSubmit() {
           </div>
 
           <div class="form-group">
-            <label for="passageDate">Geçiş Tarihi *</label>
-            <input
-              id="passageDate"
-              type="datetime-local"
+            <DatePicker
               v-model="form.passageDate"
-              required
+              label="Geçiş Tarihi *"
+              placeholder="Tarih seçin"
             />
           </div>
 

@@ -617,6 +617,7 @@ onMounted(fetchCustomer)
                 <div class="driver-name">
                   {{ getDriverDisplayName(driver) }}
                   <span v-if="driver.primary" class="badge-primary">Ana Sürücü</span>
+                  <span v-if="driver.linkedToCustomer" class="badge-linked">Müşteri kartı</span>
                   <span v-if="!driver.active" class="badge-inactive">Pasif</span>
                   <span v-if="isLicenseExpired(driver.licenseExpiryDate)" class="badge-expired">Ehliyet süresi dolmuş</span>
                   <span v-else-if="isLicenseExpiringSoon(driver.licenseExpiryDate)" class="badge-expiring">Ehliyet süresi yaklaşıyor</span>
@@ -626,8 +627,11 @@ onMounted(fetchCustomer)
                   {{ driver.licenseNumber }} |
                   {{ formatDate(driver.licenseExpiryDate) }}
                 </div>
+                <p v-if="driver.linkedToCustomer" class="driver-linked-hint">
+                  Bu kart müşteri bilgileriyle eşitlenir; düzenlemek için müşteri bilgilerini güncelleyin.
+                </p>
               </div>
-              <div class="driver-actions">
+              <div v-if="!driver.linkedToCustomer" class="driver-actions">
                 <button class="btn-icon" @click="openEditModal(driver)" title="Düzenle">
                   Düzenle
                 </button>
@@ -1296,9 +1300,12 @@ onMounted(fetchCustomer)
 .driver-details {
   font-size: 13px;
   color: var(--color-text-secondary);
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
+}
+
+.driver-linked-hint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--color-text-muted);
 }
 
 .driver-actions {
@@ -1331,6 +1338,15 @@ onMounted(fetchCustomer)
   padding: 2px 8px;
   background: var(--color-success-light);
   color: var(--color-success);
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 4px;
+}
+
+.badge-linked {
+  padding: 2px 8px;
+  background: var(--color-info-light, #dbeafe);
+  color: var(--color-info, #2563eb);
   font-size: 11px;
   font-weight: 600;
   border-radius: 4px;

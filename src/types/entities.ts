@@ -466,6 +466,7 @@ export interface Driver {
     customerId?: number
     primary?: boolean
     active: boolean
+    linkedToCustomer?: boolean
     createdAt: string
 }
 
