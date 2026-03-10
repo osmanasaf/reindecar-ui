@@ -62,8 +62,6 @@ const form = ref<UpdateVehicleForm>({
 
 const currentYear = new Date().getFullYear()
 const minimumEditableKm = computed(() => originalVehicle.value?.currentKm ?? 0)
-const { validateForm, getError, hasError, touch, reset } = useValidation()
-
 const formRules = computed(() => ({
   plateNumber: { value: form.value.plateNumber, rules: [rules.required(), rules.plate()] },
   vinNumber: { value: form.value.vinNumber, rules: [rules.required(), rules.vin()] },
@@ -79,6 +77,7 @@ const formRules = computed(() => ({
   categoryId: { value: form.value.categoryId, rules: [rules.required()] },
   branchId: { value: form.value.branchId, rules: [rules.required('Şube seçiniz')] }
 }))
+const { validateForm, getError, hasError, touch, reset } = useValidation(() => formRules.value)
 
 const fuelTypeOptions = [
   { value: FuelType.GASOLINE, label: 'Benzin' },

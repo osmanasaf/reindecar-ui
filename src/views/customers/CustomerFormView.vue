@@ -199,7 +199,7 @@ function validateCompanyAuthorizedPersons(list: AuthorizedPerson[]): boolean {
   return true
 }
 
-const { validateForm, getError, hasError, touch, reset } = useValidation()
+const { validateForm, getError, hasError, touch, reset } = useValidation(() => formRules.value)
 
 
 const formRules = computed(() => {

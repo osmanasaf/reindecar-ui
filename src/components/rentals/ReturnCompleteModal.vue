@@ -36,8 +36,6 @@ const form = ref<{
 })
 
 const startKmRef = computed(() => rental.value?.startKm || 0)
-const { validateForm, getError, hasError, touch, reset } = useValidation()
-
 const minReturnDate = computed(() => rental.value?.startDate ?? '')
 const plannedEndDate = computed(() => rental.value?.endDate ?? '')
 
@@ -75,6 +73,8 @@ const inputRules = computed(() => ({
     ]
   }
 }))
+
+const { validateForm, getError, hasError, touch, reset } = useValidation(() => inputRules.value)
 
 const totalKm = computed(() => {
   if (!rental.value?.startKm) return 0

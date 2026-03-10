@@ -147,7 +147,7 @@ watch(selectedColorId, (colorId) => {
   form.value.color = c ? c.name : ''
 })
 
-const { validateForm, getError, hasError, touch } = useValidation()
+const { validateForm, getError, hasError, touch } = useValidation(() => formRules.value)
 
 const formRules = computed(() => ({
   plateNumber: { value: form.value.plateNumber, rules: [rules.required(), rules.plate()] },

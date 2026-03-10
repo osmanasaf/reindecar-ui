@@ -35,7 +35,7 @@ const form = ref({
   licenseExpiryDate: ''
 })
 
-const { validateForm, getError, hasError, touch, reset } = useValidation()
+const { validateForm, getError, hasError, touch, reset } = useValidation(() => formRules.value)
 
 const formRules = computed(() => ({
   firstName: { value: form.value.firstName, rules: [rules.required()] },

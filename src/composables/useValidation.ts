@@ -7,13 +7,93 @@ export interface ValidationRule {
 }
 
 export interface FieldValidation {
-    value: Ref<unknown>
+    value: Ref<unknown> | unknown
     rules: ValidationRule[]
 }
 
-export interface ValidationResult {
-    isValid: boolean
-    errors: string[]
+/** Form alanları getter ile verilirse validasyon değerlere göre anlık (reaktif) güncellenir. */
+export type ValidationFieldsGetter = () => Record<string, { value: unknown; rules: ValidationRule[] }>
+
+export function useValidation(getFields?: ValidationFieldsGetter) {
+    const touched = ref<Record<string, boolean>>({})
+    const errorsFromSubmit = ref<Record<string, string[]>>({})
+
+    function runRules(value: unknown, fieldRules: ValidationRule[]): string[] {
+        const fieldErrors: string[] = []
+        for (const rule of fieldRules) {
+            if (!rule.validate(value)) {
+                fieldErrors.push(rule.message)
+            }
+        }
+        return fieldErrors
+    }
+
+    const computedErrors = getFields
+        ? computed<Record<string, string[]>>(() => {
+            const fields = getFields()
+            const result: Record<string, string[]> = {}
+            for (const [name, field] of Object.entries(fields)) {
+                result[name] = runRules(field.value, field.rules)
+            }
+            return result
+        })
+        : null
+
+    const errors = computed(() => (computedErrors?.value != null ? computedErrors.value : errorsFromSubmit.value))
+
+    function validateField(name: string, value: unknown, fieldRules: ValidationRule[]): string[] {
+        const fieldErrors = runRules(value, fieldRules)
+        if (!getFields) {
+            errorsFromSubmit.value = { ...errorsFromSubmit.value, [name]: fieldErrors }
+        }
+        return fieldErrors
+    }
+
+    function validateForm(fields?: Record<string, { value: unknown; rules: ValidationRule[] }>): boolean {
+        const source = getFields ? getFields() : (fields ?? {})
+        for (const name of Object.keys(source)) {
+            touched.value = { ...touched.value, [name]: true }
+        }
+        if (!getFields && fields) {
+            const next: Record<string, string[]> = {}
+            for (const [name, field] of Object.entries(fields)) {
+                next[name] = runRules(field.value, field.rules)
+            }
+            errorsFromSubmit.value = next
+        }
+        return Object.values(errors.value).every(errs => errs.length === 0)
+    }
+
+    function touch(name: string) {
+        touched.value = { ...touched.value, [name]: true }
+    }
+
+    function reset() {
+        errorsFromSubmit.value = {}
+        touched.value = {}
+    }
+
+    function getError(name: string): string | undefined {
+        return touched.value[name] === true ? errors.value[name]?.[0] : undefined
+    }
+
+    function hasError(name: string): boolean {
+        return touched.value[name] === true && (errors.value[name]?.length ?? 0) > 0
+    }
+
+    const isValid = computed(() => Object.values(errors.value).every(errs => errs.length === 0))
+
+    return {
+        errors,
+        touched,
+        validateField,
+        validateForm,
+        touch,
+        reset,
+        getError,
+        hasError,
+        isValid
+    }
 }
 
 const TCKN_PATTERN = /^[1-9]\d{10}$/
@@ -171,71 +251,6 @@ export const rules = {
         },
         message: message || 'Değer belirtilen değerden büyük olmalıdır'
     })
-}
-
-export function useValidation() {
-    const errors = ref<Record<string, string[]>>({})
-    const touched = ref<Record<string, boolean>>({})
-
-    function validateField(name: string, value: unknown, fieldRules: ValidationRule[]): string[] {
-        const fieldErrors: string[] = []
-
-        for (const rule of fieldRules) {
-            if (!rule.validate(value)) {
-                fieldErrors.push(rule.message)
-            }
-        }
-
-        errors.value[name] = fieldErrors
-        return fieldErrors
-    }
-
-    function validateForm(fields: Record<string, { value: unknown; rules: ValidationRule[] }>): boolean {
-        let isValid = true
-
-        for (const [name, field] of Object.entries(fields)) {
-            touched.value[name] = true
-            const fieldErrors = validateField(name, field.value, field.rules)
-            if (fieldErrors.length > 0) {
-                isValid = false
-            }
-        }
-
-        return isValid
-    }
-
-    function touch(name: string) {
-        touched.value[name] = true
-    }
-
-    function reset() {
-        errors.value = {}
-        touched.value = {}
-    }
-
-    function getError(name: string): string | undefined {
-        return touched.value[name] === true ? errors.value[name]?.[0] : undefined
-    }
-
-    function hasError(name: string): boolean {
-        return touched.value[name] === true && (errors.value[name]?.length ?? 0) > 0
-    }
-
-    const isValid = computed(() => {
-        return Object.values(errors.value).every(errs => errs.length === 0)
-    })
-
-    return {
-        errors,
-        touched,
-        validateField,
-        validateForm,
-        touch,
-        reset,
-        getError,
-        hasError,
-        isValid
-    }
 }
 
 export { useValidation as default }

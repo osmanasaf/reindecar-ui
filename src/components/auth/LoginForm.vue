@@ -16,7 +16,7 @@ const username = ref('')
 const password = ref('')
 const showPassword = ref(false)
 
-const { validateForm, getError, hasError, touch, reset } = useValidation()
+const { validateForm, getError, hasError, touch, reset } = useValidation(() => formFields.value)
 
 const formFields = computed(() => ({
   username: { value: username.value, rules: [rules.required(), rules.minLength(3)] },

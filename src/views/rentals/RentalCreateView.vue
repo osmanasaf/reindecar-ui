@@ -2,7 +2,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { rentalsApi, branchesApi, kmPackagesApi, rentalExtraItemApi } from '@/api'
-import { useToast, useValidation } from '@/composables'
+import { useToast, useValidation, rules } from '@/composables'
 import { SearchableSelect } from '@/components/common'
 import { formatCurrency } from '@/utils/format'
 import { RentalType, CustomerType } from '@/types'
@@ -51,7 +51,17 @@ const selectedReturnBranchId = ref<number | null>(null)
 
 const branchOptions = computed(() => branches.value.map(b => ({ value: b.id as number, label: b.name })))
 
-const { getError, hasError, touch } = useValidation()
+const rentalDateFields = computed(() => ({
+  startDate: { value: startDate.value, rules: [rules.required('Başlangıç tarihi seçiniz')] },
+  endDate: {
+    value: endDate.value,
+    rules: [
+      rules.required('Bitiş tarihi seçiniz'),
+      rules.dateAfter(startDate, 'Bitiş tarihi başlangıçtan sonra olmalıdır')
+    ]
+  }
+}))
+const { getError, hasError, touch } = useValidation(() => rentalDateFields.value)
 
 const rentalTypes: { value: RentalType; label: string; description: string; minDays?: number }[] = [
   { value: RentalType.DAILY, label: 'Günlük Kiralama', description: '1-30 gün arası kısa süreli kiralama' },
