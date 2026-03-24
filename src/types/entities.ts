@@ -97,6 +97,7 @@ export interface Vehicle {
     isInsuranceExpiringSoon: boolean
     isInspectionExpiringSoon: boolean
     notes: string | null
+    imageUrl?: string | null
     createdAt: string
 }
 

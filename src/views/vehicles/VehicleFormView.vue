@@ -304,6 +304,9 @@ async function fetchData() {
         monthlyPrice: vehicle.monthlyPrice ?? null,
         notes: vehicle.notes ?? ''
       }
+      if (vehicle.imageUrl) {
+        photoPreview.value = vehicle.imageUrl
+      }
     } else {
       originalVehicle.value = null
     }
@@ -336,10 +339,24 @@ async function handleSubmit() {
   try {
     if (isEditMode.value) {
       branchChanged = originalVehicle.value !== null && form.value.branchId !== originalVehicle.value.branchId
-      await vehiclesApi.patchById(Number(route.params.id), buildUpdatePayload())
+      const updated = await vehiclesApi.patchById(Number(route.params.id), buildUpdatePayload())
+      if (photoFile.value) {
+        try {
+          await vehiclesApi.uploadImage(updated.id, photoFile.value)
+        } catch {
+          toast.error('Araç güncellendi fakat görsel yüklenemedi')
+        }
+      }
       toast.success('Araç başarıyla güncellendi')
     } else {
-      await vehiclesApi.create(buildCreatePayload())
+      const created = await vehiclesApi.create(buildCreatePayload())
+      if (photoFile.value) {
+        try {
+          await vehiclesApi.uploadImage(created.id, photoFile.value)
+        } catch {
+          toast.error('Araç eklendi fakat görsel yüklenemedi')
+        }
+      }
       toast.success('Araç başarıyla eklendi')
     }
     router.push('/vehicles')

@@ -82,6 +82,16 @@ class VehiclesApiService extends BaseApi {
         formData.append('file', file)
         return this.postFormData(formData, '/recognize')
     }
+
+    async uploadImage(vehicleId: number, file: File): Promise<string> {
+        const formData = new FormData()
+        formData.append('image', file)
+        return this.postFormData(formData, `/${vehicleId}/image`)
+    }
+
+    async deleteImage(vehicleId: number): Promise<void> {
+        return this.remove(`/${vehicleId}/image`)
+    }
 }
 
 class VehicleCategoriesApiService extends BaseApi {

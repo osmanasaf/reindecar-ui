@@ -181,7 +181,8 @@ watch([() => props.startDate, () => props.endDate], () => {
       <div class="selected-badge">Seçili Araç</div>
       <div class="selected-info">
         <div class="vehicle-image-placeholder">
-          <span>{{ selectedVehicle.brand.charAt(0) }}</span>
+          <img v-if="selectedVehicle.imageUrl" :src="selectedVehicle.imageUrl" :alt="selectedVehicle.brand" class="vehicle-thumb" />
+          <span v-else>{{ selectedVehicle.brand.charAt(0) }}</span>
         </div>
         <div class="vehicle-details">
           <h4>{{ selectedVehicle.brand }} {{ selectedVehicle.model }}</h4>
@@ -212,7 +213,8 @@ watch([() => props.startDate, () => props.endDate], () => {
           @click="selectVehicle(vehicle)"
         >
           <div class="vehicle-image">
-            <span class="brand-initial">{{ vehicle.brand.charAt(0) }}</span>
+            <img v-if="vehicle.imageUrl" :src="vehicle.imageUrl" :alt="vehicle.brand" class="vehicle-thumb" />
+            <span v-else class="brand-initial">{{ vehicle.brand.charAt(0) }}</span>
           </div>
           <div class="vehicle-info">
             <h4>{{ vehicle.brand }} {{ vehicle.model }}</h4>
@@ -327,13 +329,14 @@ watch([() => props.startDate, () => props.endDate], () => {
   width: 80px;
   height: 80px;
   border-radius: 12px;
-  background: var(--color-primary);
+  background: var(--color-bg-secondary);
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 32px;
   font-weight: 700;
+  overflow: hidden;
 }
 
 .vehicle-details {
@@ -437,12 +440,21 @@ watch([() => props.startDate, () => props.endDate], () => {
 
 .vehicle-image {
   width: 100%;
-  height: 120px;
+  height: 140px;
   background: var(--color-bg-secondary);
   border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
+}
+
+.vehicle-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  border-radius: inherit;
 }
 
 .brand-initial {

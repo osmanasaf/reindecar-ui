@@ -133,6 +133,12 @@ onMounted(fetchVehicles)
         :to="`/vehicles/${vehicle.id}`"
         class="vehicle-card"
       >
+        <div class="card-image-wrapper">
+          <img v-if="vehicle.imageUrl" :src="vehicle.imageUrl" :alt="vehicle.brand" class="vehicle-thumb" />
+          <div v-else class="vehicle-image-placeholder">
+            <span>{{ vehicle.brand.charAt(0) }}</span>
+          </div>
+        </div>
         <div class="card-header">
           <span class="plate">{{ vehicle.plateNumber }}</span>
           <span :class="['status-badge', statusColors[vehicle.status]]">
@@ -275,15 +281,45 @@ onMounted(fetchVehicles)
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 12px;
-  padding: 20px;
   text-decoration: none;
   color: inherit;
   transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-.vehicle-card:hover {
-  border-color: var(--color-primary);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+.card-image-wrapper {
+  width: 100%;
+  height: 160px;
+  background: var(--color-bg-secondary);
+  position: relative;
+  overflow: hidden;
+}
+
+.vehicle-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  transition: transform 0.3s ease;
+}
+
+.vehicle-card:hover .vehicle-thumb {
+  transform: scale(1.05);
+}
+
+.vehicle-image-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-muted);
+  font-size: 48px;
+  font-weight: 700;
+  opacity: 0.3;
 }
 
 .card-header {
@@ -291,6 +327,7 @@ onMounted(fetchVehicles)
   justify-content: space-between;
   align-items: center;
   margin-bottom: 12px;
+  padding: 16px 20px 0;
 }
 
 .plate {
@@ -316,6 +353,7 @@ onMounted(fetchVehicles)
   font-size: 16px;
   font-weight: 600;
   margin: 0 0 8px 0;
+  padding: 0 20px;
 }
 
 .details {
@@ -323,16 +361,18 @@ onMounted(fetchVehicles)
   gap: 12px;
   font-size: 13px;
   color: var(--color-text-secondary);
+  padding: 0 20px;
 }
 
 .card-footer {
   display: flex;
   justify-content: space-between;
-  margin-top: 16px;
-  padding-top: 16px;
+  margin-top: auto;
+  padding: 16px 20px;
   border-top: 1px solid var(--color-border);
   font-size: 13px;
   color: var(--color-text-secondary);
+  background: var(--color-surface);
 }
 
 .pagination {
