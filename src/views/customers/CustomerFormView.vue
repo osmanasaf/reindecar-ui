@@ -744,7 +744,6 @@ watch(customerType, () => reset())
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 12px;
-  overflow: hidden;
 }
 
 .type-selector {
