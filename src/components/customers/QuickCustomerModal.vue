@@ -31,7 +31,7 @@ const form = ref({
   phone: '',
   birthDate: '',
   licenseNumber: '',
-  licenseClass: 'B',
+  licenseClassId: null as number | null,
   licenseExpiryDate: ''
 })
 
@@ -44,7 +44,6 @@ const formRules = computed(() => ({
   phone: { value: form.value.phone, rules: [rules.required(), rules.phone()] },
   birthDate: { value: form.value.birthDate, rules: [rules.required(), rules.minAge(18)] },
   licenseNumber: { value: form.value.licenseNumber, rules: [rules.required()] },
-  licenseClass: { value: form.value.licenseClass, rules: [rules.required()] },
   licenseExpiryDate: { 
     value: form.value.licenseExpiryDate, 
     rules: [
@@ -55,12 +54,12 @@ const formRules = computed(() => ({
   }
 }))
 
-const licenseClassOptions = ref<{ value: string; label: string }[]>([])
+const licenseClassOptions = ref<{ value: number; label: string }[]>([])
 
 async function fetchLicenseClasses() {
   try {
     const list = await referenceDataApi.getLicenseClasses()
-    licenseClassOptions.value = list.map(lc => ({ value: lc.code, label: lc.code }))
+    licenseClassOptions.value = list.map(lc => ({ value: lc.id, label: lc.code }))
   } catch {
     licenseClassOptions.value = []
   }
@@ -84,7 +83,7 @@ async function handleSubmit() {
       city: '',
       birthDate: form.value.birthDate,
       licenseNumber: form.value.licenseNumber,
-      licenseClass: form.value.licenseClass,
+      licenseClassId: form.value.licenseClassId ?? undefined,
       licenseExpiryDate: form.value.licenseExpiryDate
     }
 
@@ -112,7 +111,7 @@ function resetForm() {
     phone: '',
     birthDate: '',
     licenseNumber: '',
-    licenseClass: 'B',
+    licenseClassId: null,
     licenseExpiryDate: ''
   }
   reset()
@@ -221,7 +220,7 @@ watch(() => props.visible, (isVisible) => {
             <div class="form-group" :class="{ error: hasError('licenseClass') }">
               <label>Ehliyet Sınıfı <span class="required">*</span></label>
               <SearchableSelect
-                v-model="form.licenseClass"
+                v-model="form.licenseClassId"
                 :options="licenseClassOptions"
                 placeholder="Sınıf seçin"
                 search-placeholder="Ara..."

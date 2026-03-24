@@ -56,7 +56,7 @@ const form = ref({
   nationalId: '',
   birthDate: '',
   licenseNumber: '',
-  licenseClass: '',
+  licenseClassId: null as number | null,
   licenseExpiryDate: '',
   
 
@@ -87,7 +87,7 @@ const commonTitles = [
 
 const licenseClassesList = ref<{ id: number; code: string }[]>([])
 const licenseClassOptions = computed(() =>
-  licenseClassesList.value.map(lc => ({ value: lc.code, label: lc.code }))
+  licenseClassesList.value.map(lc => ({ value: lc.id, label: lc.code }))
 )
 
 async function fetchLicenseClasses() {
@@ -99,14 +99,7 @@ async function fetchLicenseClasses() {
   }
 }
 
-function resolveLicenseClassCode(data: { personalInfo?: { licenseClass?: string; licenseClassId?: number }; licenseClass?: string }): string {
-  const code = data.personalInfo?.licenseClass || data.licenseClass || ''
-  if (code) return code
-  const id = data.personalInfo?.licenseClassId
-  if (id == null) return ''
-  const found = licenseClassesList.value.find(lc => lc.id === id)
-  return found?.code ?? ''
-}
+
 
 /** Kurumsal müşteri çalışan sayısı aralıkları (backend’e üst sınır sayı gider) */
 const EMPLOYEE_COUNT_OPTIONS = [
@@ -218,7 +211,7 @@ const formRules = computed(() => {
       nationalId: { value: form.value.nationalId, rules: [rules.required(), rules.tckn()] },
       birthDate: { value: form.value.birthDate, rules: [rules.required(), rules.minAge(18, 'Müşteri en az 18 yaşında olmalıdır')] },
       licenseNumber: { value: form.value.licenseNumber, rules: [rules.required()] },
-      licenseClass: { value: form.value.licenseClass, rules: [rules.required()] },
+      licenseClassId: { value: form.value.licenseClassId, rules: [rules.required('Ehliyet sınıfı zorunludur')] },
       licenseExpiryDate: { value: form.value.licenseExpiryDate, rules: [rules.required('Ehliyet geçerlilik tarihi zorunludur'), rules.futureDate('Ehliyet süresi dolmuş')] }
     }
   } else {
@@ -279,7 +272,7 @@ async function fetchCustomer() {
       nationalId: data.personalInfo?.nationalId || data.nationalId || '',
       birthDate: data.personalInfo?.birthDate ? (data.personalInfo.birthDate.split('T')[0] ?? '') : (data.birthDate ? (data.birthDate.split('T')[0] ?? '') : ''),
       licenseNumber: data.personalInfo?.licenseNumber || data.licenseNumber || '',
-      licenseClass: resolveLicenseClassCode(data),
+      licenseClassId: data.personalInfo?.licenseClassId ?? null,
       licenseExpiryDate: data.personalInfo?.licenseExpiryDate ? (data.personalInfo.licenseExpiryDate.split('T')[0] ?? '') : (data.licenseExpiryDate ? (data.licenseExpiryDate.split('T')[0] ?? '') : ''),
       
       companyName: data.companyInfo?.companyName || data.displayName || '',
@@ -320,7 +313,7 @@ async function handleSubmit() {
         address: form.value.address,
         city: form.value.city,
         licenseNumber: form.value.licenseNumber,
-        licenseClass: form.value.licenseClass,
+        licenseClassId: form.value.licenseClassId ?? undefined,
         licenseExpiryDate: form.value.licenseExpiryDate
       }
 
@@ -471,17 +464,17 @@ watch(customerType, () => reset())
                 <span class="error-text">{{ getError('licenseNumber') }}</span>
               </div>
 
-              <div class="form-group" :class="{ error: hasError('licenseClass') }">
+              <div class="form-group" :class="{ error: hasError('licenseClassId') }">
                 <label>Sınıf <span class="required">*</span></label>
                 <SearchableSelect
-                  v-model="form.licenseClass"
+                  v-model="form.licenseClassId"
                   :options="licenseClassOptions"
                   placeholder="Sınıf seçin"
                   search-placeholder="Ara..."
-                  :error="hasError('licenseClass')"
-                  @blur="handleBlur('licenseClass')"
+                  :error="hasError('licenseClassId')"
+                  @blur="handleBlur('licenseClassId')"
                 />
-                <span class="error-text">{{ getError('licenseClass') }}</span>
+                <span class="error-text">{{ getError('licenseClassId') }}</span>
               </div>
 
               <div class="form-group" :class="{ error: hasError('licenseExpiryDate') }">

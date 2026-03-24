@@ -1,5 +1,5 @@
 <script setup lang="ts" generic="T extends string | number">
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 
 interface Option {
   value: T
@@ -38,6 +38,29 @@ const searchQuery = ref('')
 const customValue = ref('')
 const showCreateInput = ref(false)
 const searchInput = ref<HTMLInputElement | null>(null)
+const triggerRef = ref<HTMLElement | null>(null)
+
+const dropdownStyle = ref({
+  top: '0px',
+  left: '0px',
+  width: '280px'
+})
+
+function updateDropdownPosition() {
+  if (!triggerRef.value) return
+  const rect = triggerRef.value.getBoundingClientRect()
+  const viewportHeight = window.innerHeight
+  const panelHeight = 320
+  const spaceBelow = viewportHeight - rect.bottom
+  const top = spaceBelow >= panelHeight
+    ? rect.bottom + 4
+    : rect.top - panelHeight - 4
+  dropdownStyle.value = {
+    top: `${top}px`,
+    left: `${rect.left}px`,
+    width: `${Math.max(rect.width, 280)}px`
+  }
+}
 
 const selectedOption = computed(() => {
   return props.options.find(opt => opt.value === props.modelValue)
@@ -67,6 +90,7 @@ function clearSelection() {
 
 function openDropdown() {
   if (props.disabled) return
+  updateDropdownPosition()
   isOpen.value = true
   searchQuery.value = ''
   nextTick(() => {
@@ -97,6 +121,20 @@ function toggleCreateInput() {
   }
 }
 
+function handleScroll() {
+  if (isOpen.value) updateDropdownPosition()
+}
+
+onMounted(() => {
+  window.addEventListener('scroll', handleScroll, true)
+  window.addEventListener('resize', handleScroll)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('scroll', handleScroll, true)
+  window.removeEventListener('resize', handleScroll)
+})
+
 watch(() => props.modelValue, () => {
   searchQuery.value = ''
 })
@@ -104,7 +142,7 @@ watch(() => props.modelValue, () => {
 
 <template>
   <div class="searchable-select" :class="{ disabled, open: isOpen, 'has-error': error }">
-    <div class="select-trigger" @click="openDropdown">
+    <div ref="triggerRef" class="select-trigger" @click="openDropdown">
       <span v-if="selectedOption" class="selected-value">
         {{ selectedOption.label }}
       </span>
@@ -124,61 +162,63 @@ watch(() => props.modelValue, () => {
       </div>
     </div>
 
-    <div v-if="isOpen" class="dropdown-panel">
-      <div class="search-box">
-        <input
-          ref="searchInput"
-          v-model="searchQuery"
-          type="text"
-          :placeholder="searchPlaceholder"
-          class="search-input"
-          @keydown.esc="closeDropdown"
-        />
-      </div>
-
-      <div v-if="loading" class="loading-state">
-        Yükleniyor...
-      </div>
-
-      <div v-else-if="!hasResults && !createable" class="empty-state">
-        Sonuç bulunamadı
-      </div>
-
-      <div v-else class="options-list">
-        <div
-          v-for="option in filteredOptions"
-          :key="option.value"
-          :class="['option-item', { 
-            selected: option.value === modelValue,
-            disabled: option.disabled 
-          }]"
-          @click="selectOption(option)"
-        >
-          {{ option.label }}
+    <Teleport to="body">
+      <div v-if="isOpen" class="dropdown-panel" :style="dropdownStyle">
+        <div class="search-box">
+          <input
+            ref="searchInput"
+            v-model="searchQuery"
+            type="text"
+            :placeholder="searchPlaceholder"
+            class="search-input"
+            @keydown.esc="closeDropdown"
+          />
         </div>
 
-        <div v-if="createable && !hasResults && searchQuery" class="create-section">
-          <div v-if="!showCreateInput" class="create-prompt">
-            <p>Sonuç bulunamadı</p>
-            <button type="button" class="btn-create" @click="toggleCreateInput">
-              + "{{ searchQuery }}" ekle
-            </button>
+        <div v-if="loading" class="loading-state">
+          Yükleniyor...
+        </div>
+
+        <div v-else-if="!hasResults && !createable" class="empty-state">
+          Sonuç bulunamadı
+        </div>
+
+        <div v-else class="options-list">
+          <div
+            v-for="option in filteredOptions"
+            :key="option.value"
+            :class="['option-item', { 
+              selected: option.value === modelValue,
+              disabled: option.disabled 
+            }]"
+            @click="selectOption(option)"
+          >
+            {{ option.label }}
           </div>
-          <div v-else class="create-input-box">
-            <input
-              v-model="customValue"
-              type="text"
-              placeholder="Yeni değer"
-              class="create-input"
-              @keydown.enter="handleCreateNew"
-            />
-            <button type="button" class="btn-save" @click="handleCreateNew">
-              Kaydet
-            </button>
+
+          <div v-if="createable && !hasResults && searchQuery" class="create-section">
+            <div v-if="!showCreateInput" class="create-prompt">
+              <p>Sonuç bulunamadı</p>
+              <button type="button" class="btn-create" @click="toggleCreateInput">
+                + "{{ searchQuery }}" ekle
+              </button>
+            </div>
+            <div v-else class="create-input-box">
+              <input
+                v-model="customValue"
+                type="text"
+                placeholder="Yeni değer"
+                class="create-input"
+                @keydown.enter="handleCreateNew"
+              />
+              <button type="button" class="btn-save" @click="handleCreateNew">
+                Kaydet
+              </button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </Teleport>
 
     <div v-if="isOpen" class="dropdown-overlay" @click="closeDropdown"></div>
   </div>
@@ -278,71 +318,71 @@ watch(() => props.modelValue, () => {
   z-index: 998;
 }
 
-.dropdown-panel {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
+:global(.dropdown-panel) {
+  position: fixed;
+  min-width: 280px;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  z-index: 999;
-  max-height: 300px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  z-index: 9999;
+  max-height: 320px;
   display: flex;
   flex-direction: column;
 }
 
-.search-box {
+:global(.dropdown-panel .search-box) {
   padding: 12px;
   border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
 }
 
-.search-input {
+:global(.dropdown-panel .search-input) {
   width: 100%;
   padding: 8px 12px;
   border: 1px solid var(--color-border);
   border-radius: 6px;
   font-size: 14px;
   background: var(--color-bg-secondary);
+  box-sizing: border-box;
 }
 
-.search-input:focus {
+:global(.dropdown-panel .search-input:focus) {
   outline: none;
   border-color: var(--color-primary);
 }
 
-.loading-state,
-.empty-state {
+:global(.dropdown-panel .options-list) {
+  overflow-y: auto;
+  flex: 1;
+}
+
+:global(.dropdown-panel .loading-state),
+:global(.dropdown-panel .empty-state) {
   padding: 20px;
   text-align: center;
   color: var(--color-text-secondary);
   font-size: 14px;
 }
 
-.options-list {
-  overflow-y: auto;
-  max-height: 240px;
-}
-
-.option-item {
+:global(.dropdown-panel .option-item) {
   padding: 10px 14px;
   cursor: pointer;
   font-size: 14px;
   transition: background 0.15s;
 }
 
-.option-item:hover {
+:global(.dropdown-panel .option-item:hover) {
   background: var(--color-bg-secondary);
 }
 
-.option-item.selected {
+:global(.dropdown-panel .option-item.selected) {
   background: var(--color-primary-light);
   color: var(--color-primary);
   font-weight: 500;
 }
 
-.option-item.disabled {
+:global(.dropdown-panel .option-item.disabled) {
   opacity: 0.5;
   cursor: not-allowed;
 }

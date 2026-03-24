@@ -18,7 +18,7 @@ export interface CreatePersonalCustomerForm {
     address: string
     city: string
     licenseNumber: string
-    licenseClass: string
+    licenseClassId?: number
     licenseExpiryDate: string
     creditScore?: number
 }
@@ -52,7 +52,7 @@ export interface CreateCompanyCustomerForm extends CompanyCustomerBaseForm {
     authorizedPersons: AuthorizedPerson[]
 }
 
-export interface UpdateCompanyCustomerForm extends CompanyCustomerBaseForm {}
+export interface UpdateCompanyCustomerForm extends CompanyCustomerBaseForm { }
 
 export interface CreateAuthorizedPersonRequest {
     firstName: string
