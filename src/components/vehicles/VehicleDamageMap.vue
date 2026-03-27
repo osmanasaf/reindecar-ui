@@ -29,14 +29,29 @@ const zoneConfigs = computed(() => {
 
   const configs: Record<number, { color: string; onClick: () => void; opacity?: number }> = {}
   const allZones = [1, 2, 3, 4, 6, 7, 8, 9, 10, 12, 13]
-
+  
   allZones.forEach(zoneId => {
-    const zoneInfo = damageMap.value!.zones[zoneId]
-    const isRepairedOnly = zoneInfo && zoneInfo.maxSeverity === null
+    // Harita her zaman GÜNCEL FİZİKSEL DURUMU göstersin (Onarılmışlar Yeşil olur)
+    // Sadece henüz onarılmamış (aktif) hasarların en yüksek şiddetini bulalım
+    const activeDamagesInZone = damageMap.value!.damages.filter(d => d.zoneId === zoneId && !d.repaired)
+    
+    let color = '#4CAF50' // Default: Sağlam / Onarılmış
+    if (activeDamagesInZone.length > 0) {
+      // Aktif hasarlar varsa, onları severity sırasına göre dizip en ciddisinin rengini alalım
+      const severityOrder = ['#B71C1C', '#D32F2F', '#F57C00', '#FBC02D'] // Kritik(Koyu Kırmızı), Major(Kırmızı), Moderate(Turuncu), Minor(Sarı)
+      // Array'de bu renklere en önde sahip olanı bul:
+      activeDamagesInZone.sort((a, b) => {
+        const idxA = severityOrder.indexOf(a.severityColorCode)
+        const idxB = severityOrder.indexOf(b.severityColorCode)
+        return (idxA !== -1 ? idxA : 99) - (idxB !== -1 ? idxB : 99)
+      })
+      color = activeDamagesInZone[0]?.severityColorCode || '#F57C00'
+    }
+
     configs[zoneId] = {
-      color: zoneInfo?.colorCode || '#4CAF50',
+      color,
       onClick: () => selectZone(zoneId),
-      opacity: isRepairedOnly ? 0.6 : 1
+      opacity: 1
     }
   })
 
@@ -48,8 +63,11 @@ const selectedZoneDamages = computed(() => {
   const zoneInfo = damageMap.value.zones[selectedZone.value]
   if (!zoneInfo) return []
   let list = damageMap.value.damages.filter(d => zoneInfo.damageIds.includes(d.id))
+  
   if (includeRepaired.value) {
     list = list.filter(d => d.repaired)
+  } else {
+    list = list.filter(d => !d.repaired)
   }
   return list
 })
@@ -57,9 +75,13 @@ const selectedZoneDamages = computed(() => {
 const allDamagesSorted = computed(() => {
   if (!damageMap.value) return []
   let list = damageMap.value.damages
+  
   if (includeRepaired.value) {
     list = list.filter(d => d.repaired)
+  } else {
+    list = list.filter(d => !d.repaired)
   }
+  
   return [...list].sort((a, b) =>
     new Date(b.reportDate).getTime() - new Date(a.reportDate).getTime()
   )
@@ -196,22 +218,29 @@ onMounted(() => {
     <template v-else-if="damageMap">
       <!-- İstatistik Kartları -->
       <div class="stats-row">
-        <div class="stat-pill" :class="{ 'stat-danger': damageMap.totalActiveDamages > 0 }">
-          <span class="stat-num">{{ damageMap.totalActiveDamages }}</span>
-          <span class="stat-lbl">Aktif Hasar</span>
-        </div>
-        <div v-if="includeRepaired" class="stat-pill">
-          <span class="stat-num">{{ damageMap.damages.filter(d => d.repaired).length }}</span>
-          <span class="stat-lbl">Onarılmış</span>
-        </div>
-        <div class="stat-pill stat-cost">
-          <span class="stat-num stat-num-sm">{{ formatCurrency(totalEstimatedCost, 'TRY') }}</span>
-          <span class="stat-lbl">Tahmini Maliyet</span>
-        </div>
-        <div v-if="totalRepairCost > 0" class="stat-pill stat-success">
-          <span class="stat-num stat-num-sm">{{ formatCurrency(totalRepairCost, 'TRY') }}</span>
-          <span class="stat-lbl">Onarım Maliyeti</span>
-        </div>
+        <!-- Sadece Aktif Mod -->
+        <template v-if="!includeRepaired">
+          <div class="stat-pill" :class="{ 'stat-danger': damageMap.totalActiveDamages > 0 }">
+            <span class="stat-num">{{ damageMap.totalActiveDamages }}</span>
+            <span class="stat-lbl">Aktif Hasar</span>
+          </div>
+          <div class="stat-pill stat-cost">
+            <span class="stat-num stat-num-sm">{{ formatCurrency(totalEstimatedCost, 'TRY') }}</span>
+            <span class="stat-lbl">Tahmini Maliyet</span>
+          </div>
+        </template>
+
+        <!-- Sadece Onarılmış Modu -->
+        <template v-else>
+          <div class="stat-pill">
+            <span class="stat-num">{{ damageMap.damages.filter(d => d.repaired).length }}</span>
+            <span class="stat-lbl">Onarılmış</span>
+          </div>
+          <div v-if="totalRepairCost > 0" class="stat-pill stat-success">
+            <span class="stat-num stat-num-sm">{{ formatCurrency(totalRepairCost, 'TRY') }}</span>
+            <span class="stat-lbl">Onarım Maliyeti</span>
+          </div>
+        </template>
       </div>
 
       <!-- Ana İçerik: Sol (Araç) + Sağ (Detay) -->
@@ -425,7 +454,7 @@ onMounted(() => {
         :has-rental="Boolean(selectedDamage?.rentalId)"
         :service-providers="serviceProviders"
         @close="closeRepairModal"
-        @submit="handleRepairSubmit"
+        @submit="(form) => handleRepairSubmit(form as MarkDamageRepairedForm)"
       />
     </teleport>
 

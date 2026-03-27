@@ -40,7 +40,7 @@ const isCompleted = computed(() => {
   if (!installment.value) return false
   const rem = Number(installment.value.remainingInstallments)
   const bal = Number(installment.value.outstandingBalance ?? 0)
-  return rem === 0 || bal <= 0
+  return rem === 0 || bal <= 0 || !!installment.value.earlyClosedAt
 })
 
 const nextPaymentDisplay = computed(() => {
@@ -51,12 +51,17 @@ const nextPaymentDisplay = computed(() => {
   return formatDate(date)
 })
 
+const displayPaidCount = computed(() => {
+  if (!installment.value) return 0
+  const total = installment.value.numberOfInstallments ?? 0
+  if (total > 0 && isCompleted.value) return total
+  return paidCount.value
+})
+
 const remainingDisplay = computed(() => {
   if (!installment.value) return '0 / 0'
   const total = Number(installment.value.numberOfInstallments) || 0
-  const rem = Number(installment.value.remainingInstallments) ?? 0
-  if (rem === 0 || Number(installment.value.outstandingBalance ?? 0) <= 0) return `${total} / ${total}`
-  return `${rem} / ${total}`
+  return `${displayPaidCount.value} / ${total}`
 })
 
 onMounted(async () => {
@@ -109,7 +114,7 @@ function handleCloseSuccess(): void {
             <span class="value">{{ formatCurrency(installment.monthlyPayment, installment.monthlyPaymentCurrency) }}</span>
           </div>
           <div class="summary-item">
-            <span class="label">Kalan Taksit</span>
+            <span class="label">Ödenen Taksit</span>
             <span class="value">{{ remainingDisplay }}</span>
           </div>
           <div class="summary-item">
@@ -124,6 +129,10 @@ function handleCloseSuccess(): void {
             <span class="label">Bitiş Tarihi</span>
             <span class="value">{{ new Date(installment.endDate).toLocaleDateString('tr-TR') }}</span>
           </div>
+          <div class="summary-item highlight" v-if="installment.earlyClosedAt">
+            <span class="label">Erken Kapatma</span>
+            <span class="value">{{ new Date(installment.earlyClosedAt).toLocaleDateString('tr-TR') }}</span>
+          </div>
           <div class="summary-item highlight">
             <span class="label">Sonraki Ödeme</span>
             <span class="value next-payment">{{ nextPaymentDisplay }}</span>
@@ -137,7 +146,7 @@ function handleCloseSuccess(): void {
 
       <div class="payment-schedule">
         <h3>Ödeme Planı</h3>
-        <PaymentScheduleTable :payments="payments" @payment-recorded="loadDetails" />
+        <PaymentScheduleTable :payments="payments" :installment="installment" @payment-recorded="loadDetails" />
       </div>
     </template>
 

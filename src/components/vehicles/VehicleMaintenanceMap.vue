@@ -301,7 +301,7 @@ onMounted(() => {
                 v-for="maintenance in allMaintenancesSorted"
                 :key="maintenance.id"
                 class="maintenance-row"
-                @click="selectZone(maintenance.affectedZones?.[0] ?? 13)"
+                @click="maintenance.affectedZones && maintenance.affectedZones.length > 0 ? selectZone(maintenance.affectedZones[0]!) : (maintenanceForDetailModal = maintenance)"
               >
                 <span class="type-dot" :style="{ background: maintenance.maintenanceTypeColorCode }"></span>
                 <div class="maintenance-row-info">

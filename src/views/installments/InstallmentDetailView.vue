@@ -35,7 +35,7 @@ const isCompleted = computed(() => {
   if (!installment.value) return false
   const rem = Number(installment.value.remainingInstallments)
   const bal = Number(installment.value.outstandingBalance)
-  return rem === 0 || bal <= 0
+  return rem === 0 || bal <= 0 || !!installment.value.earlyClosedAt
 })
 
 const displayPaidCount = computed(() => {
@@ -48,9 +48,7 @@ const displayPaidCount = computed(() => {
 const remainingDisplay = computed(() => {
   if (!installment.value) return '0 / 0'
   const total = Number(installment.value.numberOfInstallments) || 0
-  const rem = Number(installment.value.remainingInstallments) ?? 0
-  if (rem === 0 || Number(installment.value.outstandingBalance) <= 0) return `${total} / ${total}`
-  return `${rem} / ${total}`
+  return `${displayPaidCount.value} / ${total}`
 })
 
 function isInvalidOrEpochDate(date: string | number | null | undefined): boolean {
@@ -193,7 +191,7 @@ watch(() => route.params.id, loadInstallment)
           <span class="value">{{ formatCurrency(installment.monthlyPayment, installment.monthlyPaymentCurrency) }}</span>
         </div>
         <div class="summary-item">
-          <span class="label">Kalan Taksit</span>
+          <span class="label">Ödenen Taksit</span>
           <span class="value">
             {{ remainingDisplay }}
             <span v-if="isCompleted" class="badge-done">(Tamamlandı)</span>

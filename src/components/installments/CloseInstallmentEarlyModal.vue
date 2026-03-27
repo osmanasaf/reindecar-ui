@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { installmentsApi } from '@/api'
 import { useToast } from '@/composables'
 import type { VehicleInstallmentResponse } from '@/types'
@@ -16,19 +16,57 @@ const emit = defineEmits<{
 
 const toast = useToast()
 const loading = ref(false)
-const discountPercentage = ref<number>(0)
 const notes = ref('')
 
 const outstandingBalance = computed(() => props.installment.outstandingBalance || 0)
 
+const discountPercentage = ref<number | ''>(0)
+const paymentAmount = ref<number | ''>(0)
+
+watch(() => props.visible, (isVisible) => {
+  if (isVisible) {
+    paymentAmount.value = outstandingBalance.value
+    discountPercentage.value = 0
+    notes.value = ''
+  }
+}, { immediate: true })
+
 const discountAmount = computed(() => {
-  if (!discountPercentage.value) return 0
-  return outstandingBalance.value * (discountPercentage.value / 100)
+  const amount = Number(paymentAmount.value) || 0
+  return Math.max(0, outstandingBalance.value - amount)
 })
 
-const finalAmount = computed(() => {
-  return outstandingBalance.value - discountAmount.value
-})
+function onDiscountRateChange() {
+  if (discountPercentage.value === '' || Number(discountPercentage.value) < 0) {
+    paymentAmount.value = outstandingBalance.value
+    return
+  }
+  const rate = Number(discountPercentage.value)
+  const discount = outstandingBalance.value * (rate / 100)
+  paymentAmount.value = Number((outstandingBalance.value - discount).toFixed(2))
+}
+
+function onPaymentAmountChange() {
+  if (paymentAmount.value === '' || Number(paymentAmount.value) < 0) {
+    discountPercentage.value = 0
+    return
+  }
+  let amount = Number(paymentAmount.value)
+
+  // Erken kapatma tutarı kalan bakiyeden büyük olamaz
+  if (amount > outstandingBalance.value) {
+    amount = outstandingBalance.value
+    paymentAmount.value = amount
+  }
+
+  if (outstandingBalance.value > 0) {
+    const discount = outstandingBalance.value - amount
+    const rate = (discount / outstandingBalance.value) * 100
+    discountPercentage.value = Number(rate.toFixed(2))
+  } else {
+    discountPercentage.value = 0
+  }
+}
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat('tr-TR', { 
@@ -42,9 +80,9 @@ async function handleSubmit() {
     loading.value = true
     try {
       await installmentsApi.closeEarly(props.installment.id, {
-        paymentAmount: finalAmount.value,
+        paymentAmount: Number(paymentAmount.value) || 0,
         paymentCurrency: props.installment.outstandingCurrency || 'TRY',
-        discountPercentage: discountPercentage.value,
+        discountPercentage: Number(discountPercentage.value) || 0,
         notes: notes.value
       })
       toast.success('Taksit planı başarıyla kapatıldı')
@@ -77,18 +115,37 @@ async function handleSubmit() {
           </p>
         </div>
 
-        <div class="form-group">
-          <label>İndirim Oranı (%)</label>
-          <div class="input-with-suffix">
-            <input 
-              v-model.number="discountPercentage" 
-              type="number" 
-              min="0" 
-              max="100" 
-              step="0.1"
-              placeholder="0"
-            />
-            <span class="suffix">%</span>
+        <div class="form-row">
+          <div class="form-group">
+            <label>İndirim Oranı (%)</label>
+            <div class="input-with-suffix">
+              <input 
+                v-model.number="discountPercentage" 
+                type="number" 
+                min="0" 
+                max="100" 
+                step="0.1"
+                placeholder="0"
+                @input="onDiscountRateChange"
+              />
+              <span class="suffix">%</span>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Erken Kapatma Tutarı</label>
+            <div class="input-with-suffix">
+              <input 
+                v-model.number="paymentAmount" 
+                type="number" 
+                min="0" 
+                :max="outstandingBalance"
+                step="0.01"
+                placeholder="0"
+                @input="onPaymentAmountChange"
+              />
+              <span class="suffix">{{ props.installment.totalCurrency || 'TRY' }}</span>
+            </div>
           </div>
         </div>
 
@@ -98,12 +155,12 @@ async function handleSubmit() {
             <span>{{ formatCurrency(outstandingBalance) }}</span>
           </div>
           <div class="calc-row discount" v-if="discountAmount > 0">
-            <span>İndirim ({{ discountPercentage }}%)</span>
+            <span>İndirim Tutarı</span>
             <span>-{{ formatCurrency(discountAmount) }}</span>
           </div>
           <div class="calc-row total">
             <span>Ödenecek Tutar</span>
-            <span>{{ formatCurrency(finalAmount) }}</span>
+            <span>{{ formatCurrency(Number(paymentAmount) || 0) }}</span>
           </div>
         </div>
 
@@ -215,6 +272,15 @@ async function handleSubmit() {
   margin: 0;
   font-size: 13px;
   color: var(--color-text-secondary);
+}
+
+.form-row {
+  display: flex;
+  gap: 16px;
+}
+
+.form-row .form-group {
+  flex: 1;
 }
 
 .form-group {

@@ -1,16 +1,18 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { formatDate, formatCurrency, getStatusBadgeColor, getStatusLabel } from '@/utils/installmentHelpers'
-import type { InstallmentPaymentResponse } from '@/types'
+import type { InstallmentPaymentResponse, VehicleInstallmentResponse } from '@/types'
 import RecordPaymentButton from './RecordPaymentButton.vue'
 
 interface Props {
   payments: InstallmentPaymentResponse[]
   showVehicleInfo?: boolean
+  installment?: VehicleInstallmentResponse | null
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  showVehicleInfo: false
+  showVehicleInfo: false,
+  installment: null
 })
 
 const emit = defineEmits<{
@@ -38,7 +40,7 @@ const sortedPayments = computed(() => {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="payment in sortedPayments" :key="payment.id" :class="{ 'overdue': payment.isOverdue }">
+          <tr v-for="payment in sortedPayments" :key="payment.id" :class="{ 'overdue': payment.isOverdue, 'early-closed': props.installment?.earlyClosedAt && payment.dueDate > props.installment.earlyClosedAt }">
             <td class="installment-number">{{ payment.installmentNumber }}</td>
             <td>{{ formatDate(payment.dueDate) }}</td>
             <td class="amount">{{ formatCurrency(payment.amount, payment.currency) }}</td>
@@ -114,6 +116,17 @@ const sortedPayments = computed(() => {
 
 .table tbody tr.overdue {
   background: var(--color-danger-light);
+}
+
+.table tbody tr.early-closed .amount,
+.table tbody tr.early-closed .installment-number {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.table tbody tr.early-closed {
+  background: #f8fafc;
+  color: var(--color-text-secondary);
 }
 
 .installment-number {
