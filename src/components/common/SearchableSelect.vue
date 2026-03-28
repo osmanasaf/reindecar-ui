@@ -86,6 +86,9 @@ function selectOption(option: Option) {
 function clearSelection() {
   emit('update:modelValue', null)
   searchQuery.value = ''
+  nextTick(() => {
+    emit('blur')
+  })
 }
 
 function openDropdown() {
@@ -103,7 +106,9 @@ function closeDropdown() {
   searchQuery.value = ''
   showCreateInput.value = false
   customValue.value = ''
-  emit('blur')
+  nextTick(() => {
+    emit('blur')
+  })
 }
 
 function handleCreateNew() {

@@ -7,6 +7,7 @@ import type { VehicleColor } from '@/types/reference'
 const toast = useToast()
 const colors = ref<VehicleColor[]>([])
 const loading = ref(true)
+const showInactive = ref(false)
 
 const showModal = ref(false)
 const editingColor = ref<VehicleColor | null>(null)
@@ -18,11 +19,28 @@ const deactivateTarget = ref<VehicleColor | null>(null)
 async function fetchColors() {
     loading.value = true
     try {
-        colors.value = await referenceDataApi.getColors()
+        colors.value = showInactive.value
+            ? await referenceDataApi.getColorsAll()
+            : await referenceDataApi.getColors()
     } catch {
         toast.error('Renkler yüklenemedi')
     } finally {
         loading.value = false
+    }
+}
+
+async function handleToggleShowInactive() {
+    showInactive.value = !showInactive.value
+    await fetchColors()
+}
+
+async function doActivate(color: VehicleColor) {
+    try {
+        await referenceDataApi.activateColor(color.id)
+        toast.success(`"${color.name}" tekrar aktif edildi`)
+        await fetchColors()
+    } catch (err) {
+        toast.apiError(err, 'Aktif edilemedi')
     }
 }
 
@@ -98,7 +116,20 @@ onMounted(fetchColors)
   <div class="colors-manager">
     <div class="section-header">
       <h2>Araç Renkleri</h2>
-      <button class="btn btn-primary" @click="openAdd">Yeni Renk</button>
+      <div class="header-actions">
+        <button
+          type="button"
+          class="toggle-label"
+          :aria-pressed="showInactive"
+          @click="handleToggleShowInactive"
+        >
+          <span class="toggle-track" :class="{ active: showInactive }">
+            <span class="toggle-thumb"></span>
+          </span>
+          <span class="toggle-text">Pasifleri göster</span>
+        </button>
+        <button class="btn btn-primary" @click="openAdd">Yeni Renk</button>
+      </div>
     </div>
 
     <div v-if="loading" class="loading">Yükleniyor...</div>
@@ -108,6 +139,7 @@ onMounted(fetchColors)
           v-for="color in colors"
           :key="color.id"
           class="color-row"
+          :class="{ 'color-row--inactive': color.active === false }"
         >
           <div
             class="swatch"
@@ -118,9 +150,13 @@ onMounted(fetchColors)
             <span class="color-name">{{ color.name }}</span>
             <span v-if="color.hexCode" class="color-hex">{{ color.hexCode }}</span>
           </div>
+          <span v-if="color.active === false" class="inactive-badge">Pasif</span>
           <div class="row-actions">
-            <button class="btn-sm btn-outline" @click="openEdit(color)">Düzenle</button>
-            <button class="btn-sm btn-danger" @click="confirmDeactivate(color)">Pasif yap</button>
+            <template v-if="color.active !== false">
+              <button class="btn-sm btn-outline" @click="openEdit(color)">Düzenle</button>
+              <button class="btn-sm btn-danger" @click="confirmDeactivate(color)">Pasif yap</button>
+            </template>
+            <button v-else class="btn-sm btn-success" @click="doActivate(color)">Aktif et</button>
           </div>
         </div>
       </div>
@@ -189,6 +225,8 @@ onMounted(fetchColors)
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .section-header h2 {
@@ -196,6 +234,37 @@ onMounted(fetchColors)
   font-weight: 600;
   margin: 0;
 }
+
+.header-actions { display: flex; align-items: center; gap: 12px; }
+
+.toggle-label {
+  display: flex; align-items: center; gap: 0.5rem;
+  cursor: pointer; user-select: none;
+  background: none; border: none; padding: 0; font: inherit;
+}
+.toggle-track {
+  position: relative; display: inline-block;
+  width: 2.25rem; height: 1.25rem;
+  background: var(--color-border, #d1d5db); border-radius: 9999px; transition: background 0.2s;
+}
+.toggle-track.active { background: var(--color-primary, #2563eb); }
+.toggle-thumb {
+  position: absolute; top: 0.125rem; left: 0.125rem;
+  width: 1rem; height: 1rem; background: white; border-radius: 50%;
+  transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.toggle-track.active .toggle-thumb { transform: translateX(1rem); }
+.toggle-text { font-size: 0.875rem; color: var(--color-text-secondary, #6b7280); }
+
+.inactive-badge {
+  font-size: 0.7rem; padding: 0.15rem 0.5rem;
+  border-radius: 9999px; background: #e5e7eb; color: #6b7280; font-weight: 500;
+}
+
+.color-row--inactive { opacity: 0.75; background: var(--color-bg-secondary) !important; }
+
+.btn-success { background: var(--color-success, #059669); color: white; border: none; }
+.btn-success:hover { opacity: 0.9; }
 
 .btn { padding: 10px 20px; border-radius: 8px; font-weight: 500; cursor: pointer; border: none; }
 .btn-primary { background: var(--color-primary); color: white; }

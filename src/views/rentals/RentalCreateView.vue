@@ -290,7 +290,7 @@ async function handleSubmit() {
       customIncludedKm: customIncludedKm.value && customIncludedKm.value > 0 ? customIncludedKm.value : undefined,
       customExtraKmPrice: customExtraKmPrice.value && customExtraKmPrice.value > 0 ? customExtraKmPrice.value : undefined,
       discountAmount: appliedDiscountAmount.value > 0 ? appliedDiscountAmount.value : undefined,
-      totalAmount: finalTotalWithDiscount.value
+      totalAmount: baseTotal.value
     }
 
     const rental = await rentalsApi.create(payload)

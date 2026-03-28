@@ -30,7 +30,6 @@ const vehicles = ref<Vehicle[]>([])
 const customers = ref<Customer[]>([])
 const drivers = ref<RentalDriver[]>([])
 const loadingRentals = ref(false)
-const loadingVehicles = ref(false)
 
 const selectedRentalId = ref<number | undefined>(props.rentalId)
 const selectedVehicleId = ref<number | undefined>(props.vehicleId)
@@ -63,7 +62,7 @@ const driverOptions = computed(() =>
 )
 
 const violationTypeOptions = computed(() =>
-  Object.entries(violationTypes.value).map(([value, label]) => ({ value, label: label as string }))
+  Object.entries(violationTypes).map(([value, label]) => ({ value, label: String(label) }))
 )
 
 const selectedRental = computed(() =>
@@ -115,7 +114,7 @@ watch(selectedRentalId, async (rentalId) => {
       drivers.value = await rentalsApi.getDrivers(rentalId)
       if (drivers.value.length > 0) {
         const primary = drivers.value.find(d => d.primary)
-        selectedDriverId.value = primary?.driverId || drivers.value[0].driverId
+        selectedDriverId.value = (primary?.driverId || drivers.value[0]?.driverId) as number | undefined
       }
     } catch {
       drivers.value = []
@@ -128,7 +127,7 @@ async function loadRentals() {
   try {
     const response = await rentalsApi.getAll({ size: 200 })
     rentals.value = response.content.filter(r =>
-      r.status === 'ACTIVE' || r.status === 'OVERDUE' || r.status === 'RETURN_PENDING' || r.status === 'RESERVED'
+      r.status === 'ACTIVE' || r.status === 'OVERDUE' || r.status === 'RETURN_PENDING' || r.status === 'RESERVED' || r.status === 'CLOSED' || r.status === 'PENDING_PAYMENT'
     )
   } catch {
     rentals.value = []
@@ -239,6 +238,15 @@ watch(() => props.show, async (newVal) => {
     selectedDriverId.value = props.driverId
     await loadRentals()
     await loadInitialData()
+    
+    // Ensure IDs are set if they were missing from props but available in the loaded rental
+    if (selectedRentalId.value && (!selectedVehicleId.value || !selectedCustomerId.value)) {
+      const rental = rentals.value.find(r => r.id === selectedRentalId.value)
+      if (rental) {
+        selectedVehicleId.value = rental.vehicleId
+        selectedCustomerId.value = rental.customerId
+      }
+    }
   }
 })
 </script>

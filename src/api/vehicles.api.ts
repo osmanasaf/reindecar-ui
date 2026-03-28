@@ -33,7 +33,7 @@ class VehiclesApiService extends BaseApi {
     }
 
     async getAvailableForPeriod(startDate: string, endDate: string): Promise<Vehicle[]> {
-        const response = await this.getList<Vehicle>('/available-for-period', { startDate, endDate })
+        const response = await this.getList<Vehicle>('/available-for-period', { startDate, endDate } as any)
         return response.content
     }
 
@@ -101,6 +101,10 @@ class VehicleCategoriesApiService extends BaseApi {
         return this.get()
     }
 
+    async getAllAll(): Promise<VehicleCategory[]> {
+        return this.get('/all')
+    }
+
     async getById(id: number): Promise<VehicleCategory> {
         return this.get(`/${id}`)
     }
@@ -114,7 +118,11 @@ class VehicleCategoriesApiService extends BaseApi {
     }
 
     async deactivate(id: number): Promise<void> {
-        return this.patch(`/${id}/deactivate`, {})
+        return this.patch(`/${id}/deactivate`)
+    }
+
+    async activate(id: number): Promise<void> {
+        return this.patch(`/${id}/activate`)
     }
 
     async deleteById(id: number): Promise<void> {

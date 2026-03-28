@@ -60,12 +60,25 @@ async function loadModels(brandId: number) {
     if (modelsByBrand.value.has(brandId)) return
     loadingModels.value.add(brandId)
     try {
-        const list = await referenceDataApi.getModelsByBrand(brandId)
+        const list = showInactive.value
+            ? await referenceDataApi.getModelsByBrandAll(brandId)
+            : await referenceDataApi.getModelsByBrand(brandId)
         modelsByBrand.value.set(brandId, [...list])
     } catch {
         toast.error('Modeller yüklenemedi')
     } finally {
         loadingModels.value.delete(brandId)
+    }
+}
+
+async function doActivateModel(model: CarModel) {
+    try {
+        await referenceDataApi.activateModel(model.id)
+        toast.success(`"${model.name}" tekrar aktif edildi`)
+        modelsByBrand.value.delete(model.brandId)
+        await loadModels(model.brandId)
+    } catch (err) {
+        toast.apiError(err, 'Aktif edilemedi')
     }
 }
 
@@ -257,15 +270,24 @@ onMounted(fetchBrands)
                   v-for="model in (modelsByBrand.get(brand.id) || [])"
                   :key="model.id"
                   class="model-row"
+                  :class="{ 'model-row--inactive': model.active === false }"
                 >
-                  <span>{{ model.name }}</span>
+                  <div class="model-info">
+                    <span>{{ model.name }}</span>
+                    <span v-if="model.active === false" class="inactive-badge">Pasif</span>
+                  </div>
                   <div class="row-actions">
-                    <button class="btn-sm btn-outline" @click="openEditModel(model)">Düzenle</button>
-                    <button
-                      class="btn-sm btn-danger"
-                      @click="confirmDeactivate('model', model.id, model.name, brand.id)"
-                    >
-                      Pasif yap
+                    <template v-if="model.active !== false">
+                      <button class="btn-sm btn-outline" @click="openEditModel(model)">Düzenle</button>
+                      <button
+                        class="btn-sm btn-danger"
+                        @click="confirmDeactivate('model', model.id, model.name, brand.id)"
+                      >
+                        Pasif yap
+                      </button>
+                    </template>
+                    <button v-else class="btn-sm btn-success" @click="doActivateModel(model)">
+                      Aktif et
                     </button>
                   </div>
                 </li>
@@ -434,6 +456,17 @@ onMounted(fetchBrands)
 
 .btn-success:hover {
   opacity: 0.9;
+}
+
+.model-row--inactive {
+  opacity: 0.75;
+  background: var(--color-bg-tertiary, #f9fafb) !important;
+}
+
+.model-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .section-header h2 {

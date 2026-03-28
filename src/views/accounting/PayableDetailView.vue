@@ -147,6 +147,14 @@ const handleCancel = async () => {
         <div class="detail-card">
           <h3 class="card-title">Genel Bilgiler</h3>
           <div class="info-grid">
+            <div v-if="payable.customerName" class="info-item">
+              <span class="label">Müşteri:</span>
+              <span class="value">{{ payable.customerName }}</span>
+            </div>
+            <div v-if="payable.vehiclePlate" class="info-item">
+              <span class="label">Araç:</span>
+              <span class="value">{{ payable.vehiclePlate }} — {{ payable.vehicleModel }}</span>
+            </div>
             <div class="info-item">
               <span class="label">Açıklama:</span>
               <span class="value">{{ payable.description }}</span>

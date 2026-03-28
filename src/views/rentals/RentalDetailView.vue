@@ -36,7 +36,6 @@ const selectedDriverId = ref<number | null>(null)
 
 const payments = ref<Payment[]>([])
 const paymentSummary = ref<{ totalPaid: number; currency: string } | null>(null)
-const loadingPayments = ref(false)
 const showReturnModal = ref(false)
 
 const penalties = ref<PenaltyResponse[]>([])
@@ -173,7 +172,7 @@ const grandTotal = computed(() => {
   const total = rental.value.totalPrice || 0
   const extraKm = rental.value.extraKmCharge || 0
   const discount = rental.value.discountAmount || 0
-  return total + extraKm - discount + penaltyTotalAmount.value + damageTotalAmount.value + tollTotalAmount.value
+  return total + extraItemsTotalDisplay.value + extraKm - discount + penaltyTotalAmount.value + damageTotalAmount.value + tollTotalAmount.value
 })
 
 function getExtraItemTotal(item: RentalExtraItem): number {
@@ -799,7 +798,7 @@ onActivated(() => {
             <div class="card-header">
               <h3>Trafik Cezaları</h3>
               <button
-                v-if="rental.status !== 'CLOSED' && rental.status !== 'CANCELLED'"
+                v-if="rental.status !== 'CANCELLED'"
                 class="btn-sm btn-outline"
                 @click="showCreatePenaltyModal = true"
               >
@@ -1089,45 +1088,48 @@ onActivated(() => {
         </div>
       </Teleport>
 
-      <ReturnCompleteModal
-        :visible="showReturnModal"
-        :rental-id="rentalId"
-        @close="showReturnModal = false"
-        @completed="handleReturnCompleted"
-      />
+      <Teleport to="body">
+        <ReturnCompleteModal
+          v-if="showReturnModal"
+          :visible="showReturnModal"
+          :rental-id="rentalId"
+          @close="showReturnModal = false"
+          @completed="handleReturnCompleted"
+        />
 
-      <CreateDamageForm
-        v-if="showCreateDamageForm && rental"
-        :vehicle-id="rental.vehicleId"
-        :rental-id="rental.id"
-        @close="showCreateDamageForm = false"
-        @created="handleDamageCreated"
-      />
+        <CreateDamageForm
+          v-if="showCreateDamageForm && rental"
+          :vehicle-id="rental.vehicleId"
+          :rental-id="rental.id"
+          @close="showCreateDamageForm = false"
+          @created="handleDamageCreated"
+        />
 
-      <DamageDetailModal
-        :damage="damageForModal(selectedDamage)"
-        :visible="selectedDamage !== null"
-        @close="selectedDamage = null"
-      />
+        <DamageDetailModal
+          :damage="damageForModal(selectedDamage)"
+          :visible="selectedDamage !== null"
+          @close="selectedDamage = null"
+        />
 
-      <CreatePenaltyModal
-        v-if="rental"
-        :show="showCreatePenaltyModal"
-        :rental-id="rental.id"
-        :vehicle-id="rental.vehicleId"
-        :customer-id="rental.customerId"
-        @close="showCreatePenaltyModal = false"
-        @success="handlePenaltyCreated"
-      />
+        <CreatePenaltyModal
+          v-if="rental"
+          :show="showCreatePenaltyModal"
+          :rental-id="rental.id"
+          :vehicle-id="rental.vehicleId"
+          :customer-id="rental.customerId"
+          @close="showCreatePenaltyModal = false"
+          @success="handlePenaltyCreated"
+        />
 
-      <CreateTollModal
-        v-if="showCreateTollModal && rental"
-        :rental-id="rental.id"
-        :vehicle-id="rental.vehicleId"
-        :customer-id="rental.customerId"
-        @close="showCreateTollModal = false"
-        @created="handleTollCreated"
-      />
+        <CreateTollModal
+          v-if="showCreateTollModal && rental"
+          :rental-id="rental.id"
+          :vehicle-id="rental.vehicleId"
+          :customer-id="rental.customerId"
+          @close="showCreateTollModal = false"
+          @created="handleTollCreated"
+        />
+      </Teleport>
     </template>
 
   </div>

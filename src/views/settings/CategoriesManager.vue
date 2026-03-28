@@ -7,6 +7,7 @@ import type { VehicleCategory } from '@/types'
 const toast = useToast()
 const categories = ref<VehicleCategory[]>([])
 const loading = ref(true)
+const showInactive = ref(false)
 
 const showModal = ref(false)
 const editingCategory = ref<VehicleCategory | null>(null)
@@ -18,11 +19,28 @@ const deactivateTarget = ref<VehicleCategory | null>(null)
 async function fetchCategories() {
     loading.value = true
     try {
-        categories.value = await vehicleCategoriesApi.getAll()
+        categories.value = showInactive.value
+            ? await vehicleCategoriesApi.getAllAll()
+            : await vehicleCategoriesApi.getAll()
     } catch {
         toast.error('Kategoriler yüklenemedi')
     } finally {
         loading.value = false
+    }
+}
+
+async function handleToggleShowInactive() {
+    showInactive.value = !showInactive.value
+    await fetchCategories()
+}
+
+async function doActivate(category: VehicleCategory) {
+    try {
+        await vehicleCategoriesApi.activate(category.id)
+        toast.success(`"${category.name}" tekrar aktif edildi`)
+        await fetchCategories()
+    } catch (err) {
+        toast.apiError(err, 'Aktif edilemedi')
     }
 }
 
@@ -112,7 +130,20 @@ onMounted(fetchCategories)
   <div class="categories-manager">
     <div class="section-header">
       <h2>Araç Kategorileri</h2>
-      <button class="btn btn-primary" @click="openAdd">Yeni Kategori</button>
+      <div class="header-actions">
+        <button
+          type="button"
+          class="toggle-label"
+          :aria-pressed="showInactive"
+          @click="handleToggleShowInactive"
+        >
+          <span class="toggle-track" :class="{ active: showInactive }">
+            <span class="toggle-thumb"></span>
+          </span>
+          <span class="toggle-text">Pasifleri göster</span>
+        </button>
+        <button class="btn btn-primary" @click="openAdd">Yeni Kategori</button>
+      </div>
     </div>
 
     <div v-if="loading" class="loading">Yükleniyor...</div>
@@ -122,6 +153,7 @@ onMounted(fetchCategories)
           v-for="category in categories"
           :key="category.id"
           class="category-row"
+          :class="{ 'category-row--inactive': category.active === false }"
         >
           <div class="category-badge">{{ category.code }}</div>
           <div class="category-info">
@@ -131,9 +163,13 @@ onMounted(fetchCategories)
           <div class="category-price" v-if="category.defaultDailyPrice">
             {{ category.defaultDailyPrice.toLocaleString('tr-TR') }} ₺/gün
           </div>
+          <span v-if="category.active === false" class="inactive-badge">Pasif</span>
           <div class="row-actions">
-            <button class="btn-sm btn-outline" @click="openEdit(category)">Düzenle</button>
-            <button class="btn-sm btn-danger" @click="confirmDeactivate(category)">Pasif yap</button>
+            <template v-if="category.active !== false">
+              <button class="btn-sm btn-outline" @click="openEdit(category)">Düzenle</button>
+              <button class="btn-sm btn-danger" @click="confirmDeactivate(category)">Pasif yap</button>
+            </template>
+            <button v-else class="btn-sm btn-success" @click="doActivate(category)">Aktif et</button>
           </div>
         </div>
       </div>
@@ -212,6 +248,8 @@ onMounted(fetchCategories)
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .section-header h2 {
@@ -219,6 +257,37 @@ onMounted(fetchCategories)
   font-weight: 600;
   margin: 0;
 }
+
+.header-actions { display: flex; align-items: center; gap: 12px; }
+
+.toggle-label {
+  display: flex; align-items: center; gap: 0.5rem;
+  cursor: pointer; user-select: none;
+  background: none; border: none; padding: 0; font: inherit;
+}
+.toggle-track {
+  position: relative; display: inline-block;
+  width: 2.25rem; height: 1.25rem;
+  background: var(--color-border, #d1d5db); border-radius: 9999px; transition: background 0.2s;
+}
+.toggle-track.active { background: var(--color-primary, #2563eb); }
+.toggle-thumb {
+  position: absolute; top: 0.125rem; left: 0.125rem;
+  width: 1rem; height: 1rem; background: white; border-radius: 50%;
+  transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.toggle-track.active .toggle-thumb { transform: translateX(1rem); }
+.toggle-text { font-size: 0.875rem; color: var(--color-text-secondary, #6b7280); }
+
+.inactive-badge {
+  font-size: 0.7rem; padding: 0.15rem 0.5rem;
+  border-radius: 9999px; background: #e5e7eb; color: #6b7280; font-weight: 500;
+}
+
+.category-row--inactive { opacity: 0.75; background: var(--color-bg-secondary) !important; }
+
+.btn-success { background: var(--color-success, #059669); color: white; border: none; }
+.btn-success:hover { opacity: 0.9; }
 
 .btn { padding: 10px 20px; border-radius: 8px; font-weight: 500; cursor: pointer; border: none; }
 .btn-primary { background: var(--color-primary); color: white; }

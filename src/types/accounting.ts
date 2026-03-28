@@ -103,6 +103,8 @@ export interface ReceivableResponse {
   sourceId: number
   customerId: number
   customerName?: string
+  vehiclePlate?: string
+  vehicleModel?: string
   description: string
   amount: number
   currency: string
@@ -123,6 +125,9 @@ export interface PayableResponse {
   sourceId: number
   serviceProviderId: number
   serviceProviderName?: string
+  customerName?: string
+  vehiclePlate?: string
+  vehicleModel?: string
   description: string
   amount: number
   currency: string

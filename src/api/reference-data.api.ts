@@ -33,16 +33,44 @@ class ReferenceDataApiService extends BaseApi {
         return this.get<CarModel[]>(`/brands/${brandId}/models`)
     }
 
+    async getModelsByBrandAll(brandId: number): Promise<CarModel[]> {
+        return this.get<CarModel[]>(`/brands/${brandId}/models/all`)
+    }
+
     async getCities(): Promise<City[]> {
         return this.get<City[]>('/cities')
+    }
+
+    async getCitiesAll(): Promise<City[]> {
+        return this.get<City[]>('/cities/all')
     }
 
     async getDistrictsByCity(cityId: number): Promise<District[]> {
         return this.get<District[]>(`/cities/${cityId}/districts`)
     }
 
+    async getDistrictsByCityAll(cityId: number): Promise<District[]> {
+        return this.get<District[]>(`/cities/${cityId}/districts/all`)
+    }
+
     async getColors(): Promise<VehicleColor[]> {
         return this.get<VehicleColor[]>('/colors')
+    }
+
+    async getColorsAll(): Promise<VehicleColor[]> {
+        return this.get<VehicleColor[]>('/colors/all')
+    }
+
+    async activateCity(id: number): Promise<void> {
+        await this.patch(`/cities/${id}/activate`)
+    }
+
+    async activateDistrict(id: number): Promise<void> {
+        await this.patch(`/districts/${id}/activate`)
+    }
+
+    async activateColor(id: number): Promise<void> {
+        await this.patch(`/colors/${id}/activate`)
     }
 
     async createBrand(data: CreateBrandRequest): Promise<CarBrand> {
@@ -70,7 +98,11 @@ class ReferenceDataApiService extends BaseApi {
     }
 
     async deactivateModel(id: number): Promise<void> {
-        await this.remove(`/models/${id}`)
+        await this.patch(`/models/${id}/deactivate`)
+    }
+
+    async activateModel(id: number): Promise<void> {
+        await this.patch(`/models/${id}/activate`)
     }
 
     async createCity(data: CreateCityRequest): Promise<City> {
@@ -82,7 +114,7 @@ class ReferenceDataApiService extends BaseApi {
     }
 
     async deactivateCity(id: number): Promise<void> {
-        await this.remove(`/cities/${id}`)
+        await this.patch(`/cities/${id}/deactivate`)
     }
 
     async createDistrict(data: CreateDistrictRequest): Promise<District> {
@@ -94,7 +126,7 @@ class ReferenceDataApiService extends BaseApi {
     }
 
     async deactivateDistrict(id: number): Promise<void> {
-        await this.remove(`/districts/${id}`)
+        await this.patch(`/districts/${id}/deactivate`)
     }
 
     async createColor(data: CreateColorRequest): Promise<VehicleColor> {
@@ -106,11 +138,23 @@ class ReferenceDataApiService extends BaseApi {
     }
 
     async deactivateColor(id: number): Promise<void> {
-        await this.remove(`/colors/${id}`)
+        await this.patch(`/colors/${id}/deactivate`)
     }
 
     async getLicenseClasses(): Promise<LicenseClass[]> {
         return this.get<LicenseClass[]>('/license-classes')
+    }
+
+    async getLicenseClassesAll(): Promise<LicenseClass[]> {
+        return this.get<LicenseClass[]>('/license-classes/all')
+    }
+
+    async activateLicenseClass(id: number): Promise<void> {
+        await this.patch(`/license-classes/${id}/activate`)
+    }
+
+    async deactivateLicenseClass(id: number): Promise<void> {
+        await this.patch(`/license-classes/${id}/deactivate`)
     }
 }
 

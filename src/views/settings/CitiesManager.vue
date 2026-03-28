@@ -7,6 +7,7 @@ import type { City, District } from '@/types/reference'
 const toast = useToast()
 const cities = ref<City[]>([])
 const loading = ref(true)
+const showInactive = ref(false)
 const expandedCityId = ref<number | null>(null)
 const districtsByCity = ref<Map<number, District[]>>(new Map())
 const loadingDistricts = ref<Set<number>>(new Set())
@@ -26,7 +27,9 @@ const deactivateTarget = ref<{ type: 'city' | 'district'; id: number; name: stri
 async function fetchCities() {
     loading.value = true
     try {
-        cities.value = await referenceDataApi.getCities()
+        cities.value = showInactive.value
+            ? await referenceDataApi.getCitiesAll()
+            : await referenceDataApi.getCities()
     } catch {
         toast.error('İller yüklenemedi')
     } finally {
@@ -34,11 +37,32 @@ async function fetchCities() {
     }
 }
 
+async function handleToggleShowInactive() {
+    showInactive.value = !showInactive.value
+    await fetchCities()
+}
+
+async function doActivateCity(city: City) {
+    try {
+        await referenceDataApi.activateCity(city.id)
+        toast.success(`"${city.name}" tekrar aktif edildi`)
+        await fetchCities()
+        if (expandedCityId.value === city.id) {
+            expandedCityId.value = null
+            districtsByCity.value.delete(city.id)
+        }
+    } catch (err) {
+        toast.apiError(err, 'Aktif edilemedi')
+    }
+}
+
 async function loadDistricts(cityId: number) {
     if (districtsByCity.value.has(cityId)) return
     loadingDistricts.value.add(cityId)
     try {
-        const list = await referenceDataApi.getDistrictsByCity(cityId)
+        const list = showInactive.value
+            ? await referenceDataApi.getDistrictsByCityAll(cityId)
+            : await referenceDataApi.getDistrictsByCity(cityId)
         districtsByCity.value.set(cityId, [...list])
     } catch {
         toast.error('İlçeler yüklenemedi')
@@ -172,6 +196,17 @@ async function doDeactivate() {
     }
 }
 
+async function doActivateDistrict(district: District, cityId: number) {
+    try {
+        await referenceDataApi.activateDistrict(district.id)
+        toast.success(`"${district.name}" tekrar aktif edildi`)
+        districtsByCity.value.delete(cityId)
+        if (expandedCityId.value === cityId) await loadDistricts(cityId)
+    } catch (err) {
+        toast.apiError(err, 'Aktif edilemedi')
+    }
+}
+
 onMounted(fetchCities)
 </script>
 
@@ -179,7 +214,20 @@ onMounted(fetchCities)
   <div class="cities-manager">
     <div class="section-header">
       <h2>İller ve İlçeler</h2>
-      <button class="btn btn-primary" @click="openAddCity">Yeni İl</button>
+      <div class="header-actions">
+        <button
+          type="button"
+          class="toggle-label"
+          :aria-pressed="showInactive"
+          @click="handleToggleShowInactive"
+        >
+          <span class="toggle-track" :class="{ active: showInactive }">
+            <span class="toggle-thumb"></span>
+          </span>
+          <span class="toggle-text">Pasifleri göster</span>
+        </button>
+        <button class="btn btn-primary" @click="openAddCity">Yeni İl</button>
+      </div>
     </div>
 
     <div v-if="loading" class="loading">Yükleniyor...</div>
@@ -189,6 +237,7 @@ onMounted(fetchCities)
           v-for="city in cities"
           :key="city.id"
           class="accordion-item"
+          :class="{ 'accordion-item--inactive': city.active === false }"
         >
           <div
             class="accordion-header"
@@ -197,10 +246,16 @@ onMounted(fetchCities)
             <span class="accordion-arrow">{{ expandedCityId === city.id ? '▼' : '▶' }}</span>
             <span class="city-plate">{{ city.plateCode || '—' }}</span>
             <span class="city-name">{{ city.name }}</span>
+            <span v-if="city.active === false" class="inactive-badge">Pasif</span>
             <div class="header-actions" @click.stop>
-              <button class="btn-sm btn-outline" @click="openEditCity(city)">Düzenle</button>
-              <button class="btn-sm btn-danger" @click="confirmDeactivate('city', city.id, city.name)">
-                Pasif yap
+              <template v-if="city.active !== false">
+                <button class="btn-sm btn-outline" @click="openEditCity(city)">Düzenle</button>
+                <button class="btn-sm btn-danger" @click="confirmDeactivate('city', city.id, city.name)">
+                  Pasif yap
+                </button>
+              </template>
+              <button v-else class="btn-sm btn-success" @click="doActivateCity(city)">
+                Aktif et
               </button>
             </div>
           </div>
@@ -216,15 +271,22 @@ onMounted(fetchCities)
                   v-for="district in (districtsByCity.get(city.id) || [])"
                   :key="district.id"
                   class="district-row"
+                  :class="{ 'row--inactive': district.active === false }"
                 >
                   <span>{{ district.name }}</span>
+                  <span v-if="district.active === false" class="inactive-badge">Pasif</span>
                   <div class="row-actions">
-                    <button class="btn-sm btn-outline" @click="openEditDistrict(district)">Düzenle</button>
-                    <button
-                      class="btn-sm btn-danger"
-                      @click="confirmDeactivate('district', district.id, district.name, city.id)"
-                    >
-                      Pasif yap
+                    <template v-if="district.active !== false">
+                      <button class="btn-sm btn-outline" @click="openEditDistrict(district)">Düzenle</button>
+                      <button
+                        class="btn-sm btn-danger"
+                        @click="confirmDeactivate('district', district.id, district.name, city.id)"
+                      >
+                        Pasif yap
+                      </button>
+                    </template>
+                    <button v-else class="btn-sm btn-success" @click="doActivateDistrict(district, city.id)">
+                      Aktif et
                     </button>
                   </div>
                 </li>
@@ -311,12 +373,99 @@ onMounted(fetchCities)
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .section-header h2 {
   font-size: 18px;
   font-weight: 600;
   margin: 0;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  user-select: none;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+}
+
+.toggle-track {
+  position: relative;
+  display: inline-block;
+  width: 2.25rem;
+  height: 1.25rem;
+  background: var(--color-border, #d1d5db);
+  border-radius: 9999px;
+  transition: background 0.2s;
+}
+
+.toggle-track.active {
+  background: var(--color-primary, #2563eb);
+}
+
+.toggle-thumb {
+  position: absolute;
+  top: 0.125rem;
+  left: 0.125rem;
+  width: 1rem;
+  height: 1rem;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.toggle-track.active .toggle-thumb {
+  transform: translateX(1rem);
+}
+
+.toggle-text {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary, #6b7280);
+}
+
+.accordion-item--inactive {
+  opacity: 0.85;
+}
+
+.accordion-item--inactive .accordion-header {
+  background: var(--color-bg-secondary, #f3f4f6);
+}
+
+.inactive-badge {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+  background: #e5e7eb;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.row--inactive {
+  opacity: 0.75;
+  background: var(--color-bg-secondary) !important;
+}
+
+.btn-success {
+  background: var(--color-success, #059669);
+  color: white;
+  border: none;
+}
+
+.btn-success:hover {
+  opacity: 0.9;
 }
 
 .btn { padding: 10px 20px; border-radius: 8px; font-weight: 500; cursor: pointer; border: none; }

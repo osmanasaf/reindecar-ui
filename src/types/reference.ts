@@ -10,12 +10,14 @@ export interface CarModel {
     brandId: number
     brandName: string
     name: string
+    active?: boolean
 }
 
 export interface City {
     id: number
     name: string
     plateCode: string | null
+    active?: boolean
 }
 
 export interface District {
@@ -23,12 +25,14 @@ export interface District {
     cityId: number
     cityName: string
     name: string
+    active?: boolean
 }
 
 export interface VehicleColor {
     id: number
     name: string
     hexCode: string | null
+    active?: boolean
 }
 
 export interface CreateBrandRequest {
@@ -93,4 +97,5 @@ export interface LicenseClass {
     id: number
     code: string
     description?: string
+    active?: boolean
 }

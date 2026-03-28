@@ -180,6 +180,10 @@ const goBack = () => {
               <span class="label">Müşteri:</span>
               <span class="value">{{ receivable.customerName || '-' }}</span>
             </div>
+            <div v-if="receivable.vehiclePlate" class="info-item">
+              <span class="label">Araç:</span>
+              <span class="value">{{ receivable.vehiclePlate }} — {{ receivable.vehicleModel }}</span>
+            </div>
             <div class="info-item">
               <span class="label">Açıklama:</span>
               <span class="value">{{ receivable.description }}</span>

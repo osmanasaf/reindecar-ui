@@ -46,6 +46,16 @@ const dueDateBadgeColor = computed(() => getDueDateBadgeColor(props.payable.dueD
         <span class="value">{{ payable.serviceProviderName }}</span>
       </div>
 
+      <div v-if="payable.customerName" class="card-info-row">
+        <span class="label">Müşteri:</span>
+        <span class="value">{{ payable.customerName }}</span>
+      </div>
+
+      <div v-if="payable.vehiclePlate" class="card-info-row">
+        <span class="label">Araç:</span>
+        <span class="value">{{ payable.vehiclePlate }} — {{ payable.vehicleModel }}</span>
+      </div>
+
       <div class="card-info-row">
         <span class="label">Açıklama:</span>
         <span class="value">{{ payable.description }}</span>

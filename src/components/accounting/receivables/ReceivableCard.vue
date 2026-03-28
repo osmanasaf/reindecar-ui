@@ -45,6 +45,11 @@ const typeText = computed(() => translateReceivableType(props.receivable.type))
         <span class="value">{{ receivable.customerName }}</span>
       </div>
 
+      <div v-if="receivable.vehiclePlate" class="card-info-row">
+        <span class="label">Araç:</span>
+        <span class="value">{{ receivable.vehiclePlate }} — {{ receivable.vehicleModel }}</span>
+      </div>
+
       <div class="card-info-row">
         <span class="label">Açıklama:</span>
         <span class="value">{{ receivable.description }}</span>
