@@ -550,5 +550,32 @@ watch([() => props.startDate, () => props.endDate], () => {
   .search-box {
     max-width: none;
   }
+
+  .selector-header {
+    align-items: stretch;
+  }
+
+  .selected-info {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .vehicle-details,
+  .selected-price {
+    text-align: left;
+  }
+
+  .clear-btn {
+    width: 100%;
+  }
+
+  .vehicles-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .vehicle-info .specs,
+  .vehicle-info .meta {
+    flex-wrap: wrap;
+  }
 }
 </style>

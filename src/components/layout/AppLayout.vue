@@ -1,19 +1,54 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterView } from 'vue-router'
 import AppSidebar from './AppSidebar.vue'
 import AppHeader from './AppHeader.vue'
 
 const sidebarCollapsed = ref(false)
+const sidebarOpen = ref(false)
+const viewportWidth = ref(globalThis.window === undefined ? 1280 : globalThis.window.innerWidth)
+
+const isMobile = computed(() => viewportWidth.value <= 768)
+
+function syncViewport() {
+  viewportWidth.value = window.innerWidth
+
+  if (!isMobile.value) {
+    sidebarOpen.value = false
+  }
+}
 
 function toggleSidebar() {
+  if (isMobile.value) {
+    sidebarOpen.value = !sidebarOpen.value
+    return
+  }
+
   sidebarCollapsed.value = !sidebarCollapsed.value
 }
+
+function closeSidebar() {
+  sidebarOpen.value = false
+}
+
+onMounted(() => {
+  syncViewport()
+  globalThis.window.addEventListener('resize', syncViewport)
+})
+
+onBeforeUnmount(() => {
+  globalThis.window.removeEventListener('resize', syncViewport)
+})
 </script>
 
 <template>
   <div class="app-layout" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
-    <AppSidebar :collapsed="sidebarCollapsed" />
+    <AppSidebar :collapsed="sidebarCollapsed" :mobile-open="isMobile && sidebarOpen" />
+    <div
+      class="sidebar-backdrop"
+      :class="{ visible: isMobile && sidebarOpen }"
+      @click="closeSidebar"
+    ></div>
     <div class="main-area">
       <AppHeader @toggle-sidebar="toggleSidebar" />
       <main class="page-content">
@@ -48,9 +83,25 @@ function toggleSidebar() {
   overflow-y: auto;
 }
 
+.sidebar-backdrop {
+  display: none;
+}
+
 @media (max-width: 768px) {
   .main-area {
     margin-left: 0;
+  }
+
+  .page-content {
+    padding: var(--spacing-lg);
+  }
+
+  .sidebar-backdrop.visible {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgb(15 23 42 / 0.4);
+    z-index: calc(var(--sidebar-overlay-z) - 1);
   }
 }
 </style>

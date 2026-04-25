@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores'
 
 defineProps<{
   collapsed: boolean
+  mobileOpen: boolean
 }>()
 
 const route = useRoute()
@@ -75,7 +76,7 @@ watch(() => route.path, (newPath) => {
 </script>
 
 <template>
-  <aside class="sidebar" :class="{ collapsed }">
+  <aside class="sidebar" :class="{ collapsed, 'mobile-open': mobileOpen }">
     <div class="sidebar-header">
       <RouterLink to="/" class="logo">
         <span class="logo-icon">🦌</span>
@@ -141,8 +142,8 @@ watch(() => route.path, (newPath) => {
   border-right: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
-  transition: width var(--transition-normal);
-  z-index: 50;
+  transition: width var(--transition-normal), transform var(--transition-normal);
+  z-index: var(--sidebar-overlay-z);
 }
 
 .sidebar.collapsed {
@@ -263,11 +264,16 @@ watch(() => route.path, (newPath) => {
 
 @media (max-width: 768px) {
   .sidebar {
+    width: min(85vw, 320px);
     transform: translateX(-100%);
   }
   
   .sidebar.mobile-open {
     transform: translateX(0);
+  }
+
+  .sidebar.collapsed {
+    width: min(85vw, 320px);
   }
 }
 </style>

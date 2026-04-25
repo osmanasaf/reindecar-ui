@@ -423,4 +423,29 @@ onMounted(() => {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+@media (max-width: 640px) {
+  .manager-header,
+  .item-card,
+  .item-actions,
+  .total-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .loading-state,
+  .empty-state,
+  .total-section {
+    padding: 16px;
+  }
+
+  .item-amount {
+    text-align: left;
+  }
+
+  .action-btn,
+  .add-btn {
+    width: 100%;
+  }
+}
 </style>

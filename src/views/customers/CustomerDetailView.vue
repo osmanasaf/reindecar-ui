@@ -191,6 +191,8 @@ const showBlacklistModal = ref(false)
 const showUnblacklistModal = ref(false)
 const blacklistReason = ref('')
 const processingBlacklist = ref(false)
+const showArchiveModal = ref(false)
+const archivingCustomer = ref(false)
 
 async function handleBlacklist() {
   showBlacklistModal.value = true
@@ -233,6 +235,20 @@ async function confirmUnblacklist() {
     toast.apiError(err, 'Kara listeden çıkarılamadı')
   } finally {
     processingBlacklist.value = false
+  }
+}
+
+async function confirmArchiveCustomer() {
+  archivingCustomer.value = true
+  try {
+    await customersApi.deleteById(customerId.value)
+    toast.success('Müşteri listeden kaldırıldı (arşivlendi)')
+    showArchiveModal.value = false
+    router.push('/customers')
+  } catch (err) {
+    toast.apiError(err, 'Müşteri arşivlenemedi')
+  } finally {
+    archivingCustomer.value = false
   }
 }
 
@@ -361,6 +377,14 @@ onMounted(fetchCustomer)
             ⚠️ Kara Listeye Ekle
           </button>
           <button class="btn btn-outline" @click="router.push(`/customers/${customer.id}/edit`)">✏️ Düzenle</button>
+          <button
+            type="button"
+            class="btn btn-outline btn-archive-customer"
+            title="Veritabanında silinmez, listede görünmez"
+            @click="showArchiveModal = true"
+          >
+            Listeden kaldır
+          </button>
         </div>
       </header>
 
@@ -800,6 +824,24 @@ onMounted(fetchCustomer)
       </div>
     </div>
 
+    <div v-if="showArchiveModal && customer" class="modal-overlay" @click.self="showArchiveModal = false">
+      <div class="modal modal-sm">
+        <div class="modal-header">
+          <h3>Listeden kaldır</h3>
+          <button class="close-btn" type="button" @click="showArchiveModal = false">×</button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-description">
+            <strong>{{ customer.displayName }}</strong> adlı müşteri listede gösterilmeyecek; kayıt sistemde arşivlenir (soft delete).
+          </p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" type="button" @click="showArchiveModal = false">Vazgeç</button>
+          <button class="btn btn-danger" type="button" :disabled="archivingCustomer" @click="confirmArchiveCustomer">Evet, kaldır</button>
+        </div>
+      </div>
+    </div>
+
     <div v-if="showDeleteDriverModal && driverToDelete" class="modal-overlay" @click.self="closeDeleteDriverModal">
       <div class="modal modal-sm">
         <div class="modal-header">
@@ -952,6 +994,15 @@ onMounted(fetchCustomer)
   background: transparent;
   border: 1px solid var(--color-border);
   color: var(--color-text);
+}
+
+.btn-archive-customer {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+.btn-archive-customer:hover {
+  background: var(--color-danger-light, rgba(220, 38, 38, 0.1));
 }
 
 .btn-danger {

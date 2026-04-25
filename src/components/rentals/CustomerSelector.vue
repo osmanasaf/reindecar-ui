@@ -57,7 +57,7 @@ function handleSearchInput() {
   if (debounceTimer.value) {
     clearTimeout(debounceTimer.value)
   }
-  debounceTimer.value = window.setTimeout(() => {
+  debounceTimer.value = globalThis.setTimeout(() => {
     searchCustomers(searchQuery.value)
   }, 300)
 }
@@ -476,5 +476,41 @@ watch(() => props.modelValue, (newVal) => {
 
 .quick-create-btn:hover {
   background: var(--color-primary-hover);
+}
+
+@media (max-width: 640px) {
+  .customer-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .customer-info,
+  .customer-status {
+    width: 100%;
+  }
+
+  .customer-contact {
+    overflow-wrap: anywhere;
+  }
+
+  .change-btn {
+    width: 100%;
+  }
+
+  .dropdown-item {
+    align-items: flex-start;
+  }
+
+  .item-info {
+    min-width: 0;
+  }
+
+  .item-details {
+    overflow-wrap: anywhere;
+  }
+
+  .item-badge {
+    align-self: flex-start;
+  }
 }
 </style>

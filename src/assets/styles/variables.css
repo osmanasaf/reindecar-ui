@@ -31,6 +31,9 @@
   --sidebar-width: 260px;
   --sidebar-collapsed-width: 64px;
   --header-height: 64px;
+  --bp-mobile: 768px;
+  --bp-tablet: 1024px;
+  --sidebar-overlay-z: 60;
 
   --spacing-xs: 0.25rem;
   --spacing-sm: 0.5rem;
@@ -169,6 +172,15 @@ textarea {
   color: var(--color-danger);
 }
 
+.responsive-table {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.responsive-table > table {
+  min-width: 720px;
+}
+
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -185,4 +197,27 @@ textarea {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-text-secondary);
+}
+
+@media (max-width: 768px) {
+  .responsive-page-header {
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .responsive-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .responsive-filters > * {
+    width: 100%;
+    max-width: none !important;
+  }
+
+  .responsive-pagination {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
 }

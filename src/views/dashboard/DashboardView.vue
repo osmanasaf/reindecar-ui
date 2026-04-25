@@ -410,7 +410,41 @@ onMounted(() => fetchAll(revenuePeriod.value))
                 <div v-else-if="activeRentals.length === 0" class="empty-state">
                     Şu an kirada araç bulunmuyor.
                 </div>
-                <div v-else class="tbl-wrap">
+                <div v-else class="mobile-table-cards">
+                    <div
+                        v-for="r in activeRentals"
+                        :key="`mobile-rental-${r.id}`"
+                        class="mobile-data-card"
+                        :class="{ 'row-overdue': r.isOverdue }"
+                    >
+                        <div class="mobile-card-head">
+                            <div>
+                                <div class="td-mono">{{ r.vehiclePlate ?? '—' }}</div>
+                                <div>{{ r.vehicleName ?? '—' }}</div>
+                            </div>
+                            <span v-if="r.isOverdue" class="badge-danger">
+                                {{ r.overdueDays }}g gecikti
+                            </span>
+                            <span v-else class="badge-success">Aktif</span>
+                        </div>
+                        <div class="mobile-card-grid">
+                            <div class="mobile-data-row">
+                                <span class="mobile-label">Müşteri</span>
+                                <span>{{ r.customerName ?? '—' }}</span>
+                            </div>
+                            <div class="mobile-data-row">
+                                <span class="mobile-label">Başlangıç</span>
+                                <span>{{ formatDate(r.startDate) }}</span>
+                            </div>
+                            <div class="mobile-data-row">
+                                <span class="mobile-label">İade</span>
+                                <span>{{ formatDate(r.endDate) }}</span>
+                            </div>
+                        </div>
+                        <button class="btn-sm mobile-action-btn" @click="openReturnModal(r.id)">İade Al</button>
+                    </div>
+                </div>
+                <div class="tbl-wrap">
                     <table class="dtbl">
                         <thead>
                             <tr>
@@ -641,7 +675,38 @@ onMounted(() => fetchAll(revenuePeriod.value))
             <div v-else-if="sortedReturns.length === 0" class="empty-state">
                 Yaklaşan iade bulunmuyor.
             </div>
-            <div v-else class="tbl-wrap">
+            <div v-else class="mobile-table-cards">
+                <div
+                    v-for="item in sortedReturns"
+                    :key="`mobile-return-${item.rentalId}`"
+                    class="mobile-data-card"
+                    :class="{ 'row-overdue': item.isOverdue }"
+                >
+                    <div class="mobile-card-head">
+                        <div>
+                            <div class="td-mono">{{ item.plateNumber }}</div>
+                            <div>{{ item.customerName }}</div>
+                        </div>
+                        <span :class="formatReturnBadge(item).cls">
+                            {{ formatReturnBadge(item).text }}
+                        </span>
+                    </div>
+                    <div class="mobile-card-grid">
+                        <div class="mobile-data-row">
+                            <span class="mobile-label">Sürücü</span>
+                            <span>{{ item.primaryDriverName || '—' }}</span>
+                        </div>
+                        <div class="mobile-data-row">
+                            <span class="mobile-label">İade Tarihi</span>
+                            <span>{{ formatDate(item.endDate) }}</span>
+                        </div>
+                    </div>
+                    <button class="btn-sm mobile-action-btn" @click="openReturnModal(item.rentalId)">
+                        İade Al
+                    </button>
+                </div>
+            </div>
+            <div class="tbl-wrap">
                 <table class="dtbl">
                     <thead>
                         <tr>
@@ -1070,6 +1135,54 @@ onMounted(() => fetchAll(revenuePeriod.value))
     overflow-x: auto;
 }
 
+.mobile-table-cards {
+    display: none;
+    padding: 16px;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.mobile-data-card {
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    padding: 14px;
+    background: var(--color-surface);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.mobile-card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.mobile-card-grid {
+    display: grid;
+    gap: 10px;
+}
+
+.mobile-data-row {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 13px;
+    color: var(--color-text-secondary);
+}
+
+.mobile-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+    letter-spacing: 0.04em;
+}
+
+.mobile-action-btn {
+    width: 100%;
+}
+
 .dtbl {
     width: 100%;
     border-collapse: collapse;
@@ -1458,19 +1571,56 @@ onMounted(() => fetchAll(revenuePeriod.value))
 }
 
 @media (max-width: 900px) {
+    .dashboard { gap: 16px; }
+    .card-head { flex-wrap: wrap; gap: 12px; align-items: flex-start; }
+    .card-head-actions,
+    .tab-bar,
+    .db-header-actions { flex-wrap: wrap; }
     .charts-row { grid-template-columns: 1fr; }
     .acc-grid   { grid-template-columns: 1fr; }
     .acc-net    { border: none; border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); padding: 20px 0; margin: 16px 0; }
     .bh-grid    { flex-direction: column; }
     .bh-divider { width: 100%; height: 1px; margin: 16px 0; }
+    .dtbl { min-width: 760px; }
 }
 
 @media (max-width: 640px) {
     .stat-row { grid-template-columns: repeat(2, 1fr); }
     .db-header { flex-direction: column; align-items: flex-start; }
+    .db-header-actions,
+    .card-head-actions,
+    .tab-bar,
+    .seg-ctrl { width: 100%; }
+    .btn-primary,
+    .btn-refresh,
+    .btn-retry,
+    .link-btn { width: 100%; justify-content: center; }
+    .seg-btn,
+    .tab-btn { flex: 1; justify-content: center; }
+    .card-head,
+    .card-foot,
+    .error-banner,
+    .acc-row { flex-direction: column; align-items: stretch; }
+    .chart-area,
+    .status-list,
+    .tbl-skel,
+    .acc-grid,
+    .bh-grid,
+    .empty-state { padding-left: 16px; padding-right: 16px; }
+    .card-head { padding: 16px; }
+    .card-foot { padding: 12px 16px; gap: 6px; }
+    .error-banner { gap: 12px; }
+    .status-item { flex-direction: column; align-items: stretch; }
+    .si-left,
+    .si-right { width: 100%; }
+    .acc-alert-bar span { margin-left: 0 !important; }
+    .mobile-table-cards { display: flex; }
+    .tbl-wrap { display: none; }
 }
 
 @media (max-width: 400px) {
     .stat-row { grid-template-columns: 1fr; }
+    .sc-value { font-size: 24px; }
+    .db-title { font-size: 22px; }
 }
 </style>

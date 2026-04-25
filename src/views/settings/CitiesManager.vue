@@ -495,7 +495,7 @@ onMounted(fetchCities)
 .accordion-arrow { font-size: 12px; color: var(--color-text-muted); width: 20px; }
 .city-plate { font-weight: 600; min-width: 28px; color: var(--color-text-muted); }
 .city-name { flex: 1; font-weight: 500; }
-.header-actions { display: flex; gap: 8px; }
+.accordion-header .header-actions { display: flex; gap: 8px; }
 
 .accordion-body { padding: 12px 16px 16px 48px; background: var(--color-bg-secondary); }
 
@@ -544,4 +544,35 @@ onMounted(fetchCities)
 .form-actions { display: flex; gap: 12px; margin-top: 20px; }
 .form-actions .btn { flex: 1; }
 .modal-sm { max-width: 360px; }
+
+@media (max-width: 768px) {
+  .header-actions,
+  .accordion-header .header-actions,
+  .districts-toolbar,
+  .district-row,
+  .row-actions,
+  .form-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .accordion-body {
+    padding: 12px;
+  }
+
+  .btn,
+  .btn-sm {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .modal-overlay {
+    padding: 16px;
+  }
+
+  .modal,
+  .modal-sm {
+    max-width: 100%;
+  }
+}
 </style>

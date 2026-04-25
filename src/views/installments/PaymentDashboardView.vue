@@ -230,7 +230,7 @@ function handleViewInstallment(installmentId: number): void {
 
 .summary-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 1.25rem;
   margin-bottom: 2rem;
 }
@@ -340,5 +340,38 @@ function handleViewInstallment(installmentId: number): void {
 
 .btn-primary:hover {
   background: var(--color-primary-dark, #1d4ed8);
+}
+
+@media (max-width: 1024px) {
+  .payment-dashboard {
+    padding: 1.5rem 1rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .page-header,
+  .section-header,
+  .overdue-banner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .summary-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .card {
+    padding: 1rem;
+  }
+
+  .upcoming-payments,
+  .error-state,
+  .empty-state {
+    padding: 1rem;
+  }
+
+  .btn {
+    width: 100%;
+  }
 }
 </style>

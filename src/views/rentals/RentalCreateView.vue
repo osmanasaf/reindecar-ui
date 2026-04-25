@@ -51,6 +51,26 @@ const selectedReturnBranchId = ref<number | null>(null)
 
 const branchOptions = computed(() => branches.value.map(b => ({ value: b.id as number, label: b.name })))
 
+/** Bitiş takviminde başlangıçla aynı gün seçilemesin: min = başlangıç + 1 gün */
+function addDaysYmd(ymd: string, days: number): string {
+  const d = new Date(ymd + 'T12:00:00')
+  d.setDate(d.getDate() + days)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+const endDatePickerMin = computed(() => (startDate.value ? addDaysYmd(startDate.value, 1) : undefined))
+
+watch(startDate, (newStart) => {
+  if (!newStart || !endDate.value) return
+  const minEnd = addDaysYmd(newStart, 1)
+  if (endDate.value < minEnd) {
+    endDate.value = ''
+  }
+})
+
 const rentalDateFields = computed(() => ({
   startDate: { value: startDate.value, rules: [rules.required('Başlangıç tarihi seçiniz')] },
   endDate: {
@@ -401,7 +421,6 @@ onMounted(() => {
                   <DatePicker
                     v-model="startDate"
                     label="Başlangıç Tarihi"
-                    :min="new Date().toISOString().split('T')[0]"
                     placeholder="Başlangıç tarihi"
                     @closed="touch('startDate')"
                   />
@@ -411,13 +430,15 @@ onMounted(() => {
                   <DatePicker
                     v-model="endDate"
                     label="Bitiş Tarihi"
-                    :min="startDate || new Date().toISOString().split('T')[0]"
+                    :min="endDatePickerMin"
                     placeholder="Bitiş tarihi"
                     @closed="touch('endDate')"
                   />
                   <span class="error-text">{{ getError('endDate') }}</span>
                 </div>
               </div>
+
+              <p class="date-hint">Geçmişe dönük kiralamaları da kayıt edebilirsiniz; takvimde bugünden önceki tarihler seçilebilir. Bitiş, başlangıçtan en az bir gün sonra olmalıdır.</p>
 
               <div v-if="isLeasing" class="leasing-notice">
                 <span class="notice-icon">ℹ️</span>
@@ -1086,6 +1107,13 @@ onMounted(() => {
   min-height: 16px;
 }
 
+.date-hint {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  line-height: 1.45;
+}
+
 .leasing-notice {
   display: flex;
   align-items: flex-start;
@@ -1349,6 +1377,14 @@ onMounted(() => {
 }
 
 @media (max-width: 768px) {
+  .rental-create {
+    max-width: 100%;
+  }
+
+  .page-header {
+    margin-bottom: 20px;
+  }
+
   .date-price-grid {
     grid-template-columns: 1fr;
   }
@@ -1365,18 +1401,94 @@ onMounted(() => {
   .form-grid {
     grid-template-columns: 1fr;
   }
+
+  .date-section-full {
+    max-width: none;
+  }
+
+  .wizard {
+    border-radius: 12px;
+  }
   
   .wizard-steps {
-    padding: 16px;
+    padding: 12px;
     gap: 8px;
   }
   
   .step {
     padding: 10px 12px;
+    min-width: 64px;
+    justify-content: center;
   }
   
   .step-label {
     display: none;
+  }
+
+  .wizard-content {
+    padding: 20px 16px;
+    min-height: auto;
+  }
+
+  .wizard-footer {
+    padding: 16px;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .spacer {
+    display: none;
+  }
+
+  .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .summary-card,
+  .date-summary,
+  .leasing-notice,
+  .term-notice,
+  .skip-notice {
+    padding: 16px;
+  }
+
+  .summary-row,
+  .extra-items-summary .summary-row,
+  .summary-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .package-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .wizard-steps {
+    gap: 6px;
+  }
+
+  .step {
+    min-width: 52px;
+    padding: 8px;
+  }
+
+  .step-number {
+    width: 24px;
+    height: 24px;
+    font-size: 12px;
+  }
+
+  .page-header h1 {
+    font-size: 24px;
+  }
+
+  .step-content h2 {
+    font-size: 18px;
+    margin-bottom: 16px;
   }
 }
 </style>

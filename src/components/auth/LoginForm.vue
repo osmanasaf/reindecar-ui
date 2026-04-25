@@ -209,4 +209,24 @@ watch([username, password], () => reset())
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+@media (max-width: 480px) {
+  .login-form {
+    gap: var(--spacing-md);
+  }
+
+  .form-group input {
+    padding: 12px;
+    font-size: var(--font-size-sm);
+  }
+
+  .toggle-password {
+    right: 6px;
+  }
+
+  .submit-btn {
+    width: 100%;
+    padding: 12px 16px;
+  }
+}
 </style>

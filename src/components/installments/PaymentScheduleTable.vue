@@ -89,6 +89,7 @@ const sortedPayments = computed(() => {
 
 .table {
   width: 100%;
+  min-width: 720px;
   border-collapse: collapse;
   font-size: 14px;
 }
@@ -186,5 +187,16 @@ const sortedPayments = computed(() => {
   padding: 40px;
   text-align: center;
   color: var(--color-text-secondary);
+}
+
+@media (max-width: 768px) {
+  .actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .btn-link {
+    width: 100%;
+  }
 }
 </style>

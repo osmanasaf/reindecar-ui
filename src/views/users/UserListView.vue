@@ -109,7 +109,7 @@ onMounted(fetchUsers)
 
 <template>
   <div class="users-page">
-    <header class="page-header">
+    <header class="page-header responsive-page-header">
       <div class="header-left">
         <h1>Kullanıcılar</h1>
         <span class="count">{{ users.length }} kullanıcı</span>
@@ -121,7 +121,7 @@ onMounted(fetchUsers)
 
     <div v-if="loading" class="loading">Yükleniyor...</div>
 
-    <div v-else class="users-table">
+    <div v-else class="users-table responsive-table">
       <table>
         <thead>
           <tr>
@@ -165,6 +165,47 @@ onMounted(fetchUsers)
           </tr>
         </tbody>
       </table>
+    </div>
+
+    <div v-if="!loading" class="mobile-cards">
+      <div v-for="user in users" :key="`mobile-${user.id}`" class="mobile-card">
+        <div class="mobile-card-header">
+          <div class="user-cell">
+            <span class="avatar">{{ user.fullName.charAt(0) }}</span>
+            <div>
+              <strong>{{ user.fullName }}</strong>
+              <span class="username">@{{ user.username }}</span>
+            </div>
+          </div>
+          <span :class="['status-badge', user.active ? 'active' : 'inactive']">
+            {{ user.active ? 'Aktif' : 'Pasif' }}
+          </span>
+        </div>
+        <div class="mobile-card-grid">
+          <div class="mobile-field">
+            <span class="mobile-label">E-posta</span>
+            <span>{{ user.email }}</span>
+          </div>
+          <div class="mobile-field">
+            <span class="mobile-label">Rol</span>
+            <span :class="['role-badge', user.role.toLowerCase()]">{{ roleLabels[user.role] }}</span>
+          </div>
+          <div class="mobile-field">
+            <span class="mobile-label">Şube</span>
+            <span>{{ user.branchName }}</span>
+          </div>
+          <div class="mobile-field">
+            <span class="mobile-label">Kayıt Tarihi</span>
+            <span>{{ formatDate(user.createdAt) }}</span>
+          </div>
+        </div>
+        <div class="actions mobile-actions">
+          <button class="btn-action" @click="openEditForm(user)">✏️ Düzenle</button>
+          <button class="btn-action" @click="toggleStatus(user)">
+            {{ user.active ? '⏸️ Pasifleştir' : '▶️ Aktifleştir' }}
+          </button>
+        </div>
+      </div>
     </div>
 
     <div v-if="showForm" class="modal-overlay" @click.self="showForm = false">
@@ -272,6 +313,10 @@ onMounted(fetchUsers)
   border: 1px solid var(--color-border);
   border-radius: 12px;
   overflow: hidden;
+}
+
+.mobile-cards {
+  display: none;
 }
 
 table {
@@ -418,5 +463,80 @@ tbody tr:last-child td {
 
 .form-actions .btn {
   flex: 1;
+}
+
+@media (max-width: 768px) {
+  .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .users-table {
+    display: none;
+  }
+
+  .mobile-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .mobile-card {
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    background: var(--color-surface);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .mobile-card-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .mobile-card-grid {
+    display: grid;
+    gap: 12px;
+  }
+
+  .mobile-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    color: var(--color-text-secondary);
+    font-size: 13px;
+  }
+
+  .mobile-label {
+    font-size: 12px;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .mobile-actions {
+    flex-direction: column;
+  }
+
+  .mobile-actions .btn-action {
+    width: 100%;
+  }
+
+  .modal-overlay {
+    padding: 16px;
+  }
+
+  .modal {
+    padding: 20px 16px;
+    max-width: 100%;
+  }
+
+  .form-actions {
+    flex-direction: column;
+  }
 }
 </style>

@@ -1079,6 +1079,50 @@ textarea {
 .photo-file-input {
   display: none;
 }
+
+@media (max-width: 768px) {
+  .page-header,
+  .header-left,
+  .form-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .form-container {
+    padding: 20px 16px;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .form-group.full-width {
+    grid-column: auto;
+  }
+
+  .btn {
+    width: 100%;
+  }
+
+  .photo-preview-img {
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+  }
+
+  .photo-actions {
+    width: 100%;
+  }
+
+  .btn-recognize {
+    min-width: 0;
+  }
+
+  .recognition-badge {
+    align-self: flex-start;
+  }
+}
 </style>
 
 

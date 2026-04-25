@@ -74,6 +74,8 @@ async function handleLogout() {
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
+  min-width: 0;
+  flex: 1;
 }
 
 .menu-toggle {
@@ -96,6 +98,7 @@ async function handleLogout() {
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
+  flex-shrink: 0;
 }
 
 .user-menu {
@@ -170,9 +173,16 @@ async function handleLogout() {
   background: var(--color-bg-secondary);
 }
 
-@media (max-width: 768px) {
+@media (max-width: 480px) {
   .user-name {
     display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-header {
+    padding: 0 var(--spacing-md);
+    gap: var(--spacing-sm);
   }
 }
 </style>

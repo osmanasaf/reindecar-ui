@@ -3,7 +3,8 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { vehiclesApi } from '@/api'
 import { useToast } from '@/composables'
-import type { Vehicle, VehicleStatus } from '@/types'
+import { VehicleStatus } from '@/types'
+import type { Vehicle } from '@/types'
 import VehicleEditModal from '@/components/vehicles/VehicleEditModal.vue'
 import VehicleDamageMap from '@/components/vehicles/VehicleDamageMap.vue'
 import VehicleMaintenanceMap from '@/components/vehicles/VehicleMaintenanceMap.vue'
@@ -24,6 +25,8 @@ const vehicle = ref<Vehicle | null>(null)
 const loading = ref(true)
 const showEditModal = ref(false)
 const showCreateInsuranceModal = ref(false)
+const showArchiveModal = ref(false)
+const archiving = ref(false)
 const insuranceListRef = ref<InstanceType<typeof VehicleInsuranceList> | null>(null)
 
 function getTabFromQuery(): TabKey {
@@ -151,6 +154,25 @@ const handleInsuranceCreated = () => {
   toast.success('Sigorta poliçesi eklendi')
 }
 
+const canArchiveVehicle = computed(
+  () => vehicle.value && vehicle.value.status !== VehicleStatus.RENTED
+)
+
+async function confirmArchiveVehicle() {
+  if (!vehicle.value) return
+  archiving.value = true
+  try {
+    await vehiclesApi.deleteById(vehicle.value.id)
+    toast.success('Araç listeden kaldırıldı (arşivlendi)')
+    showArchiveModal.value = false
+    router.push('/vehicles')
+  } catch (err) {
+    toast.apiError(err, 'Araç arşivlenemedi')
+  } finally {
+    archiving.value = false
+  }
+}
+
 onMounted(fetchVehicle)
 </script>
 
@@ -171,6 +193,15 @@ onMounted(fetchVehicle)
         </div>
         <div class="header-actions">
           <button class="btn btn-outline" @click="showEditModal = true">Düzenle</button>
+          <button
+            type="button"
+            class="btn btn-outline btn-archive-vehicle"
+            :disabled="!canArchiveVehicle"
+            :title="vehicle?.status === VehicleStatus.RENTED ? 'Kiradaki araç arşivlenemez' : 'Veritabanında silinmez, listede görünmez'"
+            @click="showArchiveModal = true"
+          >
+            Listeden kaldır
+          </button>
         </div>
       </header>
 
@@ -354,6 +385,24 @@ onMounted(fetchVehicle)
         @close="showEditModal = false"
         @saved="handleVehicleSaved"
       />
+
+      <div v-if="showArchiveModal && vehicle" class="archive-modal-overlay" @click.self="showArchiveModal = false">
+        <div class="archive-modal">
+          <div class="archive-modal-header">
+            <h3>Listeden kaldır</h3>
+            <button type="button" class="archive-close-btn" @click="showArchiveModal = false">×</button>
+          </div>
+          <div class="archive-modal-body">
+            <p>
+              <strong>{{ vehicle.plateNumber }}</strong> plakalı araç listede gösterilmeyecek; kayıt sistemde arşivlenir (soft delete). Kiradaki araçlar kaldırılamaz.
+            </p>
+          </div>
+          <div class="archive-modal-footer">
+            <button type="button" class="btn btn-outline" @click="showArchiveModal = false">Vazgeç</button>
+            <button type="button" class="btn btn-danger" :disabled="archiving" @click="confirmArchiveVehicle">Evet, kaldır</button>
+          </div>
+        </div>
+      </div>
     </template>
   </div>
 
@@ -550,6 +599,98 @@ onMounted(fetchVehicle)
 
 .tab-content {
   animation: fadeIn 0.2s;
+}
+
+.header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.btn-archive-vehicle {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+.btn-archive-vehicle:hover:not(:disabled) {
+  background: var(--color-danger-light, rgba(220, 38, 38, 0.12));
+}
+
+.btn-archive-vehicle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-danger {
+  background: var(--color-danger);
+  color: var(--color-text-inverse, #fff);
+  border: 1px solid var(--color-danger);
+}
+
+.btn-danger:hover:not(:disabled) {
+  filter: brightness(0.95);
+}
+
+.btn-danger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.archive-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.archive-modal {
+  width: 100%;
+  max-width: 420px;
+  background: var(--color-surface);
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+}
+
+.archive-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.archive-modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.archive-close-btn {
+  background: none;
+  border: none;
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--color-text-muted);
+}
+
+.archive-modal-body {
+  padding: 20px;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.archive-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 20px 20px;
 }
 
 @keyframes fadeIn {

@@ -146,7 +146,7 @@ onMounted(fetchRentals)
 
 <template>
   <div class="rentals-page">
-    <header class="page-header">
+    <header class="page-header responsive-page-header">
       <div class="header-left">
         <h1>Kiralamalar</h1>
         <span class="count">{{ totalElements }} kiralama</span>
@@ -156,7 +156,7 @@ onMounted(fetchRentals)
       </RouterLink>
     </header>
 
-    <div class="filters">
+    <div class="filters responsive-filters">
       <SearchableSelect
         :model-value="statusFilter || null"
         :options="statusOptions"
@@ -183,7 +183,7 @@ onMounted(fetchRentals)
       <p>Kiralama bulunamadı</p>
     </div>
 
-    <div v-else class="rentals-table">
+    <div v-else class="rentals-table responsive-table">
       <table>
         <thead>
           <tr>
@@ -236,7 +236,48 @@ onMounted(fetchRentals)
       </table>
     </div>
 
-    <div v-if="!loading && filteredRentals.length > 0" class="pagination">
+    <div v-if="!loading && filteredRentals.length > 0" class="mobile-cards">
+      <div
+        v-for="rental in filteredRentals"
+        :key="`mobile-${rental.id}`"
+        class="mobile-card"
+        @click="$router.push(`/rentals/${rental.id}`)"
+      >
+        <div class="mobile-card-header">
+          <div>
+            <div class="mobile-card-id">{{ rental.rentalNumber || `#${rental.id}` }}</div>
+            <div class="mobile-card-title">
+              {{ rental.customerName || getCustomer(rental)?.displayName || '-' }}
+            </div>
+          </div>
+          <span :class="['status-badge', statusColors[rental.status] || 'muted']">
+            {{ statusLabels[rental.status] || rental.status }}
+          </span>
+        </div>
+
+        <div class="mobile-card-grid">
+          <div class="mobile-field">
+            <span class="mobile-label">Araç</span>
+            <strong>{{ rental.vehiclePlate || getVehicle(rental)?.plateNumber || '-' }}</strong>
+            <span>{{ rental.vehicleName || (getVehicle(rental) ? `${getVehicle(rental)?.brand} ${getVehicle(rental)?.model}` : '-') }}</span>
+          </div>
+          <div class="mobile-field">
+            <span class="mobile-label">Tip</span>
+            <span class="type-badge">{{ typeLabels[rental.rentalType] || rental.rentalType }}</span>
+          </div>
+          <div class="mobile-field">
+            <span class="mobile-label">Tarih</span>
+            <span>{{ formatDate(rental.startDate) }} - {{ formatDate(rental.endDate) }}</span>
+          </div>
+          <div class="mobile-field">
+            <span class="mobile-label">Toplam</span>
+            <strong class="amount">{{ formatCurrency(rental.grandTotal) }}</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="!loading && filteredRentals.length > 0" class="pagination responsive-pagination">
       <button :disabled="page === 0" @click="handlePageChange(page - 1)">
         ← Önceki
       </button>
@@ -292,6 +333,10 @@ onMounted(fetchRentals)
 .btn-primary {
   background: var(--color-primary);
   color: white;
+}
+
+.btn-primary:hover {
+  background: var(--color-primary-hover);
 }
 
 .filters {
@@ -420,6 +465,10 @@ tbody tr:last-child td {
 .status-badge.secondary { background: #f3f4f6; color: #4b5563; }
 .status-badge.pending-payment { background: #ede9fe; color: #6d28d9; }
 
+.mobile-cards {
+  display: none;
+}
+
 .pagination {
   display: flex;
   justify-content: center;
@@ -439,5 +488,78 @@ tbody tr:last-child td {
 .pagination button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .header-left {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .mobile-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .mobile-card {
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    background: var(--color-surface);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    cursor: pointer;
+  }
+
+  .mobile-card-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .mobile-card-id {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-primary);
+  }
+
+  .mobile-card-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--color-text);
+  }
+
+  .mobile-card-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .mobile-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    color: var(--color-text-secondary);
+    font-size: 13px;
+  }
+
+  .mobile-label {
+    font-size: 12px;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .rentals-table {
+    display: none;
+  }
 }
 </style>

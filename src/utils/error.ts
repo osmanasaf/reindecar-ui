@@ -93,8 +93,110 @@ export const errorMessageMap: Record<string, string> = {
     S007: 'Veri bütünlük hatası'
 }
 
+/** Sunucunun İngilizce döndürdüğü bilinen metinler (yedek; backend Türkçeleştikçe daraltılabilir) */
+export const backendEnglishToTurkish: Record<string, string> = {
+    'Vehicle deleted successfully': 'Araç listesinden kaldırıldı',
+    'Customer deleted successfully': 'Müşteri listesinden kaldırıldı',
+    'Rental created successfully': 'Kiralama oluşturuldu',
+    'Rental reserved successfully': 'Kiralama rezerve edildi',
+    'Rental activated successfully': 'Kiralama etkinleştirildi',
+    'Return process started': 'İade süreci başlatıldı',
+    'Rental completed successfully': 'Kiralama tamamlandı',
+    'Rental closed successfully': 'Kiralama kapatıldı',
+    'Rental cancelled successfully': 'Kiralama iptal edildi',
+    'Vehicle created successfully': 'Araç oluşturuldu',
+    'Vehicle updated successfully': 'Araç güncellendi',
+    'Vehicle status changed successfully': 'Araç durumu güncellendi',
+    'Vehicle branch changed successfully': 'Araç şubesi değiştirildi',
+    'Vehicle kilometers updated successfully': 'Kilometre güncellendi',
+    'Vehicle image uploaded successfully': 'Araç görseli yüklendi',
+    'Vehicle image deleted successfully': 'Araç görseli kaldırıldı',
+    'Vehicle details updated successfully': 'Araç detayları güncellendi',
+    'Personal customer created successfully': 'Bireysel müşteri oluşturuldu',
+    'Company customer created successfully': 'Kurumsal müşteri oluşturuldu',
+    'Customer updated successfully': 'Müşteri güncellendi',
+    'Customer blacklisted successfully': 'Müşteri kara listeye eklendi',
+    'Customer removed from blacklist successfully': 'Müşteri kara listeden çıkarıldı',
+    'Driver created successfully': 'Sürücü oluşturuldu',
+    'Driver updated successfully': 'Sürücü güncellendi',
+    'Driver deleted successfully': 'Sürücü silindi',
+    'File deleted successfully': 'Dosya silindi',
+    'File uploaded successfully': 'Dosya yüklendi',
+    'Branch deleted successfully': 'Şube listesinden kaldırıldı',
+    'Branch created successfully': 'Şube oluşturuldu',
+    'Branch updated successfully': 'Şube güncellendi',
+    'Cannot delete rented vehicle': 'Kiradaki araç listeden kaldırılamaz',
+    'User created successfully': 'Kullanıcı oluşturuldu',
+    'User updated successfully': 'Kullanıcı güncellendi',
+    'User status updated successfully': 'Kullanıcı durumu güncellendi',
+    'Password changed successfully': 'Şifre değiştirildi',
+    'Profile updated successfully': 'Profil güncellendi',
+    'Settings updated successfully': 'Ayarlar güncellendi',
+    'User deleted successfully': 'Kullanıcı silindi',
+    'Login successful': 'Giriş başarılı',
+    'Token refreshed successfully': 'Oturum yenilendi',
+    'Logout successful': 'Çıkış yapıldı',
+    'Color deleted successfully': 'Renk silindi',
+    'Reference data import completed': 'Referans veriler içe aktarıldı',
+    'License class deleted successfully': 'Ehliyet sınıfı silindi',
+    'District deleted successfully': 'İlçe silindi',
+    'City deleted successfully': 'İl silindi',
+    'Car model deleted successfully': 'Araç modeli silindi',
+    'Brand deleted successfully': 'Marka silindi',
+    'Item activated successfully': 'Kayıt aktif yapıldı',
+    'Item deactivated successfully': 'Kayıt pasif yapıldı',
+    'Created': 'Oluşturuldu',
+    'Category created successfully': 'Kategori oluşturuldu',
+    'Category updated successfully': 'Kategori güncellendi',
+    'Category deleted successfully': 'Kategori silindi',
+    'Insurance created successfully': 'Sigorta poliçesi oluşturuldu',
+    'Insurance activated successfully': 'Sigorta poliçesi aktif edildi',
+    'Insurance deactivated successfully': 'Sigorta poliçesi pasif edildi',
+    'Presigned URL generated': 'İndirme bağlantısı oluşturuldu',
+    'Payment recorded successfully': 'Ödeme kaydedildi',
+    'Branch status updated successfully': 'Şube durumu güncellendi',
+    'Authorized person created successfully': 'Yetkili kişi oluşturuldu',
+    'Authorized person updated successfully': 'Yetkili kişi güncellendi',
+    'Primary contact updated successfully': 'Birincil yetkili güncellendi',
+    'Authorized person deactivated successfully': 'Yetkili kişi pasif yapıldı',
+    'Authorized person activated successfully': 'Yetkili kişi aktif edildi',
+    'Authorized person deleted successfully': 'Yetkili kişi silindi',
+    'KM package created successfully': 'Kilometre paketi oluşturuldu',
+    'KM package updated successfully': 'Kilometre paketi güncellendi',
+    'KM package activated successfully': 'Kilometre paketi aktif edildi',
+    'KM package deactivated successfully': 'Kilometre paketi pasif edildi',
+    'Driver added successfully': 'Sürücü eklendi',
+    'Driver removed successfully': 'Sürücü kaldırıldı',
+    'Primary driver updated': 'Ana sürücü güncellendi',
+    'Pricing created successfully': 'Fiyat kuralı oluşturuldu',
+    'Pricing deactivated': 'Fiyat kuralı pasif edildi',
+    'Notification marked as read': 'Bildirim okundu işaretlendi',
+    'Notification dismissed': 'Bildirim kapatıldı',
+    'Contract created successfully': 'Sözleşme oluşturuldu',
+    'Contract signed successfully': 'Sözleşme imzalandı',
+    'Contract cancelled successfully': 'Sözleşme iptal edildi',
+    'No pricing found for this combination': 'Bu kombinasyon için fiyat kuralı bulunamadı'
+}
+
+function translateBackendString(message: string): string {
+    const trimmed = message.trim()
+    if (backendEnglishToTurkish[trimmed]) {
+        return backendEnglishToTurkish[trimmed]
+    }
+    if (trimmed.startsWith('Geçersiz işlem: ')) {
+        const rest = trimmed.slice('Geçersiz işlem: '.length)
+        if (backendEnglishToTurkish[rest]) {
+            return `Geçersiz işlem: ${backendEnglishToTurkish[rest]}`
+        }
+    }
+    return message
+}
+
 export function getUserFriendlyMessage(code: string, originalMessage: string): string {
-    return errorMessageMap[code] || originalMessage
+    if (errorMessageMap[code]) {
+        return errorMessageMap[code]
+    }
+    return translateBackendString(originalMessage)
 }
 
 export function generateTraceId(): string {
@@ -135,10 +237,10 @@ export function getApiErrorMessage(err: unknown, fallback = 'Bir hata oluştu'):
         }
 
         if (typeof error.message === 'string' && error.message.trim().length > 0) {
-            return error.message
+            return translateBackendString(error.message)
         }
 
-        return errorMessageMap[error.code] || fallback
+        return translateBackendString(errorMessageMap[error.code] || fallback)
     }
 
     if (!err) return fallback

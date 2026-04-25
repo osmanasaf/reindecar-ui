@@ -373,4 +373,42 @@ onMounted(fetchCategories)
 .form-actions { display: flex; gap: 12px; margin-top: 20px; }
 .form-actions .btn { flex: 1; }
 .modal-sm { max-width: 380px; }
+
+@media (max-width: 768px) {
+  .header-actions,
+  .category-row,
+  .row-actions,
+  .form-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .category-info {
+    width: 100%;
+  }
+
+  .category-price,
+  .inactive-badge {
+    align-self: flex-start;
+  }
+
+  .btn,
+  .btn-sm {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .modal-overlay {
+    padding: 16px;
+  }
+
+  .modal,
+  .modal-sm {
+    max-width: 100%;
+  }
+}
 </style>

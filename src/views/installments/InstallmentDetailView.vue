@@ -501,4 +501,39 @@ watch(() => route.params.id, loadInstallment)
 .btn-danger:hover {
   background: #b91c1c;
 }
+
+@media (max-width: 1024px) {
+  .installment-detail-view {
+    padding: 1.5rem 1rem;
+  }
+
+  .page-subtitle {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 768px) {
+  .page-header,
+  .header-actions,
+  .progress-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .overdue-banner,
+  .progress-box,
+  .schedule-box,
+  .documents-box,
+  .empty-state {
+    padding: 1rem;
+  }
+
+  .btn {
+    width: 100%;
+  }
+}
 </style>

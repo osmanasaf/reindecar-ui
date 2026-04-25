@@ -550,4 +550,40 @@ onMounted(fetchBrands)
 .form-actions { display: flex; gap: 12px; margin-top: 20px; }
 .form-actions .btn { flex: 1; }
 .modal-sm { max-width: 360px; }
+
+@media (max-width: 768px) {
+  .header-actions,
+  .accordion-header .header-actions,
+  .models-toolbar,
+  .model-row,
+  .row-actions,
+  .form-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .accordion-body {
+    padding: 12px;
+  }
+
+  .model-info {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .btn,
+  .btn-sm {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .modal-overlay {
+    padding: 16px;
+  }
+
+  .modal,
+  .modal-sm {
+    max-width: 100%;
+  }
+}
 </style>

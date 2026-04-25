@@ -197,7 +197,7 @@ const vehicleOptions = computed(() =>
 
 <template>
   <div class="page-container">
-    <div class="page-header">
+    <div class="page-header responsive-page-header">
       <div>
         <h1 class="page-title">Verecekler</h1>
         <p class="page-subtitle">Servis sağlayıcılara ödenecek tutarlar</p>
@@ -248,7 +248,7 @@ const vehicleOptions = computed(() =>
       </button>
     </div>
 
-    <div v-if="viewMode === 'rental'" class="filter-bar">
+    <div v-if="viewMode === 'rental'" class="filter-bar responsive-filters">
       <SearchableSelect
         v-model="selectedRentalId"
         :options="rentalOptions"
@@ -260,7 +260,7 @@ const vehicleOptions = computed(() =>
       />
     </div>
 
-    <div v-else-if="viewMode === 'vehicle'" class="filter-bar">
+    <div v-else-if="viewMode === 'vehicle'" class="filter-bar responsive-filters">
       <SearchableSelect
         v-model="selectedVehicleId"
         :options="vehicleOptions"
@@ -272,7 +272,7 @@ const vehicleOptions = computed(() =>
       />
     </div>
 
-    <div v-else-if="viewMode === 'all'" class="filter-bar">
+    <div v-else-if="viewMode === 'all'" class="filter-bar responsive-filters">
       <SearchableSelect
         :model-value="filters.status ?? null"
         :options="statusOptions"
@@ -332,7 +332,7 @@ const vehicleOptions = computed(() =>
     <div v-if="!loading && payables.length > 0 && (viewMode === 'rental' || viewMode === 'vehicle')" class="list-info">
       {{ payables.length }} verecek kaydı listeleniyor.
     </div>
-    <div v-if="!loading && payables.length > 0 && viewMode === 'all'" class="pagination">
+    <div v-if="!loading && payables.length > 0 && viewMode === 'all'" class="pagination responsive-pagination">
       <button class="page-btn" :disabled="page === 0" @click="handlePageChange(page - 1)">‹ Önceki</button>
       <span class="page-info">Sayfa {{ page + 1 }}</span>
       <button class="page-btn" @click="handlePageChange(page + 1)">Sonraki ›</button>
@@ -419,4 +419,49 @@ const vehicleOptions = computed(() =>
 .btn-primary:hover { background: var(--color-primary-dark, #1d4ed8); }
 .btn-secondary { background: var(--color-secondary, #4b5563); color: white; }
 .btn-ghost { background: transparent; border: 1px solid var(--color-border, #e5e7eb); color: var(--color-text, #111827); }
+
+@media (max-width: 1024px) {
+  .page-container {
+    padding: 1.5rem 1rem;
+  }
+
+  .view-tabs {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .tab-btn {
+    white-space: nowrap;
+  }
+
+  .rental-select,
+  .vehicle-select {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .page-header,
+  .filter-check,
+  .pagination {
+    align-items: stretch;
+  }
+
+  .btn,
+  .page-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .stats-grid,
+  .cards-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .stat-card,
+  .empty-state,
+  .empty-state-hint {
+    padding: 1rem;
+  }
+}
 </style>

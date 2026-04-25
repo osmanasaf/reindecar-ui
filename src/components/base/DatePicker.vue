@@ -57,7 +57,7 @@ function onUpdateModelValue(value: Date | null) {
 </script>
 
 <template>
-  <div class="date-picker-wrap">
+  <div class="date-picker-wrap notranslate" translate="no">
     <label v-if="label" class="date-picker-label">{{ label }}</label>
     <VueDatePicker
       :model-value="internalValue"

@@ -484,4 +484,40 @@ watch([() => props.vehicleId, () => props.startDate, () => props.endDate, () => 
   margin: 0;
   line-height: 1.5;
 }
+
+@media (max-width: 640px) {
+  .loading-state,
+  .error-state,
+  .empty-state,
+  .leasing-plans,
+  .price-summary {
+    padding: 16px;
+  }
+
+  .plans-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .plan-header,
+  .summary-header,
+  .breakdown-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .duration {
+    width: 100%;
+    text-align: center;
+  }
+
+  .error-state button {
+    width: 100%;
+  }
+
+  .breakdown-item .value,
+  .breakdown-item.total .value {
+    overflow-wrap: anywhere;
+  }
+}
 </style>

@@ -343,11 +343,6 @@ onMounted(() => {
 }
 
 @media (max-width: 480px) {
-  .term-grid {
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-  }
-  
   .term-card {
     padding: 16px 12px;
   }
@@ -359,6 +354,11 @@ onMounted(() => {
   .term-badge {
     font-size: 9px;
     padding: 2px 8px;
+  }
+
+  .savings-info,
+  .no-discount-info {
+    padding: 12px;
   }
 }
 </style>

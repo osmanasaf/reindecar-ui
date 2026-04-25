@@ -77,6 +77,8 @@ const breadcrumbs = computed<BreadcrumbItem[]>(() => {
 <style scoped>
 .breadcrumb {
   font-size: var(--font-size-sm);
+  min-width: 0;
+  overflow: hidden;
 }
 
 .breadcrumb-list {
@@ -85,17 +87,23 @@ const breadcrumbs = computed<BreadcrumbItem[]>(() => {
   list-style: none;
   margin: 0;
   padding: 0;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .breadcrumb-item {
   display: flex;
   align-items: center;
+  min-width: 0;
 }
 
 .breadcrumb-link {
   color: var(--color-text-secondary);
   text-decoration: none;
   transition: color var(--transition-fast);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .breadcrumb-link:hover {
@@ -105,10 +113,20 @@ const breadcrumbs = computed<BreadcrumbItem[]>(() => {
 .breadcrumb-current {
   color: var(--color-text);
   font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .breadcrumb-separator {
   margin: 0 var(--spacing-sm);
   color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .breadcrumb-item:not(:last-child):not(:first-child) {
+    display: none;
+  }
 }
 </style>

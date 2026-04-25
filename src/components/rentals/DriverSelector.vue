@@ -576,5 +576,24 @@ watch(() => props.customerId, (newCustomerId) => {
   .btn {
     width: 100%;
   }
+
+  .driver-item {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .driver-name {
+    flex-wrap: wrap;
+  }
+
+  .driver-details {
+    overflow-wrap: anywhere;
+    line-height: 1.5;
+  }
+
+  .selection-summary {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 </style>

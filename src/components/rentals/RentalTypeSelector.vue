@@ -238,15 +238,30 @@ function isSelected(type: RentalType): boolean {
   }
   
   .type-card {
-    flex-direction: row;
+    display: grid;
+    grid-template-columns: auto 1fr;
     justify-content: flex-start;
+    align-items: center;
     text-align: left;
-    gap: 16px;
+    gap: 8px 16px;
+    padding-right: 44px;
   }
   
   .type-icon {
+    grid-row: span 3;
     font-size: 24px;
     margin-bottom: 0;
+  }
+
+  .type-label,
+  .type-description,
+  .type-advantage {
+    width: 100%;
+  }
+
+  .type-advantage {
+    margin-top: 0;
+    width: fit-content;
   }
   
   .check-mark {

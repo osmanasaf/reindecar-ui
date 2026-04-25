@@ -50,15 +50,19 @@ function updateDropdownPosition() {
   if (!triggerRef.value) return
   const rect = triggerRef.value.getBoundingClientRect()
   const viewportHeight = window.innerHeight
+  const viewportWidth = window.innerWidth
   const panelHeight = 320
   const spaceBelow = viewportHeight - rect.bottom
   const top = spaceBelow >= panelHeight
     ? rect.bottom + 4
     : rect.top - panelHeight - 4
+  const preferredWidth = Math.max(rect.width, 280)
+  const width = Math.min(preferredWidth, viewportWidth - 16)
+  const left = Math.max(8, Math.min(rect.left, viewportWidth - width - 8))
   dropdownStyle.value = {
     top: `${top}px`,
-    left: `${rect.left}px`,
-    width: `${Math.max(rect.width, 280)}px`
+    left: `${left}px`,
+    width: `${width}px`
   }
 }
 
@@ -453,5 +457,29 @@ watch(() => props.modelValue, () => {
 
 .btn-save:hover {
   background: var(--color-success-hover);
+}
+
+@media (max-width: 640px) {
+  .selected-value,
+  .placeholder {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  ::global(.dropdown-panel) {
+    min-width: 0;
+    max-width: calc(100vw - 16px);
+  }
+
+  .create-input-box {
+    flex-direction: column;
+  }
+
+  .btn-create,
+  .btn-save {
+    width: 100%;
+  }
 }
 </style>

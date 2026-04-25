@@ -238,6 +238,7 @@ function redirectAfterLogin() {
   
   .login-form-section {
     background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+    min-height: 100vh;
   }
   
   .form-container {
@@ -245,6 +246,53 @@ function redirectAfterLogin() {
     padding: 40px;
     border-radius: 16px;
     box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+  }
+}
+
+@media (max-width: 768px) {
+  .login-form-section {
+    padding: 24px 16px;
+    align-items: stretch;
+  }
+
+  .form-container {
+    max-width: 100%;
+    margin: auto 0;
+    padding: 28px 20px;
+    border-radius: 14px;
+  }
+
+  .form-header {
+    margin-bottom: 24px;
+  }
+
+  .form-header h2 {
+    font-size: 24px;
+  }
+
+  .form-header p {
+    font-size: 15px;
+  }
+}
+
+@media (max-width: 480px) {
+  .login-form-section {
+    padding: 16px;
+  }
+
+  .form-container {
+    padding: 20px 16px;
+    border-radius: 12px;
+    box-shadow: 0 16px 32px -16px rgb(0 0 0 / 0.3);
+  }
+
+  .form-header h2 {
+    font-size: 22px;
+  }
+
+  .form-footer {
+    margin-top: 24px;
+    font-size: 13px;
   }
 }
 </style>

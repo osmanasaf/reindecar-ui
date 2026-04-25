@@ -73,7 +73,7 @@ onMounted(fetchCustomers)
 
 <template>
   <div class="customers-page">
-    <header class="page-header">
+    <header class="page-header responsive-page-header">
       <div class="header-left">
         <h1>Müşteriler</h1>
         <span class="count">{{ totalElements }} müşteri</span>
@@ -85,7 +85,7 @@ onMounted(fetchCustomers)
       </div>
     </header>
 
-    <div class="filters">
+    <div class="filters responsive-filters">
       <div class="search-box">
         <input
           v-model="searchQuery"
@@ -110,7 +110,7 @@ onMounted(fetchCustomers)
       <p>Müşteri bulunamadı</p>
     </div>
 
-    <div v-else class="customers-table">
+    <div v-else class="customers-table responsive-table">
       <table>
         <thead>
           <tr>
@@ -156,7 +156,49 @@ onMounted(fetchCustomers)
       </table>
     </div>
 
-    <div v-if="!loading && filteredCustomers.length > 0" class="pagination">
+    <div v-if="!loading && filteredCustomers.length > 0" class="mobile-cards">
+      <div
+        v-for="customer in filteredCustomers"
+        :key="`mobile-${customer.id}`"
+        class="mobile-card"
+        @click="$router.push(`/customers/${customer.id}`)"
+      >
+        <div class="mobile-card-header">
+          <div class="customer-name mobile-customer-name">
+            <span class="avatar">{{ customer.displayName?.charAt(0) || '?' }}</span>
+            <div>
+              <strong>{{ customer.displayName }}</strong>
+              <span class="id">{{ customer.publicId }}</span>
+            </div>
+          </div>
+          <span v-if="customer.blacklisted" class="status-badge danger">Kara Liste</span>
+          <span v-else class="status-badge success">Aktif</span>
+        </div>
+
+        <div class="mobile-card-grid">
+          <div class="mobile-field">
+            <span class="mobile-label">Tip</span>
+            <span :class="['type-badge', customer.customerType.toLowerCase()]">
+              {{ typeLabels[customer.customerType] }}
+            </span>
+          </div>
+          <div class="mobile-field">
+            <span class="mobile-label">Telefon</span>
+            <span>{{ formatPhone(customer.phone) }}</span>
+          </div>
+          <div class="mobile-field">
+            <span class="mobile-label">E-posta</span>
+            <span>{{ customer.email || '-' }}</span>
+          </div>
+          <div class="mobile-field">
+            <span class="mobile-label">Şehir</span>
+            <span>{{ customer.city || '-' }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="!loading && filteredCustomers.length > 0" class="pagination responsive-pagination">
       <button :disabled="page === 0" @click="handlePageChange(page - 1)">
         ← Önceki
       </button>
@@ -267,6 +309,10 @@ onMounted(fetchCustomers)
   border: 1px solid var(--color-border);
   border-radius: 12px;
   overflow: hidden;
+}
+
+.mobile-cards {
+  display: none;
 }
 
 table {
@@ -383,5 +429,75 @@ tbody tr:last-child td {
 .pagination button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .header-left {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .header-actions,
+  .btn {
+    width: 100%;
+  }
+
+  .btn {
+    justify-content: center;
+  }
+
+  .customers-table {
+    display: none;
+  }
+
+  .mobile-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .mobile-card {
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    background: var(--color-surface);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    cursor: pointer;
+  }
+
+  .mobile-card-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .mobile-customer-name {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .mobile-card-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .mobile-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 13px;
+    color: var(--color-text-secondary);
+  }
+
+  .mobile-label {
+    font-size: 12px;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
 }
 </style>
