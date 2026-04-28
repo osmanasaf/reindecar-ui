@@ -1,6 +1,6 @@
 export { default as apiClient, tokenStorage } from './client'
 
-export { authApi } from './auth.api'
+export { authApi, publicUserInvitationsApi } from './auth.api'
 export { vehiclesApi, vehicleCategoriesApi } from './vehicles.api'
 export { customersApi } from './customers.api'
 export { driversApi } from './drivers.api'
@@ -33,6 +33,13 @@ export { dashboardApi } from './dashboard.api'
 export type { DashboardStats, RevenueData, VehicleStatusData, UpcomingReturn, DashboardResponse, AccountingStats } from './dashboard.api'
 export { usersApi } from './users.api'
 export type { UpdateProfileRequest, ChangePasswordRequest, UserSettings, UserResponse } from './users.api'
+export { userInvitationsApi } from './user-invitations.api'
+export type {
+    CreateUserInvitationRequest,
+    UserInvitationResponse,
+    UserInvitationRole,
+    UserInvitationStatus
+} from './user-invitations.api'
 export {
     receivablesApi,
     payablesApi,

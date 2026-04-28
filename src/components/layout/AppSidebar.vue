@@ -38,6 +38,7 @@ const allNavItems: NavItem[] = [
   { name: 'installments-dashboard', label: 'Taksit Yönetimi', icon: '💳' },
   { name: 'branches', label: 'Şubeler', icon: '🏢', adminOnly: true },
   { name: 'users', label: 'Kullanıcılar', icon: '👤', adminOnly: true },
+  { name: 'user-invitations', label: 'Davetler', icon: '✉️', adminOnly: true },
   { name: 'settings', label: 'Ayarlar', icon: '⚙️' }
 ]
 

@@ -3,6 +3,7 @@ import { ref, computed, readonly } from 'vue'
 import { authApi, tokenStorage } from '@/api'
 import { tokenManager } from '@/services/tokenManager'
 import type { User, LoginForm, Role } from '@/types'
+import type { RegisterInvitedUserRequest, RegisterTenantRequest } from '@/api/auth.api'
 
 export const useAuthStore = defineStore('auth', () => {
     const user = ref<User | null>(null)
@@ -64,6 +65,34 @@ export const useAuthStore = defineStore('auth', () => {
             return true
         } catch (e) {
             error.value = (e as Error).message || 'Giriş başarısız'
+            return false
+        } finally {
+            loading.value = false
+        }
+    }
+
+    async function registerTenant(request: RegisterTenantRequest): Promise<boolean> {
+        return authenticateWithTokens(() => authApi.registerTenant(request), 'Kayıt başarısız')
+    }
+
+    async function registerInvitedUser(request: RegisterInvitedUserRequest): Promise<boolean> {
+        return authenticateWithTokens(() => authApi.registerInvitedUser(request), 'Davet kaydı başarısız')
+    }
+
+    async function authenticateWithTokens(loader: () => Promise<{ accessToken: string; refreshToken: string }>, fallbackError: string): Promise<boolean> {
+        loading.value = true
+        error.value = null
+
+        try {
+            const tokens = await loader()
+            tokenStorage.setTokens(tokens.accessToken, tokens.refreshToken)
+            setupTokenListeners()
+            tokenManager.start()
+            updateTokenStatus()
+            await fetchUser()
+            return true
+        } catch (e) {
+            error.value = (e as Error).message || fallbackError
             return false
         } finally {
             loading.value = false
@@ -145,6 +174,8 @@ export const useAuthStore = defineStore('auth', () => {
         isAdmin,
         userFullName,
         login,
+        registerTenant,
+        registerInvitedUser,
         logout,
         checkAuth,
         fetchUser,

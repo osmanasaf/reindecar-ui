@@ -11,6 +11,18 @@ const router = createRouter({
             meta: { requiresAuth: false }
         },
         {
+            path: '/register',
+            name: 'register-tenant',
+            component: () => import('@/views/auth/RegisterTenantView.vue'),
+            meta: { requiresAuth: false }
+        },
+        {
+            path: '/register-invited-user',
+            name: 'register-invited-user',
+            component: () => import('@/views/auth/RegisterInvitedUserView.vue'),
+            meta: { requiresAuth: false }
+        },
+        {
             path: '/',
             name: 'dashboard',
             component: () => import('@/views/dashboard/DashboardView.vue'),
@@ -92,6 +104,12 @@ const router = createRouter({
             path: '/users',
             name: 'users',
             component: () => import('@/views/users/UserListView.vue'),
+            meta: { requiresAuth: true, roles: ['ADMIN'] }
+        },
+        {
+            path: '/user-invitations',
+            name: 'user-invitations',
+            component: () => import('@/views/users/UserInvitationsView.vue'),
             meta: { requiresAuth: true, roles: ['ADMIN'] }
         },
         {

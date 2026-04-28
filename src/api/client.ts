@@ -187,7 +187,7 @@ export abstract class BaseApi {
         return path.startsWith('/') ? `${this.basePath}${path}` : `${this.basePath}/${path}`
     }
 
-    protected async get<T>(path = '', params?: PaginationParams): Promise<T> {
+    protected async get<T>(path = '', params?: PaginationParams | Record<string, unknown>): Promise<T> {
         const { data } = await apiClient.get<ApiResponse<T>>(this.buildUrl(path), { params })
         return data.data
     }

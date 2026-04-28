@@ -82,6 +82,7 @@ function redirectAfterLogin() {
         />
 
         <div class="form-footer">
+          <p>Hesabınız yok mu? <RouterLink :to="{ name: 'register-tenant' }">Firma kaydı oluşturun</RouterLink></p>
           <p>Şifrenizi mi unuttunuz? <a href="#">Yardım alın</a></p>
         </div>
       </div>

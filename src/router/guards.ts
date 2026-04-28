@@ -25,5 +25,11 @@ export async function authGuard(
         return
     }
 
+    const roles = to.meta.roles as string[] | undefined
+    if (roles?.length && !roles.includes(authStore.user?.role ?? '')) {
+        next({ name: 'dashboard' })
+        return
+    }
+
     next()
 }
