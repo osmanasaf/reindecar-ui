@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { useInstallmentStore } from '@/stores/installment.store'
 import { validateStartDate, validatePositiveNumber, validateInstallmentCount } from '@/utils/installmentHelpers'
 import type { CreateVehicleInstallmentRequest } from '@/types'
+import { RcButton } from '@/components/rc'
 import DatePicker from '@/components/base/DatePicker.vue'
 
 interface Props {
@@ -121,14 +122,12 @@ function onInstallmentCountChange(): void {
 </script>
 
 <template>
-  <div class="installment-form">
-    <h3 class="form-title">Yeni Taksit Planı Oluştur</h3>
-
+  <div class="rc-veh-modal-form">
     <form @submit.prevent="handleSubmit">
       <div class="form-grid">
         <div class="form-group full-width">
-          <label for="totalAmount" class="form-label">
-            Toplam Tutar <span class="required">*</span>
+          <label for="totalAmount">
+            Toplam Tutar <span style="color: var(--rc-danger-500)">*</span>
           </label>
           <input
             id="totalAmount"
@@ -136,34 +135,32 @@ function onInstallmentCountChange(): void {
             type="number"
             step="0.01"
             min="0"
-            class="form-input"
-            :class="{ 'has-error': errors.totalAmount }"
+            :class="{ error: errors.totalAmount }"
             @input="onTotalChange"
             placeholder="Örn: 500000"
           />
-          <span v-if="errors.totalAmount" class="error-message">{{ errors.totalAmount }}</span>
+          <span v-if="errors.totalAmount" class="error-text">{{ errors.totalAmount }}</span>
         </div>
 
         <div class="form-group">
-          <label for="numberOfInstallments" class="form-label">
-            Taksit Sayısı <span class="required">*</span>
+          <label for="numberOfInstallments">
+            Taksit Sayısı <span style="color: var(--rc-danger-500)">*</span>
           </label>
           <input
             id="numberOfInstallments"
             v-model.number="formData.numberOfInstallments"
             type="number"
             min="1"
-            class="form-input"
-            :class="{ 'has-error': errors.numberOfInstallments }"
+            :class="{ error: errors.numberOfInstallments }"
             @input="onInstallmentCountChange"
             placeholder="Örn: 50"
           />
-          <span v-if="errors.numberOfInstallments" class="error-message">{{ errors.numberOfInstallments }}</span>
+          <span v-if="errors.numberOfInstallments" class="error-text">{{ errors.numberOfInstallments }}</span>
         </div>
 
         <div class="form-group">
-          <label for="monthlyPayment" class="form-label">
-            Aylık Ödeme <span class="required">*</span>
+          <label for="monthlyPayment">
+            Aylık Ödeme <span style="color: var(--rc-danger-500)">*</span>
           </label>
           <input
             id="monthlyPayment"
@@ -171,14 +168,17 @@ function onInstallmentCountChange(): void {
             type="number"
             step="0.01"
             min="0"
-            class="form-input"
-            :class="{ 'has-error': errors.monthlyPayment }"
+            :class="{ error: errors.monthlyPayment }"
             @input="onMonthlyChange"
             placeholder="Örn: 10000"
           />
-          <span v-if="errors.monthlyPayment" class="error-message">{{ errors.monthlyPayment }}</span>
-          <span v-if="lastEditedField === 'total' && formData.monthlyPayment > 0" class="help-text success">
-            ✓ Otomatik hesaplandı
+          <span v-if="errors.monthlyPayment" class="error-text">{{ errors.monthlyPayment }}</span>
+          <span
+            v-if="lastEditedField === 'total' && formData.monthlyPayment > 0"
+            class="error-text"
+            style="color: var(--rc-success-600)"
+          >
+            Otomatik hesaplandı
           </span>
         </div>
 
@@ -189,157 +189,29 @@ function onInstallmentCountChange(): void {
             placeholder="Başlangıç tarihi"
             :class="{ 'error': errors.startDate }"
           />
-          <span v-if="errors.startDate" class="error-message">{{ errors.startDate }}</span>
+          <span v-if="errors.startDate" class="error-text">{{ errors.startDate }}</span>
         </div>
 
         <div class="form-group full-width">
-          <label for="notes" class="form-label">Notlar</label>
+          <label for="notes">Notlar</label>
           <textarea
             id="notes"
             v-model="formData.notes"
             rows="3"
             maxlength="1000"
-            class="form-input"
             placeholder="Opsiyonel notlar..."
           />
         </div>
       </div>
 
       <div class="form-actions">
-        <button type="button" class="btn btn-secondary" @click="handleCancel" :disabled="submitting">
+        <RcButton type="button" variant="secondary" :disabled="submitting" @click="handleCancel">
           İptal
-        </button>
-        <button type="submit" class="btn btn-primary" :disabled="submitting">
-          {{ submitting ? 'Oluşturuluyor...' : 'Oluştur' }}
-        </button>
+        </RcButton>
+        <RcButton type="submit" variant="accent" :disabled="submitting">
+          {{ submitting ? 'Oluşturuluyor…' : 'Oluştur' }}
+        </RcButton>
       </div>
     </form>
   </div>
 </template>
-
-<style scoped>
-.installment-form {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  padding: 24px;
-}
-
-.form-title {
-  font-size: 18px;
-  font-weight: 600;
-  margin: 0 0 24px 0;
-  color: var(--color-text);
-}
-
-.form-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 20px;
-  margin-bottom: 24px;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.form-group.full-width {
-  grid-column: span 2;
-}
-
-.form-label {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--color-text);
-}
-
-.required {
-  color: var(--color-danger);
-}
-
-.form-input {
-  padding: 10px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  font-size: 14px;
-  background: var(--color-bg-secondary);
-  transition: all 0.2s;
-}
-
-.form-input:focus {
-  outline: none;
-  border-color: var(--color-primary);
-  background: var(--color-surface);
-}
-
-.form-input.has-error {
-  border-color: var(--color-danger);
-}
-
-.help-text {
-  font-size: 12px;
-  color: var(--color-text-secondary);
-}
-
-.help-text.success {
-  color: var(--color-success);
-  font-weight: 500;
-}
-
-.error-message {
-  font-size: 12px;
-  color: var(--color-danger);
-}
-
-.form-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-}
-
-.btn {
-  padding: 10px 20px;
-  border-radius: 8px;
-  font-weight: 500;
-  font-size: 14px;
-  cursor: pointer;
-  border: none;
-  transition: all 0.2s;
-}
-
-.btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.btn-secondary {
-  background: transparent;
-  border: 1px solid var(--color-border);
-  color: var(--color-text);
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background: var(--color-bg-secondary);
-}
-
-.btn-primary {
-  background: var(--color-primary);
-  color: white;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: var(--color-primary-hover);
-}
-
-@media (max-width: 768px) {
-  .form-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .form-group.full-width {
-    grid-column: span 1;
-  }
-}
-</style>

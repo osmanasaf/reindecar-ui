@@ -2,6 +2,9 @@
 import { onMounted, ref } from 'vue'
 import { userInvitationsApi } from '@/api'
 import { useToast } from '@/composables'
+import { AccountingConfirmModal } from '@/components/accounting'
+import { RcPageHeader, RcButton, RcEmpty, RcStatusPill } from '@/components/rc'
+import { RcIcon } from '@/components/icons'
 import type { UserInvitationResponse, UserInvitationRole } from '@/api'
 
 const toast = useToast()
@@ -12,22 +15,16 @@ const creating = ref(false)
 const cancellingId = ref<number | null>(null)
 const createError = ref<string | null>(null)
 const lastInviteLink = ref('')
+const cancelTarget = ref<UserInvitationResponse | null>(null)
 
 const form = ref({
   email: '',
-  role: 'OPERATOR' as UserInvitationRole
+  role: 'OPERATOR' as UserInvitationRole,
 })
 
 const roleLabels: Record<UserInvitationRole, string> = {
   ADMIN: 'Tenant admin',
-  OPERATOR: 'Operatör'
-}
-
-const statusLabels: Record<string, string> = {
-  PENDING: 'Beklemede',
-  USED: 'Kullanıldı',
-  CANCELLED: 'İptal edildi',
-  EXPIRED: 'Süresi doldu'
+  OPERATOR: 'Operatör',
 }
 
 onMounted(loadInvitations)
@@ -55,7 +52,7 @@ async function createInvitation() {
   try {
     const created = await userInvitationsApi.create({
       email: form.value.email.trim(),
-      role: form.value.role
+      role: form.value.role,
     })
     invitations.value = [created, ...invitations.value]
     form.value.email = ''
@@ -69,12 +66,18 @@ async function createInvitation() {
   }
 }
 
-async function cancelInvitation(invitation: UserInvitationResponse) {
-  if (!confirm(`${invitation.email} daveti iptal edilsin mi?`)) return
+function requestCancel(invitation: UserInvitationResponse) {
+  cancelTarget.value = invitation
+}
+
+async function confirmCancel() {
+  const invitation = cancelTarget.value
+  if (!invitation) return
 
   cancellingId.value = invitation.id
   try {
     await userInvitationsApi.cancel(invitation.id)
+    cancelTarget.value = null
     await loadInvitations()
     toast.success('Davet iptal edildi')
   } catch (e) {
@@ -89,8 +92,7 @@ async function copyInvitationLink(invitation: UserInvitationResponse) {
     toast.error('Bu davetin token bilgisi yalnızca oluşturulduğu anda gösterilir.')
     return
   }
-  const url = buildInvitationLink(invitation)
-  await copyText(url)
+  await copyText(buildInvitationLink(invitation))
   toast.success('Davet linki kopyalandı')
 }
 
@@ -107,62 +109,93 @@ function isValidEmail(value: string) {
 }
 
 function formatDate(value: string | null) {
-  if (!value) return '-'
+  if (!value) return '—'
   return new Intl.DateTimeFormat('tr-TR', {
     dateStyle: 'medium',
-    timeStyle: 'short'
+    timeStyle: 'short',
   }).format(new Date(value))
 }
 </script>
 
 <template>
-  <div class="invitations-page">
-    <header class="page-header responsive-page-header">
-      <div class="header-left">
-        <h1>Kullanıcı Davetleri</h1>
-        <span class="count">{{ invitations.length }} davet</span>
+  <div class="rc-page rca-invitations">
+    <RcPageHeader
+      title="Kullanıcı Davetleri"
+      subtitle="Yeni kullanıcıları e-posta daveti ile sisteme ekleyin"
+    />
+
+    <div class="rca-stats rca-stats--payables">
+      <div class="rca-stat">
+        <div class="rca-stat__label">Toplam davet</div>
+        <div class="rca-stat__value rc-num">{{ invitations.length }}</div>
       </div>
-    </header>
-
-    <section class="create-card">
-      <h2>Yeni davet oluştur</h2>
-      <form class="invite-form" @submit.prevent="createInvitation">
-        <div class="form-group">
-          <label for="invite-email">E-posta</label>
-          <input id="invite-email" v-model="form.email" type="email" required placeholder="kullanici@firma.com" />
+      <div class="rca-stat">
+        <div class="rca-stat__label">Bekleyen</div>
+        <div class="rca-stat__value rca-stat__value--warning rc-num">
+          {{ invitations.filter(i => i.status === 'PENDING').length }}
         </div>
+      </div>
+    </div>
 
-        <div class="form-group">
-          <label for="invite-role">Rol</label>
-          <select id="invite-role" v-model="form.role">
+    <div class="rc-card rca-invite-panel">
+      <div class="rc-card__head">
+        <div>
+          <div class="rc-card__title">Yeni davet oluştur</div>
+          <div style="font-size: 12px; color: var(--rc-text-muted); margin-top: 2px">
+            Link oluşturulunca otomatik panoya kopyalanır
+          </div>
+        </div>
+      </div>
+
+      <form class="rca-invite-form" @submit.prevent="createInvitation">
+        <label class="rc-field">
+          <span class="rc-field__label">E-posta</span>
+          <input
+            id="invite-email"
+            v-model="form.email"
+            type="email"
+            class="rc-input"
+            required
+            placeholder="kullanici@firma.com"
+          />
+        </label>
+        <label class="rc-field">
+          <span class="rc-field__label">Rol</span>
+          <select id="invite-role" v-model="form.role" class="rc-select">
             <option value="OPERATOR">Operatör</option>
             <option value="ADMIN">Tenant admin</option>
           </select>
-        </div>
-
-        <button class="btn btn-primary" type="submit" :disabled="creating || !form.email">
-          {{ creating ? 'Oluşturuluyor...' : 'Davet oluştur' }}
-        </button>
+        </label>
+        <RcButton variant="accent" type="submit" :disabled="creating || !form.email">
+          {{ creating ? 'Oluşturuluyor…' : 'Davet oluştur' }}
+        </RcButton>
       </form>
-      <p v-if="createError" class="error-text">{{ createError }}</p>
-      <p class="hint">Davet linki oluşturulduğunda otomatik panoya kopyalanır. Token veritabanında düz metin saklanmaz.</p>
 
-      <div v-if="lastInviteLink" class="created-link">
-        <div>
-          <strong>Son oluşturulan davet linki</strong>
-          <span>Bu linki test kullanıcısına gönderebilir veya yeni sekmede açabilirsiniz.</span>
+      <p v-if="createError" class="rc-alert rc-alert--danger" style="margin-top: 12px">{{ createError }}</p>
+
+      <div v-if="lastInviteLink" class="rca-invite-link">
+        <div class="rc-field__label">Son oluşturulan link</div>
+        <div class="rca-invite-link__row">
+          <input :value="lastInviteLink" readonly class="rc-input" />
+          <RcButton variant="secondary" size="sm" type="button" @click="copyText(lastInviteLink)">
+            Kopyala
+          </RcButton>
         </div>
-        <input :value="lastInviteLink" readonly />
-        <button class="btn btn-secondary" type="button" @click="copyText(lastInviteLink)">
-          Kopyala
-        </button>
       </div>
-    </section>
+    </div>
 
-    <div v-if="loading" class="loading">Yükleniyor...</div>
+    <div v-if="loading" class="rc-skeleton rc-card-skeleton" style="height: 240px" />
 
-    <section v-else class="table-card responsive-table">
-      <table>
+    <RcEmpty
+      v-else-if="invitations.length === 0"
+      title="Davet yok"
+      description="Henüz kullanıcı daveti oluşturulmadı"
+    >
+      <template #icon><RcIcon name="mail" :size="32" /></template>
+    </RcEmpty>
+
+    <div v-else class="rc-card" style="overflow: hidden">
+      <table class="rc-table rcv-table--slim">
         <thead>
           <tr>
             <th>E-posta</th>
@@ -170,7 +203,7 @@ function formatDate(value: string | null) {
             <th>Durum</th>
             <th>Oluşturulma</th>
             <th>Son kullanma</th>
-            <th>İşlem</th>
+            <th />
           </tr>
         </thead>
         <tbody>
@@ -178,248 +211,85 @@ function formatDate(value: string | null) {
             <td>{{ invitation.email }}</td>
             <td>{{ roleLabels[invitation.role] }}</td>
             <td>
-              <span :class="['status-badge', invitation.status.toLowerCase()]">
-                {{ statusLabels[invitation.status] }}
-              </span>
+              <RcStatusPill :status="invitation.status" />
             </td>
-            <td>{{ formatDate(invitation.createdAt) }}</td>
-            <td>{{ formatDate(invitation.expiresAt) }}</td>
-            <td class="actions">
-              <button
-                v-if="invitation.status === 'PENDING' && invitation.token"
-                class="btn-action"
-                type="button"
-                @click="copyInvitationLink(invitation)"
-              >
-                Linki kopyala
-              </button>
-              <button
-                v-if="invitation.status === 'PENDING'"
-                class="btn-action danger"
-                type="button"
-                :disabled="cancellingId === invitation.id"
-                @click="cancelInvitation(invitation)"
-              >
-                İptal
-              </button>
+            <td class="rc-mono" style="font-size: 12.5px">{{ formatDate(invitation.createdAt) }}</td>
+            <td class="rc-mono" style="font-size: 12.5px">{{ formatDate(invitation.expiresAt) }}</td>
+            <td class="rc-right">
+              <div style="display: flex; gap: 6px; justify-content: flex-end">
+                <RcButton
+                  v-if="invitation.status === 'PENDING' && invitation.token"
+                  variant="ghost"
+                  size="sm"
+                  @click="copyInvitationLink(invitation)"
+                >
+                  Link
+                </RcButton>
+                <RcButton
+                  v-if="invitation.status === 'PENDING'"
+                  variant="danger"
+                  size="sm"
+                  :disabled="cancellingId === invitation.id"
+                  @click="requestCancel(invitation)"
+                >
+                  İptal
+                </RcButton>
+              </div>
             </td>
-          </tr>
-          <tr v-if="invitations.length === 0">
-            <td colspan="6" class="empty">Henüz davet oluşturulmadı.</td>
           </tr>
         </tbody>
       </table>
-    </section>
+    </div>
+
+    <AccountingConfirmModal
+      :open="!!cancelTarget"
+      title="Daveti iptal et"
+      :message="cancelTarget ? `${cancelTarget.email} daveti iptal edilsin mi?` : ''"
+      confirm-label="İptal et"
+      variant="danger"
+      @close="cancelTarget = null"
+      @confirm="confirmCancel"
+    />
   </div>
 </template>
 
 <style scoped>
-.invitations-page {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
+.rca-invite-panel {
+  padding: 16px 20px;
+  margin-bottom: 16px;
 }
 
-.create-card,
-.table-card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: 20px;
-}
-
-.create-card h2 {
-  margin: 0 0 16px;
-  font-size: 18px;
-}
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 42px;
-  padding: 10px 16px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-sm);
-  font-weight: 700;
-  line-height: 1;
-  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), opacity var(--transition-fast);
-}
-
-.btn:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.btn-primary {
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: var(--color-primary-hover);
-}
-
-.btn-secondary {
-  background: var(--color-bg-secondary);
-  color: var(--color-text);
-  border-color: var(--color-border);
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background: var(--color-surface-hover);
-  border-color: var(--color-primary);
-}
-
-.invite-form {
+.rca-invite-form {
   display: grid;
   grid-template-columns: minmax(220px, 1fr) 180px auto;
-  gap: 14px;
-  align-items: end;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.form-group label {
-  font-size: var(--font-size-sm);
-  font-weight: 600;
-  color: var(--color-text-secondary);
-}
-
-.form-group input,
-.form-group select {
-  padding: 10px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-text);
-}
-
-.hint {
-  margin: 12px 0 0;
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-sm);
-}
-
-.created-link {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
   align-items: end;
+}
+
+.rca-invite-link {
   margin-top: 16px;
-  padding: 14px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-bg);
+  padding-top: 16px;
+  border-top: 1px solid var(--rc-border);
 }
 
-.created-link > div {
-  grid-column: 1 / -1;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.created-link span {
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-sm);
-}
-
-.created-link input {
-  min-width: 0;
-  padding: 10px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-text);
-}
-
-.error-text {
-  margin: 12px 0 0;
-  color: var(--color-danger);
-}
-
-.status-badge {
-  display: inline-flex;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: var(--font-size-xs);
-  font-weight: 700;
-  background: var(--color-bg);
-}
-
-.status-badge.pending {
-  color: var(--color-warning);
-}
-
-.status-badge.used {
-  color: var(--color-success);
-}
-
-.status-badge.cancelled,
-.status-badge.expired {
-  color: var(--color-text-secondary);
-}
-
-.actions {
+.rca-invite-link__row {
   display: flex;
   gap: 8px;
-  flex-wrap: wrap;
+  margin-top: 6px;
 }
 
-.btn-action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 34px;
-  padding: 7px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-primary);
-  font-size: var(--font-size-xs);
-  font-weight: 700;
-  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), opacity var(--transition-fast);
-}
-
-.btn-action:hover:not(:disabled) {
-  background: var(--color-primary-light);
-  border-color: var(--color-primary);
-}
-
-.btn-action:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.btn-action.danger {
-  color: var(--color-danger);
-}
-
-.btn-action.danger:hover:not(:disabled) {
-  background: var(--color-danger-light);
-  border-color: var(--color-danger);
-}
-
-.empty {
-  text-align: center;
-  color: var(--color-text-secondary);
-  padding: 24px;
+.rca-invite-link__row .rc-input {
+  flex: 1;
+  min-width: 0;
 }
 
 @media (max-width: 760px) {
-  .invite-form {
+  .rca-invite-form {
     grid-template-columns: 1fr;
   }
 
-  .created-link {
-    grid-template-columns: 1fr;
+  .rca-invite-link__row {
+    flex-direction: column;
   }
 }
 </style>

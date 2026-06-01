@@ -153,6 +153,26 @@ export interface CreateRentalForm {
     notes?: string
 }
 
+export interface UpdateRentalForm {
+    startDate: string
+    endDate: string
+    branchId: number
+    returnBranchId?: number
+    kmPackageId?: number
+    customIncludedKm?: number
+    customExtraKmPrice?: number
+    discountAmount?: number
+    notes?: string
+    extraItems?: Array<{
+        itemTypeId?: number
+        customName?: string
+        description?: string
+        amount: number
+        currency?: string
+        calculationType: string
+    }>
+}
+
 export interface AddRentalDriverForm {
     driverId: number
     primary: boolean
@@ -261,6 +281,11 @@ export interface VehicleReturnForm {
     actualReturnDate: string
     endKm: number
     notes?: string
+}
+
+export interface ExtendRentalForm {
+    newEndDate: string
+    reason?: string
 }
 
 

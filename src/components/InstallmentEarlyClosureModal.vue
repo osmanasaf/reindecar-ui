@@ -1,126 +1,10 @@
-<template>
-  <div v-if="show" class="modal-overlay" @click.self="$emit('close')">
-    <div class="modal early-closure-modal">
-      <div class="modal-header">
-        <h2>Taksit Erken Kapatma</h2>
-        <button class="close-btn" @click="$emit('close')">×</button>
-      </div>
-
-      <div class="modal-body">
-        <!-- Info Section -->
-        <div class="info-section">
-          <div class="info-item">
-            <span class="label">Toplam Tutar:</span>
-            <strong>{{ formatCurrency(installment.totalAmount) }}</strong>
-          </div>
-          <div class="info-item">
-            <span class="label">Aylık Ödeme:</span>
-            <strong>{{ formatCurrency(installment.monthlyPayment) }}</strong>
-          </div>
-          <div class="info-item">
-            <span class="label">Kalan Taksit:</span>
-            <strong>{{ installment.remainingInstallments }} adet</strong>
-          </div>
-          <div class="info-item highlight">
-            <span class="label">Kalan Bakiye:</span>
-            <strong class="amount">{{ formatCurrency(installment.outstandingBalance) }}</strong>
-          </div>
-        </div>
-
-        <!-- Discount Section -->
-        <div class="section">
-          <h3>İndirim Oranı (Opsiyonel)</h3>
-          <p class="description">
-            Erken ödeme indirimi uygulamak isterseniz aşağıdan oran girebilirsiniz.
-          </p>
-
-          <div class="form-group">
-            <label>İndirim Oranı (%)</label>
-            <input 
-              v-model.number="discountPercentage" 
-              type="number" 
-              min="0" 
-              max="100"
-              step="0.1"
-              placeholder="0"
-            />
-            <span class="hint">0-100 arası bir değer giriniz</span>
-          </div>
-          <div class="form-group">
-            <label>İndirim Tutarı (₺)</label>
-            <input 
-              v-model.number="discountAmountInput" 
-              type="number" 
-              min="0"
-              :max="installment.outstandingBalance"
-              step="0.01"
-              placeholder="0"
-            />
-            <span class="hint">Tutar girerseniz oran otomatik hesaplanır</span>
-          </div>
-        </div>
-
-        <!-- Calculation Preview -->
-        <div class="calculation-preview">
-          <h3>Hesap Özeti</h3>
-          <div class="calc-row">
-            <span>Kalan Bakiye:</span>
-            <span class="value">{{ formatCurrency(installment.outstandingBalance) }}</span>
-          </div>
-          <div v-if="discountAmount > 0" class="calc-row discount">
-            <span>İndirim ({{ effectiveDiscountPercentage.toFixed(1) }}%):</span>
-            <span class="value">-{{ formatCurrency(discountAmount) }}</span>
-          </div>
-          <div class="calc-row total">
-            <span>Ödenecek Tutar:</span>
-            <strong class="value">{{ formatCurrency(finalAmount) }}</strong>
-          </div>
-        </div>
-
-        <!-- Notes Section -->
-        <div class="section">
-          <div class="form-group">
-            <label>Notlar (Opsiyonel)</label>
-            <textarea 
-              v-model="notes" 
-              rows="3"
-              placeholder="Erken kapama ile ilgili notlarınız..."
-            ></textarea>
-          </div>
-        </div>
-
-        <!-- Warning -->
-        <div class="warning-box">
-          <span class="icon">⚠️</span>
-          <div>
-            <strong>Dikkat:</strong> Erken kapama işlemi geri alınamaz. 
-            Tüm kalan taksitler ödendi olarak işaretlenecektir.
-          </div>
-        </div>
-      </div>
-
-      <div class="modal-footer">
-        <button class="btn btn-outline" @click="$emit('close')">
-          İptal
-        </button>
-        <button 
-          class="btn btn-primary" 
-          @click="handleSubmit"
-          :disabled="processing"
-        >
-          {{ processing ? 'İşleniyor...' : `${formatCurrency(finalAmount)} Öde ve Kapat` }}
-        </button>
-      </div>
-    </div>
-  </div>
-</template>
-
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import type { VehicleInstallmentResponse } from '@/types'
+import { RcModal, RcButton, RcField } from '@/components/rc'
 
 interface Props {
-  show: boolean
+  open: boolean
   installment: VehicleInstallmentResponse
 }
 
@@ -147,9 +31,7 @@ const discountAmount = computed(() => {
   return 0
 })
 
-const finalAmount = computed(() => {
-  return Math.max(0, outstandingBalance.value - discountAmount.value)
-})
+const finalAmount = computed(() => Math.max(0, outstandingBalance.value - discountAmount.value))
 
 const effectiveDiscountPercentage = computed(() => {
   if (outstandingBalance.value <= 0 || discountAmount.value <= 0) return 0
@@ -183,8 +65,8 @@ watch(discountAmountInput, (val) => {
   }
 })
 
-watch(() => props.show, (show) => {
-  if (show) {
+watch(() => props.open, (isOpen) => {
+  if (isOpen) {
     discountPercentage.value = 0
     discountAmountInput.value = ''
     notes.value = ''
@@ -194,7 +76,7 @@ watch(() => props.show, (show) => {
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('tr-TR', {
     style: 'currency',
-    currency: props.installment.outstandingCurrency || props.installment.totalCurrency || 'TRY'
+    currency: props.installment.outstandingCurrency || props.installment.totalCurrency || 'TRY',
   }).format(amount)
 }
 
@@ -204,248 +86,178 @@ function handleSubmit() {
 }
 </script>
 
+<template>
+  <RcModal
+    :open="open"
+    title="Taksit erken kapatma"
+    subtitle="Kalan bakiyeyi tek seferde kapatın"
+    wide
+    @close="emit('close')"
+  >
+    <div class="rci-closure__summary">
+      <div class="rci-closure__metric">
+        <span class="rci-closure__label">Toplam tutar</span>
+        <strong>{{ formatCurrency(installment.totalAmount) }}</strong>
+      </div>
+      <div class="rci-closure__metric">
+        <span class="rci-closure__label">Aylık ödeme</span>
+        <strong>{{ formatCurrency(installment.monthlyPayment) }}</strong>
+      </div>
+      <div class="rci-closure__metric">
+        <span class="rci-closure__label">Kalan taksit</span>
+        <strong>{{ installment.remainingInstallments }} adet</strong>
+      </div>
+      <div class="rci-closure__metric rci-closure__metric--highlight">
+        <span class="rci-closure__label">Kalan bakiye</span>
+        <strong class="rci-closure__balance">{{ formatCurrency(installment.outstandingBalance) }}</strong>
+      </div>
+    </div>
+
+    <div class="rci-closure__section">
+      <h4 class="rci-closure__section-title">İndirim (opsiyonel)</h4>
+      <p class="rci-closure__hint">Erken ödeme indirimi uygulamak isterseniz oran veya tutar girebilirsiniz.</p>
+      <div class="rcs-modal-grid">
+        <RcField label="İndirim oranı (%)" hint="0–100 arası">
+          <input
+            v-model.number="discountPercentage"
+            type="number"
+            class="rc-input"
+            min="0"
+            max="100"
+            step="0.1"
+            placeholder="0"
+          />
+        </RcField>
+        <RcField label="İndirim tutarı (₺)" hint="Tutar girerseniz oran otomatik hesaplanır">
+          <input
+            v-model.number="discountAmountInput"
+            type="number"
+            class="rc-input"
+            min="0"
+            :max="installment.outstandingBalance"
+            step="0.01"
+            placeholder="0"
+          />
+        </RcField>
+      </div>
+    </div>
+
+    <div class="rci-closure__calc">
+      <div class="rci-closure__calc-row">
+        <span>Kalan bakiye</span>
+        <span>{{ formatCurrency(installment.outstandingBalance) }}</span>
+      </div>
+      <div v-if="discountAmount > 0" class="rci-closure__calc-row rci-closure__calc-row--discount">
+        <span>İndirim ({{ effectiveDiscountPercentage.toFixed(1) }}%)</span>
+        <span>−{{ formatCurrency(discountAmount) }}</span>
+      </div>
+      <div class="rci-closure__calc-row rci-closure__calc-row--total">
+        <span>Ödenecek tutar</span>
+        <strong>{{ formatCurrency(finalAmount) }}</strong>
+      </div>
+    </div>
+
+    <RcField label="Notlar (opsiyonel)">
+      <textarea
+        v-model="notes"
+        class="rc-input"
+        rows="3"
+        placeholder="Erken kapama ile ilgili notlarınız…"
+        style="resize: vertical; min-height: 72px"
+      />
+    </RcField>
+
+    <div class="rca-pay-alert rca-pay-alert--warn" style="margin-top: 16px">
+      <strong>Dikkat:</strong> Erken kapama işlemi geri alınamaz. Tüm kalan taksitler ödendi olarak işaretlenecektir.
+    </div>
+
+    <template #footer>
+      <RcButton variant="secondary" @click="emit('close')">İptal</RcButton>
+      <RcButton variant="primary" :disabled="processing" @click="handleSubmit">
+        {{ processing ? 'İşleniyor…' : `${formatCurrency(finalAmount)} öde ve kapat` }}
+      </RcButton>
+    </template>
+  </RcModal>
+</template>
+
 <style scoped>
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 20px;
-}
-
-.modal {
-  background: var(--color-surface);
-  border-radius: 12px;
-  width: 100%;
-}
-
-.early-closure-modal {
-  max-width: 600px;
-  max-height: 90vh;
-  overflow-y: auto;
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.modal-header h2 {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 600;
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  font-size: 28px;
-  cursor: pointer;
-  color: var(--color-text-secondary);
-  padding: 0;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.close-btn:hover {
-  color: var(--color-text);
-}
-
-.modal-body {
-  padding: 20px;
-}
-
-.info-section {
+.rci-closure__summary {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  margin-bottom: 24px;
-  padding: 16px;
-  background: var(--color-bg-secondary);
-  border-radius: 8px;
+  gap: 12px;
+  padding: 14px;
+  background: var(--rc-bg-subtle);
+  border-radius: var(--rc-radius-md);
+  margin-bottom: 16px;
 }
 
-.info-item {
+.rci-closure__metric {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-.info-item.highlight {
+.rci-closure__metric--highlight {
   grid-column: 1 / -1;
-  padding: 12px;
-  background: white;
-  border-radius: 6px;
-  border-left: 4px solid var(--color-primary);
+  padding: 10px 12px;
+  background: var(--rc-surface);
+  border-radius: var(--rc-radius-sm);
+  border-left: 3px solid var(--rc-accent);
 }
 
-.info-item .label {
-  font-size: 13px;
-  color: var(--color-text-secondary);
+.rci-closure__label {
+  font-size: 12px;
+  color: var(--rc-text-muted);
 }
 
-.info-item strong {
-  font-size: 16px;
+.rci-closure__balance {
+  font-size: 18px;
+  color: var(--rc-accent);
 }
 
-.info-item.highlight .amount {
-  font-size: 20px;
-  color: var(--color-primary);
-}
-
-.section {
-  margin-bottom: 24px;
-}
-
-.section h3 {
-  font-size: 16px;
-  font-weight: 600;
-  margin: 0 0 8px 0;
-}
-
-.description {
-  margin: 0 0 16px 0;
-  font-size: 14px;
-  color: var(--color-text-secondary);
-}
-
-.form-group {
+.rci-closure__section {
   margin-bottom: 16px;
 }
 
-.form-group label {
-  display: block;
-  margin-bottom: 6px;
-  font-weight: 500;
+.rci-closure__section-title {
+  margin: 0 0 4px;
   font-size: 14px;
-}
-
-.form-group input,
-.form-group textarea {
-  width: 100%;
-  padding: 10px;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  font-size: 14px;
-  font-family: inherit;
-}
-
-.hint {
-  display: block;
-  margin-top: 4px;
-  font-size: 12px;
-  color: var(--color-text-secondary);
-}
-
-.calculation-preview {
-  padding: 16px;
-  background: var(--color-bg-secondary);
-  border-radius: 8px;
-  margin-bottom: 24px;
-}
-
-.calculation-preview h3 {
-  font-size: 16px;
   font-weight: 600;
-  margin: 0 0 16px 0;
 }
 
-.calc-row {
+.rci-closure__hint {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--rc-text-muted);
+}
+
+.rci-closure__calc {
+  padding: 14px;
+  background: var(--rc-bg-subtle);
+  border-radius: var(--rc-radius-md);
+  margin-bottom: 16px;
+}
+
+.rci-closure__calc-row {
   display: flex;
   justify-content: space-between;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--color-border);
+  padding: 8px 0;
+  border-bottom: 1px solid var(--rc-border-subtle);
+  font-size: 14px;
 }
 
-.calc-row:last-child {
+.rci-closure__calc-row:last-child {
   border-bottom: none;
 }
 
-.calc-row.discount {
-  color: var(--color-success);
+.rci-closure__calc-row--discount {
+  color: var(--rc-green-600);
 }
 
-.calc-row.total {
-  margin-top: 8px;
-  padding-top: 16px;
-  border-top: 2px solid var(--color-border);
-  font-size: 16px;
-}
-
-.calc-row .value {
-  font-weight: 500;
-}
-
-.warning-box {
-  display: flex;
-  gap: 12px;
-  padding: 16px;
-  background: #fff3cd;
-  border: 1px solid #ffc107;
-  border-radius: 8px;
-  margin-bottom: 24px;
-}
-
-.warning-box .icon {
-  font-size: 20px;
-}
-
-.warning-box strong {
-  display: block;
-  margin-bottom: 4px;
-}
-
-.modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  padding: 20px;
-  border-top: 1px solid var(--color-border);
-}
-
-.btn {
-  padding: 10px 20px;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-outline {
-  background: white;
-  border: 1px solid var(--color-border);
-  color: var(--color-text);
-}
-
-.btn-outline:hover {
-  background: var(--color-bg-secondary);
-}
-
-.btn-primary {
-  background: var(--color-primary);
-  border: none;
-  color: white;
-}
-
-.btn-primary:hover:not(:disabled) {
-  opacity: 0.9;
-}
-
-.btn-primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.rci-closure__calc-row--total {
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 2px solid var(--rc-border-subtle);
+  font-size: 15px;
 }
 </style>

@@ -1,12 +1,12 @@
 import { ref, reactive, computed } from 'vue'
 
-interface UseFormOptions<T extends Record<string, unknown>> {
+interface UseFormOptions<T extends object> {
     initialValues: T
     onSubmit?: (values: T) => Promise<void>
     validate?: (values: T) => Partial<Record<keyof T, string>>
 }
 
-export function useForm<T extends Record<string, unknown>>(options: UseFormOptions<T>) {
+export function useForm<T extends object>(options: UseFormOptions<T>) {
     const { initialValues, onSubmit, validate } = options
 
     const values = reactive({ ...initialValues }) as T
@@ -51,7 +51,7 @@ export function useForm<T extends Record<string, unknown>>(options: UseFormOptio
             const validationErrors = validate(values)
             errors.value = {}
             Object.entries(validationErrors).forEach(([key, value]) => {
-                if (value) errors.value[key] = value
+                if (typeof value === 'string' && value) errors.value[key] = value
             })
         }
         return Object.keys(errors.value).length === 0

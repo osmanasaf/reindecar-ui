@@ -71,7 +71,7 @@ function validateInput() {
   
   const numValue = typeof props.modelValue === 'number' ? props.modelValue : parseNumber(String(props.modelValue))
   const result = validate(numValue, rules.value)
-  errorMessage.value = result.valid ? '' : result.errors[0]
+  errorMessage.value = result.valid ? '' : (result.errors[0] ?? '')
 }
 
 function handleInput(event: Event) {

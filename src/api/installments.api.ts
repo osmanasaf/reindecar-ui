@@ -21,7 +21,7 @@ class InstallmentsApiService extends BaseApi {
     }
 
     async delete(id: number): Promise<void> {
-        return this.remove(`/${id}`)
+        return this.deleteByPath(`/${id}`)
     }
 
     async recordPayment(installmentId: number, paymentId: number): Promise<any> {

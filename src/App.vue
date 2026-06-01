@@ -15,9 +15,7 @@ const showLayout = computed(() => {
 <template>
   <ToastContainer />
   <SessionTimeoutWarning v-if="showLayout" />
-  <AppLayout v-if="showLayout">
-    <RouterView />
-  </AppLayout>
+  <AppLayout v-if="showLayout" />
   <RouterView v-else />
 </template>
 

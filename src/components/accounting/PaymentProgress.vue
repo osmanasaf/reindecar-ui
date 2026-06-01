@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { formatCurrency } from '@/utils/format'
+import { calculatePaymentProgress } from '@/utils/accounting'
 
 interface Props {
   amount: number
@@ -11,120 +12,35 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   currency: 'TRY',
-  showAmounts: true
+  showAmounts: true,
 })
 
-const percentage = computed(() => {
-  if (props.amount === 0) return 0
-  return Math.min((props.paidAmount / props.amount) * 100, 100)
-})
-
+const percentage = computed(() => calculatePaymentProgress(props.paidAmount, props.amount))
 const remainingAmount = computed(() => props.amount - props.paidAmount)
 
 const progressColor = computed(() => {
-  if (percentage.value === 100) return '#10b981'
-  if (percentage.value >= 50) return '#3b82f6'
-  if (percentage.value > 0) return '#f59e0b'
-  return '#9ca3af'
+  if (percentage.value === 100) return 'var(--rc-green-500)'
+  if (percentage.value >= 50) return 'var(--rc-blue-500)'
+  if (percentage.value > 0) return 'var(--rc-orange-500)'
+  return 'var(--rc-ink-300)'
 })
 </script>
 
 <template>
-  <div class="payment-progress">
-    <div class="progress-header">
-      <span class="progress-label">Ödeme İlerlemesi</span>
-      <span class="progress-percentage">{{ percentage.toFixed(0) }}%</span>
+  <div class="rca-progress">
+    <div class="rca-progress__head">
+      <span class="rca-progress__label">Ödeme ilerlemesi</span>
+      <span class="rca-progress__pct">{{ percentage }}%</span>
     </div>
-    
-    <div class="progress-bar-container">
-      <div 
-        class="progress-bar"
-        :style="{ 
-          width: `${percentage}%`,
-          backgroundColor: progressColor
-        }"
+    <div class="rca-progress__bar">
+      <div
+        class="rca-progress__fill"
+        :style="{ width: `${percentage}%`, backgroundColor: progressColor }"
       />
     </div>
-    
-    <div v-if="showAmounts" class="progress-amounts">
-      <div class="amount-item">
-        <span class="amount-label">Ödenen:</span>
-        <span class="amount-value paid">{{ formatCurrency(paidAmount, currency) }}</span>
-      </div>
-      <div class="amount-item">
-        <span class="amount-label">Kalan:</span>
-        <span class="amount-value remaining">{{ formatCurrency(remainingAmount, currency) }}</span>
-      </div>
+    <div v-if="showAmounts" class="rca-progress__amounts">
+      <span>Ödenen: <strong style="color: var(--rc-green-600)">{{ formatCurrency(paidAmount, currency) }}</strong></span>
+      <span>Kalan: <strong style="color: var(--rc-orange-600)">{{ formatCurrency(remainingAmount, currency) }}</strong></span>
     </div>
   </div>
 </template>
-
-<style scoped>
-.payment-progress {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.progress-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.progress-label {
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--color-text, #111827);
-}
-
-.progress-percentage {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--color-text-secondary, #6b7280);
-}
-
-.progress-bar-container {
-  width: 100%;
-  height: 0.5rem;
-  background-color: #e5e7eb;
-  border-radius: 9999px;
-  overflow: hidden;
-}
-
-.progress-bar {
-  height: 100%;
-  border-radius: 9999px;
-  transition: width 0.3s ease, background-color 0.3s ease;
-}
-
-.progress-amounts {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.amount-item {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.amount-label {
-  font-size: 0.75rem;
-  color: var(--color-text-secondary, #6b7280);
-}
-
-.amount-value {
-  font-size: 0.875rem;
-  font-weight: 600;
-}
-
-.amount-value.paid {
-  color: #10b981;
-}
-
-.amount-value.remaining {
-  color: #ef4444;
-}
-</style>

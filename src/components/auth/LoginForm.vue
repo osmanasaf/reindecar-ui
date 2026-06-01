@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useValidation, rules } from '@/composables'
+import { RcButton, RcInput } from '@/components/rc'
+import { RcIcon } from '@/components/icons'
 import type { LoginForm } from '@/types'
 
 const emit = defineEmits<{
@@ -14,26 +16,28 @@ defineProps<{
 
 const username = ref('')
 const password = ref('')
+const remember = ref(true)
 const showPassword = ref(false)
 
 const { validateForm, getError, hasError, touch, reset } = useValidation(() => formFields.value)
 
 const formFields = computed(() => ({
   username: { value: username.value, rules: [rules.required(), rules.minLength(3)] },
-  password: { value: password.value, rules: [rules.required(), rules.minLength(4)] }
+  password: { value: password.value, rules: [rules.required(), rules.minLength(4)] },
 }))
 
-const isFormValid = computed(() => 
-  username.value.trim().length >= 3 && password.value.length >= 4
+const isFormValid = computed(() =>
+  username.value.trim().length >= 3 && password.value.length >= 4,
 )
 
 function handleSubmit() {
   const isValid = validateForm(formFields.value)
   if (!isValid) return
-  
+
   emit('submit', {
     username: username.value.trim(),
-    password: password.value
+    password: password.value,
+    remember: remember.value,
   })
 }
 
@@ -50,29 +54,37 @@ watch([username, password], () => reset())
 </script>
 
 <template>
-  <form class="login-form" @submit.prevent="handleSubmit">
-    <div v-if="error" class="error-message">
+  <form class="rc-auth__form" @submit.prevent="handleSubmit">
+    <div v-if="error" class="rc-alert rc-alert--danger" role="alert">
       {{ error }}
     </div>
 
-    <div class="form-group" :class="{ error: hasError('username') }">
-      <label for="username">Kullanıcı Adı</label>
-      <input
+    <label
+      class="rc-field"
+      :class="{ 'rc-field--error': hasError('username') }"
+    >
+      <span class="rc-field__label">Kullanıcı adı</span>
+      <RcInput
         id="username"
         v-model="username"
-        type="text"
         autocomplete="username"
         placeholder="Kullanıcı adınızı girin"
+        class="rc-input--lg"
         :disabled="loading"
         @blur="handleBlur('username')"
-        required
       />
-      <span v-if="hasError('username')" class="error-text">{{ getError('username') }}</span>
-    </div>
+      <span v-if="hasError('username')" class="rc-field__error">{{ getError('username') }}</span>
+    </label>
 
-    <div class="form-group" :class="{ error: hasError('password') }">
-      <label for="password">Şifre</label>
-      <div class="password-input">
+    <label
+      class="rc-field"
+      :class="{ 'rc-field--error': hasError('password') }"
+    >
+      <span class="rc-auth__field-label-row rc-field__label">
+        <span>Parola</span>
+        <a href="#">Unuttum</a>
+      </span>
+      <div class="rc-input-group rc-input--lg">
         <input
           id="password"
           v-model="password"
@@ -81,152 +93,47 @@ watch([username, password], () => reset())
           placeholder="Şifrenizi girin"
           :disabled="loading"
           @blur="handleBlur('password')"
-          required
         />
-        <button 
-          type="button" 
-          class="toggle-password"
-          @click="togglePassword"
+        <RcButton
+          type="button"
+          variant="ghost"
+          icon
+          :aria-label="showPassword ? 'Parolayı gizle' : 'Parolayı göster'"
           :disabled="loading"
+          @click="togglePassword"
         >
-          {{ showPassword ? '🙈' : '👁️' }}
-        </button>
+          <RcIcon name="eye" :size="16" />
+        </RcButton>
       </div>
-      <span v-if="hasError('password')" class="error-text">{{ getError('password') }}</span>
-    </div>
+      <span v-if="hasError('password')" class="rc-field__error">{{ getError('password') }}</span>
+    </label>
 
-    <button 
-      type="submit" 
-      class="submit-btn"
+    <label class="rc-auth__remember">
+      <input v-model="remember" type="checkbox" :disabled="loading" />
+      1 hafta boyunca hatırla
+    </label>
+
+    <RcButton
+      type="submit"
+      variant="primary"
+      size="lg"
+      class="rc-auth__submit"
       :disabled="!isFormValid || loading"
     >
-      <span v-if="loading">Giriş yapılıyor...</span>
-      <span v-else>Giriş Yap</span>
-    </button>
+      <span v-if="loading" class="rc-spin" aria-hidden="true" />
+      {{ loading ? 'Giriş yapılıyor…' : 'Giriş yap' }}
+      <RcIcon v-if="!loading" name="arrowRight" :size="16" />
+    </RcButton>
   </form>
 </template>
 
 <style scoped>
-.login-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-lg);
+.rc-auth__submit {
+  width: 100%;
+  margin-top: 4px;
 }
 
-.error-message {
-  background: var(--color-danger-light);
-  color: var(--color-danger);
-  padding: var(--spacing-md);
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-sm);
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
-}
-
-.form-group.error input {
-  border-color: var(--color-danger);
-}
-
-.form-group label {
-  font-size: var(--font-size-sm);
-  font-weight: 500;
-  color: var(--color-text-secondary);
-}
-
-.form-group input {
-  padding: var(--spacing-md);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-base);
-  background: var(--color-surface);
-  color: var(--color-text);
-  transition: border-color var(--transition-fast);
-}
-
-.form-group input:focus {
-  outline: none;
-  border-color: var(--color-primary);
-}
-
-.form-group input:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.error-text {
-  font-size: var(--font-size-xs);
-  color: var(--color-danger);
-}
-
-.password-input {
-  position: relative;
-  display: flex;
-}
-
-.password-input input {
-  flex: 1;
-  padding-right: 48px;
-}
-
-.toggle-password {
-  position: absolute;
-  right: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-  background: none;
-  border: none;
-  font-size: 18px;
-  cursor: pointer;
-  padding: 4px;
-}
-
-.toggle-password:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.submit-btn {
-  padding: var(--spacing-md) var(--spacing-lg);
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-  border: none;
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-base);
-  font-weight: 500;
-  cursor: pointer;
-  transition: background var(--transition-fast);
-}
-
-.submit-btn:hover:not(:disabled) {
-  background: var(--color-primary-hover);
-}
-
-.submit-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-@media (max-width: 480px) {
-  .login-form {
-    gap: var(--spacing-md);
-  }
-
-  .form-group input {
-    padding: 12px;
-    font-size: var(--font-size-sm);
-  }
-
-  .toggle-password {
-    right: 6px;
-  }
-
-  .submit-btn {
-    width: 100%;
-    padding: 12px 16px;
-  }
+.rc-input-group.rc-input--lg {
+  height: 40px;
 }
 </style>

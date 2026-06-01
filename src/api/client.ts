@@ -8,23 +8,48 @@ const API_URL = import.meta.env.VITE_API_URL || '/api/v1'
 
 const ACCESS_TOKEN_KEY = 'reindecar_access_token'
 const REFRESH_TOKEN_KEY = 'reindecar_refresh_token'
+const PERSISTENCE_KEY = 'reindecar_token_persistence'
+
+function readToken(storage: Storage, key: string): string | null {
+    return storage.getItem(key)
+}
+
+function clearAllTokenStores(): void {
+    for (const storage of [localStorage, sessionStorage]) {
+        storage.removeItem(ACCESS_TOKEN_KEY)
+        storage.removeItem(REFRESH_TOKEN_KEY)
+    }
+    localStorage.removeItem(PERSISTENCE_KEY)
+}
 
 export const tokenStorage = {
-    getAccessToken: (): string | null => localStorage.getItem(ACCESS_TOKEN_KEY),
-    getRefreshToken: (): string | null => localStorage.getItem(REFRESH_TOKEN_KEY),
-    setTokens: (accessToken: string, refreshToken: string) => {
-        localStorage.setItem(ACCESS_TOKEN_KEY, accessToken)
-        localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken)
+    getAccessToken: (): string | null => {
+        return readToken(sessionStorage, ACCESS_TOKEN_KEY)
+            ?? readToken(localStorage, ACCESS_TOKEN_KEY)
+    },
+    getRefreshToken: (): string | null => {
+        return readToken(sessionStorage, REFRESH_TOKEN_KEY)
+            ?? readToken(localStorage, REFRESH_TOKEN_KEY)
+    },
+    setTokens: (accessToken: string, refreshToken: string, options?: { remember?: boolean }) => {
+        const remember = options?.remember ?? true
+        clearAllTokenStores()
+        localStorage.setItem(PERSISTENCE_KEY, remember ? 'local' : 'session')
+        const storage = remember ? localStorage : sessionStorage
+        storage.setItem(ACCESS_TOKEN_KEY, accessToken)
+        storage.setItem(REFRESH_TOKEN_KEY, refreshToken)
     },
     clearTokens: () => {
-        localStorage.removeItem(ACCESS_TOKEN_KEY)
-        localStorage.removeItem(REFRESH_TOKEN_KEY)
+        clearAllTokenStores()
     },
     isAccessTokenValid: (): boolean => {
-        const token = localStorage.getItem(ACCESS_TOKEN_KEY)
+        const token = tokenStorage.getAccessToken()
         if (!token) return false
         return !isTokenExpired(token)
-    }
+    },
+    usesPersistentSession: (): boolean => {
+        return localStorage.getItem(PERSISTENCE_KEY) !== 'session'
+    },
 }
 
 const apiClient: AxiosInstance = axios.create({
@@ -214,7 +239,7 @@ export abstract class BaseApi {
         return data.data
     }
 
-    protected async remove(path = ''): Promise<void> {
+    protected async deleteByPath(path = ''): Promise<void> {
         await apiClient.delete(this.buildUrl(path))
     }
 

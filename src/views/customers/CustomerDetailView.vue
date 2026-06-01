@@ -1,14 +1,19 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { customersApi, driversApi, referenceDataApi } from '@/api'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute, useRouter, RouterLink } from 'vue-router'
+import { customersApi, driversApi, referenceDataApi, rentalsApi, receivablesApi } from '@/api'
 import { useToast } from '@/composables'
 import { formatPhoneInput } from '@/utils/phone'
-import type { Customer, CustomerType, CustomerStatus, CreditRating, CustomerStats, Driver, CreateDriverForm, UpdateDriverForm } from '@/types'
+import { fmtTRY, formatDate as formatDateUtil } from '@/utils/format'
+import type { Customer, CustomerType, CustomerStatus, CreditRating, CustomerStats, Driver, CreateDriverForm, UpdateDriverForm, Rental, ReceivableResponse } from '@/types'
 import CompanyAuthorizedPersonsSection from '@/components/customers/CompanyAuthorizedPersonsSection.vue'
+import CustomerEditModal from '@/components/customers/CustomerEditModal.vue'
+import CustomerDriverEditModal from '@/components/customers/CustomerDriverEditModal.vue'
 import DocumentsSection from '@/components/shared/DocumentsSection.vue'
 import { SearchableSelect } from '@/components/common'
 import DatePicker from '@/components/base/DatePicker.vue'
+import { RcIcon } from '@/components/icons'
+import { RcButton, RcBadge, RcAvatar, RcSegTab, RcStatusPill, RcEmpty, RcField } from '@/components/rc'
 
 const route = useRoute()
 const router = useRouter()
@@ -23,8 +28,12 @@ const loadingDrivers = ref(false)
 const showDriverForm = ref(false)
 const savingDriver = ref(false)
 const editingDriver = ref<Driver | null>(null)
-const showEditModal = ref(false)
+const showDriverEditModal = ref(false)
+const showCustomerEditModal = ref(false)
 const updatingDriver = ref(false)
+
+const previewRentals = ref<Rental[]>([])
+const loadingPreviewRentals = ref(false)
 
 const newDriver = ref<CreateDriverForm>({
   nationalId: '',
@@ -38,7 +47,15 @@ const newDriver = ref<CreateDriverForm>({
 
 const licenseClassOptions = ref<{ value: number; label: string }[]>([])
 
-const editDriverForm = ref<UpdateDriverForm>({})
+const activeTab = ref<'info' | 'rentals' | 'finance' | 'drivers' | 'documents'>('info')
+
+const rentals = ref<Rental[]>([])
+const loadingRentals = ref(false)
+const rentalsLoaded = ref(false)
+
+const receivables = ref<ReceivableResponse[]>([])
+const loadingFinance = ref(false)
+const financeLoaded = ref(false)
 
 const customerId = computed(() => Number(route.params.id))
 
@@ -95,6 +112,7 @@ async function fetchCustomer() {
     customer.value = await customersApi.getById(customerId.value)
     fetchDrivers()
     fetchStats()
+    fetchPreviewRentals()
   } catch {
     toast.error('Müşteri bilgileri yüklenemedi')
     router.push('/customers')
@@ -103,9 +121,43 @@ async function fetchCustomer() {
   }
 }
 
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount)
+async function fetchPreviewRentals() {
+  loadingPreviewRentals.value = true
+  try {
+    const response = await rentalsApi.getByCustomer(customerId.value, {
+      page: 0,
+      size: 5,
+      sort: 'startDate',
+      direction: 'desc',
+    })
+    previewRentals.value = response.content
+  } catch {
+    previewRentals.value = []
+  } finally {
+    loadingPreviewRentals.value = false
+  }
 }
+
+function openCustomerEdit() {
+  showCustomerEditModal.value = true
+}
+
+async function onCustomerSaved() {
+  await fetchCustomer()
+  await fetchStats()
+  rentalsLoaded.value = false
+  financeLoaded.value = false
+}
+
+const lastActivityLabel = computed(() => {
+  const at = customer.value?.lastActivityAt
+  if (at) return formatDate(at)
+  const latest = previewRentals.value[0]
+  if (latest?.startDate) return formatDate(latest.startDate)
+  return customer.value?.createdAt ? formatDate(customer.value.createdAt) : '—'
+})
+
+const outstandingBalance = computed(() => customer.value?.outstandingBalance ?? 0)
 
 function isLicenseExpiringSoon(expiryDate: string | undefined): boolean {
   if (!expiryDate) return false
@@ -169,8 +221,44 @@ function formatPhone(phone: string): string {
 }
 
 function formatDate(date: string): string {
-  return new Date(date).toLocaleDateString('tr-TR')
+  return formatDateUtil(date)
 }
+
+async function fetchRentals() {
+  if (rentalsLoaded.value) return
+  loadingRentals.value = true
+  try {
+    const response = await rentalsApi.getByCustomer(customerId.value, { page: 0, size: 50, sort: 'startDate', direction: 'desc' })
+    rentals.value = response.content
+    rentalsLoaded.value = true
+  } catch (err) {
+    toast.apiError(err, 'Kiralamalar yüklenemedi')
+  } finally {
+    loadingRentals.value = false
+  }
+}
+
+async function fetchFinance() {
+  if (financeLoaded.value) return
+  loadingFinance.value = true
+  try {
+    receivables.value = await receivablesApi.getByCustomer(customerId.value)
+    financeLoaded.value = true
+  } catch (err) {
+    toast.apiError(err, 'Finans verileri yüklenemedi')
+  } finally {
+    loadingFinance.value = false
+  }
+}
+
+function startRental() {
+  router.push({ name: 'rental-create', query: { customerId: String(customerId.value) } })
+}
+
+watch(activeTab, (tab) => {
+  if (tab === 'rentals') fetchRentals()
+  if (tab === 'finance') fetchFinance()
+})
 
 function maskId(id: string): string {
   if (id.length >= 11) {
@@ -252,7 +340,36 @@ async function confirmArchiveCustomer() {
   }
 }
 
-const activeTab = ref<'info' | 'drivers' | 'documents'>('info')
+const financeSummary = computed(() => {
+  const open = receivables.value.filter((r) => r.remainingAmount > 0)
+  return {
+    totalOutstanding: open.reduce((s, r) => s + r.remainingAmount, 0),
+    openCount: open.length,
+    totalPaid: receivables.value.reduce((s, r) => s + r.paidAmount, 0),
+  }
+})
+
+const detailTabs = computed(() => [
+  { id: 'info', label: 'Genel' },
+  { id: 'rentals', label: 'Kiralamalar', count: stats.value?.totalCompletedRentals || undefined },
+  {
+    id: 'finance',
+    label: 'Finans',
+    count: financeSummary.value.openCount || undefined,
+  },
+  { id: 'drivers', label: 'Sürücüler', count: drivers.value.length || undefined },
+  { id: 'documents', label: 'Belgeler' },
+])
+
+function initials(name: string): string {
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .map((s) => s[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase()
+}
 
 const showDeleteDriverModal = ref(false)
 const driverToDelete = ref<Driver | null>(null)
@@ -282,23 +399,12 @@ async function doDeleteDriver() {
 
 function openEditModal(driver: Driver) {
   editingDriver.value = driver
-  editDriverForm.value = {
-    firstName: driver.firstName,
-    lastName: driver.lastName,
-    nationalId: driver.nationalId,
-    phone: formatPhoneInput(driver.phone || ''),
-    licenseNumber: driver.licenseNumber,
-    licenseClassId: driver.licenseClassId,
-    licenseExpiryDate: driver.licenseExpiryDate,
-    active: driver.active
-  }
-  showEditModal.value = true
+  showDriverEditModal.value = true
 }
 
 function closeEditModal() {
-  showEditModal.value = false
+  showDriverEditModal.value = false
   editingDriver.value = null
-  editDriverForm.value = {}
 }
 
 function handleNewDriverPhoneInput(event: Event) {
@@ -306,23 +412,17 @@ function handleNewDriverPhoneInput(event: Event) {
   newDriver.value.phone = formatPhoneInput(target.value)
 }
 
-function handleEditDriverPhoneInput(event: Event) {
-  const target = event.target as HTMLInputElement
-  editDriverForm.value.phone = formatPhoneInput(target.value)
-}
-
-async function updateDriver() {
+async function updateDriver(form: UpdateDriverForm) {
   if (!editingDriver.value) return
-  
+
   updatingDriver.value = true
   try {
-    const updated = await driversApi.update(editingDriver.value.id, editDriverForm.value)
+    const updated = await driversApi.update(editingDriver.value.id, form)
     toast.success('Sürücü başarıyla güncellendi')
     const index = drivers.value.findIndex(d => d.id === editingDriver.value!.id)
     if (index !== -1) {
       drivers.value[index] = updated
     }
-    
     closeEditModal()
   } catch (err) {
     toast.apiError(err, 'Sürücü güncellenemedi')
@@ -331,341 +431,494 @@ async function updateDriver() {
   }
 }
 
-onMounted(fetchCustomer)
+onMounted(() => {
+  fetchCustomer()
+  if (route.query.edit === '1') {
+    showCustomerEditModal.value = true
+    router.replace({ query: {} })
+  }
+})
 </script>
 
 <template>
-  <div class="customer-detail">
+  <div class="customer-detail rc-page">
     <div v-if="loading" class="loading">Yükleniyor...</div>
 
     <template v-else-if="customer">
-      <header class="page-header">
-        <div class="header-left">
-          <button class="back-btn" @click="router.back()">← Geri</button>
-          <div class="title-group">
-            <span class="avatar-large">{{ customer.displayName?.charAt(0) || '?' }}</span>
-            <div>
-              <h1>{{ customer.displayName }}</h1>
-              <div class="subtitle">
-                <span :class="['type-badge', customer.customerType.toLowerCase()]">
-                  {{ typeLabels[customer.customerType] }}
-                </span>
-                <span :class="['status-badge', customer.status?.toLowerCase() ?? 'active']">
-                  {{ statusLabels[customer.status] ?? 'Aktif' }}
-                </span>
-                <span class="public-id">{{ customer.publicId }}</span>
-                <span v-if="customer.createdAt" class="created-at">Kayıt: {{ formatDate(customer.createdAt) }}</span>
-              </div>
-            </div>
+      <div class="rc-cust-detail-nav">
+        <RouterLink to="/customers" class="rc-btn rc-btn--ghost rc-btn--sm">
+          <RcIcon name="chevronLeft" :size="14" />
+          Müşterilere dön
+        </RouterLink>
+        <span class="rc-cust-detail-nav__activity">Son aktivite: {{ lastActivityLabel }}</span>
+      </div>
+
+      <div class="rcv-hero rcv-hero--tight">
+        <RcAvatar size="lg" class="rc-cust-hero-avatar">{{ initials(customer.displayName) }}</RcAvatar>
+        <div class="rcv-hero__info">
+          <div class="rcv-hero__badges" style="margin-top: 0">
+            <span class="rcv-hero__plate">{{ customer.publicId }}</span>
+            <RcBadge :variant="customer.customerType === 'COMPANY' ? 'purple' : 'accent'">
+              {{ typeLabels[customer.customerType] }}
+            </RcBadge>
+            <RcBadge v-if="customer.blacklisted" variant="danger" dot>Kara liste</RcBadge>
+            <RcBadge v-else variant="success" dot>{{ statusLabels[customer.status] ?? 'Aktif' }}</RcBadge>
+          </div>
+          <h1 class="rcv-hero__title">{{ customer.displayName }}</h1>
+          <div class="rcv-hero__meta">
+            <span v-if="customer.city">
+              <RcIcon name="pin" :size="13" />
+              {{ customer.city }}
+            </span>
+            <span v-if="customer.createdAt">
+              <RcIcon name="calendar" :size="13" />
+              Kayıt: {{ formatDate(customer.createdAt) }}
+            </span>
+            <span>
+              <RcIcon name="phone" :size="13" />
+              {{ formatPhone(customer.phone) }}
+            </span>
           </div>
         </div>
-        <div class="header-actions">
-          <button 
-            v-if="customer.blacklisted" 
-            class="btn btn-success"
+        <div class="rcv-hero__actions">
+          <RcButton
+            variant="accent"
+            :disabled="customer.blacklisted"
+            style="min-width: 160px"
+            @click="startRental"
+          >
+            <RcIcon name="plus" :size="14" />
+            Yeni kiralama
+          </RcButton>
+          <a :href="`tel:${customer.phone}`" class="rc-btn rc-btn--secondary">
+            <RcIcon name="phone" :size="14" />
+            Ara
+          </a>
+          <RcButton variant="ghost" @click="openCustomerEdit">
+            <RcIcon name="edit" :size="14" />
+            Düzenle
+          </RcButton>
+          <RcButton
+            v-if="customer.blacklisted"
+            variant="secondary"
             :disabled="processingBlacklist"
             @click="handleUnblacklist"
           >
-            ✓ Kara Listeden Çıkar
-          </button>
-          <button 
-            v-else 
-            class="btn btn-danger"
+            Kara listeden çıkar
+          </RcButton>
+          <RcButton
+            v-else
+            variant="danger"
             :disabled="processingBlacklist"
             @click="handleBlacklist"
           >
-            ⚠️ Kara Listeye Ekle
-          </button>
-          <button class="btn btn-outline" @click="router.push(`/customers/${customer.id}/edit`)">✏️ Düzenle</button>
-          <button
-            type="button"
-            class="btn btn-outline btn-archive-customer"
-            title="Veritabanında silinmez, listede görünmez"
-            @click="showArchiveModal = true"
-          >
+            Kara listeye ekle
+          </RcButton>
+          <RcButton variant="ghost" @click="showArchiveModal = true">
             Listeden kaldır
-          </button>
+          </RcButton>
         </div>
-      </header>
-
-      <div v-if="customer.blacklisted" class="alert alert-danger">
-        ⚠️ Bu müşteri kara listede: {{ customer.blacklistReason }}
       </div>
 
-      <!-- Tab Navigasyonu -->
-      <nav class="tab-nav">
-        <button
-          :class="['tab-btn', { active: activeTab === 'info' }]"
-          @click="activeTab = 'info'"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
-          Genel Bilgiler
-        </button>
-        <button
-          :class="['tab-btn', { active: activeTab === 'drivers' }]"
-          @click="activeTab = 'drivers'"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-          Sürücüler
-          <span v-if="drivers.length > 0" class="tab-count">{{ drivers.length }}</span>
-        </button>
-        <button
-          :class="['tab-btn', { active: activeTab === 'documents' }]"
-          @click="activeTab = 'documents'"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-          Belgeler
-        </button>
-      </nav>
+      <div v-if="customer.blacklisted" class="rc-alert rc-alert--danger" role="alert" style="margin-top: 14px">
+        <RcIcon name="warning" :size="16" />
+        <span>Bu müşteri kara listede: {{ customer.blacklistReason }}</span>
+      </div>
 
-      <!-- Genel Bilgiler Sekmesi -->
-      <div v-show="activeTab === 'info'" class="detail-grid">
-        <section class="card">
-          <h2>İletişim Bilgileri</h2>
-          <div class="info-grid">
-            <div class="info-item">
-              <span class="label">Telefon</span>
-              <span class="value">{{ formatPhone(customer.phone) }}</span>
-            </div>
-            <div class="info-item">
-              <span class="label">E-posta</span>
-              <span class="value">{{ customer.email }}</span>
-            </div>
-            <div class="info-item full">
-              <span class="label">Adres</span>
-              <span class="value">{{ [customer.address || customer.companyInfo?.invoiceAddress, customer.city].filter(Boolean).join(', ') || '-' }}</span>
-            </div>
+      <div v-if="loadingStats" class="rc-skeleton" style="height: 88px; margin-top: 14px" />
+      <div v-else class="rcv-stats rcv-stats--airy" style="margin-top: 14px">
+        <div class="rcv-stat">
+          <div class="rcv-stat__label">Toplam harcama</div>
+          <div class="rcv-stat__value">{{ fmtTRY(stats?.totalSpending ?? 0) }}</div>
+          <div class="rcv-stat__sub">{{ stats?.totalCompletedRentals ?? 0 }} tamamlanan kiralama</div>
+        </div>
+        <div class="rcv-stat">
+          <div class="rcv-stat__label">Toplam kiralama</div>
+          <div class="rcv-stat__value">{{ customer.totalRentals ?? stats?.totalCompletedRentals ?? 0 }}</div>
+          <div class="rcv-stat__sub">kayıtlı kiralama</div>
+        </div>
+        <div class="rcv-stat">
+          <div class="rcv-stat__label">Aktif kiralama</div>
+          <div class="rcv-stat__value">{{ stats?.hasActiveRental ? 'Var' : 'Yok' }}</div>
+          <div class="rcv-stat__sub">{{ stats?.hasActiveRental ? 'devam eden sözleşme' : 'açık kiralama yok' }}</div>
+        </div>
+        <div class="rcv-stat">
+          <div class="rcv-stat__label">Açık bakiye</div>
+          <div class="rcv-stat__value" :class="{ 'rcv-stat__value--warn': outstandingBalance > 0 }">
+            {{ fmtTRY(outstandingBalance) }}
           </div>
-        </section>
+          <div class="rcv-stat__sub">{{ outstandingBalance > 0 ? 'tahsil edilecek' : 'borç yok' }}</div>
+        </div>
+      </div>
 
-        <section class="card" v-if="customer.customerType === 'PERSONAL'">
-          <h2>Kişisel Bilgiler</h2>
-          <div class="info-grid">
-            <div class="info-item">
-              <span class="label">Ad</span>
-              <span class="value">{{ customer.personalInfo?.firstName || '-' }}</span>
+      <div class="rc-card rc-cust-tab-card" style="margin-top: 14px">
+        <div class="rc-segtabs">
+          <RcSegTab
+            v-for="tab in detailTabs"
+            :id="tab.id"
+            :key="tab.id"
+            :active="activeTab"
+            :count="tab.count"
+            @select="activeTab = $event as typeof activeTab"
+          >
+            {{ tab.label }}
+          </RcSegTab>
+        </div>
+      </div>
+
+      <div class="rc-cust-tab-panel">
+      <!-- Genel -->
+      <div v-show="activeTab === 'info'" class="rc-detail">
+        <div class="rc-detail__main">
+          <div class="rc-card" style="overflow: hidden">
+            <div class="rc-card__head">
+              <h3 class="rc-card__title">Son kiralamalar</h3>
+              <RcButton variant="ghost" size="sm" @click="activeTab = 'rentals'; fetchRentals()">
+                Tümü
+                <RcIcon name="chevronRight" :size="14" />
+              </RcButton>
             </div>
-            <div class="info-item">
-              <span class="label">Soyad</span>
-              <span class="value">{{ customer.personalInfo?.lastName || '-' }}</span>
-            </div>
-            <div class="info-item">
-              <span class="label">TC Kimlik No</span>
-              <span class="value mono">{{ maskId(customer.personalInfo?.nationalId || customer.nationalId || '') }}</span>
-            </div>
-            <div class="info-item">
-              <span class="label">Doğum Tarihi</span>
-              <span class="value">{{ customer.personalInfo?.birthDate ? formatDate(customer.personalInfo.birthDate) : (customer.birthDate ? formatDate(customer.birthDate) : '-') }}</span>
-            </div>
-            <div class="info-item">
-              <span class="label">Ehliyet No</span>
-              <span class="value">{{ customer.personalInfo?.licenseNumber || customer.licenseNumber || '-' }}</span>
-            </div>
-            <div class="info-item">
-              <span class="label">Ehliyet Sınıfı</span>
-              <span class="value">{{ customer.personalInfo?.licenseClassName || customer.personalInfo?.licenseClass || customer.licenseClass || '-' }}</span>
-            </div>
-            <div class="info-item">
-              <span class="label">Ehliyet Bitiş</span>
-              <span class="value">{{ customer.personalInfo?.licenseExpiryDate ? formatDate(customer.personalInfo.licenseExpiryDate) : (customer.licenseExpiryDate ? formatDate(customer.licenseExpiryDate) : '-') }}</span>
-            </div>
-            <div class="info-item">
-              <span class="label">Kredi Skoru</span>
-              <span class="value">{{ customer.creditScore || '-' }}</span>
-            </div>
+            <div v-if="loadingPreviewRentals" class="rc-skeleton" style="height: 160px" />
+            <RcEmpty
+              v-else-if="previewRentals.length === 0"
+              title="Kiralama kaydı yok"
+              description="Bu müşteriye ait kiralama bulunamadı"
+            />
+            <table v-else class="rc-table rcv-table--slim">
+              <thead>
+                <tr>
+                  <th>Kiralama</th>
+                  <th>Araç</th>
+                  <th>Tarih</th>
+                  <th>Durum</th>
+                  <th class="rc-right">Tutar</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="rental in previewRentals"
+                  :key="rental.id"
+                  style="cursor: pointer"
+                  @click="router.push(`/rentals/${rental.id}`)"
+                >
+                  <td><span class="rc-mono" style="font-size: 12.5px; font-weight: 500">{{ rental.rentalNumber }}</span></td>
+                  <td>
+                    <div class="rcv-row__primary">{{ rental.vehiclePlate || rental.vehicleName || '—' }}</div>
+                  </td>
+                  <td><span class="rc-mono" style="font-size: 12.5px">{{ formatDate(rental.startDate) }}</span></td>
+                  <td><RcStatusPill :status="rental.status" /></td>
+                  <td class="rc-right rc-num" style="font-weight: 500">{{ fmtTRY(rental.grandTotal) }}</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
-        </section>
 
-        <section class="card" v-if="customer.customerType === 'COMPANY'">
-          <h2>Şirket Bilgileri</h2>
-          <div class="info-grid">
-            <div class="info-item full">
-              <span class="label">Şirket Adı</span>
-              <span class="value">{{ customer.companyInfo?.companyName || customer.displayName || '-' }}</span>
-            </div>
-            <div class="info-item">
-              <span class="label">Vergi No</span>
-              <span class="value mono">{{ maskTaxNumber(customer.companyInfo?.taxNumber || customer.taxNumber || '') }}</span>
-            </div>
-            <div class="info-item">
-              <span class="label">Vergi Dairesi</span>
-              <span class="value">{{ customer.companyInfo?.taxOffice || customer.taxOffice || '-' }}</span>
-            </div>
-            <div class="info-item">
-              <span class="label">Sektör</span>
-              <span class="value">{{ customer.companyInfo?.sector ?? customer.sector ?? '-' }}</span>
-            </div>
-            <div class="info-item">
-              <span class="label">Çalışan Sayısı</span>
-              <span class="value">{{ formatEmployeeCount(customer.companyInfo?.employeeCount ?? customer.employeeCount ?? undefined) }}</span>
-            </div>
-            <div class="info-item">
-              <span class="label">Ticaret Sicil No</span>
-              <span class="value">{{ customer.tradeRegisterNo || customer.tradeRegistryNumber || '-' }}</span>
-            </div>
-            <div class="info-item">
-              <span class="label">Ana Yetkili</span>
-              <span class="value">{{ customer.authorizedPerson || customer.authorizedPersonName || '-' }}</span>
-            </div>
-            <div class="info-item">
-              <span class="label">Yetkili Telefon</span>
-              <span class="value">{{ customer.authorizedPersonPhone || '-' }}</span>
-            </div>
+          <div v-if="customer.customerType === 'COMPANY'" class="rc-card">
+            <CompanyAuthorizedPersonsSection :customer-id="customer.id" />
           </div>
-        </section>
+        </div>
 
-        <section v-if="customer.customerType === 'COMPANY'" class="authorized-persons-card">
-          <CompanyAuthorizedPersonsSection :customer-id="customer.id" />
-        </section>
-
-        <section class="card stats-card">
-          <h2 class="card-title-with-icon">İstatistikler</h2>
-          <div v-if="loadingStats" class="stats-loading">Yükleniyor...</div>
-          <div v-else class="stats-grid">
-            <div class="stat">
-              <span class="stat-value">{{ stats?.totalCompletedRentals ?? 0 }}</span>
-              <span class="stat-label">Tamamlanan Kiralama</span>
+        <div class="rc-detail__side">
+          <div class="rc-card">
+            <div class="rc-card__head">
+              <h3 class="rc-card__title">İletişim</h3>
             </div>
-            <div class="stat">
-              <span :class="['stat-value', 'stat-badge', stats?.hasActiveRental ? 'stat-active' : 'stat-none']">
-                {{ stats?.hasActiveRental ? 'Var' : 'Yok' }}
-              </span>
-              <span class="stat-label">Aktif Kiralama</span>
-            </div>
-            <div class="stat">
-              <span class="stat-value">{{ formatCurrency(Number(stats?.totalSpending ?? 0)) }}</span>
-              <span class="stat-label">Toplam Harcama</span>
-            </div>
-            <div class="stat">
-              <span class="stat-value">{{ customer.creditScore ?? '-' }}</span>
-              <span class="stat-label">
-                Kredi Skoru
-                <span v-if="customer.creditRating" :class="['credit-badge', customer.creditRating.toLowerCase()]">
-                  {{ creditRatingLabels[customer.creditRating] }}
+            <div class="rc-card__body">
+              <div class="rc-meta-row">
+                <span class="rc-meta-row__label">Telefon</span>
+                <a :href="`tel:${customer.phone}`" class="rc-meta-row__value">{{ formatPhone(customer.phone) }}</a>
+              </div>
+              <div class="rc-meta-row">
+                <span class="rc-meta-row__label">E-posta</span>
+                <a :href="`mailto:${customer.email}`" class="rc-meta-row__value">{{ customer.email || '—' }}</a>
+              </div>
+              <div class="rc-meta-row">
+                <span class="rc-meta-row__label">Adres</span>
+                <span class="rc-meta-row__value">
+                  {{ [customer.address, customer.city].filter(Boolean).join(', ') || '—' }}
                 </span>
-              </span>
+              </div>
             </div>
           </div>
-        </section>
-      </div>
 
-      <!-- Sürücüler Sekmesi -->
-      <div v-show="activeTab === 'drivers'" class="tab-panel">
-        <section class="card drivers-card">
-          <div class="card-header">
-            <h2>Sürücüler</h2>
-            <button class="btn btn-primary btn-sm" @click="showDriverForm = !showDriverForm">
-              {{ showDriverForm ? '✕ İptal' : '+ Sürücü Ekle' }}
-            </button>
+          <div v-if="customer.customerType === 'PERSONAL'" class="rc-card">
+            <div class="rc-card__head">
+              <h3 class="rc-card__title">Kimlik & ehliyet</h3>
+            </div>
+            <div class="rc-card__body">
+              <div class="rc-meta-row">
+                <span class="rc-meta-row__label">TC Kimlik</span>
+                <span class="rc-meta-row__value rc-mono">{{ maskId(customer.personalInfo?.nationalId || customer.nationalId || '') }}</span>
+              </div>
+              <div class="rc-meta-row">
+                <span class="rc-meta-row__label">Doğum tarihi</span>
+                <span class="rc-meta-row__value">
+                  {{ customer.personalInfo?.birthDate ? formatDate(customer.personalInfo.birthDate) : (customer.birthDate ? formatDate(customer.birthDate) : '—') }}
+                </span>
+              </div>
+              <div class="rc-meta-row">
+                <span class="rc-meta-row__label">Ehliyet no</span>
+                <span class="rc-meta-row__value">{{ customer.personalInfo?.licenseNumber || customer.licenseNumber || '—' }}</span>
+              </div>
+              <div class="rc-meta-row">
+                <span class="rc-meta-row__label">Ehliyet sınıfı</span>
+                <span class="rc-meta-row__value">{{ customer.personalInfo?.licenseClassName || customer.personalInfo?.licenseClass || customer.licenseClass || '—' }}</span>
+              </div>
+              <div class="rc-meta-row">
+                <span class="rc-meta-row__label">Ehliyet bitiş</span>
+                <span class="rc-meta-row__value">{{ customer.personalInfo?.licenseExpiryDate ? formatDate(customer.personalInfo.licenseExpiryDate) : (customer.licenseExpiryDate ? formatDate(customer.licenseExpiryDate) : '—') }}</span>
+              </div>
+            </div>
           </div>
 
-          <div v-if="showDriverForm" class="driver-form">
-            <div class="form-grid">
-              <div class="form-group">
-                <label for="new-driver-first-name">Ad *</label>
-                <input id="new-driver-first-name" v-model="newDriver.firstName" type="text" placeholder="Ad" />
+          <div v-else class="rc-card">
+            <div class="rc-card__head">
+              <h3 class="rc-card__title">Şirket bilgileri</h3>
+            </div>
+            <div class="rc-card__body">
+              <div class="rc-meta-row">
+                <span class="rc-meta-row__label">Vergi no</span>
+                <span class="rc-meta-row__value rc-mono">{{ maskTaxNumber(customer.companyInfo?.taxNumber || customer.taxNumber || '') }}</span>
               </div>
-              <div class="form-group">
-                <label for="new-driver-last-name">Soyad *</label>
-                <input id="new-driver-last-name" v-model="newDriver.lastName" type="text" placeholder="Soyad" />
+              <div class="rc-meta-row">
+                <span class="rc-meta-row__label">Vergi dairesi</span>
+                <span class="rc-meta-row__value">{{ customer.companyInfo?.taxOffice || customer.taxOffice || '—' }}</span>
               </div>
-              <div class="form-group">
-                <label for="new-driver-national-id">TC Kimlik No *</label>
+              <div class="rc-meta-row">
+                <span class="rc-meta-row__label">Sektör</span>
+                <span class="rc-meta-row__value">{{ customer.companyInfo?.sector ?? customer.sector ?? '—' }}</span>
+              </div>
+              <div class="rc-meta-row">
+                <span class="rc-meta-row__label">Çalışan sayısı</span>
+                <span class="rc-meta-row__value">{{ formatEmployeeCount(customer.companyInfo?.employeeCount ?? customer.employeeCount ?? undefined) }}</span>
+              </div>
+              <div class="rc-meta-row">
+                <span class="rc-meta-row__label">Kredi skoru</span>
+                <span class="rc-meta-row__value">
+                  {{ customer.creditScore ?? '—' }}
+                  <RcBadge v-if="customer.creditRating" variant="warning" style="margin-left: 6px">{{ creditRatingLabels[customer.creditRating] }}</RcBadge>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Kiralamalar -->
+      <div v-show="activeTab === 'rentals'">
+        <div v-if="loadingRentals" class="rc-skeleton rc-card-skeleton" style="height: 240px" />
+        <RcEmpty
+          v-else-if="rentals.length === 0"
+          title="Kiralama kaydı yok"
+          description="Bu müşteriye ait kiralama bulunamadı"
+        />
+        <div v-else class="rc-card" style="overflow: hidden">
+          <table class="rc-table rcv-table--slim">
+            <thead>
+              <tr>
+                <th>Kiralama</th>
+                <th>Araç</th>
+                <th>Tarih</th>
+                <th class="rc-right">Tutar</th>
+                <th>Durum</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="rental in rentals"
+                :key="rental.id"
+                style="cursor: pointer"
+                @click="router.push(`/rentals/${rental.id}`)"
+              >
+                <td>
+                  <div class="rcv-row__primary">{{ rental.rentalNumber }}</div>
+                  <div class="rcv-row__secondary">{{ rental.rentalType }}</div>
+                </td>
+                <td>
+                  <div class="rcv-row__primary">{{ rental.vehiclePlate || rental.vehicleName || '—' }}</div>
+                </td>
+                <td>
+                  <div class="rcv-row__primary">{{ formatDate(rental.startDate) }} – {{ formatDate(rental.endDate) }}</div>
+                  <div v-if="rental.actualReturnDate" class="rcv-row__secondary">İade: {{ formatDate(rental.actualReturnDate) }}</div>
+                </td>
+                <td class="rc-right rc-num">{{ fmtTRY(rental.grandTotal) }}</td>
+                <td><RcStatusPill :status="rental.status" /></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Finans -->
+      <div v-show="activeTab === 'finance'">
+        <div v-if="loadingFinance" class="rc-skeleton rc-card-skeleton" style="height: 240px" />
+        <template v-else>
+          <div class="rc-kpi-grid" style="margin-bottom: 16px">
+            <div class="rc-kpi">
+              <div class="rc-kpi__label">Açık alacak</div>
+              <div class="rc-kpi__value rc-num">{{ fmtTRY(financeSummary.totalOutstanding) }}</div>
+              <div class="rc-kpi__sub">{{ financeSummary.openCount }} kayıt</div>
+            </div>
+            <div class="rc-kpi">
+              <div class="rc-kpi__label">Tahsil edilen</div>
+              <div class="rc-kpi__value rc-num">{{ fmtTRY(financeSummary.totalPaid) }}</div>
+            </div>
+          </div>
+          <RcEmpty
+            v-if="receivables.length === 0"
+            title="Alacak kaydı yok"
+            description="Bu müşteriye ait alacak bulunamadı"
+          />
+          <div v-else class="rc-card" style="overflow: hidden">
+            <table class="rc-table rcv-table--slim">
+              <thead>
+                <tr>
+                  <th>Alacak</th>
+                  <th>Açıklama</th>
+                  <th>Vade</th>
+                  <th class="rc-right">Kalan</th>
+                  <th>Durum</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="row in receivables"
+                  :key="row.id"
+                  style="cursor: pointer"
+                  @click="router.push(`/accounting/receivables/${row.id}`)"
+                >
+                  <td class="rcv-row__plate">{{ row.receivableNumber }}</td>
+                  <td>
+                    <div class="rcv-row__primary">{{ row.description }}</div>
+                    <div v-if="row.vehiclePlate" class="rcv-row__secondary">{{ row.vehiclePlate }}</div>
+                  </td>
+                  <td>{{ formatDate(row.dueDate) }}</td>
+                  <td class="rc-right rc-num">{{ fmtTRY(row.remainingAmount) }}</td>
+                  <td><RcStatusPill :status="row.status" /></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </template>
+      </div>
+
+      <!-- Sürücüler -->
+      <div v-show="activeTab === 'drivers'" class="rc-cust-tab-panel">
+        <div class="rc-card">
+          <div class="rc-card__head">
+            <h3 class="rc-card__title">Sürücüler</h3>
+            <RcButton variant="accent" size="sm" @click="showDriverForm = !showDriverForm">
+              <RcIcon :name="showDriverForm ? 'close' : 'plus'" :size="14" />
+              {{ showDriverForm ? 'İptal' : 'Sürücü ekle' }}
+            </RcButton>
+          </div>
+
+          <div v-if="showDriverForm" class="rc-card__body rc-cust-drivers-form">
+            <div class="rcv-form-grid">
+              <RcField label="Ad *">
+                <input id="new-driver-first-name" v-model="newDriver.firstName" class="rc-input" type="text" placeholder="Ad" />
+              </RcField>
+              <RcField label="Soyad *">
+                <input id="new-driver-last-name" v-model="newDriver.lastName" class="rc-input" type="text" placeholder="Soyad" />
+              </RcField>
+              <RcField label="TC Kimlik No *">
                 <input
                   id="new-driver-national-id"
                   v-model="newDriver.nationalId"
+                  class="rc-input rc-mono"
                   type="text"
                   maxlength="11"
                   placeholder="11 haneli TC No"
                 />
-              </div>
-              <div class="form-group">
-                <label for="new-driver-phone">Telefon</label>
+              </RcField>
+              <RcField label="Telefon">
                 <input
                   id="new-driver-phone"
                   v-model="newDriver.phone"
+                  class="rc-input rc-mono"
                   type="tel"
                   inputmode="numeric"
                   maxlength="13"
                   placeholder="555 111 11 11"
                   @input="handleNewDriverPhoneInput"
                 />
-              </div>
-              <div class="form-group">
-                <label for="new-driver-license-number">Ehliyet No *</label>
+              </RcField>
+              <RcField label="Ehliyet no *">
                 <input
                   id="new-driver-license-number"
                   v-model="newDriver.licenseNumber"
+                  class="rc-input"
                   type="text"
                   placeholder="Ehliyet numarası"
                 />
-              </div>
-              <div class="form-group">
-                <label>Ehliyet Sınıfı</label>
+              </RcField>
+              <RcField label="Ehliyet sınıfı">
                 <SearchableSelect
-                  v-model="newDriver.licenseClassId"
+                  :model-value="newDriver.licenseClassId ?? null"
                   :options="licenseClassOptions"
                   placeholder="Sınıf seçin"
                   search-placeholder="Ara..."
                   clearable
+                  @update:model-value="newDriver.licenseClassId = ($event as number | undefined) ?? undefined"
                 />
-              </div>
-              <div class="form-group full">
+              </RcField>
+              <RcField label="Ehliyet geçerlilik *" class="span-2">
                 <DatePicker
                   v-model="newDriver.licenseExpiryDate"
-                  label="Ehliyet Geçerlilik Tarihi *"
                   placeholder="Ehliyet geçerlilik tarihi"
                 />
-              </div>
+              </RcField>
             </div>
-            <div class="form-actions">
-              <button class="btn btn-outline" @click="showDriverForm = false; resetDriverForm()">İptal</button>
-              <button class="btn btn-primary" :disabled="savingDriver" @click="createDriver">
-                {{ savingDriver ? 'Kaydediliyor...' : 'Kaydet' }}
-              </button>
+            <div class="rc-cust-drivers-form__actions">
+              <RcButton variant="ghost" @click="showDriverForm = false; resetDriverForm()">İptal</RcButton>
+              <RcButton variant="accent" :disabled="savingDriver" @click="createDriver">
+                {{ savingDriver ? 'Kaydediliyor…' : 'Kaydet' }}
+              </RcButton>
             </div>
           </div>
 
-          <div v-if="loadingDrivers" class="loading-small">Yükleniyor...</div>
-          <div v-else-if="drivers.length === 0" class="empty-state">
-            Henüz kayıtlı sürücü yok
+          <div v-if="loadingDrivers" class="rc-card__body">
+            <div class="rc-skeleton rc-card-skeleton" style="height: 120px" />
           </div>
-          <div v-else class="drivers-list">
+          <RcEmpty
+            v-else-if="drivers.length === 0 && !showDriverForm"
+            title="Henüz sürücü yok"
+            description="Bu müşteriye bağlı ek sürücü ekleyebilirsiniz"
+          />
+          <div v-else-if="drivers.length > 0" class="rc-card__body rc-cust-drivers-list">
             <div
               v-for="driver in drivers"
               :key="driver.id"
-              :class="['driver-item', { 'license-expiring': isLicenseExpiringSoon(driver.licenseExpiryDate), 'license-expired': isLicenseExpired(driver.licenseExpiryDate) }]"
+              class="rc-cust-driver-row"
+              :class="{
+                'rc-cust-driver-row--expiring': isLicenseExpiringSoon(driver.licenseExpiryDate),
+                'rc-cust-driver-row--expired': isLicenseExpired(driver.licenseExpiryDate),
+              }"
             >
-              <div class="driver-avatar">{{ driver.firstName?.charAt(0) || '?' }}</div>
-              <div class="driver-info">
-                <div class="driver-name">
+              <RcAvatar size="sm">{{ driver.firstName?.charAt(0) || '?' }}</RcAvatar>
+              <div class="rc-cust-driver-row__info">
+                <div class="rc-cust-driver-row__name">
                   {{ getDriverDisplayName(driver) }}
-                  <span v-if="driver.primary" class="badge-primary">Ana Sürücü</span>
-                  <span v-if="driver.linkedToCustomer" class="badge-linked">Müşteri kartı</span>
-                  <span v-if="!driver.active" class="badge-inactive">Pasif</span>
-                  <span v-if="isLicenseExpired(driver.licenseExpiryDate)" class="badge-expired">Ehliyet süresi dolmuş</span>
-                  <span v-else-if="isLicenseExpiringSoon(driver.licenseExpiryDate)" class="badge-expiring">Ehliyet süresi yaklaşıyor</span>
+                  <RcBadge v-if="driver.primary" variant="accent">Ana sürücü</RcBadge>
+                  <RcBadge v-if="driver.linkedToCustomer" variant="info">Müşteri kartı</RcBadge>
+                  <RcBadge v-if="!driver.active" variant="default">Pasif</RcBadge>
+                  <RcBadge v-if="isLicenseExpired(driver.licenseExpiryDate)" variant="danger">Ehliyet süresi dolmuş</RcBadge>
+                  <RcBadge v-else-if="isLicenseExpiringSoon(driver.licenseExpiryDate)" variant="warning">Ehliyet yaklaşıyor</RcBadge>
                 </div>
-                <div class="driver-details">
-                  {{ formatPhone(driver.phone || '') }} |
-                  {{ driver.licenseNumber }} |
-                  {{ formatDate(driver.licenseExpiryDate) }}
+                <div class="rc-cust-driver-row__meta">
+                  {{ formatPhone(driver.phone || '') }} · {{ driver.licenseNumber }} · {{ formatDate(driver.licenseExpiryDate) }}
                 </div>
-                <p v-if="driver.linkedToCustomer" class="driver-linked-hint">
+                <p v-if="driver.linkedToCustomer" class="rc-cust-driver-row__hint">
                   Bu kart müşteri bilgileriyle eşitlenir; düzenlemek için müşteri bilgilerini güncelleyin.
                 </p>
               </div>
-              <div v-if="!driver.linkedToCustomer" class="driver-actions">
-                <button class="btn-icon" @click="openEditModal(driver)" title="Düzenle">
-                  Düzenle
-                </button>
-                <button class="btn-icon btn-danger" @click="confirmDeleteDriver(driver)" title="Sil">
-                  Sil
-                </button>
+              <div v-if="!driver.linkedToCustomer" class="rc-cust-driver-row__actions">
+                <RcButton variant="ghost" size="sm" @click="openEditModal(driver)">Düzenle</RcButton>
+                <RcButton variant="ghost" size="sm" class="rc-btn--danger" @click="confirmDeleteDriver(driver)">Sil</RcButton>
               </div>
             </div>
           </div>
-        </section>
+        </div>
       </div>
 
       <!-- Belgeler Sekmesi -->
@@ -676,94 +929,23 @@ onMounted(fetchCustomer)
           title="Belgeler"
         />
       </div>
+      </div>
 
-        <div v-if="showEditModal" class="modal-overlay" @click.self="closeEditModal">
-          <div class="modal">
-            <div class="modal-header">
-              <h3>Sürücü Düzenle</h3>
-              <button class="close-btn" @click="closeEditModal">×</button>
-            </div>
-            <div class="modal-body">
-              <div class="form-grid">
-                <div class="form-group">
-                  <label for="edit-driver-first-name">Ad *</label>
-                  <input id="edit-driver-first-name" v-model="editDriverForm.firstName" type="text" placeholder="Ad" />
-                </div>
-                <div class="form-group">
-                  <label for="edit-driver-last-name">Soyad *</label>
-                  <input id="edit-driver-last-name" v-model="editDriverForm.lastName" type="text" placeholder="Soyad" />
-                </div>
-                <div class="form-group">
-                  <label for="edit-driver-national-id">TC Kimlik No *</label>
-                  <input
-                    id="edit-driver-national-id"
-                    v-model="editDriverForm.nationalId"
-                    type="text"
-                    maxlength="11"
-                    placeholder="11 haneli TC No"
-                  />
-                </div>
-                <div class="form-group">
-                  <label for="edit-driver-phone">Telefon</label>
-                  <input
-                    id="edit-driver-phone"
-                    v-model="editDriverForm.phone"
-                    type="tel"
-                    inputmode="numeric"
-                    maxlength="13"
-                    placeholder="555 111 11 11"
-                    @input="handleEditDriverPhoneInput"
-                  />
-                </div>
-                <div class="form-group">
-                  <label for="edit-driver-license-number">Ehliyet No *</label>
-                  <input
-                    id="edit-driver-license-number"
-                    v-model="editDriverForm.licenseNumber"
-                    type="text"
-                    placeholder="Ehliyet numarası"
-                  />
-                </div>
-                <div class="form-group">
-                  <label>Ehliyet Sınıfı</label>
-                  <SearchableSelect
-                    v-model="editDriverForm.licenseClassId"
-                    :options="licenseClassOptions"
-                    placeholder="Sınıf seçin"
-                    search-placeholder="Ara..."
-                    clearable
-                  />
-                </div>
-                <div class="form-group full">
-                  <DatePicker
-                    v-model="editDriverForm.licenseExpiryDate"
-                    label="Ehliyet Geçerlilik Tarihi *"
-                    placeholder="Ehliyet geçerlilik tarihi"
-                  />
-                </div>
-                <div class="form-group full">
-                  <label class="checkbox-label">
-                    <input v-model="editDriverForm.active" type="checkbox" />
-                    <span>Aktif</span>
-                  </label>
-                </div>
-              </div>
-            </div>
-            <div class="modal-footer">
-              <button type="button" class="btn btn-outline" @click="closeEditModal">
-                İptal
-              </button>
-              <button
-                type="button"
-                class="btn btn-primary"
-                :disabled="updatingDriver"
-                @click="updateDriver"
-              >
-                {{ updatingDriver ? 'Güncelleniyor...' : 'Güncelle' }}
-              </button>
-            </div>
-          </div>
-        </div>
+      <CustomerEditModal
+        :open="showCustomerEditModal"
+        :customer-id="customer.id"
+        @close="showCustomerEditModal = false"
+        @saved="onCustomerSaved"
+      />
+
+      <CustomerDriverEditModal
+        :open="showDriverEditModal"
+        :driver="editingDriver"
+        :license-class-options="licenseClassOptions"
+        :saving="updatingDriver"
+        @close="closeEditModal"
+        @save="updateDriver"
+      />
     </template>
 
     <div v-if="showBlacklistModal" class="modal-overlay" @click.self="showBlacklistModal = false">

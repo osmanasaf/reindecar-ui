@@ -52,7 +52,7 @@ const processFiles = (files: File[]) => {
   }
 
   if (validFiles.length > 0) {
-    selectedFiles.value = props.multiple ? validFiles : [validFiles[0]]
+    selectedFiles.value = props.multiple ? validFiles : [validFiles[0]!]
     emit('change', selectedFiles.value)
   }
 }

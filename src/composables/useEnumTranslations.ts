@@ -16,7 +16,9 @@ import {
   VehicleStatus,
   ViolationType,
   PenaltyStatus,
-  PaymentMethod
+  PaymentMethod,
+  PaymentStatus,
+  RentalStatus
 } from '@/types'
 
 export function useEnumTranslations() {
@@ -113,7 +115,8 @@ export function useEnumTranslations() {
     [PayableStatus.PARTIAL_PAID]: 'Kısmi Ödendi',
     [PayableStatus.FULLY_PAID]: 'Tamamen Ödendi',
     [PayableStatus.OVERDUE]: 'Vadesi Geçmiş',
-    [PayableStatus.CANCELLED]: 'İptal Edildi'
+    [PayableStatus.CANCELLED]: 'İptal Edildi',
+    [PayableStatus.WRITTEN_OFF]: 'Şüpheli'
   }
 
   const claimTypes: Record<ClaimType, string> = {
@@ -205,6 +208,24 @@ export function useEnumTranslations() {
     [PaymentMethod.ONLINE]: 'Online Ödeme'
   }
 
+  const paymentStatuses: Record<PaymentStatus, string> = {
+    [PaymentStatus.PENDING]: 'Beklemede',
+    [PaymentStatus.COMPLETED]: 'Tahsil edildi',
+    [PaymentStatus.FAILED]: 'Başarısız',
+    [PaymentStatus.REFUNDED]: 'İade edildi',
+  }
+
+  const rentalStatuses: Record<RentalStatus, string> = {
+    [RentalStatus.DRAFT]: 'Taslak',
+    [RentalStatus.RESERVED]: 'Rezerve',
+    [RentalStatus.ACTIVE]: 'Aktif',
+    [RentalStatus.OVERDUE]: 'Gecikmiş',
+    [RentalStatus.RETURN_PENDING]: 'İade bekliyor',
+    [RentalStatus.PENDING_PAYMENT]: 'Ödeme bekleniyor',
+    [RentalStatus.CLOSED]: 'Tamamlandı',
+    [RentalStatus.CANCELLED]: 'İptal',
+  }
+
   const vehicleStatuses: Record<VehicleStatus, string> = {
     [VehicleStatus.AVAILABLE]: 'Müsait',
     [VehicleStatus.RESERVED]: 'Rezerve',
@@ -288,6 +309,14 @@ export function useEnumTranslations() {
     return paymentMethods[method as PaymentMethod] || method
   }
 
+  const translatePaymentStatus = (status: string): string => {
+    return paymentStatuses[status as PaymentStatus] || status
+  }
+
+  const translateRentalStatus = (status: string): string => {
+    return rentalStatuses[status as RentalStatus] || status
+  }
+
   return {
     translateDamageType,
     translateSeverity,
@@ -307,6 +336,8 @@ export function useEnumTranslations() {
     translateViolationType,
     translatePenaltyStatus,
     translatePaymentMethod,
+    translatePaymentStatus,
+    translateRentalStatus,
     damageTypes,
     damageSeverities,
     damageLocations,
@@ -324,6 +355,8 @@ export function useEnumTranslations() {
     violationTypes,
     penaltyStatuses,
     paymentMethods,
+    paymentStatuses,
+    rentalStatuses,
     vehicleStatuses
   }
 }

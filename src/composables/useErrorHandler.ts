@@ -1,16 +1,16 @@
-import { ref, computed, readonly } from 'vue'
+import { ref, computed, readonly, type Ref } from 'vue'
 import type { ErrorResponse } from '@/types'
 import { isErrorResponse, isValidationError } from '@/utils/error'
 import type { AxiosError } from 'axios'
 
 export interface UseErrorHandlerReturn {
-    error: Readonly<typeof error>
-    validationErrors: Readonly<typeof validationErrors>
+    error: Readonly<Ref<ErrorResponse | null>>
+    validationErrors: Readonly<Ref<Record<string, string>>>
     handleError: (err: unknown) => void
     clearError: () => void
     getFieldError: (fieldName: string) => string | undefined
     hasFieldError: (fieldName: string) => boolean
-    hasError: Readonly<typeof hasError>
+    hasError: Readonly<Ref<boolean>>
 }
 
 

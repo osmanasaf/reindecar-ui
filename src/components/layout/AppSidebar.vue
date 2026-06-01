@@ -1,280 +1,177 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { computed } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
+import { RcIcon, RcAntlerMark } from '@/components/icons'
+import { RcAvatar, RcKbd } from '@/components/rc'
 import { useAuthStore } from '@/stores'
+import { useShellNavCounts } from '@/composables/useShellNavCounts'
+import { useShellSearch } from '@/composables/useShellSearch'
+import {
+  navSections,
+  isNavItemActive,
+  userInitials,
+  roleLabel,
+  type NavItem,
+} from './navConfig'
 
-defineProps<{
+const props = defineProps<{
   collapsed: boolean
   mobileOpen: boolean
+  isMobile: boolean
+}>()
+
+const emit = defineEmits<{
+  'toggle-collapse': []
 }>()
 
 const route = useRoute()
 const authStore = useAuthStore()
+const { countForNavItem } = useShellNavCounts()
+const { openSearch } = useShellSearch()
 
-interface NavItem {
-  name: string
-  label: string
-  icon: string
-  adminOnly?: boolean
-  children?: NavItem[]
-}
+const searchKbdLabel = computed(() =>
+  typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.platform)
+    ? '⌘K'
+    : 'Ctrl+K',
+)
 
-const allNavItems: NavItem[] = [
-  { name: 'dashboard', label: 'Dashboard', icon: '📊' },
-  { name: 'vehicles', label: 'Araçlar', icon: '🚗' },
-  { name: 'customers', label: 'Müşteriler', icon: '👥' },
-  { name: 'rentals', label: 'Kiralamalar', icon: '📋' },
-  { 
-    name: 'accounting',
-    label: 'Finans', 
-    icon: '💰',
-    children: [
-      { name: 'receivables', label: 'Alacaklar', icon: '📥' },
-      { name: 'payables', label: 'Verecekler', icon: '📤' },
-      { name: 'insurance-claims', label: 'Sigorta Başvuruları', icon: '🛡️' },
-      { name: 'service-providers', label: 'Servis Sağlayıcılar', icon: '🔧' }
-    ]
-  },
-  { name: 'installments-dashboard', label: 'Taksit Yönetimi', icon: '💳' },
-  { name: 'branches', label: 'Şubeler', icon: '🏢', adminOnly: true },
-  { name: 'users', label: 'Kullanıcılar', icon: '👤', adminOnly: true },
-  { name: 'user-invitations', label: 'Davetler', icon: '✉️', adminOnly: true },
-  { name: 'settings', label: 'Ayarlar', icon: '⚙️' }
-]
+const visibleSections = computed(() =>
+  navSections
+    .map((section) => ({
+      ...section,
+      section:
+        section.section === 'Sistem' && section.items.filter((i) => !i.adminOnly || authStore.isAdmin).length <= 1
+          ? undefined
+          : section.section,
+      items: section.items.filter((item) => !item.adminOnly || authStore.isAdmin),
+    }))
+    .filter((section) => section.items.length > 0),
+)
 
-const navItems = computed(() => {
-  if (authStore.isAdmin) return allNavItems
-  return allNavItems.filter(item => !item.adminOnly)
+const userMeta = computed(() => {
+  const user = authStore.user
+  return {
+    initials: userInitials(authStore.userFullName || 'U'),
+    name: authStore.userFullName || 'Kullanıcı',
+    branch: user?.branchName ?? '—',
+    role: roleLabel(user?.role),
+  }
 })
 
-const expandedMenus = ref<Set<string>>(new Set())
+const collapseLabel = computed(() =>
+  props.collapsed && !props.mobileOpen ? 'Menüyü genişlet' : 'Menüyü daralt',
+)
 
-const isActive = (name: string) => computed(() => {
-  if (name === 'accounting') {
-    return route.path.startsWith('/accounting')
-  }
-  return route.name === name || route.path.startsWith(`/${name}`)
-})
-
-const isExpanded = (name: string) => {
-  return expandedMenus.value.has(name) || isActive(name).value
+function itemActive(item: NavItem) {
+  return isNavItemActive(route.name as string | undefined, route.path, item.name)
 }
 
-const toggleMenu = (name: string) => {
-  if (expandedMenus.value.has(name)) {
-    expandedMenus.value.delete(name)
-  } else {
-    expandedMenus.value.add(name)
-  }
+function formatCount(n: number | undefined): string | undefined {
+  if (n == null || n <= 0) return undefined
+  return n > 999 ? '999+' : String(n)
 }
-
-
-watch(() => route.path, (newPath) => {
-  if (newPath.startsWith('/accounting')) {
-    expandedMenus.value.add('accounting')
-  }
-}, { immediate: true })
 </script>
 
 <template>
-  <aside class="sidebar" :class="{ collapsed, 'mobile-open': mobileOpen }">
-    <div class="sidebar-header">
-      <RouterLink to="/" class="logo">
-        <span class="logo-icon">🦌</span>
-        <span v-if="!collapsed" class="logo-text">Reindecar</span>
+  <aside
+    class="rc-side"
+    :class="{
+      'rc-side--collapsed': collapsed && !mobileOpen,
+      'rc-side--mobile-open': mobileOpen,
+    }"
+  >
+    <div class="rc-side__brand">
+      <RouterLink to="/" class="rc-side__brand-link">
+        <RcAntlerMark />
+        <span class="rc-mark__wordmark">Reindecar</span>
       </RouterLink>
+      <button
+        v-if="!isMobile"
+        type="button"
+        class="rc-side__collapse-btn"
+        :title="collapseLabel"
+        :aria-label="collapseLabel"
+        @click="emit('toggle-collapse')"
+      >
+        <RcIcon :name="collapsed && !mobileOpen ? 'panelRight' : 'panelLeft'" :size="16" />
+      </button>
     </div>
 
-    <nav class="sidebar-nav">
-      <template v-for="item in navItems" :key="item.name">
+    <button
+      type="button"
+      class="rc-side__search"
+      :title="`Ara (${searchKbdLabel})`"
+      @click="openSearch"
+    >
+      <RcIcon name="search" :size="14" />
+      <span v-if="!collapsed || mobileOpen" class="rc-side__search-placeholder">
+        Plaka, müşteri, kiralama…
+      </span>
+      <RcKbd v-if="!collapsed || mobileOpen">{{ searchKbdLabel }}</RcKbd>
+    </button>
 
-        <div v-if="item.children" class="nav-group">
-          <div 
-            class="nav-item nav-parent" 
-            :class="{ active: isActive(item.name).value, expanded: isExpanded(item.name) }"
-            @click="toggleMenu(item.name)"
-          >
-            <span class="nav-icon">{{ item.icon }}</span>
-            <span v-if="!collapsed" class="nav-label">{{ item.label }}</span>
-            <span v-if="!collapsed" class="nav-arrow">{{ isExpanded(item.name) ? '▼' : '▶' }}</span>
-          </div>
-          <div v-if="!collapsed && isExpanded(item.name)" class="nav-children">
-            <RouterLink
-              v-for="child in item.children"
-              :key="child.name"
-              :to="{ name: child.name }"
-              class="nav-item nav-child"
-              :class="{ active: isActive(child.name).value }"
-            >
-              <span class="nav-icon">{{ child.icon }}</span>
-              <span class="nav-label">{{ child.label }}</span>
-            </RouterLink>
-          </div>
+    <nav class="rc-side__nav" aria-label="Ana menü">
+      <template v-for="(section, si) in visibleSections" :key="si">
+        <div v-if="section.section && (!collapsed || mobileOpen)" class="rc-side__nav-section">
+          {{ section.section }}
         </div>
-
-
         <RouterLink
-          v-else
+          v-for="item in section.items"
+          :key="item.name"
           :to="{ name: item.name }"
-          class="nav-item"
-          :class="{ active: isActive(item.name).value }"
-          :title="collapsed ? item.label : undefined"
+          class="rc-side__item"
+          :class="{ 'rc-side__item--active': itemActive(item) }"
+          :title="collapsed && !mobileOpen ? item.label : undefined"
         >
-          <span class="nav-icon">{{ item.icon }}</span>
-          <span v-if="!collapsed" class="nav-label">{{ item.label }}</span>
+          <RcIcon :name="item.icon" />
+          <span v-if="!collapsed || mobileOpen" class="rc-side__item-label">{{ item.label }}</span>
+          <span
+            v-if="(!collapsed || mobileOpen) && formatCount(countForNavItem(item.name))"
+            class="rc-side__item-count"
+          >
+            {{ formatCount(countForNavItem(item.name)) }}
+          </span>
         </RouterLink>
       </template>
     </nav>
 
-    <div class="sidebar-footer">
-      <div class="version" v-if="!collapsed">v1.0.0</div>
-    </div>
+    <RouterLink to="/settings" class="rc-side__user">
+      <RcAvatar>{{ userMeta.initials }}</RcAvatar>
+      <div v-if="!collapsed || mobileOpen" class="rc-side__user-info">
+        <b>{{ userMeta.name }}</b>
+        <small>{{ userMeta.branch }} · {{ userMeta.role }}</small>
+      </div>
+      <RcIcon v-if="!collapsed || mobileOpen" name="chevronRight" :size="14" />
+    </RouterLink>
   </aside>
 </template>
 
 <style scoped>
-.sidebar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  width: var(--sidebar-width);
-  background: var(--color-surface);
-  border-right: 1px solid var(--color-border);
-  display: flex;
-  flex-direction: column;
-  transition: width var(--transition-normal), transform var(--transition-normal);
-  z-index: var(--sidebar-overlay-z);
-}
-
-.sidebar.collapsed {
-  width: var(--sidebar-collapsed-width);
-}
-
-.sidebar-header {
-  height: var(--header-height);
+.rc-side__search {
   display: flex;
   align-items: center;
-  padding: 0 var(--spacing-lg);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.logo {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  text-decoration: none;
-  color: var(--color-text);
-}
-
-.logo-icon {
-  font-size: 1.5rem;
-}
-
-.logo-text {
-  font-size: var(--font-size-lg);
-  font-weight: 700;
-  color: var(--color-primary);
-}
-
-.sidebar-nav {
-  flex: 1;
-  padding: var(--spacing-md);
-  overflow-y: auto;
-}
-
-.nav-item {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  padding: var(--spacing-md);
-  border-radius: var(--radius-md);
-  color: var(--color-text-secondary);
-  text-decoration: none;
-  transition: all var(--transition-fast);
-  margin-bottom: var(--spacing-xs);
-}
-
-.nav-item:hover {
-  background: var(--color-bg-secondary);
-  color: var(--color-text);
-}
-
-.nav-item.active {
-  background: var(--color-primary-light);
-  color: var(--color-primary);
-  font-weight: 500;
-}
-
-.nav-icon {
-  font-size: 1.25rem;
-  width: 24px;
-  text-align: center;
-}
-
-.nav-label {
-  white-space: nowrap;
-}
-
-.nav-group {
-  margin-bottom: var(--spacing-xs);
-}
-
-.nav-parent {
+  gap: 8px;
+  width: calc(100% - 16px);
+  margin: 0 8px 8px;
+  padding: 0 10px;
+  height: 32px;
+  border-radius: var(--rc-r-6);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  color: var(--rc-ink-400);
   cursor: pointer;
-  font-weight: 500;
-  justify-content: flex-start;
+  text-align: left;
+  font: inherit;
 }
-
-.nav-arrow {
-  margin-left: auto;
-  font-size: 10px;
-  color: var(--color-text-muted);
-  transition: transform 0.2s;
+.rc-side__search:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--rc-ink-200);
 }
-
-.nav-parent.expanded .nav-arrow {
-  color: var(--color-primary);
-}
-
-.nav-children {
-  margin-left: calc(24px + var(--spacing-md));
-  margin-top: var(--spacing-xs);
-}
-
-.nav-child {
-  padding: var(--spacing-sm) var(--spacing-md);
-  font-size: 0.875rem;
-}
-
-.sidebar.collapsed .nav-item {
-  justify-content: center;
-  padding: var(--spacing-md);
-}
-
-.sidebar-footer {
-  padding: var(--spacing-md);
-  border-top: 1px solid var(--color-border);
-}
-
-.version {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-muted);
-  text-align: center;
-}
-
-@media (max-width: 768px) {
-  .sidebar {
-    width: min(85vw, 320px);
-    transform: translateX(-100%);
-  }
-  
-  .sidebar.mobile-open {
-    transform: translateX(0);
-  }
-
-  .sidebar.collapsed {
-    width: min(85vw, 320px);
-  }
+.rc-side__search-placeholder {
+  flex: 1;
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 </style>

@@ -1,0 +1,40 @@
+/* Geçiş köprüsü: eski --color-* token'ları → v2 (--rc-*) */
+:root,
+[data-theme="dark"] {
+  --color-primary: var(--rc-blue-500);
+  --color-primary-hover: var(--rc-blue-600);
+  --color-primary-light: var(--rc-blue-50);
+
+  --color-success: var(--rc-success-500);
+  --color-success-light: var(--rc-success-50);
+
+  --color-warning: var(--rc-warning-500);
+  --color-warning-light: var(--rc-warning-50);
+
+  --color-danger: var(--rc-danger-500);
+  --color-danger-light: var(--rc-danger-50);
+
+  --color-info: var(--rc-info-500);
+  --color-info-light: var(--rc-info-50);
+
+  --color-bg: var(--rc-bg);
+  --color-bg-secondary: var(--rc-bg-subtle);
+  --color-surface: var(--rc-surface);
+  --color-surface-hover: var(--rc-surface-hover);
+
+  --color-text: var(--rc-text);
+  --color-text-secondary: var(--rc-text-soft);
+  --color-text-muted: var(--rc-text-muted);
+  --color-text-inverse: var(--rc-text-inverse);
+
+  --color-border: var(--rc-border);
+  --color-border-light: var(--rc-border-subtle);
+}
+
+[data-theme="dark"] {
+  --color-primary-light: rgba(0, 102, 255, 0.15);
+  --color-success-light: rgba(14, 168, 92, 0.15);
+  --color-warning-light: rgba(232, 149, 0, 0.15);
+  --color-danger-light: rgba(229, 52, 46, 0.15);
+  --color-info-light: rgba(26, 127, 204, 0.15);
+}

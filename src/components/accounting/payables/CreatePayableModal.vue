@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import type { CreatePayableRequest, PayableType, ServiceProviderResponse } from '@/types'
+import { ref, computed, onMounted, watch } from 'vue'
+import { PayableType } from '@/types'
+import type { CreatePayableRequest, ServiceProviderResponse } from '@/types'
 import { useForm, useToast } from '@/composables'
 import { SearchableSelect } from '@/components/common'
 import DatePicker from '@/components/base/DatePicker.vue'
+import { RcModal, RcButton, RcField, RcInput } from '@/components/rc'
 import { useAccountingStore } from '@/stores'
-import { onMounted } from 'vue'
 
 interface Props {
-  show: boolean
+  show?: boolean
+  open?: boolean
   sourceId?: number
   sourceType?: string
   defaultDescription?: string
@@ -22,15 +24,17 @@ const emit = defineEmits<{
   submit: [data: CreatePayableRequest]
 }>()
 
+const isOpen = computed(() => props.open ?? props.show ?? false)
+
 const toast = useToast()
 const accountingStore = useAccountingStore()
 
 const payableTypes: { value: PayableType; label: string }[] = [
-  { value: 'REPAIR_COST', label: 'Onarım Maliyeti' },
-  { value: 'MAINTENANCE_COST', label: 'Bakım Maliyeti' },
-  { value: 'PARTS_COST', label: 'Parça Maliyeti' },
-  { value: 'SUPPLIER_COST', label: 'Tedarikçi Maliyeti' },
-  { value: 'OTHER', label: 'Diğer' }
+  { value: PayableType.REPAIR_COST, label: 'Onarım Maliyeti' },
+  { value: PayableType.MAINTENANCE_COST, label: 'Bakım Maliyeti' },
+  { value: PayableType.PARTS_COST, label: 'Parça Maliyeti' },
+  { value: PayableType.SUPPLIER_COST, label: 'Tedarikçi Maliyeti' },
+  { value: PayableType.OTHER, label: 'Diğer' },
 ]
 
 const providers = ref<ServiceProviderResponse[]>([])
@@ -39,354 +43,136 @@ const providerOptions = computed(() =>
   providers.value.map(p => ({ value: p.id as number, label: `${p.name} (${p.code})` }))
 )
 
-const initialValues: CreatePayableRequest = {
-  type: 'MAINTENANCE_COST',
-  serviceProviderId: 0,
-  description: props.defaultDescription || '',
-  amount: props.defaultAmount || 0,
-  invoiceNumber: '',
-  invoiceDate: '',
-  dueDate: ''
-}
-
-const validationRules = {
-  type: (value: string) => !value ? 'Verecek türü seçilmelidir' : '',
-  serviceProviderId: (value: number) => !value ? 'Servis sağlayıcı seçilmelidir' : '',
-  description: (value: string) => {
-    if (!value) return 'Açıklama zorunludur'
-    if (value.length < 10) return 'Açıklama en az 10 karakter olmalıdır'
-    if (value.length > 500) return 'Açıklama 500 karakterden uzun olamaz'
-    return ''
-  },
-  amount: (value: number) => {
-    if (!value || value <= 0) return 'Tutar 0\'dan büyük olmalıdır'
-    return ''
-  },
-  invoiceNumber: (value: string) => {
-    if (value && value.length > 50) return 'Fatura numarası 50 karakterden uzun olamaz'
-    return ''
+function validate(formValues: CreatePayableRequest): Partial<Record<keyof CreatePayableRequest, string>> {
+  const err: Partial<Record<keyof CreatePayableRequest, string>> = {}
+  if (!formValues.type) err.type = 'Verecek türü seçilmelidir'
+  if (!formValues.serviceProviderId) err.serviceProviderId = 'Servis sağlayıcı seçilmelidir'
+  if (!formValues.description) {
+    err.description = 'Açıklama zorunludur'
+  } else if (formValues.description.length < 10) {
+    err.description = 'Açıklama en az 10 karakter olmalıdır'
+  } else if (formValues.description.length > 500) {
+    err.description = 'Açıklama 500 karakterden uzun olamaz'
   }
+  if (!formValues.amount || formValues.amount <= 0) err.amount = 'Tutar 0\'dan büyük olmalıdır'
+  if (formValues.invoiceNumber && formValues.invoiceNumber.length > 50) {
+    err.invoiceNumber = 'Fatura numarası 50 karakterden uzun olamaz'
+  }
+  return err
 }
 
-const { values, errors, touched, handleSubmit, validateField, reset } = useForm(
-  initialValues,
-  validationRules
-)
-
-const isSubmitting = ref(false)
+const { values, errors, touched, handleSubmit, validateField, reset, isSubmitting } = useForm({
+  initialValues: {
+    type: PayableType.MAINTENANCE_COST,
+    serviceProviderId: 0,
+    description: props.defaultDescription || '',
+    amount: props.defaultAmount || 0,
+    invoiceNumber: '',
+    invoiceDate: '',
+    dueDate: '',
+  } satisfies CreatePayableRequest,
+  validate,
+  async onSubmit(data) {
+    emit('submit', data)
+    reset()
+  }
+})
 
 onMounted(async () => {
   try {
     providers.value = await accountingStore.fetchServiceProviders(true)
-  } catch (error) {
+  } catch {
     toast.error('Servis sağlayıcılar yüklenemedi')
   }
 })
 
-const onSubmit = handleSubmit(async (data) => {
-  isSubmitting.value = true
-  try {
-    emit('submit', data)
-    reset()
-  } catch (error: any) {
-    toast.error(error.message || 'Verecek oluşturulurken hata oluştu')
-  } finally {
-    isSubmitting.value = false
-  }
+watch(isOpen, (open) => {
+  if (!open) reset()
 })
 
-const handleClose = () => {
+const onSubmit = () => handleSubmit()
+
+function handleClose() {
   reset()
   emit('close')
 }
 </script>
 
 <template>
-  <div v-if="show" class="modal-overlay" @click.self="handleClose">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2 class="modal-title">Yeni Verecek Oluştur</h2>
-        <button class="close-btn" @click="handleClose">×</button>
+  <RcModal :open="isOpen" title="Yeni Verecek" wide @close="handleClose">
+    <form style="display: flex; flex-direction: column; gap: 14px" @submit.prevent="onSubmit">
+      <RcField label="Verecek türü" required>
+        <SearchableSelect
+          v-model="values.type"
+          :options="payableTypes"
+          placeholder="Seçiniz"
+          search-placeholder="Ara..."
+          :error="!!(touched.type && errors.type)"
+          @blur="validateField('type')"
+        />
+      </RcField>
+
+      <RcField label="Servis sağlayıcı" required>
+        <SearchableSelect
+          :model-value="values.serviceProviderId || null"
+          :options="providerOptions"
+          placeholder="Seçiniz"
+          search-placeholder="Sağlayıcı ara..."
+          :error="!!(touched.serviceProviderId && errors.serviceProviderId)"
+          @update:model-value="(v) => values.serviceProviderId = v ?? 0"
+          @blur="validateField('serviceProviderId')"
+        />
+      </RcField>
+
+      <RcField label="Açıklama" required>
+        <textarea
+          v-model="values.description"
+          class="rc-input"
+          rows="3"
+          maxlength="500"
+          placeholder="Verecek açıklaması"
+          @blur="validateField('description')"
+        />
+      </RcField>
+
+      <RcField label="Tutar (TL)" required>
+        <RcInput
+          v-model.number="values.amount"
+          type="number"
+          step="0.01"
+          placeholder="0.00"
+          @blur="validateField('amount')"
+        />
+      </RcField>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px">
+        <RcField label="Fatura numarası">
+          <RcInput
+            v-model="values.invoiceNumber"
+            placeholder="FT2026-001"
+            maxlength="50"
+            @blur="validateField('invoiceNumber')"
+          />
+        </RcField>
+        <DatePicker
+          v-model="values.invoiceDate"
+          label="Fatura tarihi"
+          placeholder="Fatura tarihi"
+        />
       </div>
 
-      <form @submit.prevent="onSubmit">
-        <div class="modal-body">
-          <div class="form-group">
-            <label class="form-label">
-              Verecek Türü <span class="required">*</span>
-            </label>
-            <SearchableSelect
-              v-model="values.type"
-              :options="payableTypes"
-              placeholder="Seçiniz"
-              search-placeholder="Ara..."
-              :error="!!(touched.type && errors.type)"
-              @blur="validateField('type')"
-            />
-            <span v-if="touched.type && errors.type" class="error-text">
-              {{ errors.type }}
-            </span>
-          </div>
+      <DatePicker
+        v-model="values.dueDate"
+        label="Vade tarihi"
+        placeholder="Vade tarihi"
+      />
+    </form>
 
-          <div class="form-group">
-            <label class="form-label">
-              Servis Sağlayıcı <span class="required">*</span>
-            </label>
-            <SearchableSelect
-              :model-value="values.serviceProviderId || null"
-              :options="providerOptions"
-              placeholder="Seçiniz"
-              search-placeholder="Sağlayıcı ara..."
-              :error="!!(touched.serviceProviderId && errors.serviceProviderId)"
-              @update:model-value="(v) => values.serviceProviderId = v ?? 0"
-              @blur="validateField('serviceProviderId')"
-            />
-            <span v-if="touched.serviceProviderId && errors.serviceProviderId" class="error-text">
-              {{ errors.serviceProviderId }}
-            </span>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">
-              Açıklama <span class="required">*</span>
-            </label>
-            <textarea
-              v-model="values.description"
-              class="form-input"
-              :class="{ 'error': touched.description && errors.description }"
-              placeholder="Verecek açıklaması"
-              rows="3"
-              maxlength="500"
-              @blur="validateField('description')"
-            ></textarea>
-            <span v-if="touched.description && errors.description" class="error-text">
-              {{ errors.description }}
-            </span>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">
-              Tutar (TL) <span class="required">*</span>
-            </label>
-            <input
-              v-model.number="values.amount"
-              type="number"
-              step="0.01"
-              class="form-input"
-              :class="{ 'error': touched.amount && errors.amount }"
-              placeholder="0.00"
-              @blur="validateField('amount')"
-            />
-            <span v-if="touched.amount && errors.amount" class="error-text">
-              {{ errors.amount }}
-            </span>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">Fatura Numarası</label>
-              <input
-                v-model="values.invoiceNumber"
-                type="text"
-                class="form-input"
-                :class="{ 'error': touched.invoiceNumber && errors.invoiceNumber }"
-                placeholder="FT2026-001"
-                maxlength="50"
-                @blur="validateField('invoiceNumber')"
-              />
-              <span v-if="touched.invoiceNumber && errors.invoiceNumber" class="error-text">
-                {{ errors.invoiceNumber }}
-              </span>
-            </div>
-
-            <div class="form-group">
-              <DatePicker
-                v-model="values.invoiceDate"
-                label="Fatura Tarihi"
-                placeholder="Fatura tarihi"
-              />
-            </div>
-          </div>
-
-          <div class="form-group">
-            <DatePicker
-              v-model="values.dueDate"
-              label="Vade Tarihi"
-              placeholder="Vade tarihi"
-            />
-          </div>
-        </div>
-
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" @click="handleClose">
-            İptal
-          </button>
-          <button type="submit" class="btn btn-primary" :disabled="isSubmitting">
-            {{ isSubmitting ? 'Oluşturuluyor...' : 'Verecek Oluştur' }}
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
+    <template #footer>
+      <RcButton variant="secondary" @click="handleClose">İptal</RcButton>
+      <RcButton variant="accent" :disabled="isSubmitting" @click="onSubmit">
+        {{ isSubmitting ? 'Oluşturuluyor...' : 'Verecek oluştur' }}
+      </RcButton>
+    </template>
+  </RcModal>
 </template>
-
-<style scoped>
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 1rem;
-}
-
-.modal-content {
-  background: white;
-  border-radius: 0.5rem;
-  width: 100%;
-  max-width: 600px;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.5rem;
-  border-bottom: 1px solid var(--color-border, #e5e7eb);
-}
-
-.modal-title {
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: var(--color-text, #111827);
-  margin: 0;
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  font-size: 2rem;
-  color: var(--color-text-secondary, #6b7280);
-  cursor: pointer;
-  padding: 0;
-  width: 2rem;
-  height: 2rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 0.25rem;
-  transition: all 0.2s;
-}
-
-.close-btn:hover {
-  background: var(--color-background, #f3f4f6);
-  color: var(--color-text, #111827);
-}
-
-.modal-body {
-  padding: 1.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-}
-
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.form-label {
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--color-text, #111827);
-}
-
-.required {
-  color: #dc2626;
-}
-
-.form-input {
-  padding: 0.625rem 0.75rem;
-  border: 1px solid var(--color-border, #d1d5db);
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-  transition: all 0.2s;
-}
-
-.form-input:focus {
-  outline: none;
-  border-color: var(--color-primary, #2563eb);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-}
-
-.form-input.error {
-  border-color: #dc2626;
-}
-
-.error-text {
-  font-size: 0.75rem;
-  color: #dc2626;
-}
-
-textarea.form-input {
-  resize: vertical;
-  min-height: 4rem;
-}
-
-.modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.75rem;
-  padding: 1.5rem;
-  border-top: 1px solid var(--color-border, #e5e7eb);
-}
-
-.btn {
-  padding: 0.625rem 1.25rem;
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  border: none;
-  transition: all 0.2s;
-}
-
-.btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.btn-secondary {
-  background: white;
-  color: var(--color-text, #111827);
-  border: 1px solid var(--color-border, #d1d5db);
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background: var(--color-background, #f3f4f6);
-}
-
-.btn-primary {
-  background: var(--color-primary, #2563eb);
-  color: white;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: var(--color-primary-dark, #1d4ed8);
-}
-</style>

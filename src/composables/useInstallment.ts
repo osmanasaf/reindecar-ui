@@ -1,6 +1,5 @@
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import { useInstallmentStore } from '@/stores/installment.store'
-import { useToast } from '@/composables'
 import type {
     VehicleInstallmentResponse,
     VehiclePaymentDetailsResponse,
@@ -8,9 +7,8 @@ import type {
     InstallmentPaymentResponse
 } from '@/types'
 
-export function useInstallment(vehicleId?: number) {
+export function useInstallment(_vehicleId?: number) {
     const installmentStore = useInstallmentStore()
-    const toast = useToast()
 
     const loading = computed(() => installmentStore.loading)
     const error = computed(() => installmentStore.error)

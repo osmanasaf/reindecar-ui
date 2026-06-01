@@ -1,188 +1,121 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
+import { RcIcon } from '@/components/icons'
+import { RcButton, RcKbd } from '@/components/rc'
 import { useAuthStore } from '@/stores'
+import { useNotifications } from '@/composables/useNotifications'
+import { useTheme } from '@/composables/useTheme'
 import AppBreadcrumb from './AppBreadcrumb.vue'
+import NotificationPanel from './NotificationPanel.vue'
 
-const emit = defineEmits<{
+defineEmits<{
   'toggle-sidebar': []
 }>()
 
 const authStore = useAuthStore()
 const router = useRouter()
-const userMenuOpen = ref(false)
+const { count, refresh, startPolling, stopPolling } = useNotifications()
+const { isDark, toggleTheme } = useTheme()
 
-function toggleUserMenu() {
-  userMenuOpen.value = !userMenuOpen.value
-}
+const notifOpen = ref(false)
+const notifWrapRef = ref<HTMLElement | null>(null)
 
-function closeUserMenu() {
-  userMenuOpen.value = false
+const unreadBadge = computed(() => {
+  const n = count.value.unread
+  if (n <= 0) return null
+  return n > 99 ? '99+' : String(n)
+})
+
+function goToNewRental() {
+  router.push({ name: 'rental-create' })
 }
 
 async function handleLogout() {
   await authStore.logout()
   router.push({ name: 'login' })
 }
+
+function toggleNotifications() {
+  notifOpen.value = !notifOpen.value
+  if (notifOpen.value) {
+    void refresh()
+  }
+}
+
+function closeNotifications() {
+  notifOpen.value = false
+}
+
+function onDocumentClick(e: MouseEvent) {
+  if (!notifOpen.value) return
+  const el = notifWrapRef.value
+  if (el && !el.contains(e.target as Node)) {
+    notifOpen.value = false
+  }
+}
+
+onMounted(() => {
+  void refresh()
+  startPolling()
+  document.addEventListener('click', onDocumentClick)
+  window.addEventListener('focus', refresh)
+})
+
+onBeforeUnmount(() => {
+  stopPolling()
+  document.removeEventListener('click', onDocumentClick)
+  window.removeEventListener('focus', refresh)
+})
 </script>
 
 <template>
-  <header class="app-header">
-    <div class="header-left">
-      <button class="menu-toggle" @click="emit('toggle-sidebar')">
-        ☰
-      </button>
-      <AppBreadcrumb />
-    </div>
+  <header class="rc-head">
+    <button
+      type="button"
+      class="rc-head__menu"
+      aria-label="Kenar çubuğunu aç/kapat"
+      @click="$emit('toggle-sidebar')"
+    >
+      <RcIcon name="dot3v" />
+    </button>
 
-    <div class="header-right">
-      <div class="user-menu" @click="toggleUserMenu" v-click-outside="closeUserMenu">
-        <div class="user-avatar">
-          {{ authStore.userFullName?.charAt(0) || 'U' }}
-        </div>
-        <span class="user-name">{{ authStore.userFullName || 'Kullanıcı' }}</span>
-        <span class="dropdown-arrow">▼</span>
+    <AppBreadcrumb />
 
-        <div v-if="userMenuOpen" class="dropdown-menu">
-          <RouterLink to="/settings" class="dropdown-item" @click="closeUserMenu">
-            ⚙️ Ayarlar
-          </RouterLink>
-          <button class="dropdown-item" @click="handleLogout">
-            🚪 Çıkış Yap
-          </button>
-        </div>
+    <div class="rc-head__actions">
+      <div ref="notifWrapRef" class="rc-head__notif-wrap">
+        <RcButton
+          variant="ghost"
+          icon
+          aria-label="Bildirimler"
+          :class="{ 'rc-head__notif-btn--active': notifOpen }"
+          @click.stop="toggleNotifications"
+        >
+          <RcIcon name="bell" />
+          <span v-if="unreadBadge" class="rc-head__notif-badge">{{ unreadBadge }}</span>
+        </RcButton>
+        <NotificationPanel :open="notifOpen" @close="closeNotifications" />
       </div>
+
+      <RcButton
+        variant="ghost"
+        icon
+        class="rc-head__theme-btn"
+        :aria-label="isDark ? 'Açık moda geç' : 'Koyu moda geç'"
+        @click="toggleTheme"
+      >
+        <RcIcon :name="isDark ? 'sun' : 'moon'" />
+      </RcButton>
+
+      <RcButton variant="ghost" icon aria-label="Çıkış yap" @click="handleLogout">
+        <RcIcon name="logout" />
+      </RcButton>
+      <span class="rc-vr" style="height: 24px" />
+      <RcButton variant="secondary" @click="goToNewRental">
+        <RcIcon name="plus" />
+        Yeni Kiralama
+        <RcKbd>N</RcKbd>
+      </RcButton>
     </div>
   </header>
 </template>
-
-<style scoped>
-.app-header {
-  height: var(--header-height);
-  background: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 var(--spacing-lg);
-  position: sticky;
-  top: 0;
-  z-index: 40;
-}
-
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  min-width: 0;
-  flex: 1;
-}
-
-.menu-toggle {
-  background: none;
-  border: none;
-  font-size: 1.25rem;
-  color: var(--color-text-secondary);
-  padding: var(--spacing-sm);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.menu-toggle:hover {
-  background: var(--color-bg-secondary);
-  color: var(--color-text);
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  flex-shrink: 0;
-}
-
-.user-menu {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-sm) var(--spacing-md);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: background var(--transition-fast);
-}
-
-.user-menu:hover {
-  background: var(--color-bg-secondary);
-}
-
-.user-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-full);
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 600;
-  font-size: var(--font-size-sm);
-}
-
-.user-name {
-  font-size: var(--font-size-sm);
-  font-weight: 500;
-  color: var(--color-text);
-}
-
-.dropdown-arrow {
-  font-size: 0.625rem;
-  color: var(--color-text-muted);
-}
-
-.dropdown-menu {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  margin-top: var(--spacing-xs);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-lg);
-  min-width: 160px;
-  overflow: hidden;
-}
-
-.dropdown-item {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  width: 100%;
-  padding: var(--spacing-md);
-  background: none;
-  border: none;
-  text-align: left;
-  color: var(--color-text);
-  font-size: var(--font-size-sm);
-  cursor: pointer;
-  text-decoration: none;
-  transition: background var(--transition-fast);
-}
-
-.dropdown-item:hover {
-  background: var(--color-bg-secondary);
-}
-
-@media (max-width: 480px) {
-  .user-name {
-    display: none;
-  }
-}
-
-@media (max-width: 768px) {
-  .app-header {
-    padding: 0 var(--spacing-md);
-    gap: var(--spacing-sm);
-  }
-}
-</style>

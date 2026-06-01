@@ -1,18 +1,33 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { RouterView } from 'vue-router'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { RouterView, useRoute } from 'vue-router'
 import AppSidebar from './AppSidebar.vue'
 import AppHeader from './AppHeader.vue'
+import { useShellHotkeys } from '@/composables/useShellHotkeys'
+import { useShellNavCounts } from '@/composables/useShellNavCounts'
+import { useShellSearch } from '@/composables/useShellSearch'
+import ShellSearchModal from './ShellSearchModal.vue'
 
+const route = useRoute()
 const sidebarCollapsed = ref(false)
 const sidebarOpen = ref(false)
 const viewportWidth = ref(globalThis.window === undefined ? 1280 : globalThis.window.innerWidth)
 
 const isMobile = computed(() => viewportWidth.value <= 768)
 
+const { searchOpen, closeSearch } = useShellSearch()
+const { fetchNavCounts } = useShellNavCounts()
+
+useShellHotkeys()
+
+onMounted(() => {
+  syncViewport()
+  window.addEventListener('resize', syncViewport)
+  fetchNavCounts()
+})
+
 function syncViewport() {
   viewportWidth.value = window.innerWidth
-
   if (!isMobile.value) {
     sidebarOpen.value = false
   }
@@ -23,7 +38,6 @@ function toggleSidebar() {
     sidebarOpen.value = !sidebarOpen.value
     return
   }
-
   sidebarCollapsed.value = !sidebarCollapsed.value
 }
 
@@ -31,77 +45,43 @@ function closeSidebar() {
   sidebarOpen.value = false
 }
 
-onMounted(() => {
-  syncViewport()
-  globalThis.window.addEventListener('resize', syncViewport)
+watch(() => route.path, () => {
+  if (isMobile.value) {
+    sidebarOpen.value = false
+  }
 })
 
+
 onBeforeUnmount(() => {
-  globalThis.window.removeEventListener('resize', syncViewport)
+  window.removeEventListener('resize', syncViewport)
 })
 </script>
 
 <template>
-  <div class="app-layout" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
-    <AppSidebar :collapsed="sidebarCollapsed" :mobile-open="isMobile && sidebarOpen" />
+  <div
+    class="rc-app"
+    :class="{ 'rc-app--collapsed': sidebarCollapsed && !isMobile }"
+  >
+    <AppSidebar
+      :collapsed="sidebarCollapsed"
+      :mobile-open="isMobile && sidebarOpen"
+      :is-mobile="isMobile"
+      @toggle-collapse="toggleSidebar"
+    />
+
     <div
-      class="sidebar-backdrop"
-      :class="{ visible: isMobile && sidebarOpen }"
+      class="rc-side-backdrop"
+      :class="{ 'rc-side-backdrop--visible': isMobile && sidebarOpen }"
       @click="closeSidebar"
-    ></div>
-    <div class="main-area">
+    />
+
+    <div class="rc-app__main">
       <AppHeader @toggle-sidebar="toggleSidebar" />
-      <main class="page-content">
+      <main class="rc-app__scroll">
         <RouterView />
       </main>
     </div>
+
+    <ShellSearchModal :open="searchOpen" @close="closeSearch" />
   </div>
 </template>
-
-<style scoped>
-.app-layout {
-  display: flex;
-  min-height: 100vh;
-}
-
-.main-area {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  margin-left: var(--sidebar-width);
-  transition: margin-left var(--transition-normal);
-}
-
-.app-layout.sidebar-collapsed .main-area {
-  margin-left: var(--sidebar-collapsed-width);
-}
-
-.page-content {
-  flex: 1;
-  padding: var(--spacing-xl);
-  background: var(--color-bg);
-  overflow-y: auto;
-}
-
-.sidebar-backdrop {
-  display: none;
-}
-
-@media (max-width: 768px) {
-  .main-area {
-    margin-left: 0;
-  }
-
-  .page-content {
-    padding: var(--spacing-lg);
-  }
-
-  .sidebar-backdrop.visible {
-    display: block;
-    position: fixed;
-    inset: 0;
-    background: rgb(15 23 42 / 0.4);
-    z-index: calc(var(--sidebar-overlay-z) - 1);
-  }
-}
-</style>

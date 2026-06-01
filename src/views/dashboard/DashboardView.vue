@@ -1,1626 +1,592 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { LineChart } from '@/components/charts'
+import { RcSparkline, RcRevenueBars, RcFleetDonut } from '@/components/charts'
 import ReturnCompleteModal from '@/components/rentals/ReturnCompleteModal.vue'
+import { RcIcon } from '@/components/icons'
+import {
+  RcPageHeader,
+  RcButton,
+  RcBadge,
+  RcAvatar,
+  RcEmpty,
+  RcTabs,
+} from '@/components/rc'
 import { useDashboardStats, useToast } from '@/composables'
+import { useAuthStore } from '@/stores'
+import { receivablesApi, payablesApi } from '@/api'
+import { fmtTRY, formatDate } from '@/utils/format'
 import type { UpcomingReturn } from '@/api'
-import type { Rental } from '@/types'
-
-// ─── Constants ────────────────────────────────────────────────────────────────
+import type { Rental, ReceivableResponse, PayableResponse } from '@/types'
+import type { IconName } from '@/components/icons/iconPaths'
 
 const REVENUE_PERIOD_OPTIONS = [
-    { label: '6 Ay', months: 6 },
-    { label: '12 Ay', months: 12 },
+  { label: '6A', months: 6 },
+  { label: '12A', months: 12 },
 ] as const
-type RevenuePeriodMonths = typeof REVENUE_PERIOD_OPTIONS[number]['months']
+type RevenuePeriodMonths = (typeof REVENUE_PERIOD_OPTIONS)[number]['months']
 
-const VEHICLE_STATUS_CONFIG = [
-    { key: 'available',   label: 'Müsait',   color: '#10b981', bg: 'rgba(16,185,129,0.1)' },
-    { key: 'rented',      label: 'Kirada',   color: '#3b82f6', bg: 'rgba(59,130,246,0.1)' },
-    { key: 'reserved',    label: 'Rezerve',  color: '#8b5cf6', bg: 'rgba(139,92,246,0.1)' },
-    { key: 'maintenance', label: 'Bakımda',  color: '#f59e0b', bg: 'rgba(245,158,11,0.1)' },
-    { key: 'damaged',     label: 'Hasarlı',  color: '#ef4444', bg: 'rgba(239,68,68,0.1)'  },
-] as const
-
-const VEHICLE_TABLE_TABS = ['Kirada', 'Bakım & Hasar'] as const
-type VehicleTab = typeof VEHICLE_TABLE_TABS[number]
-
-// ─── Composables ──────────────────────────────────────────────────────────────
+const FLEET_COLORS = {
+  available: 'var(--rc-success-500)',
+  rented: 'var(--rc-blue-500)',
+  reserved: 'var(--rc-purple-500)',
+  maintenance: 'var(--rc-warning-500)',
+  damaged: 'var(--rc-danger-500)',
+} as const
 
 const router = useRouter()
 const toast = useToast()
+const authStore = useAuthStore()
 const {
-    stats,
-    revenue,
-    vehicleStatus,
-    upcomingReturns,
-    accounting,
-    activeRentals,
-    loading,
-    error,
-    fetchAll,
-    fetchRevenue,
+  stats,
+  revenue,
+  vehicleStatus,
+  upcomingReturns,
+  accounting,
+  loading,
+  error,
+  fetchAll,
+  fetchRevenue,
 } = useDashboardStats()
 
-// ─── State ────────────────────────────────────────────────────────────────────
-
-const revenuePeriod  = ref<RevenuePeriodMonths>(6)
-const vehicleTab     = ref<VehicleTab>('Kirada')
+const revenuePeriod = ref<RevenuePeriodMonths>(6)
+const returnsTab = ref('all')
 const showReturnModal = ref(false)
 const selectedRentalId = ref<number | null>(null)
+const receivableRows = ref<ReceivableResponse[]>([])
+const payableRows = ref<PayableResponse[]>([])
+const accountingRowsLoading = ref(false)
 
-// ─── Utilities ────────────────────────────────────────────────────────────────
+interface KpiCard {
+  id: string
+  label: string
+  value: string
+  sub: string
+  icon: IconName
+  alert?: boolean
+  route?: string
+  spark?: number[]
+  sparkColor?: string
+}
 
 function safeNum(v: unknown, fallback = 0): number {
-    const n = Number(v)
-    return Number.isFinite(n) ? n : fallback
+  const n = Number(v)
+  return Number.isFinite(n) ? n : fallback
 }
 
-function formatCurrency(amount: unknown): string {
-    return new Intl.NumberFormat('tr-TR', {
-        style: 'currency',
-        currency: 'TRY',
-        maximumFractionDigits: 0,
-    }).format(safeNum(amount))
+function formatCompactTRY(amount: unknown): string {
+  const n = safeNum(amount)
+  if (n >= 1_000_000) return `₺${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `₺${Math.round(n / 1_000)}K`
+  return fmtTRY(n)
 }
 
-function formatDate(dateStr: string): string {
-    const [year, month, day] = dateStr.split('-')
-    return year && month && day ? `${day}.${month}.${year}` : dateStr
+function initials(name: string): string {
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .map((s) => s[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase()
 }
 
-function netPositionLabel(netPositive: boolean): string {
-    return netPositive ? 'Pozitif bakiye' : 'Negatif bakiye'
+function returnWhenLabel(item: UpcomingReturn): string {
+  if (item.daysUntilReturn < 0) return `${Math.abs(item.daysUntilReturn)}g`
+  if (item.daysUntilReturn === 0) return 'Bugün'
+  if (item.daysUntilReturn === 1) return 'Yarın'
+  return `${item.daysUntilReturn}g`
 }
 
-function formatReturnBadge(item: UpcomingReturn): { text: string; cls: string } {
-    if (item.daysUntilReturn < 0)  return { text: `${Math.abs(item.daysUntilReturn)} gün gecikti`, cls: 'badge-danger' }
-    if (item.daysUntilReturn === 0) return { text: 'Bugün',  cls: 'badge-warning' }
-    if (item.daysUntilReturn === 1) return { text: 'Yarın',  cls: 'badge-warning' }
-    return { text: `${item.daysUntilReturn} gün`, cls: 'badge-neutral' }
+function returnBadgeVariant(item: UpcomingReturn): 'warning' | 'danger' | 'default' {
+  if (item.isOverdue) return 'danger'
+  if (item.daysUntilReturn <= 1) return 'warning'
+  return 'default'
 }
 
-// ─── Stat Cards ───────────────────────────────────────────────────────────────
-
-interface StatCard {
-    id: string
-    label: string
-    value: string
-    sub: string
-    icon: string
-    color: string
-    alert?: string
-    route?: string
+function receivableDueLabel(row: ReceivableResponse): { text: string; variant?: 'danger' | 'default' } {
+  if (row.status === 'OVERDUE') {
+    const days = Math.max(0, Math.floor((Date.now() - new Date(row.dueDate).getTime()) / 86400000))
+    return { text: `${days} gün geç`, variant: 'danger' }
+  }
+  return { text: formatDate(row.dueDate), variant: 'default' }
 }
 
-const statCards = computed<StatCard[]>(() => {
-    if (!stats.value) return []
-    const s = stats.value
-    const a = accounting.value
+function payableDueLabel(row: PayableResponse): { text: string; variant?: 'danger' | 'warning' | 'default' } {
+  if (row.status === 'OVERDUE') return { text: 'Geç', variant: 'danger' }
+  const due = new Date(row.dueDate)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  due.setHours(0, 0, 0, 0)
+  if (due.getTime() === today.getTime()) return { text: 'Bugün', variant: 'warning' }
+  return { text: formatDate(row.dueDate), variant: 'default' }
+}
 
-    return [
-        {
-            id: 'active',
-            label: 'Aktif Kiralama',
-            value: String(safeNum(s.activeRentals)),
-            sub: `${safeNum(s.totalRentals)} toplam`,
-            icon: '🔑',
-            color: '#3b82f6',
-            alert: s.overdueRentals > 0 ? `${s.overdueRentals} gecikmiş` : undefined,
-            route: '/rentals',
-        },
-        {
-            id: 'vehicles',
-            label: 'Müsait Araç',
-            value: String(safeNum(s.availableVehicles)),
-            sub: `${safeNum(s.totalVehicles)} toplam araç`,
-            icon: '🚗',
-            color: '#10b981',
-            route: '/vehicles',
-        },
-        {
-            id: 'customers',
-            label: 'Müşteriler',
-            value: String(safeNum(s.totalCustomers)),
-            sub: 'kayıtlı müşteri',
-            icon: '👥',
-            color: '#06b6d4',
-            route: '/customers',
-        },
-        {
-            id: 'returns',
-            label: 'Bugün İade',
-            value: String(safeNum(s.todayReturns)),
-            sub: `${safeNum(s.tomorrowReturns)} yarın`,
-            icon: '📅',
-            color: '#f59e0b',
-        },
-        {
-            id: 'net',
-            label: 'Net Pozisyon',
-            value: a ? formatCurrency(a.netPosition) : '—',
-            sub: a ? netPositionLabel(a.netPositive) : 'Yükleniyor...',
-            icon: '📊',
-            color: a?.netPositive ? '#10b981' : '#ef4444',
-        },
-    ]
+const greeting = computed(() => {
+  const name = authStore.userFullName?.split(' ')[0] || 'Operatör'
+  const hour = new Date().getHours()
+  const salutation = hour < 12 ? 'Günaydın' : hour < 18 ? 'İyi günler' : 'İyi akşamlar'
+  return `${salutation}, ${name}.`
 })
 
-// ─── Revenue Chart ────────────────────────────────────────────────────────────
+const pageSubtitle = computed(() => {
+  if (!stats.value) return 'Operasyonel ve finansal özet'
+  const parts: string[] = []
+  if (stats.value.todayReturns > 0) {
+    parts.push(`Bugün ${stats.value.todayReturns} araç teslim alınacak.`)
+  }
+  if (stats.value.overdueRentals > 0) {
+    parts.push(`${stats.value.overdueRentals} kiralama gecikmiş durumda.`)
+  }
+  return parts.join(' ') || 'Operasyonel ve finansal özet'
+})
 
-const revenueChartData = computed(() => ({
-    labels: revenue.value?.labels ?? [],
-    datasets: [{
-        label: 'Ciro (₺)',
-        backgroundColor: 'rgba(59,130,246,0.08)',
-        borderColor: '#3b82f6',
-        borderWidth: 2.5,
-        pointBackgroundColor: '#ffffff',
-        pointBorderColor: '#3b82f6',
-        pointBorderWidth: 2,
-        pointRadius: 5,
-        data: revenue.value?.values ?? [],
-        tension: 0.4,
-        fill: true,
-    }],
-}))
+const kpiCards = computed<KpiCard[]>(() => {
+  if (!stats.value) return []
+  const s = stats.value
+  const a = accounting.value
+  const revValues = revenue.value?.values ?? []
 
-const revenueChartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: { legend: { display: false }, tooltip: { mode: 'index' as const, intersect: false } },
-    scales: {
-        y: {
-            beginAtZero: true,
-            grid: { color: 'rgba(0,0,0,0.04)' },
-            ticks: {
-                callback: (v: unknown) =>
-                    new Intl.NumberFormat('tr-TR', { notation: 'compact' }).format(Number(v)) + ' ₺',
-            },
-        },
-        x: { grid: { display: false } },
+  return [
+    {
+      id: 'active',
+      label: 'Aktif kiralama',
+      value: String(safeNum(s.activeRentals)),
+      sub: `${safeNum(s.totalRentals)} toplam`,
+      icon: 'key',
+      alert: s.overdueRentals > 0,
+      route: '/rentals',
+      spark: revValues.length >= 2 ? revValues.slice(-8) : [60, 64, 71, 68, 74, 78, 80, 84],
+      sparkColor: 'var(--rc-blue-500)',
     },
-}
-
-// ─── Vehicle Status ───────────────────────────────────────────────────────────
-
-const vehicleStatusCounts = computed(() => {
-    if (!vehicleStatus.value) return {}
-    return {
-        available:   safeNum(vehicleStatus.value.available),
-        rented:      safeNum(vehicleStatus.value.rented),
-        reserved:    safeNum(vehicleStatus.value.reserved),
-        maintenance: safeNum(vehicleStatus.value.maintenance),
-        damaged:     safeNum(vehicleStatus.value.damaged),
-    }
+    {
+      id: 'vehicles',
+      label: 'Müsait araç',
+      value: String(safeNum(s.availableVehicles)),
+      sub: `${safeNum(s.totalVehicles)} toplam filo`,
+      icon: 'car',
+      route: '/vehicles',
+    },
+    {
+      id: 'customers',
+      label: 'Müşteriler',
+      value: String(safeNum(s.totalCustomers)),
+      sub: 'kayıtlı müşteri',
+      icon: 'users',
+      route: '/customers',
+    },
+    {
+      id: 'returns',
+      label: 'Bugün iade',
+      value: String(safeNum(s.todayReturns)),
+      sub: `${safeNum(s.tomorrowReturns)} yarın`,
+      icon: 'calendar',
+    },
+    {
+      id: 'net',
+      label: 'Net pozisyon',
+      value: a ? formatCompactTRY(a.netPosition) : '—',
+      sub: a ? (a.netPositive ? 'Pozitif bakiye' : 'Negatif bakiye') : '—',
+      icon: 'trend',
+      spark: revValues.length >= 2 ? revValues.slice(-8) : undefined,
+      sparkColor: a?.netPositive ? 'var(--rc-success-500)' : 'var(--rc-danger-500)',
+    },
+  ]
 })
 
-const totalVehiclesFromStatus = computed(() =>
-    Object.values(vehicleStatusCounts.value).reduce((a, b) => a + b, 0)
-)
-
-// ─── Active Rentals Table ─────────────────────────────────────────────────────
-
-const rentedVehicles = computed<Rental[]>(() =>
-    (activeRentals.value ?? []).filter(r => !r.isOverdue)
-)
-
-const overdueVehicles = computed<Rental[]>(() =>
-    (activeRentals.value ?? []).filter(r => r.isOverdue)
-)
-
-const maintenanceDamagedRentals = computed<Rental[]>(() => {
-    // Bu tab için gerçek bakım/hasar araçları vehicle status'tan gelir
-    // Aktif kiralama listesinde bu durum yoktur; placeholder olarak boş
-    return []
+// Redesign (data.jsx / page-dashboard.jsx): tüm kategoriler her zaman gösterilir; 0 sayılı satırlar da legend'da kalır.
+const fleetItems = computed(() => {
+  if (!vehicleStatus.value) return []
+  const v = vehicleStatus.value
+  return [
+    { key: 'available', label: 'Müsait', count: safeNum(v.available), color: FLEET_COLORS.available },
+    { key: 'rented', label: 'Kirada', count: safeNum(v.rented), color: FLEET_COLORS.rented },
+    { key: 'reserved', label: 'Rezerve', count: safeNum(v.reserved), color: FLEET_COLORS.reserved },
+    { key: 'maintenance', label: 'Bakımda', count: safeNum(v.maintenance), color: FLEET_COLORS.maintenance },
+    { key: 'damaged', label: 'Hasarlı', count: safeNum(v.damaged), color: FLEET_COLORS.damaged },
+  ]
 })
 
-const vehicleTabCount = computed(() => ({
-    'Kirada': rentedVehicles.value.length + overdueVehicles.value.length,
-    'Bakım & Hasar': safeNum(vehicleStatusCounts.value.maintenance) + safeNum(vehicleStatusCounts.value.damaged),
-}))
+const hasFleetData = computed(() => safeNum(stats.value?.totalVehicles) > 0)
 
-// ─── Upcoming Returns ─────────────────────────────────────────────────────────
+const fleetHint = computed(() => {
+  if (!vehicleStatus.value) return ''
+  const m = safeNum(vehicleStatus.value.maintenance)
+  const d = safeNum(vehicleStatus.value.damaged)
+  if (!m && !d) return 'Filo operasyonel durumda.'
+  const parts: string[] = []
+  if (m) parts.push(`${m} araç bakımda`)
+  if (d) parts.push(`${d} araç hasar onarımında`)
+  return parts.join(', ') + '.'
+})
 
 const sortedReturns = computed<UpcomingReturn[]>(() =>
-    [...(upcomingReturns.value ?? [])].sort((a, b) => a.daysUntilReturn - b.daysUntilReturn)
+  [...(upcomingReturns.value ?? [])].sort((a, b) => a.daysUntilReturn - b.daysUntilReturn),
 )
 
-// ─── Accounting ───────────────────────────────────────────────────────────────
-
-const receivableCollectionRate = computed(() => {
-    if (!accounting.value) return 0
-    const { totalReceivable, remainingReceivable } = accounting.value
-    if (totalReceivable === 0) return 0
-    if (remainingReceivable > 0 && remainingReceivable < totalReceivable) {
-        const rate = ((totalReceivable - remainingReceivable) / totalReceivable) * 100
-        const floored = Math.floor(rate * 10) / 10
-        return Math.min(99.9, Math.max(0, floored))
-    }
-    if (remainingReceivable <= 0) return 100
-    return 0
+const filteredReturns = computed(() => {
+  if (returnsTab.value === 'today') {
+    return sortedReturns.value.filter((r) => r.daysUntilReturn === 0)
+  }
+  if (returnsTab.value === 'overdue') {
+    return sortedReturns.value.filter((r) => r.isOverdue)
+  }
+  return sortedReturns.value
 })
 
-// ─── Actions ──────────────────────────────────────────────────────────────────
+const returnsTabOptions = computed(() => [
+  { id: 'all', label: 'Hepsi', count: sortedReturns.value.length },
+  { id: 'today', label: 'Bugün', count: sortedReturns.value.filter((r) => r.daysUntilReturn === 0).length },
+  { id: 'overdue', label: 'Gecikmiş', count: sortedReturns.value.filter((r) => r.isOverdue).length },
+])
+
+const activityItems = computed(() =>
+  sortedReturns.value.slice(0, 6).map((r) => ({
+    when: returnWhenLabel(r),
+    text: `${r.plateNumber} iadesi — ${r.customerName}`,
+    actor: r.rentalNumber,
+  })),
+)
+
+async function fetchAccountingRows(): Promise<void> {
+  accountingRowsLoading.value = true
+  try {
+    const [rec, pay] = await Promise.all([
+      receivablesApi.getOutstanding({ size: 4, page: 0 }),
+      payablesApi.getOutstanding({ size: 4, page: 0 }),
+    ])
+    receivableRows.value = rec.content ?? []
+    payableRows.value = pay.content ?? []
+  } catch {
+    receivableRows.value = []
+    payableRows.value = []
+  } finally {
+    accountingRowsLoading.value = false
+  }
+}
 
 function openReturnModal(rentalId: number): void {
-    selectedRentalId.value = rentalId
-    showReturnModal.value = true
+  selectedRentalId.value = rentalId
+  showReturnModal.value = true
 }
 
 function handleReturnCompleted(rental: Rental): void {
-    toast.success(`Kiralama #${rental.rentalNumber} tamamlandı`)
-    fetchAll(revenuePeriod.value)
+  toast.success(`Kiralama #${rental.rentalNumber} tamamlandı`)
+  fetchAll(revenuePeriod.value)
+  fetchAccountingRows()
 }
 
 function go(route?: string): void {
-    if (route) router.push(route)
+  if (route) router.push(route)
 }
-
-// ─── Watchers & Lifecycle ─────────────────────────────────────────────────────
 
 watch(revenuePeriod, (months) => fetchRevenue(months))
 
-onMounted(() => fetchAll(revenuePeriod.value))
+onMounted(async () => {
+  await fetchAll(revenuePeriod.value)
+  fetchAccountingRows()
+})
 </script>
 
 <template>
-    <div class="dashboard">
+  <div class="rc-page">
+    <RcPageHeader :title="greeting" :subtitle="pageSubtitle">
+      <template #actions>
+        <RcButton variant="secondary" :disabled="loading" @click="fetchAll(revenuePeriod)">
+          <RcIcon name="sparkle" :size="16" />
+          {{ loading ? 'Yükleniyor…' : 'Yenile' }}
+        </RcButton>
+        <RcButton variant="accent" @click="go('/rentals/create')">
+          <RcIcon name="plus" :size="16" />
+          Kiralama oluştur
+        </RcButton>
+      </template>
+    </RcPageHeader>
 
-        <!-- ── Header ─────────────────────────────────────────────────────── -->
-        <header class="db-header">
-            <div>
-                <h1 class="db-title">Dashboard</h1>
-                <p class="db-sub">Operasyonel ve finansal özet</p>
-            </div>
-            <div class="db-header-actions">
-                <button class="btn-refresh" :disabled="loading" @click="fetchAll(revenuePeriod)">
-                    <span :class="{ 'spin': loading }">↻</span>
-                    {{ loading ? 'Yükleniyor...' : 'Yenile' }}
-                </button>
-                <button class="btn-primary" @click="go('/rentals/create')">+ Yeni Kiralama</button>
-            </div>
-        </header>
-
-        <!-- ── Error Banner ───────────────────────────────────────────────── -->
-        <div v-if="error" class="error-banner">
-            <span>⚠ {{ error }}</span>
-            <button class="btn-retry" @click="fetchAll(revenuePeriod)">Tekrar Dene</button>
-        </div>
-
-        <!-- ── Stat Cards ─────────────────────────────────────────────────── -->
-        <section class="stat-row">
-            <template v-if="loading">
-                <div v-for="i in 5" :key="i" class="stat-card skel" />
-            </template>
-            <template v-else>
-                <div
-                    v-for="card in statCards"
-                    :key="card.id"
-                    class="stat-card"
-                    :class="{ 'is-link': !!card.route }"
-                    :style="{ '--accent': card.color }"
-                    @click="go(card.route)"
-                >
-                    <div class="sc-left">
-                        <span class="sc-label">{{ card.label }}</span>
-                        <span class="sc-value">{{ card.value }}</span>
-                        <span class="sc-sub">{{ card.sub }}</span>
-                        <span v-if="card.alert" class="sc-alert">{{ card.alert }}</span>
-                    </div>
-                    <div class="sc-icon">{{ card.icon }}</div>
-                </div>
-            </template>
-        </section>
-
-        <!-- ── Charts Row ─────────────────────────────────────────────────── -->
-        <section class="charts-row">
-
-            <!-- Revenue -->
-            <div class="card revenue-card">
-                <div class="card-head">
-                    <h2 class="card-title">Gelir Analizi</h2>
-                    <div class="seg-ctrl">
-                        <button
-                            v-for="opt in REVENUE_PERIOD_OPTIONS"
-                            :key="opt.months"
-                            :class="['seg-btn', { active: revenuePeriod === opt.months }]"
-                            @click="revenuePeriod = opt.months"
-                        >{{ opt.label }}</button>
-                    </div>
-                </div>
-                <div class="chart-area">
-                    <div v-if="loading" class="skel-chart" />
-                    <LineChart v-else :data="revenueChartData" :options="revenueChartOptions" />
-                </div>
-                <div v-if="!loading && revenue" class="card-foot">
-                    <span>{{ revenuePeriod }} aylık toplam</span>
-                    <strong>{{ formatCurrency(revenue.total) }}</strong>
-                </div>
-            </div>
-
-            <!-- Vehicle Status -->
-            <div class="card status-card">
-                <div class="card-head">
-                    <h2 class="card-title">Araç Durumu</h2>
-                    <span class="badge-neutral">{{ totalVehiclesFromStatus }} araç</span>
-                </div>
-
-                <div v-if="loading" class="status-skel">
-                    <div v-for="i in 5" :key="i" class="skel-row" />
-                </div>
-                <div v-else class="status-list">
-                    <div
-                        v-for="cfg in VEHICLE_STATUS_CONFIG"
-                        :key="cfg.key"
-                        class="status-item"
-                    >
-                        <div class="si-left">
-                            <span class="si-dot" :style="{ background: cfg.color }" />
-                            <span class="si-label">{{ cfg.label }}</span>
-                        </div>
-                        <div class="si-right">
-                            <div
-                                class="si-bar-wrap"
-                                :title="`${vehicleStatusCounts[cfg.key as keyof typeof vehicleStatusCounts] ?? 0} araç`"
-                            >
-                                <div
-                                    class="si-bar"
-                                    :style="{
-                                        width: totalVehiclesFromStatus
-                                            ? `${((vehicleStatusCounts[cfg.key as keyof typeof vehicleStatusCounts] ?? 0) / totalVehiclesFromStatus) * 100}%`
-                                            : '0%',
-                                        background: cfg.color,
-                                    }"
-                                />
-                            </div>
-                            <span class="si-count" :style="{ color: cfg.color }">
-                                {{ vehicleStatusCounts[cfg.key as keyof typeof vehicleStatusCounts] ?? 0 }}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-        </section>
-
-        <!-- ── Vehicle Detail Table ───────────────────────────────────────── -->
-        <section class="card">
-            <div class="card-head">
-                <h2 class="card-title">Araç Detayı</h2>
-                <div class="tab-bar">
-                    <button
-                        v-for="tab in VEHICLE_TABLE_TABS"
-                        :key="tab"
-                        :class="['tab-btn', { active: vehicleTab === tab }]"
-                        @click="vehicleTab = tab"
-                    >
-                        {{ tab }}
-                        <span class="tab-count">{{ vehicleTabCount[tab] }}</span>
-                    </button>
-                </div>
-            </div>
-
-            <!-- Kirada Tab -->
-            <template v-if="vehicleTab === 'Kirada'">
-                <div v-if="loading" class="tbl-skel">
-                    <div v-for="i in 4" :key="i" class="skel-row" />
-                </div>
-                <div v-else-if="activeRentals.length === 0" class="empty-state">
-                    Şu an kirada araç bulunmuyor.
-                </div>
-                <div v-else class="mobile-table-cards">
-                    <div
-                        v-for="r in activeRentals"
-                        :key="`mobile-rental-${r.id}`"
-                        class="mobile-data-card"
-                        :class="{ 'row-overdue': r.isOverdue }"
-                    >
-                        <div class="mobile-card-head">
-                            <div>
-                                <div class="td-mono">{{ r.vehiclePlate ?? '—' }}</div>
-                                <div>{{ r.vehicleName ?? '—' }}</div>
-                            </div>
-                            <span v-if="r.isOverdue" class="badge-danger">
-                                {{ r.overdueDays }}g gecikti
-                            </span>
-                            <span v-else class="badge-success">Aktif</span>
-                        </div>
-                        <div class="mobile-card-grid">
-                            <div class="mobile-data-row">
-                                <span class="mobile-label">Müşteri</span>
-                                <span>{{ r.customerName ?? '—' }}</span>
-                            </div>
-                            <div class="mobile-data-row">
-                                <span class="mobile-label">Başlangıç</span>
-                                <span>{{ formatDate(r.startDate) }}</span>
-                            </div>
-                            <div class="mobile-data-row">
-                                <span class="mobile-label">İade</span>
-                                <span>{{ formatDate(r.endDate) }}</span>
-                            </div>
-                        </div>
-                        <button class="btn-sm mobile-action-btn" @click="openReturnModal(r.id)">İade Al</button>
-                    </div>
-                </div>
-                <div class="tbl-wrap">
-                    <table class="dtbl">
-                        <thead>
-                            <tr>
-                                <th>Plaka</th>
-                                <th>Araç</th>
-                                <th>Müşteri</th>
-                                <th>Başlangıç</th>
-                                <th>İade</th>
-                                <th>Durum</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr
-                                v-for="r in activeRentals"
-                                :key="r.id"
-                                :class="{ 'row-overdue': r.isOverdue }"
-                            >
-                                <td class="td-mono">{{ r.vehiclePlate ?? '—' }}</td>
-                                <td>{{ r.vehicleName ?? '—' }}</td>
-                                <td>
-                                    <div class="person-cell">
-                                        <span>{{ r.customerName ?? '—' }}</span>
-                                    </div>
-                                </td>
-                                <td class="td-date">{{ formatDate(r.startDate) }}</td>
-                                <td class="td-date">{{ formatDate(r.endDate) }}</td>
-                                <td>
-                                    <span v-if="r.isOverdue" class="badge-danger">
-                                        {{ r.overdueDays }}g gecikti
-                                    </span>
-                                    <span v-else class="badge-success">Aktif</span>
-                                </td>
-                                <td>
-                                    <button class="btn-sm" @click="openReturnModal(r.id)">İade Al</button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </template>
-
-            <!-- Bakım & Hasar Tab -->
-            <template v-else>
-                <div class="bh-grid">
-                    <div class="bh-block">
-                        <div class="bh-head">
-                            <span class="bh-dot" style="background:#f59e0b" />
-                            <span>Bakımda</span>
-                            <strong>{{ vehicleStatusCounts.maintenance ?? 0 }}</strong>
-                        </div>
-                        <p class="bh-hint">
-                            Bakımdaki araçların detayı için
-                            <router-link to="/vehicles" class="link">Araçlar</router-link>
-                            sayfasını ziyaret edin.
-                        </p>
-                    </div>
-                    <div class="bh-divider" />
-                    <div class="bh-block">
-                        <div class="bh-head">
-                            <span class="bh-dot" style="background:#ef4444" />
-                            <span>Hasarlı</span>
-                            <strong>{{ vehicleStatusCounts.damaged ?? 0 }}</strong>
-                        </div>
-                        <p class="bh-hint">
-                            Hasarlı araçların detayı için
-                            <router-link to="/vehicles" class="link">Araçlar</router-link>
-                            sayfasını ziyaret edin.
-                        </p>
-                    </div>
-                </div>
-            </template>
-        </section>
-
-        <!-- ── Accounting Summary ─────────────────────────────────────────── -->
-        <section class="card">
-            <div class="card-head">
-                <h2 class="card-title">Muhasebe Özeti</h2>
-                <div class="card-head-actions">
-                    <router-link to="/accounting/receivables" class="link-btn">Alacaklar →</router-link>
-                    <router-link to="/accounting/payables" class="link-btn">Verecekler →</router-link>
-                </div>
-            </div>
-
-            <div v-if="loading" class="acc-skel">
-                <div v-for="i in 3" :key="i" class="skel-row" style="height:80px" />
-            </div>
-
-            <template v-else-if="accounting">
-                <!-- Overdue alert -->
-                <div
-                    v-if="accounting.overdueReceivableCount > 0 || accounting.overduePayableCount > 0"
-                    class="acc-alert-bar"
-                >
-                    <span v-if="accounting.overdueReceivableCount > 0">
-                        ⚠ {{ accounting.overdueReceivableCount }} vadesi geçmiş alacak —
-                        <strong>{{ formatCurrency(accounting.overdueReceivableAmount) }}</strong>
-                    </span>
-                    <span v-if="accounting.overduePayableCount > 0" style="margin-left:16px">
-                        ⚠ {{ accounting.overduePayableCount }} vadesi geçmiş verecek —
-                        <strong>{{ formatCurrency(accounting.overduePayableAmount) }}</strong>
-                    </span>
-                </div>
-
-                <div class="acc-grid">
-
-                    <!-- Alacaklar -->
-                    <div class="acc-block">
-                        <p class="acc-block-label" style="color:#10b981">Alacaklar</p>
-                        <div class="acc-big">{{ formatCurrency(accounting.totalReceivable) }}</div>
-                        <div class="acc-progress-wrap">
-                            <div
-                                class="acc-progress"
-                                :style="{ width: `${receivableCollectionRate}%`, background: '#10b981' }"
-                            />
-                        </div>
-                        <p class="acc-rate">%{{ receivableCollectionRate }} tahsil edildi</p>
-                        <div class="acc-rows">
-                            <div class="acc-row">
-                                <span>Tahsil Edilen</span>
-                                <strong class="text-success">{{ formatCurrency(accounting.paidReceivable) }}</strong>
-                            </div>
-                            <div class="acc-row">
-                                <span>Bekleyen</span>
-                                <strong>{{ formatCurrency(accounting.remainingReceivable) }}</strong>
-                            </div>
-                            <div v-if="accounting.overdueReceivableCount > 0" class="acc-row">
-                                <span>Vadesi Geçmiş</span>
-                                <strong class="text-danger">
-                                    {{ formatCurrency(accounting.overdueReceivableAmount) }}
-                                    <em>({{ accounting.overdueReceivableCount }} kayıt)</em>
-                                </strong>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Net Pozisyon -->
-                    <div class="acc-net">
-                        <p class="acc-net-label">Net Pozisyon</p>
-                        <div
-                            class="acc-net-value"
-                            :class="accounting.netPositive ? 'text-success' : 'text-danger'"
-                        >
-                            {{ formatCurrency(accounting.netPosition) }}
-                        </div>
-                        <p class="acc-net-sub">
-                            {{ accounting.netPositive ? '✓ Alacaklar fazla' : '✗ Verecekler fazla' }}
-                        </p>
-                        <div class="acc-net-badges">
-                            <div class="acc-net-badge acc-net-badge--green">
-                                <span class="acc-net-badge-label">Alacak</span>
-                                <span class="acc-net-badge-val">{{ formatCurrency(accounting.remainingReceivable) }}</span>
-                            </div>
-                            <div class="acc-net-badge acc-net-badge--red">
-                                <span class="acc-net-badge-label">Verecek</span>
-                                <span class="acc-net-badge-val">{{ formatCurrency(accounting.remainingPayable) }}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Verecekler -->
-                    <div class="acc-block">
-                        <p class="acc-block-label" style="color:#ef4444">Verecekler</p>
-                        <div class="acc-big">{{ formatCurrency(accounting.totalPayable) }}</div>
-                        <div class="acc-progress-wrap">
-                            <div
-                                class="acc-progress"
-                                :style="{
-                                    width: accounting.totalPayable
-                                        ? `${Math.round((accounting.paidPayable / accounting.totalPayable) * 100)}%`
-                                        : '0%',
-                                    background: '#ef4444',
-                                }"
-                            />
-                        </div>
-                        <p class="acc-rate">
-                            %{{
-                                accounting.totalPayable
-                                    ? Math.round((accounting.paidPayable / accounting.totalPayable) * 100)
-                                    : 0
-                            }} ödendi
-                        </p>
-                        <div class="acc-rows">
-                            <div class="acc-row">
-                                <span>Ödenen</span>
-                                <strong class="text-success">{{ formatCurrency(accounting.paidPayable) }}</strong>
-                            </div>
-                            <div class="acc-row">
-                                <span>Bekleyen</span>
-                                <strong>{{ formatCurrency(accounting.remainingPayable) }}</strong>
-                            </div>
-                            <div v-if="accounting.overduePayableCount > 0" class="acc-row">
-                                <span>Vadesi Geçmiş</span>
-                                <strong class="text-danger">
-                                    {{ formatCurrency(accounting.overduePayableAmount) }}
-                                    <em>({{ accounting.overduePayableCount }} kayıt)</em>
-                                </strong>
-                            </div>
-                        </div>
-                    </div>
-
-                </div>
-
-                <!-- Tüm değerler sıfırsa bilgi mesajı -->
-                <div
-                    v-if="accounting.totalReceivable === 0 && accounting.totalPayable === 0"
-                    class="acc-empty"
-                >
-                    Henüz muhasebe kaydı bulunmuyor. Kiralama oluşturulduğunda alacaklar burada görünecek.
-                </div>
-            </template>
-
-            <div v-else class="empty-state">
-                Muhasebe verileri yüklenemedi.
-            </div>
-        </section>
-
-        <!-- ── Upcoming Returns ───────────────────────────────────────────── -->
-        <section class="card">
-            <div class="card-head">
-                <h2 class="card-title">Yaklaşan İadeler</h2>
-                <span class="badge-neutral">{{ sortedReturns.length }} kayıt</span>
-            </div>
-
-            <div v-if="loading" class="tbl-skel">
-                <div v-for="i in 3" :key="i" class="skel-row" />
-            </div>
-            <div v-else-if="sortedReturns.length === 0" class="empty-state">
-                Yaklaşan iade bulunmuyor.
-            </div>
-            <div v-else class="mobile-table-cards">
-                <div
-                    v-for="item in sortedReturns"
-                    :key="`mobile-return-${item.rentalId}`"
-                    class="mobile-data-card"
-                    :class="{ 'row-overdue': item.isOverdue }"
-                >
-                    <div class="mobile-card-head">
-                        <div>
-                            <div class="td-mono">{{ item.plateNumber }}</div>
-                            <div>{{ item.customerName }}</div>
-                        </div>
-                        <span :class="formatReturnBadge(item).cls">
-                            {{ formatReturnBadge(item).text }}
-                        </span>
-                    </div>
-                    <div class="mobile-card-grid">
-                        <div class="mobile-data-row">
-                            <span class="mobile-label">Sürücü</span>
-                            <span>{{ item.primaryDriverName || '—' }}</span>
-                        </div>
-                        <div class="mobile-data-row">
-                            <span class="mobile-label">İade Tarihi</span>
-                            <span>{{ formatDate(item.endDate) }}</span>
-                        </div>
-                    </div>
-                    <button class="btn-sm mobile-action-btn" @click="openReturnModal(item.rentalId)">
-                        İade Al
-                    </button>
-                </div>
-            </div>
-            <div class="tbl-wrap">
-                <table class="dtbl">
-                    <thead>
-                        <tr>
-                            <th>Plaka</th>
-                            <th>Müşteri / Sürücü</th>
-                            <th>İade Tarihi</th>
-                            <th>Kalan</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr
-                            v-for="item in sortedReturns"
-                            :key="item.rentalId"
-                            :class="{ 'row-overdue': item.isOverdue }"
-                        >
-                            <td class="td-mono">{{ item.plateNumber }}</td>
-                            <td>
-                                <div class="person-cell">
-                                    <span>{{ item.customerName }}</span>
-                                    <small v-if="item.primaryDriverName" class="text-muted">
-                                        Sürücü: {{ item.primaryDriverName }}
-                                    </small>
-                                </div>
-                            </td>
-                            <td class="td-date">{{ formatDate(item.endDate) }}</td>
-                            <td>
-                                <span :class="formatReturnBadge(item).cls">
-                                    {{ formatReturnBadge(item).text }}
-                                </span>
-                            </td>
-                            <td>
-                                <button class="btn-sm" @click="openReturnModal(item.rentalId)">
-                                    İade Al
-                                </button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </section>
-
-        <!-- ── Return Modal ───────────────────────────────────────────────── -->
-        <ReturnCompleteModal
-            :visible="showReturnModal"
-            :rental-id="selectedRentalId"
-            @close="showReturnModal = false"
-            @completed="handleReturnCompleted"
-        />
-
+    <div v-if="error" class="rc-alert rc-alert--danger" role="alert">
+      {{ error }}
+      <RcButton variant="ghost" size="sm" @click="fetchAll(revenuePeriod)">Tekrar dene</RcButton>
     </div>
+
+    <!-- KPI -->
+    <div class="rc-kpi-grid">
+      <template v-if="loading && !stats">
+        <div v-for="i in 5" :key="i" class="rc-skeleton rc-kpi-skeleton" />
+      </template>
+      <template v-else>
+        <div
+          v-for="card in kpiCards"
+          :key="card.id"
+          class="rc-kpi"
+          :class="{ 'rc-kpi--link': !!card.route }"
+          @click="go(card.route)"
+        >
+        <div class="rc-kpi__label">
+          <RcIcon :name="card.icon" :size="14" />
+          {{ card.label }}
+        </div>
+        <div class="rc-kpi__value">{{ card.value }}</div>
+        <div class="rc-kpi__sub">
+          <span>{{ card.sub }}</span>
+          <span
+            v-if="card.id === 'active' && stats?.overdueRentals"
+            class="rc-kpi__delta rc-kpi__delta--down"
+          >
+            {{ stats.overdueRentals }} gecikmiş
+          </span>
+        </div>
+        <div v-if="card.spark?.length" class="rc-kpi__spark">
+          <RcSparkline :data="card.spark" :color="card.sparkColor" />
+        </div>
+        <span v-if="card.alert" class="rc-kpi__alert-dot" aria-label="Dikkat gerektiren kayıt" />
+        </div>
+      </template>
+    </div>
+
+    <!-- Revenue + Fleet -->
+    <div class="rc-two">
+      <div class="rc-card">
+        <div class="rc-card__head">
+          <div>
+            <div class="rc-card__title">Aylık ciro</div>
+            <div style="font-size: 12px; color: var(--rc-text-muted); margin-top: 2px">
+              Son {{ revenuePeriod }} ay
+            </div>
+          </div>
+          <div class="rc-tabs">
+            <button
+              v-for="opt in REVENUE_PERIOD_OPTIONS"
+              :key="opt.months"
+              type="button"
+              class="rc-tab"
+              :class="{ 'rc-tab--active': revenuePeriod === opt.months }"
+              @click="revenuePeriod = opt.months"
+            >
+              {{ opt.label }}
+            </button>
+          </div>
+        </div>
+        <div class="rc-card__body" style="padding-top: 8px">
+          <div v-if="loading" class="rc-skeleton rc-card-skeleton" />
+          <template v-else-if="revenue?.values.length">
+            <div class="rc-dashboard-revenue-head">
+              <span class="rc-dashboard-revenue-total">{{ formatCompactTRY(revenue.total) }}</span>
+              <RcBadge variant="success" dot>Toplam dönem</RcBadge>
+              <span class="rc-dashboard-revenue-meta">{{ revenuePeriod }} aylık ciro</span>
+            </div>
+            <RcRevenueBars :data="[...revenue.values]" :labels="[...revenue.labels]" />
+          </template>
+          <RcEmpty v-else title="Ciro verisi yok" description="Seçilen dönemde kayıt bulunamadı." />
+        </div>
+      </div>
+
+      <div class="rc-card">
+        <div class="rc-card__head">
+          <div class="rc-card__title">Filo durumu</div>
+          <RcButton variant="ghost" size="sm" @click="go('/vehicles')">
+            Detay
+            <RcIcon name="arrowRight" :size="14" />
+          </RcButton>
+        </div>
+        <div class="rc-card__body">
+          <div v-if="loading" class="rc-skeleton rc-card-skeleton" />
+          <template v-else-if="hasFleetData">
+            <RcFleetDonut :items="fleetItems" />
+            <hr class="rc-hr">
+            <div style="display: flex; gap: 8px; font-size: 12px; color: var(--rc-text-muted)">
+              <RcIcon name="info" :size="14" style="margin-top: 2px; flex-shrink: 0" />
+              <span>{{ fleetHint }}</span>
+            </div>
+          </template>
+          <RcEmpty v-else title="Araç verisi yok" description="Henüz filoya kayıtlı araç bulunmuyor." />
+        </div>
+      </div>
+    </div>
+
+    <!-- Returns + Activity -->
+    <div class="rc-two">
+      <div class="rc-card">
+        <div class="rc-card__head">
+          <div>
+            <div class="rc-card__title">Yaklaşan iadeler</div>
+            <div style="font-size: 12px; color: var(--rc-text-muted); margin-top: 2px">Sonraki 7 gün</div>
+          </div>
+          <RcTabs v-model="returnsTab" :tabs="returnsTabOptions" />
+        </div>
+        <div v-if="loading" class="rc-skeleton rc-card-skeleton" style="margin: 16px" />
+        <RcEmpty
+          v-else-if="!filteredReturns.length"
+          title="Yaklaşan iade yok"
+          description="Seçilen filtreye uygun kayıt bulunamadı."
+        />
+        <table v-else class="rc-table">
+          <thead>
+            <tr>
+              <th>Müşteri</th>
+              <th>Plaka · Araç</th>
+              <th>Zaman</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="item in filteredReturns" :key="item.rentalId">
+              <td>
+                <div style="display: flex; align-items: center; gap: 8px">
+                  <RcAvatar size="sm">{{ initials(item.customerName) }}</RcAvatar>
+                  <div style="display: flex; flex-direction: column; line-height: 1.2">
+                    <span style="font-weight: 500">{{ item.customerName }}</span>
+                    <small style="color: var(--rc-text-muted); font-family: var(--rc-font-mono); font-size: 11px">
+                      {{ item.rentalNumber }}
+                    </small>
+                  </div>
+                </div>
+              </td>
+              <td>
+                <div style="display: flex; flex-direction: column; line-height: 1.2">
+                  <span style="font-family: var(--rc-font-mono); font-size: 12px; letter-spacing: 0.02em">
+                    {{ item.plateNumber }}
+                  </span>
+                  <small v-if="item.primaryDriverName" style="color: var(--rc-text-muted)">
+                    {{ item.primaryDriverName }}
+                  </small>
+                </div>
+              </td>
+              <td>
+                <RcBadge :variant="returnBadgeVariant(item)" dot>
+                  {{ returnWhenLabel(item) }}
+                </RcBadge>
+              </td>
+              <td class="rc-right">
+                <RcButton variant="ghost" size="sm" @click="openReturnModal(item.rentalId)">
+                  İade al
+                  <RcIcon name="arrowRight" :size="14" />
+                </RcButton>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="rc-card">
+        <div class="rc-card__head">
+          <div class="rc-card__title">Etkinlik akışı</div>
+        </div>
+        <div v-if="loading" class="rc-skeleton rc-card-skeleton" />
+        <RcEmpty v-else-if="!activityItems.length" title="Henüz etkinlik yok" />
+        <div v-else>
+          <div v-for="(item, i) in activityItems" :key="i" class="rc-activity">
+            <span class="rc-activity__when">{{ item.when }}</span>
+            <span class="rc-activity__body">
+              {{ item.text }}
+              <span class="rc-activity__actor">· {{ item.actor }}</span>
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Receivables + Payables -->
+    <div class="rc-two">
+      <div class="rc-card">
+        <div class="rc-card__head">
+          <div class="rc-card__title">Alacaklar (özet)</div>
+          <RcButton variant="ghost" size="sm" @click="go('/accounting/finance')">
+            Tümü
+            <RcIcon name="arrowRight" :size="14" />
+          </RcButton>
+        </div>
+        <div v-if="accountingRowsLoading" class="rc-skeleton rc-card-skeleton" style="margin: 16px" />
+        <RcEmpty v-else-if="!receivableRows.length" title="Açık alacak yok" />
+        <table v-else class="rc-table">
+          <thead>
+            <tr>
+              <th>Müşteri</th>
+              <th>Tip</th>
+              <th>Vade</th>
+              <th class="rc-right">Tutar</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in receivableRows" :key="row.id">
+              <td><span style="font-weight: 500">{{ row.customerName || row.description }}</span></td>
+              <td><span style="color: var(--rc-text-muted)">{{ row.type }}</span></td>
+              <td>
+                <RcBadge
+                  v-if="receivableDueLabel(row).variant === 'danger'"
+                  variant="danger"
+                >
+                  {{ receivableDueLabel(row).text }}
+                </RcBadge>
+                <span
+                  v-else
+                  style="color: var(--rc-text-muted); font-family: var(--rc-font-mono); font-size: 12px"
+                >
+                  {{ receivableDueLabel(row).text }}
+                </span>
+              </td>
+              <td class="rc-right rc-num" style="font-weight: 500">{{ fmtTRY(row.remainingAmount) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="rc-card">
+        <div class="rc-card__head">
+          <div class="rc-card__title">Verecekler (özet)</div>
+          <RcButton variant="ghost" size="sm" @click="go('/accounting/payables')">
+            Tümü
+            <RcIcon name="arrowRight" :size="14" />
+          </RcButton>
+        </div>
+        <div v-if="accountingRowsLoading" class="rc-skeleton rc-card-skeleton" style="margin: 16px" />
+        <RcEmpty v-else-if="!payableRows.length" title="Açık verecek yok" />
+        <table v-else class="rc-table">
+          <thead>
+            <tr>
+              <th>Tedarikçi</th>
+              <th>Vade</th>
+              <th class="rc-right">Tutar</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in payableRows" :key="row.id">
+              <td><span style="font-weight: 500">{{ row.serviceProviderName || row.description }}</span></td>
+              <td>
+                <RcBadge
+                  v-if="payableDueLabel(row).variant"
+                  :variant="payableDueLabel(row).variant!"
+                >
+                  {{ payableDueLabel(row).text }}
+                </RcBadge>
+                <span
+                  v-else
+                  style="color: var(--rc-text-muted); font-family: var(--rc-font-mono); font-size: 12px"
+                >
+                  {{ payableDueLabel(row).text }}
+                </span>
+              </td>
+              <td class="rc-right rc-num" style="font-weight: 500">{{ fmtTRY(row.remainingAmount) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <ReturnCompleteModal
+      :visible="showReturnModal"
+      :rental-id="selectedRentalId"
+      @close="showReturnModal = false"
+      @completed="handleReturnCompleted"
+    />
+  </div>
 </template>
 
 <style scoped>
-/* ─── Layout ──────────────────────────────────────────────────────────────── */
-.dashboard {
-    max-width: 1440px;
-    margin: 0 auto;
-    display: flex;
-    flex-direction: column;
-    gap: 24px;
-    padding-bottom: 40px;
-}
-
-/* ─── Header ──────────────────────────────────────────────────────────────── */
-.db-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 12px;
-}
-
-.db-header-actions {
-    display: flex;
-    gap: 10px;
-    align-items: center;
-}
-
-.db-title {
-    font-size: 24px;
-    font-weight: 700;
-    margin: 0;
-    color: var(--color-heading);
-}
-
-.db-sub {
-    font-size: 13px;
-    color: var(--color-text-secondary);
-    margin: 2px 0 0;
-}
-
-.btn-refresh {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 16px;
-    background: transparent;
-    border: 1px solid var(--color-border);
-    border-radius: 8px;
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    color: var(--color-text-secondary);
-    transition: all 0.15s;
-}
-
-.btn-refresh:hover:not(:disabled) {
-    background: var(--color-bg-secondary);
-    color: var(--color-text);
-}
-
-.btn-refresh:disabled { opacity: 0.6; cursor: not-allowed; }
-
-.spin { display: inline-block; animation: spin 1s linear infinite; }
-
-.error-banner {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 12px 16px;
-    background: rgba(239, 68, 68, 0.08);
-    border: 1px solid rgba(239, 68, 68, 0.2);
-    border-radius: 10px;
-    color: #dc2626;
-    font-size: 14px;
-}
-
-.btn-retry {
-    padding: 6px 14px;
-    background: #dc2626;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    font-size: 12px;
-    font-weight: 500;
-    cursor: pointer;
-}
-
-.btn-retry:hover { background: #b91c1c; }
-
-/* ─── Stat Cards ──────────────────────────────────────────────────────────── */
-.stat-row {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 14px;
-}
-
-.stat-card {
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-top: 3px solid var(--accent, #3b82f6);
-    border-radius: 12px;
-    padding: 18px 20px;
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    transition: transform 0.15s, box-shadow 0.15s;
-    min-height: 100px;
-}
-
-.stat-card.is-link {
-    cursor: pointer;
-}
-
-.stat-card.is-link:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
-}
-
-.stat-card.skel {
-    background: var(--color-bg-secondary);
-    border-top-color: var(--color-border);
-    animation: shimmer 1.4s infinite;
-}
-
-.sc-left {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    flex: 1;
-    min-width: 0;
-}
-
-.sc-label {
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--color-text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-}
-
-.sc-value {
-    font-size: 30px;
-    font-weight: 700;
-    color: var(--color-heading);
-    line-height: 1.1;
-}
-
-.sc-sub {
-    font-size: 12px;
-    color: var(--color-text-muted);
-}
-
-.sc-alert {
-    display: inline-block;
-    margin-top: 4px;
-    padding: 2px 8px;
-    border-radius: 20px;
-    font-size: 11px;
-    font-weight: 600;
-    background: rgba(239, 68, 68, 0.1);
-    color: #ef4444;
-    width: fit-content;
-}
-
-.sc-icon {
-    font-size: 26px;
-    opacity: 0.75;
-    flex-shrink: 0;
-    margin-left: 10px;
-}
-
-/* ─── Card Base ───────────────────────────────────────────────────────────── */
-.card {
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: 14px;
-    overflow: hidden;
-}
-
-.card-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 16px 20px;
-    border-bottom: 1px solid var(--color-border);
-}
-
-.card-title {
-    font-size: 15px;
-    font-weight: 600;
-    margin: 0;
-    color: var(--color-heading);
-}
-
-.card-foot {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 12px 20px;
-    border-top: 1px solid var(--color-border);
-    font-size: 13px;
-    color: var(--color-text-secondary);
-}
-
-.card-foot strong {
-    color: var(--color-heading);
-    font-size: 15px;
-}
-
-/* ─── Charts Row ──────────────────────────────────────────────────────────── */
-.charts-row {
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: 16px;
-    align-items: stretch;
-}
-
-.chart-area {
-    padding: 20px;
-    height: 280px;
-}
-
-.skel-chart {
-    width: 100%;
-    height: 100%;
-    border-radius: 8px;
-    background: var(--color-bg-secondary);
-    animation: shimmer 1.4s infinite;
-}
-
-/* ─── Vehicle Status List ─────────────────────────────────────────────────── */
-.status-list {
-    padding: 16px 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-}
-
-.status-skel {
-    padding: 16px 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.status-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.si-left {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: 90px;
-    flex-shrink: 0;
-}
-
-.si-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    flex-shrink: 0;
-}
-
-.si-label {
-    font-size: 13px;
-    color: var(--color-text-secondary);
-}
-
-.si-right {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex: 1;
-}
-
-.si-bar-wrap {
-    flex: 1;
-    height: 6px;
-    background: var(--color-bg-secondary);
-    border-radius: 3px;
-    overflow: hidden;
-}
-
-.si-bar {
-    height: 100%;
-    border-radius: 3px;
-    transition: width 0.6s ease;
-}
-
-.si-count {
-    font-size: 14px;
-    font-weight: 700;
-    min-width: 24px;
-    text-align: right;
-}
-
-/* ─── Segment Control ─────────────────────────────────────────────────────── */
-.seg-ctrl {
-    display: flex;
-    background: var(--color-bg-secondary);
-    border-radius: 8px;
-    padding: 3px;
-    gap: 2px;
-}
-
-.seg-btn {
-    padding: 5px 14px;
-    border: none;
-    border-radius: 6px;
-    font-size: 12px;
-    font-weight: 500;
-    cursor: pointer;
-    background: transparent;
-    color: var(--color-text-secondary);
-    transition: all 0.15s;
-}
-
-.seg-btn.active {
-    background: var(--color-surface);
-    color: var(--color-primary);
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
-}
-
-/* ─── Tab Bar ─────────────────────────────────────────────────────────────── */
-.tab-bar {
-    display: flex;
-    gap: 4px;
-}
-
-.tab-btn {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 14px;
-    border: 1px solid var(--color-border);
-    border-radius: 8px;
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    background: transparent;
-    color: var(--color-text-secondary);
-    transition: all 0.15s;
-}
-
-.tab-btn.active {
-    background: var(--color-primary);
-    border-color: var(--color-primary);
-    color: white;
-}
-
-.tab-count {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 20px;
-    height: 20px;
-    padding: 0 6px;
-    border-radius: 10px;
-    font-size: 11px;
-    font-weight: 700;
-    background: rgba(255, 255, 255, 0.2);
-}
-
-.tab-btn:not(.active) .tab-count {
-    background: var(--color-bg-secondary);
-    color: var(--color-text-secondary);
-}
-
-/* ─── Data Table ──────────────────────────────────────────────────────────── */
-.tbl-wrap {
-    overflow-x: auto;
-}
-
-.mobile-table-cards {
-    display: none;
-    padding: 16px;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.mobile-data-card {
-    border: 1px solid var(--color-border);
-    border-radius: 12px;
-    padding: 14px;
-    background: var(--color-surface);
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.mobile-card-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 12px;
-}
-
-.mobile-card-grid {
-    display: grid;
-    gap: 10px;
-}
-
-.mobile-data-row {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    font-size: 13px;
-    color: var(--color-text-secondary);
-}
-
-.mobile-label {
-    font-size: 11px;
-    text-transform: uppercase;
-    color: var(--color-text-muted);
-    letter-spacing: 0.04em;
-}
-
-.mobile-action-btn {
-    width: 100%;
-}
-
-.dtbl {
-    width: 100%;
-    border-collapse: collapse;
-}
-
-.dtbl th {
-    padding: 10px 20px;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--color-text-secondary);
-    background: var(--color-bg-secondary);
-    border-bottom: 1px solid var(--color-border);
-    text-align: left;
-    white-space: nowrap;
-}
-
-.dtbl td {
-    padding: 13px 20px;
-    font-size: 13px;
-    border-bottom: 1px solid var(--color-border);
-    vertical-align: middle;
-}
-
-.dtbl tr:last-child td {
-    border-bottom: none;
-}
-
-.dtbl tr.row-overdue {
-    background: rgba(239, 68, 68, 0.03);
-}
-
-.dtbl tr:hover td {
-    background: var(--color-bg-secondary);
-}
-
-.td-mono {
-    font-family: 'JetBrains Mono', 'Fira Code', monospace;
-    font-weight: 600;
-    letter-spacing: 0.05em;
-    font-size: 13px;
-}
-
-.td-date {
-    color: var(--color-text-secondary);
-    white-space: nowrap;
-}
-
-.person-cell {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-
-.tbl-skel {
-    padding: 16px 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.skel-row {
-    height: 40px;
-    border-radius: 6px;
-    background: var(--color-bg-secondary);
-    animation: shimmer 1.4s infinite;
-}
-
-/* ─── Bakım & Hasar Block ─────────────────────────────────────────────────── */
-.bh-grid {
-    display: flex;
-    padding: 24px 20px;
-    gap: 0;
-}
-
-.bh-block {
-    flex: 1;
-}
-
-.bh-head {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 15px;
-    font-weight: 600;
-    margin-bottom: 8px;
-    color: var(--color-heading);
-}
-
-.bh-dot {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-}
-
-.bh-hint {
-    font-size: 13px;
-    color: var(--color-text-secondary);
-    margin: 0;
-}
-
-.bh-divider {
-    width: 1px;
-    background: var(--color-border);
-    margin: 0 24px;
-}
-
-/* ─── Card Head Actions ───────────────────────────────────────────────────── */
-.card-head-actions {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-}
-
-.link-btn {
-    display: inline-flex;
-    align-items: center;
-    padding: 5px 12px;
-    border: 1px solid var(--color-border);
-    border-radius: 6px;
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--color-primary);
-    text-decoration: none;
-    transition: all 0.15s;
-}
-
-.link-btn:hover {
-    background: var(--color-bg-secondary);
-}
-
-/* ─── Accounting Alert Bar ────────────────────────────────────────────────── */
-.acc-alert-bar {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    padding: 10px 20px;
-    background: rgba(239, 68, 68, 0.06);
-    border-bottom: 1px solid rgba(239, 68, 68, 0.15);
-    font-size: 13px;
-    color: #dc2626;
-}
-
-.acc-skel {
-    padding: 20px;
-    display: flex;
-    gap: 16px;
-}
-
-.acc-empty {
-    padding: 24px 20px;
-    text-align: center;
-    font-size: 13px;
-    color: var(--color-text-muted);
-    border-top: 1px solid var(--color-border);
-}
-
-/* ─── Accounting ──────────────────────────────────────────────────────────── */
-.acc-grid {
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    gap: 0;
-    padding: 24px 20px;
-    align-items: start;
-}
-
-.acc-block {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.acc-block-label {
-    font-size: 12px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin: 0;
-}
-
-.acc-big {
-    font-size: 22px;
-    font-weight: 700;
-    color: var(--color-heading);
-}
-
-.acc-progress-wrap {
-    height: 4px;
-    background: var(--color-bg-secondary);
-    border-radius: 2px;
-    overflow: hidden;
-}
-
-.acc-progress {
-    height: 100%;
-    border-radius: 2px;
-    transition: width 0.6s ease;
-}
-
-.acc-rate {
-    font-size: 12px;
-    color: var(--color-text-muted);
-    margin: 0;
-}
-
-.acc-rows {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    margin-top: 4px;
-}
-
-.acc-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    font-size: 13px;
-    color: var(--color-text-secondary);
-}
-
-.acc-row strong {
-    font-weight: 600;
-    color: var(--color-heading);
-}
-
-.acc-row em {
-    font-style: normal;
-    font-size: 11px;
-    color: var(--color-text-muted);
-    margin-left: 4px;
-}
-
-.acc-net {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 0 32px;
-    text-align: center;
-    border-left: 1px solid var(--color-border);
-    border-right: 1px solid var(--color-border);
-    min-width: 180px;
-}
-
-.acc-net-label {
-    font-size: 12px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--color-text-secondary);
-    margin: 0 0 8px;
-}
-
-.acc-net-value {
-    font-size: 26px;
-    font-weight: 700;
-    margin-bottom: 6px;
-}
-
-.acc-net-sub {
-    font-size: 12px;
-    color: var(--color-text-muted);
-    margin: 0 0 12px;
-}
-
-.acc-net-badges {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    width: 100%;
-    margin-top: 4px;
-}
-
-.acc-net-badge {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 6px 10px;
-    border-radius: 6px;
-    font-size: 12px;
-}
-
-.acc-net-badge--green {
-    background: rgba(16, 185, 129, 0.08);
-    color: #059669;
-}
-
-.acc-net-badge--red {
-    background: rgba(239, 68, 68, 0.08);
-    color: #dc2626;
-}
-
-.acc-net-badge-label {
-    font-weight: 500;
-}
-
-.acc-net-badge-val {
-    font-weight: 600;
-}
-
-/* ─── Badges ──────────────────────────────────────────────────────────────── */
-.badge-success,
-.badge-danger,
-.badge-warning,
-.badge-neutral {
-    display: inline-block;
-    padding: 3px 10px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 500;
-    white-space: nowrap;
-}
-
-.badge-success { background: rgba(16, 185, 129, 0.1); color: #10b981; }
-.badge-danger  { background: rgba(239, 68, 68, 0.1);  color: #ef4444; }
-.badge-warning { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
-.badge-neutral { background: var(--color-bg-secondary); color: var(--color-text-secondary); }
-
-/* ─── Utilities ───────────────────────────────────────────────────────────── */
-.text-success { color: #10b981 !important; }
-.text-danger  { color: #ef4444 !important; }
-.text-muted   { color: var(--color-text-muted); font-size: 12px; }
-
-.empty-state {
-    padding: 48px 20px;
-    text-align: center;
-    color: var(--color-text-muted);
-    font-size: 14px;
-}
-
-.link {
-    color: var(--color-primary);
-    text-decoration: none;
-    font-weight: 500;
-}
-
-.link:hover { text-decoration: underline; }
-
-/* ─── Buttons ─────────────────────────────────────────────────────────────── */
-.btn-primary {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 10px 20px;
-    background: var(--color-primary);
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: opacity 0.15s;
-}
-
-.btn-primary:hover { opacity: 0.9; }
-
-.btn-sm {
-    padding: 6px 12px;
-    font-size: 12px;
-    font-weight: 500;
-    border-radius: 6px;
-    border: 1px solid var(--color-border);
-    background: transparent;
-    color: var(--color-text);
-    cursor: pointer;
-    white-space: nowrap;
-    transition: background 0.15s;
-}
-
-.btn-sm:hover { background: var(--color-bg-secondary); }
-
-/* ─── Animation ───────────────────────────────────────────────────────────── */
-@keyframes shimmer {
-    0%, 100% { opacity: 1; }
-    50%       { opacity: 0.45; }
-}
-
-@keyframes spin {
-    to { transform: rotate(360deg); }
-}
-
-/* ─── Responsive ──────────────────────────────────────────────────────────── */
-@media (max-width: 1200px) {
-    .stat-row { grid-template-columns: repeat(3, 1fr); }
-}
-
-@media (max-width: 900px) {
-    .dashboard { gap: 16px; }
-    .card-head { flex-wrap: wrap; gap: 12px; align-items: flex-start; }
-    .card-head-actions,
-    .tab-bar,
-    .db-header-actions { flex-wrap: wrap; }
-    .charts-row { grid-template-columns: 1fr; }
-    .acc-grid   { grid-template-columns: 1fr; }
-    .acc-net    { border: none; border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); padding: 20px 0; margin: 16px 0; }
-    .bh-grid    { flex-direction: column; }
-    .bh-divider { width: 100%; height: 1px; margin: 16px 0; }
-    .dtbl { min-width: 760px; }
-}
-
-@media (max-width: 640px) {
-    .stat-row { grid-template-columns: repeat(2, 1fr); }
-    .db-header { flex-direction: column; align-items: flex-start; }
-    .db-header-actions,
-    .card-head-actions,
-    .tab-bar,
-    .seg-ctrl { width: 100%; }
-    .btn-primary,
-    .btn-refresh,
-    .btn-retry,
-    .link-btn { width: 100%; justify-content: center; }
-    .seg-btn,
-    .tab-btn { flex: 1; justify-content: center; }
-    .card-head,
-    .card-foot,
-    .error-banner,
-    .acc-row { flex-direction: column; align-items: stretch; }
-    .chart-area,
-    .status-list,
-    .tbl-skel,
-    .acc-grid,
-    .bh-grid,
-    .empty-state { padding-left: 16px; padding-right: 16px; }
-    .card-head { padding: 16px; }
-    .card-foot { padding: 12px 16px; gap: 6px; }
-    .error-banner { gap: 12px; }
-    .status-item { flex-direction: column; align-items: stretch; }
-    .si-left,
-    .si-right { width: 100%; }
-    .acc-alert-bar span { margin-left: 0 !important; }
-    .mobile-table-cards { display: flex; }
-    .tbl-wrap { display: none; }
-}
-
-@media (max-width: 400px) {
-    .stat-row { grid-template-columns: 1fr; }
-    .sc-value { font-size: 24px; }
-    .db-title { font-size: 22px; }
+.rc-alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
 }
 </style>

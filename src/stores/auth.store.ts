@@ -54,7 +54,9 @@ export const useAuthStore = defineStore('auth', () => {
 
         try {
             const tokens = await authApi.login(credentials)
-            tokenStorage.setTokens(tokens.accessToken, tokens.refreshToken)
+            tokenStorage.setTokens(tokens.accessToken, tokens.refreshToken, {
+                remember: credentials.remember ?? true,
+            })
 
 
             setupTokenListeners()
@@ -85,7 +87,7 @@ export const useAuthStore = defineStore('auth', () => {
 
         try {
             const tokens = await loader()
-            tokenStorage.setTokens(tokens.accessToken, tokens.refreshToken)
+            tokenStorage.setTokens(tokens.accessToken, tokens.refreshToken, { remember: true })
             setupTokenListeners()
             tokenManager.start()
             updateTokenStatus()

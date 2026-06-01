@@ -5,6 +5,7 @@ import { ProviderType, ServiceType } from '@/types'
 import { useForm, useEnumTranslations } from '@/composables'
 import { SearchableSelect } from '@/components/common'
 import { formatPhoneInput, isValidPhoneNumber, normalizePhoneDigits } from '@/utils/phone'
+import { RcModal, RcButton } from '@/components/rc'
 
 interface Props {
   show: boolean
@@ -144,15 +145,9 @@ watch(() => props.provider, (newVal) => {
 </script>
 
 <template>
-  <div v-if="show && provider" class="modal-overlay" @click.self="handleClose">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2 class="modal-title">Servis Sağlayıcı Düzenle</h2>
-        <button class="close-btn" @click="handleClose">×</button>
-      </div>
-
-      <form @submit.prevent="onSubmit">
-        <div class="modal-body">
+  <RcModal :open="show && !!provider" title="Servis sağlayıcı düzenle" xl @close="handleClose">
+      <form id="edit-provider-form" @submit.prevent="onSubmit">
+        <div class="rca-modal-form">
           <div class="form-row">
             <div class="form-group flex-2">
               <label class="form-label">
@@ -177,11 +172,12 @@ watch(() => props.provider, (newVal) => {
                 Sağlayıcı Tipi <span class="required">*</span>
               </label>
               <SearchableSelect
-                v-model="values.type"
+                :model-value="values.type ?? null"
                 :options="providerTypeOptions"
                 placeholder="Seçiniz"
                 search-placeholder="Ara..."
                 :error="!!(touched.type && errors.type)"
+                @update:model-value="(v) => values.type = (v as typeof values.type) ?? values.type"
                 @blur="validateField('type')"
               />
               <span v-if="touched.type && errors.type" class="error-text">
@@ -350,232 +346,28 @@ watch(() => props.provider, (newVal) => {
             ></textarea>
           </div>
         </div>
-
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" @click="handleClose">
-            İptal
-          </button>
-          <button type="submit" class="btn btn-primary" :disabled="isSubmitting">
-            {{ isSubmitting ? 'Kaydediliyor...' : 'Kaydet' }}
-          </button>
-        </div>
       </form>
-    </div>
-  </div>
+    <template #footer>
+      <RcButton variant="secondary" @click="handleClose">İptal</RcButton>
+      <RcButton variant="primary" type="submit" form="edit-provider-form" :disabled="isSubmitting">
+        {{ isSubmitting ? 'Kaydediliyor…' : 'Kaydet' }}
+      </RcButton>
+    </template>
+  </RcModal>
 </template>
 
 <style scoped>
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 1rem;
-}
-
-.modal-content {
-  background: white;
-  border-radius: 0.5rem;
-  width: 100%;
-  max-width: 700px;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.5rem;
-  border-bottom: 1px solid var(--color-border, #e5e7eb);
-}
-
-.modal-title {
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: var(--color-text, #111827);
-  margin: 0;
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  font-size: 2rem;
-  color: var(--color-text-secondary, #6b7280);
-  cursor: pointer;
-  padding: 0;
-  width: 2rem;
-  height: 2rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 0.25rem;
-  transition: all 0.2s;
-}
-
-.close-btn:hover {
-  background: var(--color-background, #f3f4f6);
-  color: var(--color-text, #111827);
-}
-
-.modal-body {
-  padding: 1.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-}
-
-.form-row {
-  display: flex;
-  gap: 1rem;
-}
-
-.form-row .form-group {
-  flex: 1;
-}
-
-.form-row .form-group.flex-2 {
-  flex: 2;
-}
-
-.form-row .form-group.flex-1 {
-  flex: 1;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.form-label {
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--color-text, #111827);
-}
-
-.required {
-  color: #dc2626;
-}
-
-.form-input {
-  padding: 0.625rem 0.75rem;
-  border: 1px solid var(--color-border, #d1d5db);
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-  transition: all 0.2s;
-}
-
-.form-input:focus {
-  outline: none;
-  border-color: var(--color-primary, #2563eb);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-}
-
-.form-input.error {
-  border-color: #dc2626;
-}
-
-.error-text {
-  font-size: 0.75rem;
-  color: #dc2626;
-}
-
-textarea.form-input {
-  resize: vertical;
-  min-height: 2.5rem;
-}
-
-.service-types-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.5rem;
-}
-
-.checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  background: var(--color-background, #f9fafb);
-  border: 1px solid var(--color-border, #e5e7eb);
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.checkbox-label:hover {
-  border-color: var(--color-primary, #2563eb);
-}
-
-.checkbox-label.selected {
-  background: #eff6ff;
-  border-color: var(--color-primary, #2563eb);
-  color: var(--color-primary, #2563eb);
-}
-
-.checkbox-label input {
-  accent-color: var(--color-primary, #2563eb);
-}
-
-.modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.75rem;
-  padding: 1.5rem;
-  border-top: 1px solid var(--color-border, #e5e7eb);
-}
-
-.btn {
-  padding: 0.625rem 1.25rem;
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  border: none;
-  transition: all 0.2s;
-}
-
-.btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.btn-secondary {
-  background: white;
-  color: var(--color-text, #111827);
-  border: 1px solid var(--color-border, #d1d5db);
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background: var(--color-background, #f3f4f6);
-}
-
-.btn-primary {
-  background: var(--color-primary, #2563eb);
-  color: white;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: var(--color-primary-dark, #1d4ed8);
-}
-
-@media (max-width: 640px) {
-  .form-row {
-    flex-direction: column;
-  }
-
-  .service-types-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
+.form-row { display: flex; gap: 1rem; margin-bottom: 1rem; }
+.form-row .form-group.flex-2 { flex: 2; }
+.form-row .form-group.flex-1 { flex: 1; }
+.form-group { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem; }
+.form-label { font-size: 13px; font-weight: 500; }
+.required { color: var(--rc-red-500); }
+.form-input { padding: 0.625rem 0.75rem; border: 1px solid var(--rc-border); border-radius: var(--rc-radius-sm); font-size: 14px; }
+.form-input.error { border-color: var(--rc-red-500); }
+.error-text { font-size: 12px; color: var(--rc-red-500); }
+.service-types-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
+.checkbox-label { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; background: var(--rc-bg-subtle); border: 1px solid var(--rc-border-subtle); border-radius: var(--rc-radius-sm); font-size: 13px; cursor: pointer; }
+.checkbox-label.selected { background: var(--rc-accent-subtle); border-color: var(--rc-accent); color: var(--rc-accent); }
+@media (max-width: 768px) { .form-row { flex-direction: column; } }
 </style>
-

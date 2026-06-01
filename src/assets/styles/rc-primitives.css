@@ -1,0 +1,213 @@
+/* ===========================================================
+   REINDECAR · Layout & overlay primitives (from redesign shell)
+   Shell-specific sidebar/header styles live in rc-shell.css (Modül 02)
+   =========================================================== */
+
+.rc-page {
+  padding: 24px 28px 60px;
+  max-width: 100%;
+}
+.rc-page__head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+.rc-page__title {
+  font-family: var(--rc-font-display);
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.022em;
+  line-height: 1.15;
+  color: var(--rc-text);
+  margin: 0;
+}
+.rc-page__subtitle {
+  font-size: 13.5px;
+  color: var(--rc-text-muted);
+  margin-top: 4px;
+  letter-spacing: -0.005em;
+}
+.rc-page__actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.rc-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 8px;
+  font-size: 11.5px;
+  font-weight: 500;
+  border-radius: var(--rc-r-4);
+  letter-spacing: -0.005em;
+}
+.rc-status .rc-dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+}
+.rc-status--available { background: var(--rc-success-50); color: var(--rc-success-700); }
+.rc-status--rented    { background: var(--rc-blue-50);    color: var(--rc-blue-700); }
+.rc-status--reserved  { background: var(--rc-purple-50);  color: var(--rc-purple-500); }
+.rc-status--maintenance { background: var(--rc-warning-50); color: var(--rc-warning-700); }
+.rc-status--damaged   { background: var(--rc-danger-50);  color: var(--rc-danger-700); }
+.rc-status--draft     { background: var(--rc-ink-100);    color: var(--rc-text-muted); }
+
+.rc-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 10, 10, 0.45);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 80px 20px 40px;
+  z-index: var(--rc-z-modal);
+  animation: rcOverlayIn 180ms var(--rc-ease-out);
+  overflow-y: auto;
+}
+@keyframes rcOverlayIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.rc-modal {
+  background: var(--rc-surface);
+  border-radius: var(--rc-r-12);
+  box-shadow: var(--rc-shadow-lg);
+  width: 100%;
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  animation: rcModalIn 220ms var(--rc-ease-out);
+  max-height: calc(100vh - 120px);
+}
+.rc-modal--wide { max-width: 880px; }
+.rc-modal--xl   { max-width: 1080px; }
+@keyframes rcModalIn {
+  from { transform: translateY(-8px) scale(0.98); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
+.rc-modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--rc-border-subtle);
+  gap: 16px;
+}
+.rc-modal__title {
+  font-family: var(--rc-font-display);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+}
+.rc-modal__sub {
+  font-size: 12.5px;
+  color: var(--rc-text-muted);
+  margin-top: 2px;
+  letter-spacing: -0.005em;
+}
+.rc-modal__close {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--rc-r-6);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--rc-text-muted);
+  background: transparent;
+  flex-shrink: 0;
+}
+.rc-modal__close:hover {
+  background: var(--rc-surface-hover);
+  color: var(--rc-text);
+}
+.rc-modal__body {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+.rc-modal__foot {
+  padding: 14px 20px;
+  border-top: 1px solid var(--rc-border-subtle);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--rc-surface-2);
+  border-radius: 0 0 var(--rc-r-12) var(--rc-r-12);
+}
+.rc-modal__foot .rc-spacer { flex: 1; }
+
+.rc-segtabs {
+  display: flex;
+  border-bottom: 1px solid var(--rc-border);
+  gap: 0;
+  padding: 0 20px;
+  background: var(--rc-surface);
+  border-radius: var(--rc-r-10) var(--rc-r-10) 0 0;
+}
+.rc-segtab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 14px;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  color: var(--rc-text-muted);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color var(--rc-dur-fast), border-color var(--rc-dur-fast);
+}
+.rc-segtab:hover { color: var(--rc-text); }
+.rc-segtab--active {
+  color: var(--rc-text);
+  border-bottom-color: var(--rc-blue-500);
+}
+.rc-segtab__count {
+  background: var(--rc-ink-100);
+  border-radius: 99px;
+  font-size: 10px;
+  padding: 1px 6px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+.rc-segtab--active .rc-segtab__count {
+  background: var(--rc-blue-50);
+  color: var(--rc-blue-700);
+}
+
+.rc-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--rc-text-muted);
+  font-size: 13px;
+}
+.rc-empty__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--rc-text-soft);
+  margin: 0;
+}
+.rc-empty__icon {
+  width: 40px;
+  height: 40px;
+  color: var(--rc-ink-300);
+}

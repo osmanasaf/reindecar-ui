@@ -1,11 +1,7 @@
 import type { 
-  ReceivableType,
   ReceivableStatus,
-  PayableType,
   PayableStatus,
-  ClaimType,
   ClaimStatus,
-  ServiceType
 } from '@/types'
 
 export const getReceivableStatusColor = (status: ReceivableStatus): string => {
@@ -26,7 +22,8 @@ export const getPayableStatusColor = (status: PayableStatus): string => {
     PARTIAL_PAID: 'blue',
     FULLY_PAID: 'green',
     OVERDUE: 'red',
-    CANCELLED: 'gray'
+    CANCELLED: 'gray',
+    WRITTEN_OFF: 'darkred'
   }
   return colors[status] || 'gray'
 }
@@ -79,4 +76,37 @@ export const formatClaimNumber = (number: string): string => {
 export const calculatePaymentProgress = (paidAmount: number, totalAmount: number): number => {
   if (totalAmount === 0) return 0
   return Math.round((paidAmount / totalAmount) * 100)
+}
+
+export interface DueAgeBadge {
+  label: string
+  variant: 'danger' | 'warning' | 'info'
+}
+
+export function getDueAgeBadge(
+  dueDate: string | undefined,
+  status: ReceivableStatus | PayableStatus
+): DueAgeBadge | null {
+  if (!dueDate) return null
+  if (status === 'FULLY_PAID' || status === 'CANCELLED' || status === 'WRITTEN_OFF') return null
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const due = new Date(dueDate)
+  due.setHours(0, 0, 0, 0)
+  const diffDays = Math.floor((today.getTime() - due.getTime()) / 86_400_000)
+
+  if (diffDays > 0) return { label: `${diffDays} gün geç`, variant: 'danger' }
+  if (diffDays === 0) return { label: 'vadede', variant: 'warning' }
+  return { label: 'planlandı', variant: 'info' }
+}
+
+export function isReceivableOverdue(
+  dueDate: string | undefined,
+  status: ReceivableStatus | PayableStatus
+): boolean {
+  if (!dueDate) return false
+  if (status === 'FULLY_PAID' || status === 'CANCELLED' || status === 'WRITTEN_OFF') return false
+  const today = new Date().toISOString().split('T')[0] ?? ''
+  return (today.length > 0 && dueDate < today) || status === 'OVERDUE'
 }

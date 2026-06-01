@@ -3,6 +3,9 @@ import { ref, computed, onMounted } from 'vue'
 import { filesApi, FILE_UPLOAD_TYPE_LABELS, ALLOWED_TYPES_BY_REFERENCE } from '@/api/files.api'
 import type { FileRecord, FileReferenceType, FileUploadType } from '@/api/files.api'
 import { useToast } from '@/composables'
+import { AccountingConfirmModal } from '@/components/accounting'
+import { RcButton, RcEmpty, RcBadge, RcField } from '@/components/rc'
+import { RcIcon } from '@/components/icons'
 
 interface Props {
   referenceType: FileReferenceType
@@ -13,7 +16,7 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   title: 'Belgeler',
-  readonly: false
+  readonly: false,
 })
 
 const toast = useToast()
@@ -36,22 +39,10 @@ const ACCEPTED_MIME = 'image/jpeg,image/png,image/webp,application/pdf'
 const MAX_SIZE_MB = 10
 const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024
 
-const FILE_ICONS: Record<string, string> = {
-  pdf: '📄',
-  jpg: '🖼️',
-  jpeg: '🖼️',
-  png: '🖼️',
-  webp: '🖼️',
-  default: '📎',
-}
-
-function getFileIcon(extension: string): string {
-  return FILE_ICONS[extension?.toLowerCase()] || FILE_ICONS.default
-}
-
-function isImage(file: FileRecord): boolean {
-  return ['jpg', 'jpeg', 'png', 'webp'].includes(file.extension?.toLowerCase())
-}
+const deleteTargetName = computed(() => {
+  const file = files.value.find(f => f.id === confirmDeleteId.value)
+  return file?.fileName ?? 'Bu belge'
+})
 
 async function loadFiles() {
   loading.value = true
@@ -142,17 +133,18 @@ async function downloadFile(file: FileRecord) {
   }
 }
 
-async function confirmDelete(id: number) {
+function confirmDelete(id: number) {
   confirmDeleteId.value = id
 }
 
 async function deleteFile() {
   if (!confirmDeleteId.value) return
   deletingId.value = confirmDeleteId.value
+  const id = confirmDeleteId.value
   confirmDeleteId.value = null
   try {
-    await filesApi.delete(deletingId.value)
-    files.value = files.value.filter(f => f.id !== deletingId.value)
+    await filesApi.delete(id)
+    files.value = files.value.filter(f => f.id !== id)
     toast.success('Belge silindi')
   } catch (err) {
     toast.apiError(err, 'Belge silinemedi')
@@ -163,7 +155,11 @@ async function deleteFile() {
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('tr-TR', {
-    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
   })
 }
 
@@ -171,46 +167,40 @@ onMounted(loadFiles)
 </script>
 
 <template>
-  <div class="documents-section">
-    <div class="section-header">
-      <div class="header-left">
-        <h3 class="section-title">{{ title }}</h3>
-        <span v-if="files.length > 0" class="file-count">{{ files.length }} belge</span>
-      </div>
-      <button
+  <div class="rcd-section">
+    <div class="rcd-head">
+      <h3 class="rcd-head__title">
+        {{ title }}
+        <span v-if="files.length > 0" class="rcd-head__meta">{{ files.length }} belge</span>
+      </h3>
+      <RcButton
         v-if="!readonly"
-        class="btn-upload-toggle"
-        :class="{ 'btn-cancel': showUploadForm }"
+        :variant="showUploadForm ? 'secondary' : 'accent'"
+        size="sm"
         @click="showUploadForm = !showUploadForm"
       >
-        <svg v-if="!showUploadForm" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-        </svg>
-        <svg v-else width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-        </svg>
-        {{ showUploadForm ? 'İptal' : 'Belge Ekle' }}
-      </button>
+        <RcIcon :name="showUploadForm ? 'close' : 'plus'" :size="14" />
+        {{ showUploadForm ? 'İptal' : 'Belge ekle' }}
+      </RcButton>
     </div>
 
-    <!-- Upload Form -->
-    <div v-if="showUploadForm && !readonly" class="upload-form">
-      <div class="form-row">
-        <div class="form-group">
-          <label for="doc-upload-type" class="form-label">Belge Tipi <span class="required">*</span></label>
-          <select id="doc-upload-type" v-model="selectedUploadType" class="form-select" aria-describedby="upload-hint">
-            <option value="">Seçiniz...</option>
-            <option v-for="type in allowedTypes" :key="type" :value="type">
-              {{ FILE_UPLOAD_TYPE_LABELS[type] }}
-            </option>
-          </select>
-        </div>
-      </div>
+    <div v-if="showUploadForm && !readonly" class="rcd-upload">
+      <RcField label="Belge tipi">
+        <select v-model="selectedUploadType" class="rc-select">
+          <option value="">Seçiniz…</option>
+          <option v-for="type in allowedTypes" :key="type" :value="type">
+            {{ FILE_UPLOAD_TYPE_LABELS[type] }}
+          </option>
+        </select>
+      </RcField>
 
       <div
-        class="drop-zone"
-        :class="{ dragging: isDragging, 'has-file': !!selectedFile }"
-        @click="fileInputRef?.click()"
+        class="rcd-drop"
+        :class="{
+          'rcd-drop--drag': isDragging,
+          'rcd-drop--filled': !!selectedFile,
+        }"
+        @click="!selectedFile && fileInputRef?.click()"
         @drop.prevent="handleDrop"
         @dragover.prevent="isDragging = true"
         @dragleave.prevent="isDragging = false"
@@ -223,666 +213,115 @@ onMounted(loadFiles)
           @change="handleFileSelect"
         />
 
-        <div v-if="!selectedFile" class="drop-content">
-          <svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-              d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-          </svg>
-          <p class="drop-text">Dosyayı buraya sürükleyin veya tıklayın</p>
-          <p class="drop-hint">JPG, PNG, WEBP, PDF — Maks. {{ MAX_SIZE_MB }}MB</p>
-        </div>
+        <template v-if="!selectedFile">
+          <RcIcon name="upload" :size="28" style="color: var(--rc-text-faint)" />
+          <p class="rcd-drop__hint">Dosyayı buraya sürükleyin veya tıklayın</p>
+          <p class="rcd-drop__sub">JPG, PNG, WEBP, PDF — maks. {{ MAX_SIZE_MB }}MB</p>
+        </template>
 
-        <div v-else class="selected-file" @click.stop>
-          <span class="file-icon-large">{{ getFileIcon(selectedFile.name.split('.').pop() || '') }}</span>
-          <div class="selected-file-info">
-            <span class="selected-file-name">{{ selectedFile.name }}</span>
-            <span class="selected-file-size">{{ filesApi.formatFileSize(selectedFile.size) }}</span>
+        <div v-else class="rcd-selected" @click.stop>
+          <RcIcon name="folder" :size="20" style="color: var(--rc-accent); flex-shrink: 0" />
+          <div class="rcd-selected__info">
+            <span class="rcd-selected__name">{{ selectedFile.name }}</span>
+            <span class="rcd-selected__size">{{ filesApi.formatFileSize(selectedFile.size) }}</span>
           </div>
-          <button type="button" class="remove-file-btn" @click="removeSelectedFile">×</button>
+          <RcButton variant="ghost" size="sm" icon @click="removeSelectedFile">
+            <RcIcon name="close" :size="14" />
+          </RcButton>
         </div>
       </div>
 
-      <div class="upload-actions">
-        <button
-          class="btn-primary"
+      <div class="rcd-upload__actions">
+        <RcButton
+          variant="primary"
           :disabled="!selectedFile || !selectedUploadType || uploading"
           @click="uploadFile"
         >
-          <span v-if="uploading" class="spinner" />
-          {{ uploading ? 'Yükleniyor...' : 'Yükle' }}
-        </button>
-        <button class="btn-secondary" @click="resetUploadForm">İptal</button>
+          {{ uploading ? 'Yükleniyor…' : 'Yükle' }}
+        </RcButton>
+        <RcButton variant="secondary" @click="resetUploadForm">Vazgeç</RcButton>
       </div>
-      <p v-if="(!selectedFile || !selectedUploadType) && !uploading" id="upload-hint" class="upload-hint">
-        Yüklemek için önce <strong>belge tipi</strong> seçin ve <strong>dosya</strong> ekleyin.
+      <p v-if="(!selectedFile || !selectedUploadType) && !uploading" class="rcd-upload__hint">
+        Yüklemek için belge tipi seçin ve dosya ekleyin.
       </p>
     </div>
 
-    <!-- Loading -->
-    <div v-if="loading" class="loading-state">
-      <span class="spinner" />
-      <span>Belgeler yükleniyor...</span>
+    <div v-if="loading" class="rc-skeleton" style="height: 120px" />
+
+    <RcEmpty
+      v-else-if="!files.length"
+      title="Henüz belge yok"
+      description="Sözleşme, kimlik veya diğer belgeleri yukarıdaki Belge ekle ile yükleyin"
+    >
+      <template #icon><RcIcon name="folder" :size="32" /></template>
+    </RcEmpty>
+
+    <div v-else class="rc-table-wrap">
+      <table class="rc-table">
+        <thead>
+          <tr>
+            <th>Dosya</th>
+            <th>Tip</th>
+            <th>Boyut</th>
+            <th>Yüklenme</th>
+            <th />
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="file in files" :key="file.id">
+            <td>
+              <div class="rcd-file-name">
+                <RcBadge variant="default">{{ file.extension?.toUpperCase() || '—' }}</RcBadge>
+                <span class="rcd-file-name__text" :title="file.fileName">{{ file.fileName }}</span>
+              </div>
+            </td>
+            <td>
+              <RcBadge variant="info">{{ FILE_UPLOAD_TYPE_LABELS[file.uploadType] }}</RcBadge>
+            </td>
+            <td class="rc-mono rc-num">{{ filesApi.formatFileSize(file.size) }}</td>
+            <td class="rc-mono" style="font-size: 12.5px">{{ formatDate(file.uploadedAt) }}</td>
+            <td class="rc-right">
+              <div class="rcd-actions">
+                <RcButton
+                  variant="ghost"
+                  size="sm"
+                  icon
+                  :disabled="openingId === file.id"
+                  :title="'Aç'"
+                  @click="openFile(file)"
+                >
+                  <span v-if="openingId === file.id" class="rc-spin" aria-hidden="true" />
+                  <RcIcon v-else name="eye" :size="14" />
+                </RcButton>
+                <RcButton variant="ghost" size="sm" icon title="İndir" @click="downloadFile(file)">
+                  <RcIcon name="download" :size="14" />
+                </RcButton>
+                <RcButton
+                  v-if="!readonly"
+                  variant="ghost"
+                  size="sm"
+                  icon
+                  title="Sil"
+                  :disabled="deletingId === file.id"
+                  @click="confirmDelete(file.id)"
+                >
+                  <span v-if="deletingId === file.id" class="rc-spin" aria-hidden="true" />
+                  <RcIcon v-else name="trash" :size="14" />
+                </RcButton>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
-    <!-- Empty State -->
-    <div v-else-if="!loading && files.length === 0" class="empty-state">
-      <div class="empty-state-icon">
-        <svg width="48" height="48" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-        </svg>
-      </div>
-      <p class="empty-state-title">Henüz belge yüklenmemiş</p>
-      <p class="empty-state-desc">Sözleşme, kimlik veya diğer belgeleri eklemek için yukarıdaki <strong>Belge Ekle</strong> butonuna tıklayın.</p>
-    </div>
-
-    <!-- File Grid -->
-    <div v-else class="file-grid">
-      <div v-for="file in files" :key="file.id" class="file-tile">
-        <div class="file-tile-preview">
-          <span class="file-tile-icon">{{ getFileIcon(file.extension) }}</span>
-          <span class="file-ext-badge">{{ file.extension?.toUpperCase() }}</span>
-        </div>
-        <div class="file-tile-body">
-          <span class="file-tile-name" :title="file.fileName">{{ file.fileName }}</span>
-          <div class="file-tile-meta">
-            <span class="file-type-badge">{{ FILE_UPLOAD_TYPE_LABELS[file.uploadType] }}</span>
-            <span class="file-size">{{ filesApi.formatFileSize(file.size) }}</span>
-          </div>
-          <span class="file-date">{{ formatDate(file.uploadedAt) }}</span>
-        </div>
-        <div class="file-tile-actions">
-          <button
-            class="action-btn view-btn"
-            :disabled="openingId === file.id"
-            :title="isImage(file) ? 'Görüntüle' : 'Aç'"
-            @click="openFile(file)"
-          >
-            <span v-if="openingId === file.id" class="spinner spinner-sm" />
-            <svg v-else width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-            </svg>
-          </button>
-          <button
-            class="action-btn download-btn"
-            title="İndir"
-            @click="downloadFile(file)"
-          >
-            <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-          </button>
-          <button
-            v-if="!readonly"
-            class="action-btn delete-btn"
-            :disabled="deletingId === file.id"
-            title="Sil"
-            @click="confirmDelete(file.id)"
-          >
-            <span v-if="deletingId === file.id" class="spinner spinner-sm" />
-            <svg v-else width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Delete Confirm Modal -->
-    <Teleport to="body">
-      <div v-if="confirmDeleteId" class="modal-overlay" @click.self="confirmDeleteId = null">
-        <div class="confirm-modal">
-          <div class="confirm-icon">
-            <svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-          </div>
-          <h4>Belgeyi Sil</h4>
-          <p>Bu belge kalıcı olarak silinecek. Emin misiniz?</p>
-          <div class="confirm-actions">
-            <button class="btn-danger" @click="deleteFile">Evet, Sil</button>
-            <button class="btn-secondary" @click="confirmDeleteId = null">İptal</button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
+    <AccountingConfirmModal
+      :open="!!confirmDeleteId"
+      title="Belgeyi sil"
+      :message="`${deleteTargetName} kalıcı olarak silinecek. Emin misiniz?`"
+      confirm-label="Sil"
+      @close="confirmDeleteId = null"
+      @confirm="deleteFile"
+    />
   </div>
 </template>
-
-<style scoped>
-.documents-section {
-  background: var(--color-surface, #fff);
-  border: 1px solid var(--color-border, #e5e7eb);
-  border-radius: 0.75rem;
-  padding: 1.5rem;
-}
-
-.section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 1.25rem;
-}
-
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 0.625rem;
-}
-
-.section-title {
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--color-text, #111827);
-  margin: 0;
-}
-
-.file-count {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--color-primary, #2563eb);
-  background: rgba(37, 99, 235, 0.08);
-  padding: 0.125rem 0.625rem;
-  border-radius: 9999px;
-}
-
-.btn-upload-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0.5rem 1rem;
-  background: var(--color-primary, #2563eb);
-  color: #fff;
-  border: none;
-  border-radius: 0.5rem;
-  font-size: 0.8125rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.btn-upload-toggle:hover {
-  background: var(--color-primary-dark, #1d4ed8);
-}
-
-.btn-upload-toggle.btn-cancel {
-  background: var(--color-bg-secondary, #f3f4f6);
-  color: var(--color-text, #374151);
-  border: 1px solid var(--color-border, #e5e7eb);
-}
-
-.btn-upload-toggle.btn-cancel:hover {
-  background: var(--color-border, #e5e7eb);
-}
-
-/* Upload Form */
-.upload-form {
-  background: var(--color-background, #f9fafb);
-  border: 1px solid var(--color-border, #e5e7eb);
-  border-radius: 0.5rem;
-  padding: 1rem;
-  margin-bottom: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.form-row {
-  display: flex;
-  gap: 0.75rem;
-}
-
-.form-group {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.form-label {
-  font-size: 0.8125rem;
-  font-weight: 500;
-  color: var(--color-text, #374151);
-}
-
-.form-select {
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--color-border, #d1d5db);
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-  background: #fff;
-  color: var(--color-text, #111827);
-  outline: none;
-  transition: border-color 0.15s;
-}
-
-.form-select:focus {
-  border-color: var(--color-primary, #2563eb);
-}
-
-/* Drop Zone */
-.drop-zone {
-  border: 2px dashed var(--color-border, #d1d5db);
-  border-radius: 0.5rem;
-  padding: 1.5rem;
-  text-align: center;
-  cursor: pointer;
-  transition: all 0.2s;
-  background: #fff;
-}
-
-.drop-zone:hover,
-.drop-zone.dragging {
-  border-color: var(--color-primary, #2563eb);
-  background: rgba(37, 99, 235, 0.03);
-}
-
-.drop-zone.has-file {
-  padding: 0.75rem;
-  text-align: left;
-  cursor: default;
-}
-
-.drop-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.5rem;
-  color: var(--color-text-secondary, #6b7280);
-}
-
-.drop-text {
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--color-text, #374151);
-  margin: 0;
-}
-
-.drop-hint {
-  font-size: 0.75rem;
-  color: var(--color-text-secondary, #9ca3af);
-  margin: 0;
-}
-
-.selected-file {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.file-icon-large {
-  font-size: 1.75rem;
-  flex-shrink: 0;
-}
-
-.selected-file-info {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
-}
-
-.selected-file-name {
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--color-text, #111827);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.selected-file-size {
-  font-size: 0.75rem;
-  color: var(--color-text-secondary, #6b7280);
-}
-
-.remove-file-btn {
-  background: none;
-  border: none;
-  font-size: 1.25rem;
-  color: var(--color-text-secondary, #9ca3af);
-  cursor: pointer;
-  padding: 0.25rem;
-  border-radius: 0.25rem;
-  line-height: 1;
-  transition: color 0.15s;
-}
-
-.remove-file-btn:hover {
-  color: #dc2626;
-}
-
-.upload-actions {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.upload-hint {
-  margin: 0.5rem 0 0;
-  font-size: 0.8125rem;
-  color: var(--color-text-secondary, #6b7280);
-}
-
-.upload-hint strong {
-  font-weight: 600;
-  color: var(--color-text, #374151);
-}
-
-.form-label .required {
-  color: var(--color-danger, #dc2626);
-}
-
-/* Buttons */
-.btn-primary {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0.5rem 1rem;
-  background: var(--color-primary, #2563eb);
-  color: #fff;
-  border: none;
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: var(--color-primary-dark, #1d4ed8);
-}
-
-.btn-primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn-secondary {
-  padding: 0.5rem 1rem;
-  background: var(--color-background, #f3f4f6);
-  color: var(--color-text, #374151);
-  border: 1px solid var(--color-border, #d1d5db);
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.btn-secondary:hover {
-  background: var(--color-border, #e5e7eb);
-}
-
-.btn-danger {
-  padding: 0.5rem 1rem;
-  background: #dc2626;
-  color: #fff;
-  border: none;
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.btn-danger:hover {
-  background: #b91c1c;
-}
-
-/* States */
-.loading-state,
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 2.5rem 1.5rem;
-  text-align: center;
-  background: var(--color-background, #f9fafb);
-  border-radius: 0.5rem;
-  border: 1px dashed var(--color-border, #e5e7eb);
-}
-
-.empty-state-icon {
-  color: var(--color-text-muted, #9ca3af);
-  line-height: 0;
-}
-
-.empty-state-title {
-  margin: 0;
-  font-size: 0.9375rem;
-  font-weight: 600;
-  color: var(--color-text, #374151);
-}
-
-.empty-state-desc {
-  margin: 0;
-  font-size: 0.8125rem;
-  color: var(--color-text-secondary, #6b7280);
-  max-width: 280px;
-  line-height: 1.45;
-}
-
-.empty-state-desc strong {
-  color: var(--color-primary, #2563eb);
-  font-weight: 600;
-}
-
-/* File Grid */
-.file-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 1rem;
-}
-
-.file-tile {
-  display: flex;
-  flex-direction: column;
-  background: var(--color-bg-secondary, #f9fafb);
-  border: 1px solid var(--color-border, #e5e7eb);
-  border-radius: 0.75rem;
-  overflow: hidden;
-  transition: all 0.2s;
-}
-
-.file-tile:hover {
-  border-color: var(--color-primary, #2563eb);
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.08);
-  transform: translateY(-1px);
-}
-
-.file-tile-preview {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 80px;
-  background: linear-gradient(135deg, rgba(37, 99, 235, 0.05) 0%, rgba(37, 99, 235, 0.1) 100%);
-  border-bottom: 1px solid var(--color-border, #e5e7eb);
-}
-
-.file-tile-icon {
-  font-size: 2.25rem;
-}
-
-.file-ext-badge {
-  position: absolute;
-  bottom: 6px;
-  right: 8px;
-  font-size: 0.625rem;
-  font-weight: 700;
-  color: var(--color-primary, #2563eb);
-  background: rgba(37, 99, 235, 0.12);
-  padding: 1px 5px;
-  border-radius: 4px;
-  letter-spacing: 0.05em;
-}
-
-.file-tile-body {
-  flex: 1;
-  padding: 0.625rem 0.75rem 0.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  min-width: 0;
-}
-
-.file-tile-name {
-  font-size: 0.8125rem;
-  font-weight: 500;
-  color: var(--color-text, #111827);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.file-tile-meta {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  flex-wrap: wrap;
-}
-
-.file-type-badge {
-  font-size: 0.6875rem;
-  font-weight: 500;
-  color: var(--color-primary, #2563eb);
-  background: rgba(37, 99, 235, 0.08);
-  padding: 0.125rem 0.375rem;
-  border-radius: 9999px;
-}
-
-.file-size {
-  font-size: 0.6875rem;
-  color: var(--color-text-secondary, #9ca3af);
-}
-
-.file-date {
-  font-size: 0.6875rem;
-  color: var(--color-text-secondary, #9ca3af);
-}
-
-.file-tile-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.375rem 0.5rem;
-  border-top: 1px solid var(--color-border, #e5e7eb);
-  background: var(--color-surface, #fff);
-}
-
-.action-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  background: none;
-  border: 1px solid transparent;
-  border-radius: 0.375rem;
-  cursor: pointer;
-  transition: all 0.15s;
-  color: var(--color-text-secondary, #6b7280);
-}
-
-.action-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.view-btn:hover:not(:disabled) {
-  background: rgba(37, 99, 235, 0.08);
-  border-color: rgba(37, 99, 235, 0.2);
-  color: var(--color-primary, #2563eb);
-}
-
-.download-btn:hover:not(:disabled) {
-  background: #d1fae5;
-  border-color: #6ee7b7;
-  color: #064e3b;
-}
-
-.delete-btn:hover:not(:disabled) {
-  background: #fee2e2;
-  border-color: #fca5a5;
-  color: #7f1d1d;
-}
-
-/* Spinner */
-.spinner {
-  display: inline-block;
-  width: 1rem;
-  height: 1rem;
-  border: 2px solid rgba(255, 255, 255, 0.4);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: spin 0.6s linear infinite;
-}
-
-.spinner-sm {
-  width: 0.875rem;
-  height: 0.875rem;
-  border-color: rgba(107, 114, 128, 0.3);
-  border-top-color: #6b7280;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-/* Confirm Modal */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.confirm-modal {
-  background: #fff;
-  border-radius: 0.75rem;
-  padding: 1.5rem;
-  max-width: 360px;
-  width: 90%;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
-}
-
-.confirm-icon {
-  color: #f59e0b;
-  display: flex;
-  justify-content: center;
-}
-
-.confirm-modal h4 {
-  font-size: 1rem;
-  font-weight: 600;
-  color: #111827;
-  margin: 0;
-}
-
-.confirm-modal p {
-  font-size: 0.875rem;
-  color: #6b7280;
-  margin: 0;
-}
-
-.confirm-actions {
-  display: flex;
-  gap: 0.5rem;
-  justify-content: center;
-}
-</style>

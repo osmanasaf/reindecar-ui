@@ -34,7 +34,7 @@ class UserInvitationsApiService extends BaseApi {
     }
 
     async cancel(id: number): Promise<void> {
-        return this.remove(`/${id}`)
+        return this.deleteByPath(`/${id}`)
     }
 }
 

@@ -1,39 +1,53 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
-import { damagesApi, rentalsApi, customersApi } from '@/api'
+import { damagesApi, rentalsApi, customersApi, vehiclesApi } from '@/api'
 import { useToast } from '@/composables'
 import { SearchableSelect } from '@/components/common'
 import DocumentsSection from '@/components/shared/DocumentsSection.vue'
 import DatePicker from '@/components/base/DatePicker.vue'
-import { DamageType, DamageLocation, DamageSeverity } from '@/types'
+import { RcModal, RcButton, RcField, RcInput } from '@/components/rc'
+import { RcIcon } from '@/components/icons'
+import CarDiagramSVG from './CarDiagramSVG.vue'
+import { DamageType, DamageSeverity } from '@/types'
 import type { CreateDamageReportForm, Customer, Rental } from '@/types'
+import { ZONE_NAMES, getDefaultLocationForZone } from '@/utils/vehicleZones'
 
 const props = defineProps<{
   vehicleId: number
   rentalId?: number
+  initialZoneId?: number
+  damageId?: number
+  vehicleLabel?: string
 }>()
 
 const emit = defineEmits<{
   close: []
+  saved: []
   created: []
 }>()
 
 const toast = useToast()
 const submitting = ref(false)
-const createdDamageId = ref<number | null>(null)
+const loadingEdit = ref(false)
+const savedDamageId = ref<number | null>(null)
+const isRepaired = ref(false)
+const resolvedVehicleLabel = ref(props.vehicleLabel ?? '')
 
+const pickedZoneId = ref(props.initialZoneId ?? 3)
 const vehicleRentals = ref<Rental[]>([])
 const loadingRentals = ref(false)
 const selectedCustomer = ref<Customer | null>(null)
 
+const isEditMode = computed(() => props.damageId != null)
 const isRentalLocked = computed(() => !!props.rentalId)
+const fieldsLocked = computed(() => isRepaired.value)
 
 const form = ref<CreateDamageReportForm>({
   vehicleId: props.vehicleId,
   rentalId: props.rentalId,
-  reportDate: new Date().toISOString().split('T')[0],
+  reportDate: new Date().toISOString().split('T')[0] ?? '',
   damageType: DamageType.SCRATCH,
-  location: DamageLocation.FRONT_BUMPER,
+  location: getDefaultLocationForZone(pickedZoneId.value),
   severity: DamageSeverity.MINOR,
   description: '',
   estimatedCostAmount: undefined,
@@ -43,56 +57,36 @@ const form = ref<CreateDamageReportForm>({
   customerResponsible: false
 })
 
-const damageTypes = [
+const severityOptions = [
+  { value: DamageSeverity.MINOR, label: 'Küçük', desc: 'Çizik, küçük göçük', color: '#E89500' },
+  { value: DamageSeverity.MODERATE, label: 'Orta', desc: 'Belirgin hasar', color: '#FF7A1A' },
+  { value: DamageSeverity.MAJOR, label: 'Büyük', desc: 'Onarım gerekli', color: '#E5342E' },
+  { value: DamageSeverity.CRITICAL, label: 'Kritik', desc: 'Acil müdahale', color: '#9A1B17' }
+]
+
+const damageTypeOptions = [
   { value: DamageType.SCRATCH, label: 'Çizik' },
   { value: DamageType.DENT, label: 'Göçük' },
   { value: DamageType.CRACK, label: 'Çatlak' },
-  { value: DamageType.BROKEN_GLASS, label: 'Kırık Cam' },
-  { value: DamageType.TIRE_DAMAGE, label: 'Lastik Hasarı' },
-  { value: DamageType.INTERIOR_DAMAGE, label: 'İç Mekan Hasarı' },
-  { value: DamageType.ENGINE_DAMAGE, label: 'Motor Hasarı' },
-  { value: DamageType.ELECTRICAL, label: 'Elektrik' },
+  { value: DamageType.BROKEN_GLASS, label: 'Kırık cam' },
+  { value: DamageType.TIRE_DAMAGE, label: 'Lastik' },
+  { value: DamageType.INTERIOR_DAMAGE, label: 'İç hasar' },
   { value: DamageType.ACCIDENT, label: 'Kaza' },
   { value: DamageType.OTHER, label: 'Diğer' }
 ]
 
-const locations = [
-  { value: DamageLocation.FRONT_BUMPER, label: 'Ön Tampon' },
-  { value: DamageLocation.REAR_BUMPER, label: 'Arka Tampon' },
-  { value: DamageLocation.HOOD, label: 'Kaput' },
-  { value: DamageLocation.TRUNK, label: 'Bagaj' },
-  { value: DamageLocation.ROOF, label: 'Tavan' },
-  { value: DamageLocation.FRONT_LEFT_FENDER, label: 'Sol Ön Çamurluk' },
-  { value: DamageLocation.FRONT_RIGHT_FENDER, label: 'Sağ Ön Çamurluk' },
-  { value: DamageLocation.REAR_LEFT_FENDER, label: 'Sol Arka Çamurluk' },
-  { value: DamageLocation.REAR_RIGHT_FENDER, label: 'Sağ Arka Çamurluk' },
-  { value: DamageLocation.LEFT_FRONT_DOOR, label: 'Sol Ön Kapı' },
-  { value: DamageLocation.LEFT_REAR_DOOR, label: 'Sol Arka Kapı' },
-  { value: DamageLocation.RIGHT_FRONT_DOOR, label: 'Sağ Ön Kapı' },
-  { value: DamageLocation.RIGHT_REAR_DOOR, label: 'Sağ Arka Kapı' },
-  { value: DamageLocation.WINDSHIELD, label: 'Ön Cam' },
-  { value: DamageLocation.REAR_WINDOW, label: 'Arka Cam' },
-  { value: DamageLocation.LEFT_MIRROR, label: 'Sol Ayna' },
-  { value: DamageLocation.RIGHT_MIRROR, label: 'Sağ Ayna' },
-  { value: DamageLocation.INTERIOR, label: 'İç Mekan' },
-  { value: DamageLocation.WHEEL_FRONT_LEFT, label: 'Sol Ön Tekerlek' },
-  { value: DamageLocation.WHEEL_FRONT_RIGHT, label: 'Sağ Ön Tekerlek' },
-  { value: DamageLocation.WHEEL_REAR_LEFT, label: 'Sol Arka Tekerlek' },
-  { value: DamageLocation.WHEEL_REAR_RIGHT, label: 'Sağ Arka Tekerlek' }
-]
+const ALL_ZONES = [1, 2, 3, 4, 6, 7, 8, 9, 10, 12, 13]
 
-const severities = [
-  { value: DamageSeverity.MINOR, label: 'Küçük', color: '#FFC107' },
-  { value: DamageSeverity.MODERATE, label: 'Orta', color: '#FF9800' },
-  { value: DamageSeverity.MAJOR, label: 'Büyük', color: '#F44336' },
-  { value: DamageSeverity.CRITICAL, label: 'Kritik', color: '#B71C1C' }
-]
-
-const currencyOptions = [
-  { value: 'TRY', label: 'TRY (₺)' },
-  { value: 'USD', label: 'USD ($)' },
-  { value: 'EUR', label: 'EUR (€)' }
-]
+const pickerZoneConfigs = computed(() => {
+  const configs: Record<number, { color: string; onClick: () => void }> = {}
+  ALL_ZONES.forEach(zoneId => {
+    configs[zoneId] = {
+      color: pickedZoneId.value === zoneId ? 'var(--rc-blue-100)' : '#f0f0f0',
+      onClick: () => selectZone(zoneId)
+    }
+  })
+  return configs
+})
 
 const rentalOptions = computed(() =>
   vehicleRentals.value.map(r => ({
@@ -101,11 +95,23 @@ const rentalOptions = computed(() =>
   }))
 )
 
-const selectedRentalDisplay = computed(() => {
-  if (!form.value.rentalId) return ''
-  const r = vehicleRentals.value.find(r => r.id === form.value.rentalId)
-  return r ? `${r.rentalNumber} - ${r.customerName || 'Müşteri'}` : ''
+const modalTitle = computed(() => {
+  if (savedDamageId.value) return 'Hasar kaydedildi'
+  if (isEditMode.value) return 'Hasarı düzenle'
+  return 'Yeni hasar bildir'
 })
+
+const submitLabel = computed(() => {
+  if (submitting.value) return 'Kaydediliyor...'
+  if (isEditMode.value) return 'Değişiklikleri kaydet'
+  return 'Hasarı kaydet'
+})
+
+function selectZone(zoneId: number) {
+  if (fieldsLocked.value) return
+  pickedZoneId.value = zoneId
+  form.value.location = getDefaultLocationForZone(zoneId)
+}
 
 watch(() => form.value.rentalId, async (rentalId) => {
   if (!rentalId) {
@@ -116,7 +122,6 @@ watch(() => form.value.rentalId, async (rentalId) => {
     }
     return
   }
-
   const rental = vehicleRentals.value.find(r => r.id === rentalId)
   if (rental) {
     form.value.customerId = rental.customerId
@@ -128,6 +133,19 @@ watch(() => form.value.rentalId, async (rentalId) => {
     }
   }
 })
+
+async function loadVehicleLabel() {
+  if (props.vehicleLabel) {
+    resolvedVehicleLabel.value = props.vehicleLabel
+    return
+  }
+  try {
+    const v = await vehiclesApi.getById(props.vehicleId)
+    resolvedVehicleLabel.value = `${v.brand} ${v.model} · ${v.plateNumber}`
+  } catch {
+    resolvedVehicleLabel.value = ''
+  }
+}
 
 async function loadVehicleRentals() {
   loadingRentals.value = true
@@ -144,6 +162,43 @@ async function loadVehicleRentals() {
   }
 }
 
+async function loadDamageForEdit() {
+  if (!props.damageId) return
+  loadingEdit.value = true
+  try {
+    const damage = await damagesApi.getById(props.damageId)
+    isRepaired.value = damage.repaired
+    pickedZoneId.value = damage.zoneId
+    form.value = {
+      vehicleId: damage.vehicleId,
+      rentalId: damage.rentalId ?? undefined,
+      reportDate: damage.reportDate.split('T')[0] ?? '',
+      damageType: damage.damageType,
+      location: damage.location,
+      severity: damage.severity,
+      description: damage.description,
+      estimatedCostAmount: damage.estimatedCostAmount ?? undefined,
+      estimatedCostCurrency: damage.estimatedCostCurrency ?? 'TRY',
+      reportedBy: damage.reportedBy ?? '',
+      customerId: damage.customerId ?? undefined,
+      customerResponsible: damage.customerResponsible ?? false
+    }
+    if (damage.rentalId) {
+      const rental = vehicleRentals.value.find(r => r.id === damage.rentalId)
+      if (rental) {
+        try {
+          selectedCustomer.value = await customersApi.getById(rental.customerId)
+        } catch { /* ignore */ }
+      }
+    }
+  } catch (err) {
+    toast.apiError(err, 'Hasar yüklenemedi')
+    emit('close')
+  } finally {
+    loadingEdit.value = false
+  }
+}
+
 async function handleSubmit() {
   if (!form.value.description.trim()) {
     toast.error('Lütfen hasar açıklaması girin')
@@ -157,446 +212,231 @@ async function handleSubmit() {
 
   submitting.value = true
   try {
-    const created = await damagesApi.create(form.value)
-    toast.success('Hasar raporu oluşturuldu')
-    createdDamageId.value = created.id
+    if (isEditMode.value && props.damageId) {
+      await damagesApi.update(props.damageId, form.value)
+      toast.success('Hasar güncellendi')
+      emit('saved')
+      emit('created')
+    } else {
+      const created = await damagesApi.create(form.value)
+      toast.success('Hasar raporu oluşturuldu')
+      savedDamageId.value = created.id
+    }
   } catch (err) {
-    toast.apiError(err, 'Hasar raporu oluşturulamadı')
+    toast.apiError(err, isEditMode.value ? 'Hasar güncellenemedi' : 'Hasar raporu oluşturulamadı')
   } finally {
     submitting.value = false
   }
 }
 
 function finishWithDocuments() {
+  emit('saved')
   emit('created')
   emit('close')
 }
 
 onMounted(async () => {
-  await loadVehicleRentals()
-
-  if (props.rentalId) {
-    form.value.rentalId = props.rentalId
-    const rental = vehicleRentals.value.find(r => r.id === props.rentalId)
-    if (rental) {
-      form.value.customerId = rental.customerId
-      form.value.customerResponsible = true
-      try {
-        selectedCustomer.value = await customersApi.getById(rental.customerId)
-      } catch { /* ignore */ }
-    }
-  }
+  await Promise.all([loadVehicleRentals(), loadVehicleLabel()])
+  if (props.initialZoneId) selectZone(props.initialZoneId)
+  if (props.rentalId) form.value.rentalId = props.rentalId
+  if (isEditMode.value) await loadDamageForEdit()
 })
 </script>
 
 <template>
-  <div class="modal-overlay" @click.self="emit('close')">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2>{{ createdDamageId ? 'Hasar Raporu - Belgeler' : 'Yeni Hasar Raporu' }}</h2>
-        <button class="close-btn" @click="emit('close')">&times;</button>
+  <RcModal :open="true" xl @close="emit('close')">
+    <template #header>
+      <div class="rcv-veh-modal__head-title">
+        <div
+          class="rcv-veh-modal__head-icon"
+          :class="savedDamageId ? 'rcv-veh-modal__head-icon--docs' : 'rcv-veh-modal__head-icon--warning'"
+        >
+          <RcIcon :name="savedDamageId ? 'check' : 'warning'" />
+        </div>
+        <div>
+          <h2 class="rc-modal__title">{{ modalTitle }}</h2>
+          <div v-if="resolvedVehicleLabel" class="rc-modal__sub">{{ resolvedVehicleLabel }}</div>
+        </div>
+      </div>
+    </template>
+
+    <div v-if="loadingEdit" class="rc-veh-damage-map__loading">
+      <div class="rc-veh-damage-map__spinner" />
+      <span>Yükleniyor...</span>
+    </div>
+
+    <div v-else-if="savedDamageId" class="rc-veh-modal-form">
+      <div class="rcv-form-success">
+        <RcIcon name="check" />
+        <div>
+          <b>Hasar kaydı oluşturuldu</b>
+          {{ ZONE_NAMES[pickedZoneId] }} · belgeleri şimdi ekleyebilirsiniz.
+        </div>
+      </div>
+      <DocumentsSection
+        reference-type="DAMAGE"
+        :reference-id="savedDamageId"
+        title="Hasar Belgeleri"
+      />
+    </div>
+
+    <form v-else id="create-damage-form" class="rc-veh-modal-form" @submit.prevent="handleSubmit">
+      <div v-if="isEditMode && !fieldsLocked" class="rcv-form-mode-banner rcv-form-mode-banner--edit">
+        <RcIcon name="edit" />
+        Mevcut hasar kaydını düzenliyorsunuz · #{{ damageId }}
+      </div>
+      <div v-if="fieldsLocked" class="rcv-form-mode-banner rcv-form-mode-banner--locked">
+        <RcIcon name="check" />
+        Onarılmış hasar · yalnızca açıklama güncellenebilir
       </div>
 
-      <template v-if="createdDamageId">
-        <div class="documents-step">
-          <p class="step-message">Hasar raporu kaydedildi. İsterseniz aşağıdan bu hasara ait belgeleri ekleyebilirsiniz.</p>
-          <DocumentsSection
-            reference-type="DAMAGE"
-            :reference-id="createdDamageId"
-            title="Hasar Belgeleri"
-          />
-          <div class="form-actions">
-            <button type="button" class="btn btn-primary" @click="finishWithDocuments">
-              Bitir
-            </button>
+      <div class="rcv-damage-form-layout">
+        <div>
+          <div class="rcv-damage-form-layout__step">1. Hasarlı bölgeyi seç</div>
+          <div
+            class="rcv-car3-wrap rcv-car3-wrap--picker"
+            :class="{ 'is-disabled': fieldsLocked }"
+            data-rcv-car-wrap
+          >
+            <CarDiagramSVG
+              mode="picker"
+              compact
+              :zones="pickerZoneConfigs"
+              :picked-zone="pickedZoneId"
+              @zone-click="selectZone"
+            />
+          </div>
+          <div class="rcv-form-picked">
+            <span class="rcv-form-picked__pulse" />
+            <span><b>Seçili bölge:</b> {{ ZONE_NAMES[pickedZoneId] }}</span>
           </div>
         </div>
-      </template>
 
-      <form v-else @submit.prevent="handleSubmit" class="damage-form">
-        <div class="form-grid">
+        <div>
+          <div class="rcv-damage-form-layout__step">2. Hasar detayları</div>
 
-          <div class="form-group full-width">
-            <label>Kiralama</label>
-            <SearchableSelect
-              v-if="!isRentalLocked"
-              :model-value="form.rentalId ?? null"
-              :options="rentalOptions"
-              placeholder="Kiralama seçin (opsiyonel)"
-              search-placeholder="Kiralama ara..."
-              clearable
-              :loading="loadingRentals"
-              @update:model-value="(v) => form.rentalId = v ?? undefined"
-            />
-            <div v-else class="locked-field">
-              {{ selectedRentalDisplay || `Kiralama #${form.rentalId}` }}
-            </div>
-            <div v-if="!isRentalLocked && !loadingRentals && vehicleRentals.length === 0" class="field-hint">
-              Bu araca ait aktif kiralama bulunamadı
-            </div>
-          </div>
-
-          <div v-if="form.rentalId && selectedCustomer" class="form-group full-width">
-            <label>Müşteri</label>
-            <div class="locked-field">
-              {{ selectedCustomer.displayName }}
-              <span class="customer-badge">{{ selectedCustomer.customerType === 'PERSONAL' ? 'Bireysel' : 'Kurumsal' }}</span>
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label>Hasar Tipi *</label>
-            <SearchableSelect
-              v-model="form.damageType"
-              :options="damageTypes"
-              placeholder="Hasar tipi seçin"
-              search-placeholder="Ara..."
-            />
-          </div>
-
-          <div class="form-group">
-            <label>Lokasyon *</label>
-            <SearchableSelect
-              v-model="form.location"
-              :options="locations"
-              placeholder="Lokasyon seçin"
-              search-placeholder="Lokasyon ara..."
-            />
-          </div>
-
-          <div class="form-group full-width">
-            <label>Şiddet *</label>
-            <div class="severity-options">
-              <label
-                v-for="sev in severities"
+          <RcField label="Şiddet">
+            <div class="rcv-segopt rcv-segopt--cols-2">
+              <button
+                v-for="sev in severityOptions"
                 :key="sev.value"
-                class="severity-option"
-                :class="{ selected: form.severity === sev.value }"
+                type="button"
+                class="rcv-segopt__item rcv-segopt__item--row"
+                :class="{ 'is-on': form.severity === sev.value, 'is-disabled': fieldsLocked }"
+                :disabled="fieldsLocked"
+                @click="form.severity = sev.value"
               >
+                <span class="rcv-segopt__item-dot" :style="{ background: sev.color }" />
+                <div>
+                  <b>{{ sev.label }}</b>
+                  <small>{{ sev.desc }}</small>
+                </div>
+              </button>
+            </div>
+          </RcField>
+
+          <RcField label="Hasar tipi">
+            <div class="rcv-segopt rcv-segopt--cols-4">
+              <button
+                v-for="t in damageTypeOptions"
+                :key="t.value"
+                type="button"
+                class="rcv-segopt__item rcv-segopt__item--center"
+                :class="{ 'is-on': form.damageType === t.value, 'is-disabled': fieldsLocked }"
+                :disabled="fieldsLocked"
+                @click="form.damageType = t.value"
+              >
+                <b>{{ t.label }}</b>
+              </button>
+            </div>
+          </RcField>
+
+          <div class="rcv-form-grid">
+            <RcField label="Tahmini onarım bedeli">
+              <div class="rc-input-group">
+                <span>₺</span>
                 <input
-                  type="radio"
-                  :value="sev.value"
-                  v-model="form.severity"
-                  required
+                  v-model.number="form.estimatedCostAmount"
+                  type="number"
+                  placeholder="0"
+                  min="0"
+                  step="0.01"
+                  :disabled="fieldsLocked"
                 />
-                <span class="severity-indicator" :style="{ backgroundColor: sev.color }"></span>
-                <span>{{ sev.label }}</span>
+              </div>
+            </RcField>
+
+            <DatePicker
+              v-model="form.reportDate"
+              label="Bildirim tarihi"
+              placeholder="Tarih seçin"
+              :disabled="fieldsLocked"
+            />
+
+            <RcField label="Rapor eden">
+              <RcInput v-model="form.reportedBy" placeholder="İsim" :disabled="fieldsLocked" />
+            </RcField>
+
+            <RcField label="Kiralama">
+              <SearchableSelect
+                v-if="!isRentalLocked"
+                :model-value="form.rentalId ?? null"
+                :options="rentalOptions"
+                placeholder="Opsiyonel"
+                search-placeholder="Kiralama ara..."
+                clearable
+                :loading="loadingRentals"
+                :disabled="fieldsLocked"
+                @update:model-value="(v) => form.rentalId = v ?? undefined"
+              />
+              <RcInput v-else :model-value="`Kiralama #${form.rentalId}`" disabled />
+            </RcField>
+
+            <RcField v-if="form.rentalId && selectedCustomer" label="Müşteri" class="span-2">
+              <RcInput :model-value="selectedCustomer.displayName" disabled />
+            </RcField>
+
+            <RcField label="Açıklama *" class="span-2">
+              <textarea
+                v-model="form.description"
+                class="rc-textarea"
+                rows="3"
+                placeholder="Hasarı kısaca anlat — boyut, konum, oluşma nedeni…"
+                required
+              />
+            </RcField>
+
+            <div v-if="form.rentalId && !fieldsLocked" class="span-2">
+              <label class="rc-veh-modal-form__checkbox">
+                <input v-model="form.customerResponsible" type="checkbox" />
+                <span>Aktif kiralamaya bağla · müşteri sorumlu (alacak oluştur)</span>
               </label>
             </div>
           </div>
-
-          <div class="form-group">
-            <DatePicker
-              v-model="form.reportDate"
-              label="Rapor Tarihi *"
-              placeholder="Rapor tarihi"
-            />
-          </div>
-
-          <div class="form-group">
-            <label for="reportedBy">Rapor Eden</label>
-            <input
-              id="reportedBy"
-              type="text"
-              v-model="form.reportedBy"
-              placeholder="İsim"
-            />
-          </div>
-
-          <div class="form-group">
-            <label for="estimatedCost">Tahmini Maliyet</label>
-            <input
-              id="estimatedCost"
-              type="number"
-              v-model.number="form.estimatedCostAmount"
-              placeholder="0.00"
-              step="0.01"
-              min="0"
-            />
-          </div>
-
-          <div class="form-group">
-            <label>Para Birimi</label>
-            <SearchableSelect
-              v-model="form.estimatedCostCurrency"
-              :options="currencyOptions"
-              placeholder="Para birimi seçin"
-              search-placeholder="Ara..."
-            />
-          </div>
-
-          <div v-if="form.rentalId" class="form-group full-width">
-            <label for="customerResponsible" class="checkbox-label">
-              <input
-                id="customerResponsible"
-                type="checkbox"
-                v-model="form.customerResponsible"
-              />
-              <span>Müşteri Sorumlu (Alacak oluştur)</span>
-            </label>
-          </div>
-
-          <div class="form-group full-width">
-            <label for="description">Açıklama *</label>
-            <textarea
-              id="description"
-              v-model="form.description"
-              rows="4"
-              placeholder="Hasar detaylarını yazın..."
-              required
-            ></textarea>
-          </div>
         </div>
+      </div>
+    </form>
 
-        <div class="form-actions">
-          <button type="button" class="btn btn-outline" @click="emit('close')">
-            İptal
-          </button>
-          <button type="submit" class="btn btn-primary" :disabled="submitting">
-            {{ submitting ? 'Kaydediliyor...' : 'Kaydet' }}
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
+    <template #footer>
+      <template v-if="savedDamageId">
+        <RcButton variant="accent" @click="finishWithDocuments">
+          <RcIcon name="check" />
+          Bitir
+        </RcButton>
+      </template>
+      <template v-else>
+        <RcButton variant="ghost" @click="emit('close')">İptal</RcButton>
+        <span class="rc-spacer" />
+        <RcButton
+          variant="accent"
+          type="submit"
+          form="create-damage-form"
+          :disabled="submitting || loadingEdit"
+        >
+          <RcIcon name="check" />
+          {{ submitLabel }}
+        </RcButton>
+      </template>
+    </template>
+  </RcModal>
 </template>
-
-<style scoped>
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal-content {
-  background: var(--color-surface);
-  border-radius: 12px;
-  width: 90%;
-  max-width: 700px;
-  max-height: 90vh;
-  overflow-y: auto;
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px 24px;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.modal-header h2 {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 600;
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  font-size: 28px;
-  cursor: pointer;
-  color: var(--color-text-secondary);
-  padding: 0;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-}
-
-.close-btn:hover {
-  background: var(--color-bg-secondary);
-}
-
-.documents-step {
-  padding: 24px;
-}
-
-.step-message {
-  margin: 0 0 20px;
-  color: var(--color-text-secondary);
-}
-
-.damage-form {
-  padding: 24px;
-}
-
-.form-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.form-group.full-width {
-  grid-column: 1 / -1;
-}
-
-.form-group label {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--color-text-secondary);
-}
-
-.form-group input,
-.form-group select,
-.form-group textarea,
-.form-select {
-  padding: 10px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  font-size: 14px;
-  background: var(--color-bg-secondary);
-}
-
-.form-group input:focus,
-.form-group select:focus,
-.form-group textarea:focus,
-.form-select:focus {
-  outline: none;
-  border-color: var(--color-primary);
-  background: var(--color-surface);
-}
-
-.locked-field {
-  padding: 10px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  font-size: 14px;
-  background: var(--color-bg-secondary);
-  color: var(--color-text-secondary);
-  min-height: 40px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.customer-badge {
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 12px;
-  background: var(--color-primary, #2563eb);
-  color: white;
-  font-weight: 500;
-}
-
-.field-hint {
-  font-size: 12px;
-  color: var(--color-text-secondary);
-}
-
-.severity-options {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.severity-option {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  border: 2px solid var(--color-border);
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.severity-option:hover {
-  border-color: var(--color-primary);
-}
-
-.severity-option.selected {
-  border-color: var(--color-primary);
-  background: var(--color-primary-light);
-}
-
-.severity-option input[type="radio"] {
-  margin: 0;
-}
-
-.severity-indicator {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  border: 2px solid white;
-  box-shadow: 0 0 0 1px var(--color-border);
-}
-
-.checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  font-size: 14px;
-  padding: 10px 0;
-}
-
-.checkbox-label input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  cursor: pointer;
-}
-
-.form-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  margin-top: 24px;
-  padding-top: 20px;
-  border-top: 1px solid var(--color-border);
-}
-
-.btn {
-  padding: 10px 24px;
-  border-radius: 8px;
-  font-weight: 500;
-  cursor: pointer;
-  border: none;
-  transition: all 0.2s;
-}
-
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn-primary {
-  background: var(--color-primary);
-  color: white;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: var(--color-primary-hover);
-}
-
-.btn-outline {
-  background: transparent;
-  border: 1px solid var(--color-border);
-  color: var(--color-text);
-}
-
-.btn-outline:hover {
-  background: var(--color-bg-secondary);
-}
-
-@media (max-width: 640px) {
-  .form-grid {
-    grid-template-columns: 1fr;
-  }
-}
-</style>

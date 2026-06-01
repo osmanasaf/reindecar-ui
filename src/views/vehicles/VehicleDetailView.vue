@@ -1,21 +1,46 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { vehiclesApi } from '@/api'
 import { useToast } from '@/composables'
+import { RcIcon } from '@/components/icons'
+import type { IconName } from '@/components/icons/iconPaths'
+import {
+  RcButton,
+  RcBadge,
+  RcSegTab,
+  RcStatusPill,
+  RcModal,
+  RcEmpty,
+} from '@/components/rc'
 import { VehicleStatus } from '@/types'
 import type { Vehicle } from '@/types'
+import { fmtTRY, formatDate as formatDateUtil } from '@/utils/format'
 import VehicleEditModal from '@/components/vehicles/VehicleEditModal.vue'
-import VehicleDamageMap from '@/components/vehicles/VehicleDamageMap.vue'
-import VehicleMaintenanceMap from '@/components/vehicles/VehicleMaintenanceMap.vue'
-import VehicleHistory from '@/components/vehicles/VehicleHistory.vue'
-import VehicleInsuranceList from '@/components/vehicles/insurance/VehicleInsuranceList.vue'
-import CreateInsuranceModal from '@/components/vehicles/insurance/CreateInsuranceModal.vue'
-import VehiclePaymentDetails from '@/components/installments/VehiclePaymentDetails.vue'
-import DocumentsSection from '@/components/shared/DocumentsSection.vue'
+import VehicleOverviewTab from '@/components/vehicles/tabs/VehicleOverviewTab.vue'
+import VehicleDamageMaintenanceTab from '@/components/vehicles/tabs/VehicleDamageMaintenanceTab.vue'
+import VehicleRentalsTab from '@/components/vehicles/tabs/VehicleRentalsTab.vue'
+import VehicleDocsTab from '@/components/vehicles/tabs/VehicleDocsTab.vue'
+import VehicleFinancialTab from '@/components/vehicles/tabs/VehicleFinancialTab.vue'
 
-type TabKey = 'info' | 'history' | 'damages' | 'maintenance' | 'insurance' | 'installments' | 'documents'
-const VALID_TABS = new Set<TabKey>(['info', 'history', 'damages', 'maintenance', 'insurance', 'installments', 'documents'])
+type TabKey = 'overview' | 'damage' | 'rentals' | 'docs' | 'financial'
+
+const VALID_TABS = new Set<TabKey>(['overview', 'damage', 'rentals', 'docs', 'financial'])
+
+const LEGACY_TAB_MAP: Record<string, TabKey> = {
+  info: 'overview',
+  overview: 'overview',
+  history: 'rentals',
+  rentals: 'rentals',
+  damages: 'damage',
+  damage: 'damage',
+  maintenance: 'damage',
+  insurance: 'docs',
+  documents: 'docs',
+  docs: 'docs',
+  installments: 'financial',
+  financial: 'financial',
+}
 
 const route = useRoute()
 const router = useRouter()
@@ -24,14 +49,24 @@ const toast = useToast()
 const vehicle = ref<Vehicle | null>(null)
 const loading = ref(true)
 const showEditModal = ref(false)
-const showCreateInsuranceModal = ref(false)
 const showArchiveModal = ref(false)
+const showMoreMenu = ref(false)
 const archiving = ref(false)
-const insuranceListRef = ref<InstanceType<typeof VehicleInsuranceList> | null>(null)
+const fleetIds = ref<number[]>([])
+const activeThumb = ref(0)
+const tabCounts = ref({ damage: 0, rentals: 0 })
+
+const heroThumbs = ['Ön', 'Yan', 'Arka', 'İç']
+
+function normalizeTab(raw: string | undefined): TabKey {
+  if (!raw) return 'overview'
+  const mapped = LEGACY_TAB_MAP[raw]
+  if (mapped) return mapped
+  return VALID_TABS.has(raw as TabKey) ? (raw as TabKey) : 'overview'
+}
 
 function getTabFromQuery(): TabKey {
-  const q = route.query.tab as string
-  return VALID_TABS.has(q as TabKey) ? (q as TabKey) : 'info'
+  return normalizeTab(route.query.tab as string)
 }
 
 const activeTab = ref<TabKey>(getTabFromQuery())
@@ -41,77 +76,138 @@ function setTab(tab: TabKey) {
   router.replace({ query: { ...route.query, tab } })
 }
 
-watch(() => route.query.tab, (newTab) => {
-  const t = newTab as string
-  if (VALID_TABS.has(t as TabKey) && t !== activeTab.value) {
-    activeTab.value = t as TabKey
+watch(
+  () => route.query.tab,
+  (newTab) => {
+    const t = normalizeTab(newTab as string)
+    if (t !== activeTab.value) activeTab.value = t
   }
-})
+)
+
+watch(
+  () => route.query.edit,
+  (edit) => {
+    if (edit === '1') {
+      showEditModal.value = true
+      const { edit: _e, ...rest } = route.query
+      router.replace({ query: rest })
+    }
+  },
+  { immediate: true }
+)
 
 const vehicleId = computed(() => Number(route.params.id))
 
-const displayBranchName = computed(() => {
-  const v = vehicle.value
-  if (!v) return '-'
-  return v.branchName || '-'
-})
+const detailTabs = computed(() => [
+  { id: 'overview' as TabKey, label: 'Genel bakış', icon: 'info' as IconName },
+  {
+    id: 'damage' as TabKey,
+    label: 'Hasar & Bakım',
+    icon: 'wrench' as IconName,
+    count: tabCounts.value.damage || undefined,
+  },
+  {
+    id: 'rentals' as TabKey,
+    label: 'Kiralama geçmişi',
+    icon: 'key' as IconName,
+    count: tabCounts.value.rentals || undefined,
+  },
+  { id: 'docs' as TabKey, label: 'Sigorta & Belgeler', icon: 'shield' as IconName },
+  { id: 'financial' as TabKey, label: 'Finansal', icon: 'receipt' as IconName },
+])
 
-const displayCategoryName = computed(() => {
-  const v = vehicle.value
-  if (!v) return '-'
-  return v.categoryName || '-'
-})
-
-const statusLabels: Record<VehicleStatus, string> = {
-  AVAILABLE: 'Müsait',
-  RESERVED: 'Rezerve',
-  RENTED: 'Kirada',
-  MAINTENANCE: 'Bakımda',
-  DAMAGED: 'Hasarlı',
-  INACTIVE: 'Pasif',
-  SOLD: 'Satıldı'
-}
-
-const statusColors: Record<VehicleStatus, string> = {
-  AVAILABLE: 'success',
-  RESERVED: 'primary',
-  RENTED: 'warning',
-  MAINTENANCE: 'info',
-  DAMAGED: 'danger',
-  INACTIVE: 'danger',
-  SOLD: 'danger'
-}
-
-const fuelTypeLabels: Record<string, string> = {
+const FUEL_LABELS: Record<string, string> = {
   GASOLINE: 'Benzin',
   DIESEL: 'Dizel',
   ELECTRIC: 'Elektrik',
   HYBRID: 'Hibrit',
-  LPG: 'LPG'
+  LPG: 'LPG',
 }
 
-const transmissionLabels: Record<string, string> = {
+const TRANSMISSION_LABELS: Record<string, string> = {
   MANUAL: 'Manuel',
   AUTOMATIC: 'Otomatik',
-  SEMI_AUTOMATIC: 'Yarı Otomatik'
+  SEMI_AUTOMATIC: 'Yarı Otomatik',
 }
 
-function formatFuelType(value: unknown): string {
-  if (value == null || value === '') return '-'
-  const key = String(value).toUpperCase()
-  return fuelTypeLabels[key] ?? String(value)
+const vehicleTitle = computed(() => {
+  const v = vehicle.value
+  if (!v) return ''
+  return `${v.brand} ${v.model}`
+})
+
+const dailyPriceDisplay = computed(() => {
+  const v = vehicle.value
+  if (!v) return 0
+  return v.dailyPrice ?? v.category?.defaultDailyPrice ?? 0
+})
+
+const canArchiveVehicle = computed(
+  () => vehicle.value && vehicle.value.status !== VehicleStatus.RENTED
+)
+
+const currentFleetIndex = computed(() => fleetIds.value.indexOf(vehicleId.value))
+const prevVehicleId = computed(() => {
+  const i = currentFleetIndex.value
+  return i > 0 ? fleetIds.value[i - 1] : null
+})
+const nextVehicleId = computed(() => {
+  const i = currentFleetIndex.value
+  return i >= 0 && i < fleetIds.value.length - 1 ? fleetIds.value[i + 1] : null
+})
+
+function fuelLabel(v: Vehicle): string {
+  return FUEL_LABELS[String(v.fuelType).toUpperCase()] ?? String(v.fuelType)
 }
 
-function formatTransmission(value: unknown): string {
-  if (value == null || value === '') return '-'
-  const key = String(value).toUpperCase()
-  return transmissionLabels[key] ?? String(value)
+function transmissionLabel(v: Vehicle): string {
+  return TRANSMISSION_LABELS[String(v.transmission).toUpperCase()] ?? String(v.transmission)
+}
+
+function formatKm(km: number): string {
+  return new Intl.NumberFormat('tr-TR').format(km) + ' km'
+}
+
+function formatDate(date: unknown): string {
+  if (!date || (typeof date !== 'string' && !(date instanceof Date))) return '—'
+  return formatDateUtil(date)
+}
+
+function sparkPoints(seed: number): string {
+  const pts: string[] = []
+  for (let i = 0; i < 8; i++) {
+    const y = 12 + ((seed * (i + 3) * 7) % 10)
+    pts.push(`${i * 6},${y}`)
+  }
+  return pts.join(' ')
+}
+
+async function fetchFleetIds() {
+  try {
+    const res = await vehiclesApi.getAll({ page: 0, size: 500 })
+    fleetIds.value = res.content.map((v) => v.id)
+  } catch {
+    fleetIds.value = []
+  }
+}
+
+async function fetchTabCounts() {
+  try {
+    const h = await vehiclesApi.getHistory(vehicleId.value)
+    tabCounts.value = {
+      damage: h.damages.filter((d) => !d.repaired).length + h.maintenances.length,
+      rentals: h.rentals.length,
+    }
+  } catch {
+    tabCounts.value = { damage: 0, rentals: 0 }
+  }
 }
 
 async function fetchVehicle() {
   loading.value = true
   try {
     vehicle.value = await vehiclesApi.getById(vehicleId.value)
+    await fetchTabCounts()
   } catch {
     toast.error('Araç bilgileri yüklenemedi')
     router.push('/vehicles')
@@ -120,43 +216,11 @@ async function fetchVehicle() {
   }
 }
 
-function safeNumber(value: unknown, defaultValue = 0): number {
-  if (value === null || value === undefined) return defaultValue
-  const num = Number(value)
-  return Number.isNaN(num) ? defaultValue : num
-}
-
-function formatKm(km: unknown): string {
-  const num = safeNumber(km)
-  return new Intl.NumberFormat('tr-TR').format(num) + ' km'
-}
-
-function formatDate(date: unknown): string {
-  if (!date) return '-'
-  const d = new Date(String(date))
-  if (Number.isNaN(d.getTime())) return '-'
-  return d.toLocaleDateString('tr-TR')
-}
-
-function formatCurrency(amount: unknown): string {
-  const num = safeNumber(amount)
-  return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(num)
-}
-
 function handleVehicleSaved(updatedVehicle: Vehicle) {
   vehicle.value = updatedVehicle
+  showEditModal.value = false
   toast.success('Araç güncellendi')
 }
-
-const handleInsuranceCreated = () => {
-  showCreateInsuranceModal.value = false
-  insuranceListRef.value?.refresh()
-  toast.success('Sigorta poliçesi eklendi')
-}
-
-const canArchiveVehicle = computed(
-  () => vehicle.value && vehicle.value.status !== VehicleStatus.RENTED
-)
 
 async function confirmArchiveVehicle() {
   if (!vehicle.value) return
@@ -173,210 +237,229 @@ async function confirmArchiveVehicle() {
   }
 }
 
-onMounted(fetchVehicle)
+function goRent() {
+  router.push({ path: '/rentals/create', query: { vehicleId: String(vehicleId.value) } })
+}
+
+function goMaintenance() {
+  setTab('damage')
+  toast.info('Bakım kaydı eklemek için Hasar & Bakım sekmesini kullanın')
+}
+
+function navigateVehicle(id: number) {
+  router.push({ path: `/vehicles/${id}`, query: { tab: activeTab.value } })
+}
+
+onMounted(async () => {
+  await fetchFleetIds()
+  await fetchVehicle()
+  const legacy = route.query.tab as string
+  if (legacy && LEGACY_TAB_MAP[legacy] && legacy !== activeTab.value) {
+    router.replace({ query: { ...route.query, tab: activeTab.value } })
+  }
+})
 </script>
 
 <template>
-  <div class="vehicle-detail">
-    <div v-if="loading" class="loading">Yükleniyor...</div>
+  <div class="rc-page rc-veh-detail">
+    <div v-if="loading" class="rc-skeleton" style="height: 420px" />
 
     <template v-else-if="vehicle">
-      <header class="page-header">
-        <div class="header-left">
-          <button class="back-btn" @click="router.back()">← Geri</button>
-          <div class="title-group">
-            <h1>{{ vehicle.plateNumber }}</h1>
-            <span :class="['status-badge', statusColors[vehicle.status]]">
-              {{ statusLabels[vehicle.status] }}
-            </span>
+      <div class="rc-cust-detail-nav rc-veh-detail__nav">
+        <RouterLink to="/vehicles" class="rc-btn rc-btn--ghost rc-btn--sm">
+          <RcIcon name="chevronLeft" :size="14" />
+          Filoya dön
+        </RouterLink>
+        <RcButton
+          v-if="prevVehicleId"
+          variant="ghost"
+          size="sm"
+          @click="navigateVehicle(prevVehicleId)"
+        >
+          <RcIcon name="chevronLeft" :size="14" />
+          Önceki
+        </RcButton>
+        <RcButton
+          v-if="nextVehicleId"
+          variant="ghost"
+          size="sm"
+          @click="navigateVehicle(nextVehicleId)"
+        >
+          Sonraki
+          <RcIcon name="chevronRight" :size="14" />
+        </RcButton>
+        <span v-if="vehicle.createdAt" class="rc-cust-detail-nav__activity">
+          Kayıt: {{ formatDate(vehicle.createdAt) }}
+        </span>
+      </div>
+
+      <div class="rcv-hero rcv-hero--tight rc-veh-detail__hero">
+        <div class="rcv-hero__gallery">
+          <div class="rcv-hero__main">
+            <img
+              v-if="vehicle.imageUrl && activeThumb === 0"
+              :src="vehicle.imageUrl"
+              :alt="vehicleTitle"
+              class="rcv-hero__main-img"
+            />
+            <span v-else>{{ vehicle.brand.toUpperCase() }} {{ vehicle.model.toUpperCase() }}</span>
+          </div>
+          <div class="rcv-hero__thumbs">
+            <button
+              v-for="(label, idx) in heroThumbs"
+              :key="label"
+              type="button"
+              class="rcv-hero__thumb"
+              :class="{ 'rcv-hero__thumb--active': activeThumb === idx }"
+              @click="activeThumb = idx"
+            >
+              {{ label }}
+            </button>
           </div>
         </div>
-        <div class="header-actions">
-          <button class="btn btn-outline" @click="showEditModal = true">Düzenle</button>
-          <button
-            type="button"
-            class="btn btn-outline btn-archive-vehicle"
-            :disabled="!canArchiveVehicle"
-            :title="vehicle?.status === VehicleStatus.RENTED ? 'Kiradaki araç arşivlenemez' : 'Veritabanında silinmez, listede görünmez'"
-            @click="showArchiveModal = true"
+
+        <div class="rcv-hero__info">
+          <div class="rcv-hero__badges" style="margin-top: 0">
+            <span class="rcv-hero__plate">{{ vehicle.plateNumber }}</span>
+            <RcStatusPill :status="vehicle.status" />
+            <RcBadge v-if="vehicle.categoryName">{{ vehicle.categoryName }}</RcBadge>
+            <RcBadge v-if="vehicle.color" variant="accent">{{ vehicle.color }}</RcBadge>
+          </div>
+          <h1 class="rcv-hero__title">{{ vehicleTitle }}</h1>
+          <div class="rcv-hero__meta">
+            <span><RcIcon name="calendar" :size="13" /> {{ vehicle.year }} model</span>
+            <span><RcIcon name="bolt" :size="13" /> {{ fuelLabel(vehicle) }}</span>
+            <span><RcIcon name="settings" :size="13" /> {{ transmissionLabel(vehicle) }}</span>
+            <span v-if="vehicle.branchName">
+              <RcIcon name="building" :size="13" /> {{ vehicle.branchName }}
+            </span>
+            <span><RcIcon name="globe" :size="13" /> {{ formatKm(vehicle.currentKm) }}</span>
+          </div>
+        </div>
+
+        <div class="rcv-hero__actions">
+          <RcButton variant="accent" size="lg" class="rc-veh-detail__rent-btn" @click="goRent">
+            <RcIcon name="key" :size="16" />
+            Kirala
+          </RcButton>
+          <RcButton variant="secondary" @click="goMaintenance">
+            <RcIcon name="wrench" :size="14" />
+            Bakıma al
+          </RcButton>
+          <RcButton variant="ghost" @click="showEditModal = true">
+            <RcIcon name="edit" :size="14" />
+            Düzenle
+          </RcButton>
+          <RcButton variant="ghost" @click="showMoreMenu = !showMoreMenu">
+            <RcIcon name="dot3" :size="14" />
+            Daha fazla
+          </RcButton>
+          <div v-if="showMoreMenu" class="rc-veh-detail__more-menu">
+            <RcButton
+              variant="ghost"
+              size="sm"
+              :disabled="!canArchiveVehicle"
+              @click="showArchiveModal = true; showMoreMenu = false"
+            >
+              Listeden kaldır
+            </RcButton>
+          </div>
+        </div>
+      </div>
+
+      <div
+        v-if="vehicle.isInsuranceExpiringSoon || vehicle.isInspectionExpiringSoon"
+        class="rc-alert rc-alert--warning"
+        role="alert"
+        style="margin-top: 14px"
+      >
+        <RcIcon name="warning" :size="16" />
+        <span>
+          <template v-if="vehicle.isInsuranceExpiringSoon">Sigorta süresi yaklaşıyor.</template>
+          <template v-if="vehicle.isInsuranceExpiringSoon && vehicle.isInspectionExpiringSoon"> · </template>
+          <template v-if="vehicle.isInspectionExpiringSoon">Muayene tarihi yaklaşıyor.</template>
+        </span>
+      </div>
+
+      <div class="rcv-stats rcv-stats--airy rc-veh-detail__stats">
+        <div class="rcv-stat">
+          <div class="rcv-stat__label">Günlük fiyat</div>
+          <div class="rcv-stat__value">{{ fmtTRY(dailyPriceDisplay) }}</div>
+          <div class="rcv-stat__sub">liste fiyatı</div>
+          <svg class="rcv-stat__spark" width="48" height="16" viewBox="0 0 48 16">
+            <polyline
+              :points="sparkPoints(vehicle.id)"
+              fill="none"
+              stroke="var(--rc-blue-400)"
+              stroke-width="1.5"
+            />
+          </svg>
+        </div>
+        <div class="rcv-stat">
+          <div class="rcv-stat__label">Güncel KM</div>
+          <div class="rcv-stat__value rc-num">{{ formatKm(vehicle.currentKm) }}</div>
+          <div class="rcv-stat__sub">son okuma</div>
+          <svg class="rcv-stat__spark" width="48" height="16" viewBox="0 0 48 16">
+            <polyline
+              :points="sparkPoints(vehicle.id + 3)"
+              fill="none"
+              stroke="var(--rc-success-500)"
+              stroke-width="1.5"
+            />
+          </svg>
+        </div>
+        <div class="rcv-stat">
+          <div class="rcv-stat__label">Doluluk (tahmini)</div>
+          <div class="rcv-stat__value">%{{ tabCounts.rentals > 0 ? Math.min(95, 40 + tabCounts.rentals * 3) : 0 }}</div>
+          <div class="rcv-stat__sub">{{ tabCounts.rentals }} kiralama</div>
+        </div>
+        <div class="rcv-stat">
+          <div class="rcv-stat__label">Açık hasar</div>
+          <div class="rcv-stat__value">{{ tabCounts.damage }}</div>
+          <div class="rcv-stat__sub">hasar + bakım kaydı</div>
+        </div>
+      </div>
+
+      <div class="rc-card rc-cust-tab-card rc-veh-detail__tabs">
+        <div class="rc-segtabs rc-veh-detail__segtabs">
+          <RcSegTab
+            v-for="tab in detailTabs"
+            :id="tab.id"
+            :key="tab.id"
+            :active="activeTab"
+            :count="tab.count"
+            @select="setTab($event as TabKey)"
           >
-            Listeden kaldır
-          </button>
-        </div>
-      </header>
-
-      <div class="tabs">
-        <button
-          :class="['tab', { active: activeTab === 'info' }]"
-          @click="setTab('info')"
-        >
-          Bilgiler
-        </button>
-        <button
-          :class="['tab', { active: activeTab === 'history' }]"
-          @click="setTab('history')"
-        >
-          Araç Geçmişi
-        </button>
-        <button
-          :class="['tab', { active: activeTab === 'damages' }]"
-          @click="setTab('damages')"
-        >
-          Hasar Haritası
-        </button>
-        <button
-          :class="['tab', { active: activeTab === 'maintenance' }]"
-          @click="setTab('maintenance')"
-        >
-          Bakım Haritası
-        </button>
-        <button
-          :class="['tab', { active: activeTab === 'insurance' }]"
-          @click="setTab('insurance')"
-        >
-          Sigorta Poliçeleri
-        </button>
-        <button
-          :class="['tab', { active: activeTab === 'installments' }]"
-          @click="setTab('installments')"
-        >
-          Taksit Yönetimi
-        </button>
-        <button
-          :class="['tab', { active: activeTab === 'documents' }]"
-          @click="setTab('documents')"
-        >
-          Belgeler
-        </button>
-      </div>
-
-      <div v-if="activeTab === 'info'" class="tab-content">
-        <div class="detail-grid">
-          <section class="card info-card">
-            <h2>Araç Bilgileri</h2>
-            <div class="info-grid">
-              <div class="info-item">
-                <span class="label">Marka</span>
-                <span class="value">{{ vehicle.brand }}</span>
-              </div>
-              <div class="info-item">
-                <span class="label">Model</span>
-                <span class="value">{{ vehicle.model }}</span>
-              </div>
-              <div class="info-item">
-                <span class="label">Yıl</span>
-                <span class="value">{{ vehicle.year }}</span>
-              </div>
-              <div class="info-item">
-                <span class="label">Renk</span>
-                <span class="value">{{ vehicle.color }}</span>
-              </div>
-              <div class="info-item">
-                <span class="label">Yakıt Tipi</span>
-                <span class="value">{{ formatFuelType(vehicle.fuelType) }}</span>
-              </div>
-              <div class="info-item">
-                <span class="label">Vites</span>
-                <span class="value">{{ formatTransmission(vehicle.transmission) }}</span>
-              </div>
-              <div class="info-item">
-                <span class="label">Motor Hacmi</span>
-                <span class="value">{{ vehicle.engineCapacity }} cc</span>
-              </div>
-              <div class="info-item">
-                <span class="label">Koltuk Sayısı</span>
-                <span class="value">{{ vehicle.seatCount }}</span>
-              </div>
-            </div>
-          </section>
-
-          <section class="card status-card">
-            <h2>Durum Bilgileri</h2>
-            <div class="info-grid">
-              <div class="info-item">
-                <span class="label">Güncel KM</span>
-                <span class="value highlight">{{ formatKm(vehicle.currentKm) }}</span>
-              </div>
-              <div class="info-item">
-                <span class="label">Günlük Fiyat</span>
-                <span class="value highlight">{{ formatCurrency(vehicle.dailyPrice) }}</span>
-              </div>
-              <div class="info-item">
-                <span class="label">Şube</span>
-                <span class="value">{{ displayBranchName }}</span>
-              </div>
-              <div class="info-item">
-                <span class="label">Kategori</span>
-                <span class="value">{{ displayCategoryName }}</span>
-              </div>
-            </div>
-          </section>
-
-          <section class="card dates-card">
-            <h2>Tarihler</h2>
-            <div class="info-grid">
-              <div class="info-item">
-                <span class="label">Sigorta Bitiş</span>
-                <span class="value">{{ formatDate(vehicle.insuranceExpiryDate) }}</span>
-              </div>
-              <div class="info-item">
-                <span class="label">Muayene Bitiş</span>
-                <span class="value">{{ formatDate(vehicle.inspectionExpiryDate) }}</span>
-              </div>
-              <div class="info-item">
-                <span class="label">Tescil Tarihi</span>
-                <span class="value">{{ formatDate(vehicle.registrationDate) }}</span>
-              </div>
-            </div>
-          </section>
-
-          <section class="card id-card">
-            <h2>Kimlik Bilgileri</h2>
-            <div class="info-grid">
-              <div class="info-item full">
-                <span class="label">VIN Numarası</span>
-                <span class="value mono">{{ vehicle.vinNumber }}</span>
-              </div>
-            </div>
-          </section>
-
-          <section class="card notes-card" v-if="vehicle.notes">
-            <h2>Notlar</h2>
-            <p>{{ vehicle.notes }}</p>
-          </section>
+            <RcIcon :name="tab.icon" :size="14" />
+            {{ tab.label }}
+          </RcSegTab>
         </div>
       </div>
 
-      <div v-else-if="activeTab === 'history'" class="tab-content">
-        <VehicleHistory :vehicle-id="vehicleId" />
-      </div>
+      <div class="rc-cust-tab-panel">
+        <div v-show="activeTab === 'overview'">
+          <VehicleOverviewTab :vehicle="vehicle" />
+        </div>
 
-      <div v-else-if="activeTab === 'damages'" class="tab-content">
-        <VehicleDamageMap :vehicle-id="vehicleId" />
-      </div>
+        <div v-show="activeTab === 'damage'">
+          <VehicleDamageMaintenanceTab
+            :vehicle-id="vehicleId"
+            :current-km="vehicle.currentKm ?? 0"
+            :vehicle-label="`${vehicle.brand} ${vehicle.model} · ${vehicle.plateNumber}`"
+          />
+        </div>
 
-      <div v-else-if="activeTab === 'maintenance'" class="tab-content">
-        <VehicleMaintenanceMap :vehicle-id="vehicleId" :initial-current-km="vehicle?.currentKm ?? 0" />
-      </div>
+        <div v-show="activeTab === 'rentals'">
+          <VehicleRentalsTab :vehicle-id="vehicleId" />
+        </div>
 
-      <div v-else-if="activeTab === 'insurance'" class="tab-content">
-        <VehicleInsuranceList 
-          ref="insuranceListRef"
-          :vehicle-id="vehicleId" 
-          @create-new="showCreateInsuranceModal = true"
-        />
-      </div>
+        <div v-show="activeTab === 'docs'">
+          <VehicleDocsTab :vehicle-id="vehicleId" />
+        </div>
 
-      <div v-else-if="activeTab === 'installments'" class="tab-content">
-        <VehiclePaymentDetails :vehicle-id="vehicleId" />
-      </div>
-
-      <div v-else-if="activeTab === 'documents'" class="tab-content">
-        <DocumentsSection
-          reference-type="VEHICLE"
-          :reference-id="vehicleId"
-          title="Araç Belgeleri"
-        />
+        <div v-show="activeTab === 'financial'">
+          <VehicleFinancialTab :vehicle-id="vehicleId" />
+        </div>
       </div>
 
       <VehicleEditModal
@@ -386,330 +469,27 @@ onMounted(fetchVehicle)
         @saved="handleVehicleSaved"
       />
 
-      <div v-if="showArchiveModal && vehicle" class="archive-modal-overlay" @click.self="showArchiveModal = false">
-        <div class="archive-modal">
-          <div class="archive-modal-header">
-            <h3>Listeden kaldır</h3>
-            <button type="button" class="archive-close-btn" @click="showArchiveModal = false">×</button>
-          </div>
-          <div class="archive-modal-body">
-            <p>
-              <strong>{{ vehicle.plateNumber }}</strong> plakalı araç listede gösterilmeyecek; kayıt sistemde arşivlenir (soft delete). Kiradaki araçlar kaldırılamaz.
-            </p>
-          </div>
-          <div class="archive-modal-footer">
-            <button type="button" class="btn btn-outline" @click="showArchiveModal = false">Vazgeç</button>
-            <button type="button" class="btn btn-danger" :disabled="archiving" @click="confirmArchiveVehicle">Evet, kaldır</button>
-          </div>
-        </div>
-      </div>
+      <RcModal :open="showArchiveModal" title="Listeden kaldır" @close="showArchiveModal = false">
+        <p style="margin: 0; font-size: 14px; color: var(--rc-text-soft); line-height: 1.55">
+          <strong>{{ vehicle.plateNumber }}</strong> plakalı araç listede gösterilmeyecek; kayıt
+          sistemde arşivlenir (soft delete). Kiradaki araçlar kaldırılamaz.
+        </p>
+        <template #footer>
+          <RcButton variant="secondary" @click="showArchiveModal = false">Vazgeç</RcButton>
+          <RcButton variant="danger" :disabled="archiving" @click="confirmArchiveVehicle">
+            {{ archiving ? 'Kaldırılıyor…' : 'Evet, kaldır' }}
+          </RcButton>
+        </template>
+      </RcModal>
     </template>
+
+    <RcEmpty v-else title="Araç bulunamadı" description="Kayıt silinmiş veya erişim yok olabilir">
+      <template #icon>
+        <RcIcon name="car" :size="32" />
+      </template>
+      <template #action>
+        <RouterLink to="/vehicles" class="rc-btn rc-btn--secondary">Filoya dön</RouterLink>
+      </template>
+    </RcEmpty>
   </div>
-
-  <Teleport to="body">
-    <CreateInsuranceModal
-      v-if="vehicle"
-      :show="showCreateInsuranceModal"
-      :vehicle-id="vehicleId"
-      @close="showCreateInsuranceModal = false"
-      @success="handleInsuranceCreated"
-    />
-  </Teleport>
 </template>
-
-<style scoped>
-.vehicle-detail {
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-.loading {
-  text-align: center;
-  padding: 60px;
-  color: var(--color-text-secondary);
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 32px;
-}
-
-.header-left {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.back-btn {
-  background: none;
-  border: none;
-  color: var(--color-text-secondary);
-  font-size: 14px;
-  cursor: pointer;
-  padding: 0;
-}
-
-.back-btn:hover {
-  color: var(--color-primary);
-}
-
-.title-group {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.title-group h1 {
-  font-size: 32px;
-  font-weight: 700;
-  margin: 0;
-}
-
-.status-badge {
-  padding: 6px 14px;
-  border-radius: 20px;
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.status-badge.success { background: var(--color-success-light); color: var(--color-success); }
-.status-badge.warning { background: var(--color-warning-light); color: var(--color-warning); }
-.status-badge.info { background: var(--color-info-light); color: var(--color-info); }
-.status-badge.primary { background: var(--color-primary-light); color: var(--color-primary); }
-.status-badge.danger { background: var(--color-danger-light); color: var(--color-danger); }
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 20px;
-  border-radius: 8px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-outline {
-  background: transparent;
-  border: 1px solid var(--color-border);
-  color: var(--color-text);
-}
-
-.btn-outline:hover {
-  background: var(--color-bg-secondary);
-}
-
-.detail-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 24px;
-}
-
-.card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  padding: 24px;
-}
-
-.card h2 {
-  font-size: 16px;
-  font-weight: 600;
-  margin: 0 0 20px 0;
-  color: var(--color-text-secondary);
-}
-
-.info-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 20px;
-}
-
-.info-item {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.info-item.full {
-  grid-column: span 2;
-}
-
-.info-item .label {
-  font-size: 13px;
-  color: var(--color-text-muted);
-}
-
-.info-item .value {
-  font-size: 15px;
-  font-weight: 500;
-  color: var(--color-text);
-}
-
-.info-item .value.highlight {
-  font-size: 18px;
-  color: var(--color-primary);
-}
-
-.info-item .value.mono {
-  font-family: monospace;
-  font-size: 14px;
-}
-
-.notes-card {
-  margin-top: 24px;
-}
-
-.notes-card p {
-  margin: 0;
-  color: var(--color-text-secondary);
-  line-height: 1.6;
-}
-
-.tabs {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 24px;
-  border-bottom: 2px solid var(--color-border);
-}
-
-.tab {
-  padding: 12px 24px;
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  font-size: 15px;
-  font-weight: 500;
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  transition: all 0.2s;
-  margin-bottom: -2px;
-}
-
-.tab:hover {
-  color: var(--color-text);
-}
-
-.tab.active {
-  color: var(--color-primary);
-  border-bottom-color: var(--color-primary);
-}
-
-.tab-content {
-  animation: fadeIn 0.2s;
-}
-
-.header-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  align-items: center;
-}
-
-.btn-archive-vehicle {
-  border-color: var(--color-danger);
-  color: var(--color-danger);
-}
-
-.btn-archive-vehicle:hover:not(:disabled) {
-  background: var(--color-danger-light, rgba(220, 38, 38, 0.12));
-}
-
-.btn-archive-vehicle:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn-danger {
-  background: var(--color-danger);
-  color: var(--color-text-inverse, #fff);
-  border: 1px solid var(--color-danger);
-}
-
-.btn-danger:hover:not(:disabled) {
-  filter: brightness(0.95);
-}
-
-.btn-danger:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.archive-modal-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  background: rgba(0, 0, 0, 0.5);
-}
-
-.archive-modal {
-  width: 100%;
-  max-width: 420px;
-  background: var(--color-surface);
-  border-radius: 12px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
-}
-
-.archive-modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.archive-modal-header h3 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.archive-close-btn {
-  background: none;
-  border: none;
-  font-size: 26px;
-  line-height: 1;
-  cursor: pointer;
-  color: var(--color-text-muted);
-}
-
-.archive-modal-body {
-  padding: 20px;
-  font-size: 14px;
-  color: var(--color-text-secondary);
-  line-height: 1.5;
-}
-
-.archive-modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  padding: 12px 20px 20px;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@media (max-width: 768px) {
-  .detail-grid {
-    grid-template-columns: 1fr;
-  }
-}
-</style>
-
-
-

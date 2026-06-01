@@ -103,6 +103,17 @@ export interface Vehicle {
 
 export type VehicleResponse = Vehicle
 
+export interface VehicleOverview {
+    total: number
+    available: number
+    rented: number
+    reserved: number
+    maintenance: number
+    damaged: number
+    inactive: number
+    sold: number
+}
+
 
 export interface PersonalInfo {
     nationalId: string
@@ -181,7 +192,19 @@ export interface Customer {
     authorizedPersonPhone?: string
     totalRentals?: number
     activeRentals?: number
+    outstandingBalance?: number
+    lastActivityAt?: string
     createdAt: string
+}
+
+export interface CustomerOverview {
+    total: number
+    personal: number
+    company: number
+    blacklisted: number
+    newThisMonth: number
+    withOutstandingBalance: number
+    totalOutstandingAmount: number
 }
 
 export interface CustomerStats {
@@ -697,6 +720,7 @@ export interface ReturnPreviewResponse {
 
 export interface RentalPaymentSummaryResponse {
     totalPaid: number
+    totalRemaining: number
     currency: string
 }
 

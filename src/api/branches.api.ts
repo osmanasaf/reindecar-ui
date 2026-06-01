@@ -46,7 +46,7 @@ class BranchesApiService extends BaseApi {
     }
 
     async deleteById(id: number): Promise<void> {
-        return this.remove(`/${id}`)
+        return this.deleteByPath(`/${id}`)
     }
 }
 

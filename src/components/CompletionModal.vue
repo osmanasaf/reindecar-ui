@@ -206,7 +206,7 @@ const serviceProviderOptions = computed(() =>
 )
 
 const form = ref({
-  completionDate: new Date().toISOString().split('T')[0],
+  completionDate: new Date().toISOString().split('T')[0] ?? '',
   costAmount: 0,
   costCurrency: 'TRY',
   serviceProviderId: null as number | null,
@@ -216,7 +216,7 @@ const form = ref({
   chargeCustomer: true
 })
 
-const today = computed(() => new Date().toISOString().split('T')[0])
+const today = computed(() => new Date().toISOString().split('T')[0] ?? '')
 
 const isFormValid = computed(() => {
   if (!form.value.costAmount || form.value.costAmount <= 0) return false
@@ -233,7 +233,7 @@ const selectedProviderName = computed(() => {
 watch(() => props.show, (show) => {
   if (show) {
     // Reset form
-    form.value.completionDate = new Date().toISOString().split('T')[0]
+    form.value.completionDate = new Date().toISOString().split('T')[0] ?? ''
     form.value.costAmount = props.estimatedCost || 0
     form.value.costCurrency = 'TRY'
     form.value.serviceProviderId = null
@@ -244,7 +244,7 @@ watch(() => props.show, (show) => {
     // Set default due date (30 days from now)
     const dueDate = new Date()
     dueDate.setDate(dueDate.getDate() + 30)
-    form.value.paymentDueDate = dueDate.toISOString().split('T')[0]
+    form.value.paymentDueDate = dueDate.toISOString().split('T')[0] ?? ''
     
     errors.value = {}
   }

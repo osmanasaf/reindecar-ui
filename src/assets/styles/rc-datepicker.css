@@ -1,0 +1,222 @@
+/* Vue Datepicker — v2 token override */
+@import '@vuepic/vue-datepicker/dist/main.css';
+
+.rc-datepicker-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.rc-datepicker-label {
+  font-size: var(--rc-text-sm);
+  font-weight: var(--rc-weight-medium);
+  color: var(--rc-text);
+}
+
+.rc-datepicker-wrap .dp__input {
+  background-color: var(--rc-surface);
+  border: 1px solid var(--rc-border);
+  border-radius: var(--rc-radius-md);
+  color: var(--rc-text);
+  font-size: var(--rc-text-sm);
+  padding: 10px 14px 10px 40px;
+  transition: border-color var(--rc-transition-fast);
+  font-family: var(--rc-font);
+}
+
+.rc-datepicker-wrap .dp__input:hover {
+  border-color: var(--rc-blue-500);
+}
+
+.rc-datepicker-wrap .dp__input_focus {
+  border-color: var(--rc-blue-500);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--rc-blue-50);
+}
+
+.rc-datepicker-wrap .dp__menu {
+  --dp-background-color: var(--rc-surface);
+  --dp-text-color: var(--rc-text);
+  --dp-border-color: var(--rc-border);
+  --dp-menu-border-color: var(--rc-border);
+  --dp-primary-color: var(--rc-blue-500);
+  --dp-primary-text-color: var(--rc-text-inverse);
+  --dp-hover-color: var(--rc-surface-hover);
+  --dp-hover-text-color: var(--rc-text);
+  --dp-secondary-color: var(--rc-text-muted);
+  --dp-border-color-hover: var(--rc-blue-500);
+  --dp-border-color-focus: var(--rc-blue-500);
+  --dp-disabled-color: var(--rc-bg-subtle);
+  --dp-disabled-color-text: var(--rc-text-muted);
+  --dp-border-radius: var(--rc-radius-md);
+  --dp-cell-border-radius: var(--rc-radius-sm);
+  --dp-font-family: var(--rc-font);
+  border-radius: var(--rc-radius-lg);
+  box-shadow: var(--rc-shadow-lg);
+}
+
+.rc-datepicker-wrap .dp__cell_inner:hover {
+  background: var(--rc-blue-50);
+}
+
+.rc-datepicker-wrap .dp__active_date {
+  background: var(--rc-blue-500);
+  color: var(--rc-text-inverse);
+}
+
+.rc-datepicker-wrap .dp__today {
+  border-color: var(--rc-blue-500);
+}
+
+.rc-datepicker-wrap .dp__input_icon {
+  color: var(--rc-text-muted);
+}
+
+.rc-datepicker-wrap .dp--tp-wrap > button:first-of-type,
+.dp__menu .dp--tp-wrap > button:first-of-type {
+  display: none !important;
+}
+
+/* Date range picker */
+.rc-date-range {
+  position: relative;
+  display: inline-block;
+}
+
+.rc-date-range__trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--rc-surface);
+  border: 1px solid var(--rc-border);
+  border-radius: var(--rc-radius-md);
+  font-size: var(--rc-text-sm);
+  color: var(--rc-text);
+  cursor: pointer;
+  transition: border-color var(--rc-transition-fast);
+  min-width: 200px;
+  font-family: var(--rc-font);
+}
+
+.rc-date-range__trigger:hover,
+.rc-date-range__trigger.is-active {
+  border-color: var(--rc-blue-500);
+}
+
+.rc-date-range__icon {
+  color: var(--rc-text-muted);
+  flex-shrink: 0;
+}
+
+.rc-date-range__value {
+  flex: 1;
+  text-align: left;
+}
+
+.rc-date-range__chevron {
+  font-size: 10px;
+  color: var(--rc-text-muted);
+  transition: transform var(--rc-transition-fast);
+}
+
+.rc-date-range__chevron.is-open {
+  transform: rotate(180deg);
+}
+
+.rc-date-range__dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  background: var(--rc-surface);
+  border: 1px solid var(--rc-border);
+  border-radius: var(--rc-radius-lg);
+  box-shadow: var(--rc-shadow-lg);
+  z-index: 100;
+  min-width: 280px;
+  overflow: hidden;
+}
+
+.rc-date-range__presets {
+  padding: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.rc-date-range__preset {
+  padding: 8px 12px;
+  background: var(--rc-bg-subtle);
+  border: 1px solid var(--rc-border);
+  border-radius: var(--rc-radius-sm);
+  font-size: var(--rc-text-xs);
+  color: var(--rc-text);
+  cursor: pointer;
+  transition: background var(--rc-transition-fast), border-color var(--rc-transition-fast);
+}
+
+.rc-date-range__preset:hover {
+  background: var(--rc-blue-50);
+  border-color: var(--rc-blue-500);
+  color: var(--rc-blue-600);
+}
+
+.rc-date-range__divider {
+  height: 1px;
+  background: var(--rc-border);
+}
+
+.rc-date-range__custom {
+  padding: 16px;
+}
+
+.rc-date-range__inputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.rc-date-range__actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.rc-date-range__clear,
+.rc-date-range__apply {
+  flex: 1;
+  padding: 10px;
+  border-radius: var(--rc-radius-md);
+  font-size: var(--rc-text-sm);
+  font-weight: var(--rc-weight-medium);
+  cursor: pointer;
+  transition: background var(--rc-transition-fast);
+}
+
+.rc-date-range__clear {
+  background: transparent;
+  border: 1px solid var(--rc-border);
+  color: var(--rc-text-soft);
+}
+
+.rc-date-range__clear:hover {
+  background: var(--rc-bg-subtle);
+  color: var(--rc-text);
+}
+
+.rc-date-range__apply {
+  background: var(--rc-blue-500);
+  border: none;
+  color: var(--rc-text-inverse);
+}
+
+.rc-date-range__apply:hover:not(:disabled) {
+  background: var(--rc-blue-600);
+}
+
+.rc-date-range__apply:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

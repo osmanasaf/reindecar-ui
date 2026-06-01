@@ -15,6 +15,16 @@ export function formatCurrency(amount: unknown, currency = 'TRY'): string {
     }).format(num)
 }
 
+/** Prototip fmtTRY — sembol + binlik ayırıcı, ondalık yok */
+export function fmtTRY(amount: unknown): string {
+    return '₺' + safeNumber(amount).toLocaleString('tr-TR')
+}
+
+/** Prototip fmtNum — TR locale sayı formatı */
+export function fmtNum(amount: unknown): string {
+    return safeNumber(amount).toLocaleString('tr-TR')
+}
+
 export function formatPhone(phone: string): string {
     const formatted = formatPhoneInput(phone)
     return formatted || phone

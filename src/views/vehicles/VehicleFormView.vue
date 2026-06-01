@@ -11,6 +11,8 @@ import { isErrorResponse } from '@/utils/error'
 import { FuelType, Transmission } from '@/types'
 import type { CreateVehicleForm, UpdateVehicleForm, VehicleCategory, Branch, Vehicle } from '@/types'
 import type { VehicleRecognitionResult } from '@/api/vehicles.api'
+import { RcPageHeader, RcButton, RcField, RcInput } from '@/components/rc'
+import { RcIcon } from '@/components/icons'
 
 interface VehicleFormModel {
   plateNumber: string
@@ -51,7 +53,6 @@ const {
   loadBrands,
   loadModelsByBrand,
   loadColors,
-  getModelsForBrand,
   invalidateModelsCache
 } = useReferenceData()
 const selectedBrandId = ref<number | null>(null)
@@ -472,15 +473,20 @@ onMounted(fetchData)
 </script>
 
 <template>
-  <div class="vehicle-form-page">
-    <header class="page-header">
-      <div class="header-left">
-        <button class="back-btn" @click="router.back()">← Geri</button>
-        <h1>{{ isEditMode ? 'Aracı Düzenle' : 'Yeni Araç Ekle' }}</h1>
-      </div>
-    </header>
+  <div class="rc-page rc-veh-form-page">
+    <div class="rc-cust-detail-nav">
+      <button type="button" class="rc-btn rc-btn--ghost rc-btn--sm" @click="router.back()">
+        <RcIcon name="chevronLeft" :size="14" />
+        Geri
+      </button>
+    </div>
 
-    <div v-if="loading && !form.plateNumber" class="loading">Yükleniyor...</div>
+    <RcPageHeader
+      :title="isEditMode ? 'Aracı düzenle' : 'Yeni araç ekle'"
+      :subtitle="isEditMode ? 'Araç bilgilerini güncelleyin' : 'Filoya yeni araç kaydı oluşturun'"
+    />
+
+    <div v-if="loading && !form.plateNumber" class="rc-skeleton" style="height: 320px" />
 
     <form v-else class="form-container" @submit.prevent="handleSubmit">
 
@@ -499,17 +505,17 @@ onMounted(fetchData)
           <div v-else class="photo-preview-container">
             <img :src="photoPreview" class="photo-preview-img" alt="Araç fotoğrafı" />
             <div class="photo-actions">
-              <button
+              <RcButton
                 type="button"
-                class="btn btn-primary btn-recognize"
+                variant="accent"
                 :disabled="recognizing"
                 @click="recognizePhoto"
               >
-                {{ recognizing ? 'Analiz ediliyor...' : 'Bilgileri Tanı' }}
-              </button>
-              <button type="button" class="btn btn-secondary" @click="removePhoto">
-                Fotoğrafı Kaldır
-              </button>
+                {{ recognizing ? 'Analiz ediliyor…' : 'Bilgileri tanı' }}
+              </RcButton>
+              <RcButton type="button" variant="secondary" @click="removePhoto">
+                Fotoğrafı kaldır
+              </RcButton>
             </div>
             <div v-if="recognitionResult" class="recognition-badge" :class="recognitionResult.recognized ? 'badge-success' : 'badge-warning'">
               {{ recognitionResult.recognized
@@ -530,30 +536,25 @@ onMounted(fetchData)
       <section class="form-section">
         <h3>Temel Bilgiler</h3>
         <div class="form-grid">
-          <div class="form-group" :class="{ error: hasError('plateNumber') }">
-            <label>Plaka <span class="required">*</span></label>
-            <input 
-              :value="form.plateNumber"
-              type="text"
+          <RcField label="Plaka" required :error="getError('plateNumber')">
+            <RcInput
+              :model-value="form.plateNumber"
+              class="rc-mono"
               placeholder="34 ABC 123"
               maxlength="12"
-              @input="form.plateNumber = formatPlateInput(($event.target as HTMLInputElement).value)"
+              @update:model-value="form.plateNumber = formatPlateInput(String($event))"
               @blur="handleBlur('plateNumber')"
             />
-            <span class="error-text">{{ getError('plateNumber') }}</span>
-          </div>
+          </RcField>
 
-          <div class="form-group" :class="{ error: hasError('vinNumber') }">
-            <label>Şasi No (VIN) <span class="required">*</span></label>
-            <input 
-              v-model="form.vinNumber" 
-              type="text" 
+          <RcField label="Şasi No (VIN)" required :error="getError('vinNumber')">
+            <RcInput
+              v-model="form.vinNumber"
               maxlength="17"
               placeholder="17 karakterli VIN"
               @blur="handleBlur('vinNumber')"
             />
-            <span class="error-text">{{ getError('vinNumber') }}</span>
-          </div>
+          </RcField>
 
           <div class="form-group" :class="{ error: hasError('brand') }">
             <label>Marka <span class="required">*</span></label>
@@ -585,17 +586,14 @@ onMounted(fetchData)
             <span class="error-text">{{ getError('model') }}</span>
           </div>
 
-          <div class="form-group" :class="{ error: hasError('year') }">
-            <label>Model Yılı <span class="required">*</span></label>
-            <input 
-              v-model.number="form.year" 
-              type="number" 
-              :min="1990"
-              :max="currentYear + 1"
+          <RcField label="Model Yılı" required :error="getError('year')">
+            <RcInput
+              :model-value="String(form.year)"
+              type="number"
+              @update:model-value="form.year = Number($event)"
               @blur="handleBlur('year')"
             />
-            <span class="error-text">{{ getError('year') }}</span>
-          </div>
+          </RcField>
 
           <div class="form-group" :class="{ error: hasError('color') }">
             <label>Renk <span class="required">*</span></label>
@@ -795,207 +793,19 @@ onMounted(fetchData)
         </div>
       </section>
       <div class="form-actions">
-        <button type="button" class="btn btn-secondary" @click="router.back()">
-          İptal
-        </button>
-        <button type="submit" class="btn btn-primary" :disabled="loading">
-          {{ loading ? 'Kaydediliyor...' : (isEditMode ? 'Güncelle' : 'Kaydet') }}
-        </button>
+        <RcButton variant="secondary" type="button" @click="router.back()">İptal</RcButton>
+        <RcButton variant="accent" type="submit" :disabled="loading">
+          {{ loading ? 'Kaydediliyor…' : isEditMode ? 'Güncelle' : 'Kaydet' }}
+        </RcButton>
       </div>
     </form>
   </div>
 </template>
 
 <style scoped>
-.vehicle-form-page {
-  max-width: 900px;
-  margin: 0 auto;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 32px;
-}
-
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.back-btn {
-  background: none;
-  border: none;
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  font-size: 14px;
-}
-
-.back-btn:hover {
-  color: var(--color-primary);
-}
-
-.page-header h1 {
-  font-size: 28px;
-  font-weight: 600;
-  margin: 0;
-}
-
-.loading {
-  text-align: center;
-  padding: 60px;
-  color: var(--color-text-secondary);
-}
-
-.form-container {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  padding: 32px;
-}
-
-.form-section {
-  margin-bottom: 32px;
-}
-
-.form-section:last-of-type {
-  margin-bottom: 0;
-}
-
-.form-section h3 {
-  font-size: 16px;
-  font-weight: 600;
-  margin: 0 0 20px 0;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.form-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 20px;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-}
-
-.form-group.full-width {
-  grid-column: 1 / -1;
-}
-
-.form-group label {
-  font-size: 14px;
-  font-weight: 500;
-  margin-bottom: 8px;
-  color: var(--color-text);
-}
-
-.required {
-  color: var(--color-danger);
-}
-
-.form-group input,
-.form-group select,
-.form-group textarea {
-  padding: 12px 16px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  font-size: 14px;
-  background: var(--color-bg);
-  transition: border-color 0.2s;
-}
-
-.form-group input:focus,
-.form-group select:focus,
-.form-group textarea:focus {
-  outline: none;
-  border-color: var(--color-primary);
-}
-
-.form-group.error input,
-.form-group.error select,
-.form-group.error textarea {
-  border-color: var(--color-danger);
-}
-
-.error-text {
-  font-size: 12px;
-  color: var(--color-danger);
-  margin-top: 4px;
-  min-height: 18px;
-}
-
-.help-text {
-  font-size: 12px;
-  color: var(--color-text-secondary);
-  margin-top: 4px;
-}
-
-.form-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  margin-top: 32px;
-  padding-top: 24px;
-  border-top: 1px solid var(--color-border);
-}
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 12px 24px;
-  border-radius: 8px;
-  font-weight: 500;
-  font-size: 14px;
-  cursor: pointer;
-  border: none;
-  transition: all 0.2s;
-}
-
-.btn-primary {
-  background: var(--color-primary);
-  color: white;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: var(--color-primary-hover);
-}
-
-.btn-primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.btn-secondary {
-  background: var(--color-bg-secondary);
-  color: var(--color-text);
-  border: 1px solid var(--color-border);
-}
-
-.btn-secondary:hover {
-  background: var(--color-bg);
-}
-
-textarea {
-  resize: vertical;
-  min-height: 100px;
-}
-
 .photo-recognition-section {
-  background: var(--color-bg-secondary);
-  border: 1px dashed var(--color-primary);
-  border-radius: 10px;
-  padding: 24px;
-}
-
-.photo-upload-area {
-  position: relative;
+  background: var(--rc-blue-50);
+  border: 1px dashed var(--rc-blue-300);
 }
 
 .photo-dropzone {
@@ -1005,32 +815,32 @@ textarea {
   justify-content: center;
   gap: 8px;
   padding: 36px;
-  border: 2px dashed var(--color-border);
-  border-radius: 8px;
+  border: 2px dashed var(--rc-border);
+  border-radius: var(--rc-r-8);
   cursor: pointer;
-  transition: border-color 0.2s, background 0.2s;
+  transition: border-color var(--rc-dur-fast), background var(--rc-dur-fast);
 }
 
 .photo-dropzone:hover {
-  border-color: var(--color-primary);
-  background: var(--color-surface);
+  border-color: var(--rc-blue-400);
+  background: var(--rc-surface);
 }
 
 .photo-icon {
   width: 40px;
   height: 40px;
-  color: var(--color-text-secondary);
+  color: var(--rc-text-muted);
 }
 
 .photo-hint {
   font-size: 14px;
   font-weight: 500;
-  color: var(--color-text);
+  color: var(--rc-text);
 }
 
 .photo-hint-sub {
   font-size: 12px;
-  color: var(--color-text-secondary);
+  color: var(--rc-text-muted);
 }
 
 .photo-preview-container {
@@ -1044,8 +854,8 @@ textarea {
   width: 200px;
   height: 140px;
   object-fit: cover;
-  border-radius: 8px;
-  border: 1px solid var(--color-border);
+  border-radius: var(--rc-r-8);
+  border: 1px solid var(--rc-border);
 }
 
 .photo-actions {
@@ -1054,26 +864,22 @@ textarea {
   gap: 10px;
 }
 
-.btn-recognize {
-  min-width: 160px;
-}
-
 .recognition-badge {
   align-self: flex-end;
   padding: 6px 14px;
-  border-radius: 20px;
+  border-radius: 99px;
   font-size: 12px;
   font-weight: 600;
 }
 
 .badge-success {
-  background: color-mix(in srgb, var(--color-success, #22c55e) 15%, transparent);
-  color: var(--color-success, #22c55e);
+  background: var(--rc-success-50);
+  color: var(--rc-success-700);
 }
 
 .badge-warning {
-  background: color-mix(in srgb, var(--color-warning, #f59e0b) 15%, transparent);
-  color: var(--color-warning, #f59e0b);
+  background: var(--rc-warning-50);
+  color: var(--rc-warning-700);
 }
 
 .photo-file-input {
@@ -1081,30 +887,6 @@ textarea {
 }
 
 @media (max-width: 768px) {
-  .page-header,
-  .header-left,
-  .form-actions {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .form-container {
-    padding: 20px 16px;
-  }
-
-  .form-grid {
-    grid-template-columns: 1fr;
-    gap: 16px;
-  }
-
-  .form-group.full-width {
-    grid-column: auto;
-  }
-
-  .btn {
-    width: 100%;
-  }
-
   .photo-preview-img {
     width: 100%;
     max-width: 100%;
@@ -1113,10 +895,6 @@ textarea {
 
   .photo-actions {
     width: 100%;
-  }
-
-  .btn-recognize {
-    min-width: 0;
   }
 
   .recognition-badge {

@@ -110,7 +110,7 @@ export const useInstallmentStore = defineStore('installment', () => {
         loading.value = true
         error.value = null
         try {
-            await installmentsApi.deleteInstallment(id)
+            await installmentsApi.delete(id)
             toast.success('Taksit planı başarıyla silindi')
 
             if (vehicleId) {

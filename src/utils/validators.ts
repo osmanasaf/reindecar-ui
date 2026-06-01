@@ -1,7 +1,5 @@
 import { isValidPhoneNumber } from './phone'
 
-const TCKN_LENGTH = 11
-
 export function validateTCKN(id: string): boolean {
     if (!/^\d{11}$/.test(id)) return false
     if (id[0] === '0') return false

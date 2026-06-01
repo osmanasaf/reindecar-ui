@@ -7,29 +7,40 @@ import type {
     RentalDetailResponse,
     KmPackage,
     CreateRentalForm,
+    UpdateRentalForm,
     VehicleDeliveryForm,
     VehicleReturnForm,
+    ExtendRentalForm,
     AddRentalDriverForm,
     CreateKmPackageForm,
     LeasingKmRecord,
     LeasingKmSummary,
     RecordKmForm,
-    RentalType
+    RentalType,
+    ReturnPreviewResponse
 } from '@/types'
 
 class RentalsApiService extends BaseApi {
     protected readonly basePath = '/rentals'
 
-    async getAll(params?: PaginationParams & { status?: string }): Promise<PaginatedResponse<Rental>> {
+    async getAll(params?: PaginationParams & { status?: string; search?: string; rentalType?: string }): Promise<PaginatedResponse<Rental>> {
         return this.getList<Rental>('', params)
     }
 
-    async getActive(params?: PaginationParams): Promise<PaginatedResponse<Rental>> {
+    async getActive(params?: PaginationParams & { search?: string; rentalType?: string }): Promise<PaginatedResponse<Rental>> {
         return this.getList<Rental>('/active', params)
     }
 
-    async getOverdue(params?: PaginationParams): Promise<PaginatedResponse<Rental>> {
+    async getOverdue(params?: PaginationParams & { search?: string; rentalType?: string }): Promise<PaginatedResponse<Rental>> {
         return this.getList<Rental>('/overdue', params)
+    }
+
+    async getByCustomer(customerId: number, params?: PaginationParams): Promise<PaginatedResponse<Rental>> {
+        return this.getList<Rental>(`/customer/${customerId}`, params)
+    }
+
+    async getActiveByCustomer(customerId: number): Promise<Rental[]> {
+        return this.get(`/customer/${customerId}/active`)
     }
 
     async getById(id: number): Promise<Rental> {
@@ -49,12 +60,20 @@ class RentalsApiService extends BaseApi {
         return this.post('', rental)
     }
 
+    async update(id: number, form: UpdateRentalForm): Promise<Rental> {
+        return this.put(`/${id}`, form)
+    }
+
     async reserve(id: number): Promise<Rental> {
         return this.post(`/${id}/reserve`)
     }
 
     async activate(id: number, form: VehicleDeliveryForm): Promise<Rental> {
         return this.post(`/${id}/activate`, form)
+    }
+
+    async extend(id: number, form: ExtendRentalForm): Promise<Rental> {
+        return this.post(`/${id}/extend`, form)
     }
 
     async startReturn(id: number): Promise<Rental> {
@@ -69,8 +88,8 @@ class RentalsApiService extends BaseApi {
         return this.post(`/${id}/complete`, form)
     }
 
-    async cancel(id: number): Promise<Rental> {
-        return this.post(`/${id}/cancel`)
+    async cancel(id: number, body?: { reason?: string; notes?: string }): Promise<Rental> {
+        return this.post(`/${id}/cancel`, body ?? {})
     }
 
     async closeRental(id: number): Promise<Rental> {
@@ -94,7 +113,7 @@ class RentalsApiService extends BaseApi {
     }
 
     async removeDriver(rentalId: number, driverId: number): Promise<void> {
-        return this.remove(`/${rentalId}/drivers/${driverId}`)
+        return this.deleteByPath(`/${rentalId}/drivers/${driverId}`)
     }
 
     async setPrimaryDriver(rentalId: number, driverId: number): Promise<RentalDriver> {

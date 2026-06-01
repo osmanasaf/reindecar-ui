@@ -1,4 +1,10 @@
-export * from './date'
+export {
+    toLocalDate,
+    isExpired,
+    daysUntil,
+    isExpiringSoon,
+    formatDateRange
+} from './date'
 export * from './format'
 export * from './validators'
 export * from './jwt'

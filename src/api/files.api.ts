@@ -115,7 +115,7 @@ class FilesApiService extends BaseApi {
     }
 
     async delete(id: number): Promise<void> {
-        return this.remove(`/${id}`)
+        return this.deleteByPath(`/${id}`)
     }
 
     async openFile(id: number): Promise<void> {

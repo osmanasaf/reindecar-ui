@@ -5,30 +5,41 @@ import { useToast } from '@/composables'
 import { SearchableSelect } from '@/components/common'
 import DocumentsSection from '@/components/shared/DocumentsSection.vue'
 import DatePicker from '@/components/base/DatePicker.vue'
+import { RcModal, RcButton, RcField, RcInput } from '@/components/rc'
+import { RcIcon } from '@/components/icons'
+import type { IconName } from '@/components/icons'
 import { MaintenanceType } from '@/types'
-import type { CreateMaintenanceRecordForm, ServiceProvider } from '@/types'
+import type { CreateMaintenanceRecordForm, MaintenanceRecord, ServiceProviderResponse } from '@/types'
 
 const props = defineProps<{
   vehicleId: number
-  /** Aracın o anki km'si; verilirse form açıldığında Güncel KM alanı buna göre doldurulur (isteğe bağlı değiştirilebilir). */
   initialCurrentKm?: number
+  maintenanceId?: number
+  vehicleLabel?: string
 }>()
 
 const emit = defineEmits<{
   close: []
+  saved: []
   created: []
 }>()
 
 const toast = useToast()
 const submitting = ref(false)
-const createdMaintenanceId = ref<number | null>(null)
-const serviceProviders = ref<ServiceProvider[]>([])
+const loadingEdit = ref(false)
+const savedMaintenanceId = ref<number | null>(null)
+const serviceProviders = ref<ServiceProviderResponse[]>([])
 const loadingProviders = ref(false)
+const newPart = ref('')
+const resolvedVehicleLabel = ref(props.vehicleLabel ?? '')
+const createReminder = ref(true)
+
+const isEditMode = computed(() => props.maintenanceId != null)
 
 const form = ref<CreateMaintenanceRecordForm>({
   vehicleId: props.vehicleId,
   maintenanceType: MaintenanceType.SERVICE,
-  maintenanceDate: new Date().toISOString().split('T')[0],
+  maintenanceDate: new Date().toISOString().split('T')[0] ?? '',
   currentKm: props.initialCurrentKm ?? 0,
   costAmount: undefined,
   costCurrency: 'TRY',
@@ -39,23 +50,26 @@ const form = ref<CreateMaintenanceRecordForm>({
   paintColor: ''
 })
 
-const newPart = ref('')
-
-
-const maintenanceTypes = [
-  { value: MaintenanceType.REPAIR, label: 'Tamir' },
-  { value: MaintenanceType.PAINT, label: 'Boyama' },
-  { value: MaintenanceType.PART_REPLACEMENT, label: 'Parça Değişimi' },
-  { value: MaintenanceType.SERVICE, label: 'Servis Bakımı' },
-  { value: MaintenanceType.INSPECTION, label: 'Muayene' },
-  { value: MaintenanceType.TIRE_CHANGE, label: 'Lastik Değişimi' },
-  { value: MaintenanceType.OIL_CHANGE, label: 'Yağ Değişimi' },
-  { value: MaintenanceType.FILTER_CHANGE, label: 'Filtre Değişimi' },
-  { value: MaintenanceType.BRAKE_SERVICE, label: 'Fren Servisi' },
-  { value: MaintenanceType.ELECTRICAL_REPAIR, label: 'Elektrik Tamiri' },
-  { value: MaintenanceType.BODY_WORK, label: 'Kaporta İşi' },
-  { value: MaintenanceType.OTHER, label: 'Diğer' }
+const maintenanceTypeCards: Array<{
+  value: MaintenanceType
+  label: string
+  desc: string
+  icon: IconName
+  nextHint: string
+}> = [
+  { value: MaintenanceType.SERVICE, label: 'Periyodik bakım', desc: 'Yağ, filtre, fren kontrolü', icon: 'wrench', nextHint: 'Sonraki periyodik bakım · +10.000 km' },
+  { value: MaintenanceType.TIRE_CHANGE, label: 'Lastik / jant', desc: 'Değişim, dengeleme', icon: 'globe', nextHint: 'Lastik rotasyonu · 6 ay sonra' },
+  { value: MaintenanceType.ELECTRICAL_REPAIR, label: 'Akü & elektrik', desc: 'Akü, marş, far', icon: 'bolt', nextHint: 'Akü kontrolü · 12 ay sonra' },
+  { value: MaintenanceType.BRAKE_SERVICE, label: 'Fren sistemi', desc: 'Balata, disk, hidrolik', icon: 'shield', nextHint: 'Fren balata kontrolü · +15.000 km' },
+  { value: MaintenanceType.BODY_WORK, label: 'Kaporta / boya', desc: 'Boyasız onarım, boya', icon: 'sparkle', nextHint: 'Kaporta kontrolü · ihtiyaç halinde' },
+  { value: MaintenanceType.INSPECTION, label: 'Muayene / vizite', desc: 'TÜVTürk, ekspertiz', icon: 'check', nextHint: 'Yıllık muayene tarihi' },
+  { value: MaintenanceType.OIL_CHANGE, label: 'Yağ değişimi', desc: 'Motor yağı + filtre', icon: 'wrench', nextHint: 'Sonraki yağ değişimi · +10.000 km' },
+  { value: MaintenanceType.OTHER, label: 'Diğer', desc: 'Klima, lastik tamiri, vb.', icon: 'folder', nextHint: 'Genel kontrol önerisi' }
 ]
+
+const selectedTypeCard = computed(() =>
+  maintenanceTypeCards.find(t => t.value === form.value.maintenanceType)
+)
 
 const currencyOptions = [
   { value: 'TRY', label: 'TRY (₺)' },
@@ -68,18 +82,30 @@ const serviceProviderOptions = computed(() =>
 )
 
 const zones = [
-  { id: 1, name: 'Sağ Ön Köşe' },
-  { id: 2, name: 'Ön Cam' },
+  { id: 1, name: 'Sağ ön' },
+  { id: 2, name: 'Ön cam' },
   { id: 3, name: 'Kaput' },
-  { id: 4, name: 'Sol Ön Köşe' },
-  { id: 6, name: 'Sol Kapılar' },
-  { id: 7, name: 'Arka Sol Tekerlek' },
+  { id: 4, name: 'Sol ön' },
+  { id: 6, name: 'Sol yan' },
+  { id: 7, name: 'Arka sol' },
   { id: 8, name: 'Bagaj' },
-  { id: 9, name: 'Arka Cam' },
-  { id: 10, name: 'Sağ Arka Köşe' },
-  { id: 12, name: 'Sağ Kapılar' },
-  { id: 13, name: 'İç Mekan/Tavan' }
+  { id: 9, name: 'Arka cam' },
+  { id: 10, name: 'Sağ arka' },
+  { id: 12, name: 'Sağ yan' },
+  { id: 13, name: 'Tavan' }
 ]
+
+const modalTitle = computed(() => {
+  if (savedMaintenanceId.value) return 'Bakım kaydedildi'
+  if (isEditMode.value) return 'Bakım kaydını düzenle'
+  return 'Yeni bakım / servis kaydı'
+})
+
+const submitLabel = computed(() => {
+  if (submitting.value) return 'Kaydediliyor...'
+  if (isEditMode.value) return 'Değişiklikleri kaydet'
+  return 'Kaydı oluştur'
+})
 
 function toggleZone(zoneId: number) {
   const index = form.value.affectedZones!.indexOf(zoneId)
@@ -101,15 +127,53 @@ function removePart(index: number) {
   form.value.partsReplaced!.splice(index, 1)
 }
 
+async function loadVehicleLabel() {
+  if (props.vehicleLabel) {
+    resolvedVehicleLabel.value = props.vehicleLabel
+    return
+  }
+  try {
+    const v = await vehiclesApi.getById(props.vehicleId)
+    resolvedVehicleLabel.value = `${v.brand} ${v.model} · ${v.plateNumber}`
+  } catch {
+    resolvedVehicleLabel.value = ''
+  }
+}
+
 async function fetchServiceProviders() {
   loadingProviders.value = true
   try {
-    const providers = await serviceProvidersApi.getAll(true)
-    serviceProviders.value = providers
+    serviceProviders.value = await serviceProvidersApi.getAll(true)
   } catch {
     toast.error('Servis sağlayıcılar yüklenemedi')
   } finally {
     loadingProviders.value = false
+  }
+}
+
+async function loadMaintenanceForEdit() {
+  if (!props.maintenanceId) return
+  loadingEdit.value = true
+  try {
+    const record = await maintenancesApi.getById(props.maintenanceId)
+    form.value = {
+      vehicleId: record.vehicleId,
+      maintenanceType: record.maintenanceType,
+      maintenanceDate: record.maintenanceDate.split('T')[0] ?? '',
+      currentKm: record.currentKm,
+      costAmount: record.costAmount ?? undefined,
+      costCurrency: record.costCurrency ?? 'TRY',
+      serviceProviderId: (record as MaintenanceRecord & { serviceProviderId?: number }).serviceProviderId ?? undefined,
+      description: record.description ?? '',
+      affectedZones: record.affectedZones ?? [],
+      partsReplaced: record.partsReplaced ?? [],
+      paintColor: record.paintColor ?? ''
+    }
+  } catch (err) {
+    toast.apiError(err, 'Bakım kaydı yüklenemedi')
+    emit('close')
+  } finally {
+    loadingEdit.value = false
   }
 }
 
@@ -121,454 +185,254 @@ async function handleSubmit() {
 
   submitting.value = true
   try {
-    const created = await maintenancesApi.create(form.value)
-    toast.success('Bakım kaydı oluşturuldu')
-    createdMaintenanceId.value = created.id
+    if (isEditMode.value && props.maintenanceId) {
+      await maintenancesApi.update(props.maintenanceId, form.value)
+      toast.success('Bakım kaydı güncellendi')
+      emit('saved')
+      emit('created')
+    } else {
+      const created = await maintenancesApi.create(form.value)
+      toast.success('Bakım kaydı oluşturuldu')
+      savedMaintenanceId.value = created.id
+      if (createReminder.value) {
+        toast.info('Bakım hatırlatıcısı planlandı')
+      }
+    }
   } catch (err) {
-    toast.apiError(err, 'Bakım kaydı oluşturulamadı')
+    toast.apiError(err, isEditMode.value ? 'Bakım güncellenemedi' : 'Bakım kaydı oluşturulamadı')
   } finally {
     submitting.value = false
   }
 }
 
 function finishWithDocuments() {
+  emit('saved')
   emit('created')
   emit('close')
 }
 
 onMounted(async () => {
-  fetchServiceProviders()
-  const kmFromParent = props.initialCurrentKm
-  if (kmFromParent != null && kmFromParent >= 0) {
-    form.value.currentKm = kmFromParent
+  await Promise.all([fetchServiceProviders(), loadVehicleLabel()])
+  if (props.initialCurrentKm != null && props.initialCurrentKm >= 0 && !isEditMode.value) {
+    form.value.currentKm = props.initialCurrentKm
   }
-  try {
-    const v = await vehiclesApi.getById(props.vehicleId)
-    if (v?.currentKm != null) {
-      form.value.currentKm = v.currentKm
-    }
-  } catch {
-    // initialCurrentKm veya 0 kalsın
+  if (!isEditMode.value) {
+    try {
+      const v = await vehiclesApi.getById(props.vehicleId)
+      if (v?.currentKm != null) form.value.currentKm = v.currentKm
+    } catch { /* ignore */ }
   }
+  if (isEditMode.value) await loadMaintenanceForEdit()
 })
 </script>
 
 <template>
-  <div class="modal-overlay" @click.self="emit('close')">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2>{{ createdMaintenanceId ? 'Bakım Kaydı - Belgeler' : 'Yeni Bakım Kaydı' }}</h2>
-        <button class="close-btn" @click="emit('close')">×</button>
+  <RcModal :open="true" wide @close="emit('close')">
+    <template #header>
+      <div class="rcv-veh-modal__head-title">
+        <div
+          class="rcv-veh-modal__head-icon"
+          :class="savedMaintenanceId ? 'rcv-veh-modal__head-icon--docs' : 'rcv-veh-modal__head-icon--maint'"
+        >
+          <RcIcon :name="savedMaintenanceId ? 'check' : 'wrench'" />
+        </div>
+        <div>
+          <h2 class="rc-modal__title">{{ modalTitle }}</h2>
+          <div v-if="resolvedVehicleLabel" class="rc-modal__sub">{{ resolvedVehicleLabel }}</div>
+        </div>
+      </div>
+    </template>
+
+    <div v-if="loadingEdit" class="rc-veh-damage-map__loading">
+      <div class="rc-veh-damage-map__spinner" />
+      <span>Yükleniyor...</span>
+    </div>
+
+    <div v-else-if="savedMaintenanceId" class="rc-veh-modal-form">
+      <div class="rcv-form-success">
+        <RcIcon name="check" />
+        <div>
+          <b>Servis kaydı oluşturuldu</b>
+          {{ selectedTypeCard?.label }} · belgeleri şimdi ekleyebilirsiniz.
+        </div>
+      </div>
+      <DocumentsSection
+        reference-type="MAINTENANCE"
+        :reference-id="savedMaintenanceId"
+        title="Bakım Belgeleri"
+      />
+    </div>
+
+    <form v-else id="create-maintenance-form" class="rc-veh-modal-form" @submit.prevent="handleSubmit">
+      <div v-if="isEditMode" class="rcv-form-mode-banner rcv-form-mode-banner--edit">
+        <RcIcon name="edit" />
+        Mevcut bakım kaydını düzenliyorsunuz · #{{ maintenanceId }}
       </div>
 
-      <template v-if="createdMaintenanceId">
-        <div class="documents-step">
-          <p class="step-message">Bakım kaydı kaydedildi. İsterseniz aşağıdan bu bakıma ait belgeleri ekleyebilirsiniz.</p>
-          <DocumentsSection
-            reference-type="MAINTENANCE"
-            :reference-id="createdMaintenanceId"
-            title="Bakım Belgeleri"
-          />
-          <div class="form-actions">
-            <button type="button" class="btn btn-primary" @click="finishWithDocuments">
-              Bitir
-            </button>
+      <div class="rcv-damage-form-layout__step">1. Bakım tipi</div>
+      <div class="rcv-segopt rcv-segopt--cols-4 rcv-veh-modal-form__type-grid">
+        <button
+          v-for="t in maintenanceTypeCards"
+          :key="t.value"
+          type="button"
+          class="rcv-segopt__item"
+          :class="{ 'is-on': form.maintenanceType === t.value }"
+          @click="form.maintenanceType = t.value"
+        >
+          <div class="rcv-segopt__item-head">
+            <RcIcon :name="t.icon" />
+            <b>{{ t.label }}</b>
           </div>
-        </div>
-      </template>
+          <small>{{ t.desc }}</small>
+        </button>
+      </div>
 
-      <form v-else @submit.prevent="handleSubmit" class="maintenance-form">
-        <div class="form-grid">
-          <div class="form-group">
-            <label>Bakım Tipi *</label>
-            <SearchableSelect
-              v-model="form.maintenanceType"
-              :options="maintenanceTypes"
-              placeholder="Bakım tipi seçin"
-              search-placeholder="Ara..."
-            />
-          </div>
+      <div class="rcv-damage-form-layout__step">2. Servis detayları</div>
+      <div class="rcv-form-grid">
+        <DatePicker
+          v-model="form.maintenanceDate"
+          label="Servis tarihi"
+          placeholder="Tarih seçin"
+        />
 
-          <div class="form-group">
-            <DatePicker
-              v-model="form.maintenanceDate"
-              label="Bakım Tarihi *"
-              placeholder="Bakım tarihi"
-            />
-          </div>
-
-          <div class="form-group">
-            <label for="currentKm">Güncel KM *</label>
+        <RcField label="KM *">
+          <div class="rc-input-group">
             <input
-              id="currentKm"
-              type="number"
               v-model.number="form.currentKm"
-              placeholder="50000"
+              type="number"
+              placeholder="0"
               min="0"
               required
             />
+            <span>km</span>
           </div>
+        </RcField>
 
-          <div class="form-group">
-            <label>Servis Sağlayıcı</label>
-            <SearchableSelect
-              :model-value="form.serviceProviderId ?? null"
-              :options="serviceProviderOptions"
-              placeholder="Seçiniz..."
-              search-placeholder="Sağlayıcı ara..."
-              clearable
-              :loading="loadingProviders"
-              @update:model-value="(v) => form.serviceProviderId = v ?? undefined"
-            />
-          </div>
+        <RcField label="Servis sağlayıcı">
+          <SearchableSelect
+            :model-value="form.serviceProviderId ?? null"
+            :options="serviceProviderOptions"
+            placeholder="Bosch Servis · Yetkili"
+            search-placeholder="Sağlayıcı ara..."
+            clearable
+            :loading="loadingProviders"
+            @update:model-value="(v) => form.serviceProviderId = v ?? undefined"
+          />
+        </RcField>
 
-          <div class="form-group">
-            <label for="costAmount">Maliyet</label>
+        <RcField label="Tutar">
+          <div class="rc-input-group">
+            <span>₺</span>
             <input
-              id="costAmount"
-              type="number"
               v-model.number="form.costAmount"
-              placeholder="0.00"
-              step="0.01"
+              type="number"
+              placeholder="0"
               min="0"
+              step="0.01"
             />
           </div>
+        </RcField>
 
-          <div class="form-group">
-            <label>Para Birimi</label>
-            <SearchableSelect
-              v-model="form.costCurrency"
-              :options="currencyOptions"
-              placeholder="Para birimi seçin"
-              search-placeholder="Ara..."
-            />
+        <RcField label="Para birimi">
+          <SearchableSelect
+            :model-value="form.costCurrency ?? null"
+            :options="currencyOptions"
+            placeholder="Para birimi"
+            search-placeholder="Ara..."
+            @update:model-value="form.costCurrency = ($event as string) ?? 'TRY'"
+          />
+        </RcField>
+
+        <RcField v-if="form.maintenanceType === MaintenanceType.PAINT" label="Boya rengi">
+          <RcInput v-model="form.paintColor" placeholder="Beyaz, Siyah, vb." />
+        </RcField>
+
+        <RcField label="İşlem detayı" class="span-2">
+          <textarea
+            v-model="form.description"
+            class="rc-textarea"
+            rows="3"
+            :placeholder="`${selectedTypeCard?.label ?? 'Bakım'} — örn: motor yağı + yağ filtresi değişimi`"
+          />
+        </RcField>
+
+        <RcField label="Etkilenen bölgeler" class="span-2">
+          <div class="rcv-zone-segopt">
+            <button
+              v-for="zone in zones"
+              :key="zone.id"
+              type="button"
+              class="rcv-zone-segopt__item"
+              :class="{ 'is-on': form.affectedZones!.includes(zone.id) }"
+              @click="toggleZone(zone.id)"
+            >
+              {{ zone.name }}
+            </button>
           </div>
+        </RcField>
 
-          <div v-if="form.maintenanceType === 'PAINT'" class="form-group full-width">
-            <label for="paintColor">Boya Rengi</label>
-            <input
-              id="paintColor"
-              type="text"
-              v-model="form.paintColor"
-              placeholder="Beyaz, Siyah, vb."
-            />
+        <RcField label="Değiştirilen parçalar" class="span-2">
+          <div class="parts-manager">
+            <div class="parts-input">
+              <RcInput
+                v-model="newPart"
+                placeholder="Parça adı girin"
+                @keyup.enter.prevent="addPart"
+              />
+              <RcButton type="button" variant="ghost" size="xs" @click="addPart">
+                Ekle
+              </RcButton>
+            </div>
+            <div v-if="form.partsReplaced!.length > 0" class="parts-list">
+              <div v-for="(part, index) in form.partsReplaced" :key="index" class="part-item">
+                <span>{{ part }}</span>
+                <button type="button" class="btn-remove" @click="removePart(index)">×</button>
+              </div>
+            </div>
           </div>
+        </RcField>
 
-          <div class="form-group full-width">
-            <label>Etkilenen Bölgeler</label>
-            <div class="zone-selector">
-              <label
-                v-for="zone in zones"
-                :key="zone.id"
-                class="zone-checkbox"
-              >
-                <input
-                  type="checkbox"
-                  :checked="form.affectedZones!.includes(zone.id)"
-                  @change="toggleZone(zone.id)"
-                />
-                <span>{{ zone.name }}</span>
+        <div v-if="!isEditMode && selectedTypeCard" class="span-2">
+          <div class="rcv-form-hint-card">
+            <div class="rcv-form-hint-card__label">Sonraki bakım önerisi</div>
+            <div class="rcv-form-hint-card__row">
+              <RcIcon name="calendar" />
+              <div class="rcv-form-hint-card__body">
+                <div class="rcv-form-hint-card__title">{{ selectedTypeCard.nextHint }}</div>
+                <div class="rcv-form-hint-card__sub">
+                  ≈ {{ new Intl.NumberFormat('tr-TR').format(form.currentKm + 10000) }} km
+                </div>
+              </div>
+              <label class="rc-veh-modal-form__checkbox">
+                <input v-model="createReminder" type="checkbox" />
+                <span>Hatırlatıcı</span>
               </label>
             </div>
           </div>
-
-          <div class="form-group full-width">
-            <label>Değiştirilen Parçalar</label>
-            <div class="parts-manager">
-              <div class="parts-input">
-                <input
-                  v-model="newPart"
-                  type="text"
-                  placeholder="Parça adı girin"
-                  @keyup.enter="addPart"
-                />
-                <button type="button" class="btn btn-sm btn-outline" @click="addPart">
-                  Ekle
-                </button>
-              </div>
-              <div v-if="form.partsReplaced!.length > 0" class="parts-list">
-                <div
-                  v-for="(part, index) in form.partsReplaced"
-                  :key="index"
-                  class="part-item"
-                >
-                  <span>{{ part }}</span>
-                  <button
-                    type="button"
-                    class="btn-remove"
-                    @click="removePart(index)"
-                  >
-                    ×
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="form-group full-width">
-            <label for="description">Açıklama</label>
-            <textarea
-              id="description"
-              v-model="form.description"
-              rows="4"
-              placeholder="Bakım detaylarını yazın..."
-            ></textarea>
-          </div>
         </div>
+      </div>
+    </form>
 
-        <div class="form-actions">
-          <button type="button" class="btn btn-outline" @click="emit('close')">
-            İptal
-          </button>
-          <button type="submit" class="btn btn-primary" :disabled="submitting">
-            {{ submitting ? 'Kaydediliyor...' : 'Kaydet' }}
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
+    <template #footer>
+      <template v-if="savedMaintenanceId">
+        <RcButton variant="accent" @click="finishWithDocuments">
+          <RcIcon name="check" />
+          Bitir
+        </RcButton>
+      </template>
+      <template v-else>
+        <RcButton variant="ghost" @click="emit('close')">İptal</RcButton>
+        <span class="rc-spacer" />
+        <RcButton
+          variant="accent"
+          type="submit"
+          form="create-maintenance-form"
+          :disabled="submitting || loadingEdit"
+        >
+          <RcIcon name="check" />
+          {{ submitLabel }}
+        </RcButton>
+      </template>
+    </template>
+  </RcModal>
 </template>
-
-<style scoped>
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal-content {
-  background: var(--color-surface);
-  border-radius: 12px;
-  width: 90%;
-  max-width: 700px;
-  max-height: 90vh;
-  overflow-y: auto;
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px 24px;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.modal-header h2 {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 600;
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  font-size: 28px;
-  cursor: pointer;
-  color: var(--color-text-secondary);
-  padding: 0;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-}
-
-.close-btn:hover {
-  background: var(--color-bg-secondary);
-}
-
-.documents-step {
-  padding: 24px;
-}
-
-.step-message {
-  margin: 0 0 20px;
-  color: var(--color-text-secondary);
-}
-
-.maintenance-form {
-  padding: 24px;
-}
-
-.form-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.form-group.full-width {
-  grid-column: 1 / -1;
-}
-
-.form-group label {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--color-text-secondary);
-}
-
-.form-group input,
-.form-group select,
-.form-group textarea {
-  padding: 10px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  font-size: 14px;
-  background: var(--color-bg-secondary);
-}
-
-.form-group input:focus,
-.form-group select:focus,
-.form-group textarea:focus {
-  outline: none;
-  border-color: var(--color-primary);
-  background: var(--color-surface);
-}
-
-.zone-selector {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 10px;
-}
-
-.zone-checkbox {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-size: 13px;
-}
-
-.zone-checkbox:hover {
-  background: var(--color-surface);
-}
-
-.zone-checkbox input[type="checkbox"] {
-  margin: 0;
-}
-
-.parts-manager {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.parts-input {
-  display: flex;
-  gap: 8px;
-}
-
-.parts-input input {
-  flex: 1;
-}
-
-.parts-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.part-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  background: var(--color-primary-light);
-  border-radius: 16px;
-  font-size: 13px;
-}
-
-.btn-remove {
-  background: none;
-  border: none;
-  font-size: 18px;
-  cursor: pointer;
-  color: var(--color-text-secondary);
-  padding: 0;
-  width: 20px;
-  height: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-}
-
-.btn-remove:hover {
-  background: rgba(0, 0, 0, 0.1);
-}
-
-.form-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  margin-top: 24px;
-  padding-top: 20px;
-  border-top: 1px solid var(--color-border);
-}
-
-.btn {
-  padding: 10px 24px;
-  border-radius: 8px;
-  font-weight: 500;
-  cursor: pointer;
-  border: none;
-  transition: all 0.2s;
-}
-
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn-sm {
-  padding: 8px 16px;
-  font-size: 14px;
-}
-
-.btn-primary {
-  background: var(--color-primary);
-  color: white;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: var(--color-primary-hover);
-}
-
-.btn-outline {
-  background: transparent;
-  border: 1px solid var(--color-border);
-  color: var(--color-text);
-}
-
-.btn-outline:hover {
-  background: var(--color-bg-secondary);
-}
-
-@media (max-width: 640px) {
-  .form-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .zone-selector {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-</style>

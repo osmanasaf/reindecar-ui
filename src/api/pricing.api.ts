@@ -151,7 +151,7 @@ class CategoryPricingApiService extends BaseApi {
     }
 
     async deactivate(id: number): Promise<void> {
-        return this.delete(`/${id}`)
+        return this.deleteByPath(`/${id}`)
     }
 }
 
@@ -167,7 +167,7 @@ class VehiclePricingApiService extends BaseApi {
     }
 
     async deactivate(vehicleId: number): Promise<void> {
-        return this.delete(`/${vehicleId}`)
+        return this.deleteByPath(`/${vehicleId}`)
     }
 }
 
@@ -195,7 +195,7 @@ class TermDiscountApiService extends BaseApi {
     }
 
     async deactivate(id: number): Promise<void> {
-        return this.delete(`/${id}`)
+        return this.deleteByPath(`/${id}`)
     }
 }
 
@@ -215,7 +215,7 @@ class ExtraItemTypeApiService extends BaseApi {
     }
 
     async deactivate(id: number): Promise<void> {
-        return this.delete(`/${id}`)
+        return this.deleteByPath(`/${id}`)
     }
 }
 
@@ -231,7 +231,7 @@ class RentalExtraItemApiService extends BaseApi {
     }
 
     async remove(itemId: number): Promise<void> {
-        return this.delete(`/extra-items/${itemId}`)
+        return this.deleteByPath(`/extra-items/${itemId}`)
     }
 }
 

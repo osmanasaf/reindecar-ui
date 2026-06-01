@@ -73,7 +73,7 @@ class PenaltiesApiService extends BaseApi {
   }
 
   async remove(id: number): Promise<void> {
-    return super.remove(`/${id}`)
+    return super.deleteByPath(`/${id}`)
   }
 
   async import(request: ImportPenaltyRequest): Promise<PenaltyResponse[]> {

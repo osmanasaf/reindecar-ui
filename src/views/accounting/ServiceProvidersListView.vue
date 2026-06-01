@@ -3,10 +3,12 @@ import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAccountingStore } from '@/stores'
 import { useToast, useEnumTranslations } from '@/composables'
-import { SearchableSelect } from '@/components/common'
 import { ProviderType } from '@/types'
 import type { ServiceProviderResponse, CreateServiceProviderRequest, UpdateServiceProviderRequest } from '@/types'
-import { ProviderCard, CreateProviderModal, EditProviderModal } from '@/components/accounting'
+import { CreateProviderModal, EditProviderModal } from '@/components/accounting'
+import ServiceProvidersTable from '@/components/accounting/service-providers/ServiceProvidersTable.vue'
+import { RcPageHeader, RcButton, RcEmpty } from '@/components/rc'
+import { RcIcon } from '@/components/icons'
 
 const router = useRouter()
 const route = useRoute()
@@ -20,30 +22,21 @@ const loading = computed(() => accountingStore.providersLoading)
 const searchQuery = ref('')
 const selectedType = ref<ProviderType | ''>('')
 const showInactive = ref(false)
-
 const showCreateModal = ref(false)
 const showEditModal = ref(false)
 const selectedProvider = ref<ServiceProviderResponse | null>(null)
 
-const providerTypeOptions = [
-  { value: '', label: 'Tüm Tipler' },
-  ...Object.values(ProviderType).map(value => ({
-    value,
-    label: translateProviderType(value)
-  }))
-]
-
 const filteredProviders = computed(() => {
-  const providersList = Array.isArray(providers.value) ? providers.value : []
-  let result = [...providersList]
+  const list = Array.isArray(providers.value) ? providers.value : []
+  let result = [...list]
 
   if (searchQuery.value) {
-    const query = searchQuery.value.toLowerCase()
+    const q = searchQuery.value.toLowerCase()
     result = result.filter(p =>
-      p.name.toLowerCase().includes(query) ||
-      p.taxNumber?.toLowerCase().includes(query) ||
-      p.contactPerson?.toLowerCase().includes(query) ||
-      p.code?.toLowerCase().includes(query)
+      p.name.toLowerCase().includes(q)
+      || p.taxNumber?.toLowerCase().includes(q)
+      || p.contactPerson?.toLowerCase().includes(q)
+      || p.code?.toLowerCase().includes(q)
     )
   }
 
@@ -70,9 +63,17 @@ const stats = computed(() => {
     total: all.length,
     active: active.length,
     inactive: all.length - active.length,
-    byType
+    byType,
   }
 })
+
+const typeChips = computed(() =>
+  Object.values(ProviderType).map(type => ({
+    id: type,
+    label: translateProviderType(type),
+    count: stats.value.byType[type] ?? 0,
+  }))
+)
 
 onMounted(async () => {
   await loadProviders()
@@ -81,31 +82,31 @@ onMounted(async () => {
   }
 })
 
-const loadProviders = async () => {
+async function loadProviders() {
   try {
     await accountingStore.fetchServiceProviders(false)
-  } catch (error: any) {
-    toast.error(error.message || 'Servis sağlayıcılar yüklenemedi')
+  } catch (error: unknown) {
+    toast.error(error instanceof Error ? error.message : 'Servis sağlayıcılar yüklenemedi')
   }
 }
 
-const handleSearch = async () => {
+async function handleSearch() {
   if (searchQuery.value.length >= 2) {
     try {
       await accountingStore.searchProviders(searchQuery.value)
-    } catch (error: any) {
-      toast.error(error.message || 'Arama yapılırken hata oluştu')
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Arama yapılırken hata oluştu')
     }
   } else if (searchQuery.value.length === 0) {
     await loadProviders()
   }
 }
 
-const handleProviderClick = (id: number) => {
+function handleProviderClick(id: number) {
   router.push({ name: 'provider-detail', params: { id } })
 }
 
-const handleEditClick = (id: number) => {
+function handleEditClick(id: number) {
   const provider = providers.value.find(p => p.id === id)
   if (provider) {
     selectedProvider.value = JSON.parse(JSON.stringify(provider)) as ServiceProviderResponse
@@ -113,137 +114,119 @@ const handleEditClick = (id: number) => {
   }
 }
 
-const handleCreateSubmit = async (data: CreateServiceProviderRequest) => {
+async function handleCreateSubmit(data: CreateServiceProviderRequest) {
   try {
     await accountingStore.createServiceProvider(data)
     toast.success('Servis sağlayıcı başarıyla oluşturuldu')
     showCreateModal.value = false
     await loadProviders()
-  } catch (error: any) {
-    toast.error(error.message || 'Servis sağlayıcı oluşturulurken hata oluştu')
+  } catch (error: unknown) {
+    toast.error(error instanceof Error ? error.message : 'Servis sağlayıcı oluşturulurken hata oluştu')
   }
 }
 
-const handleEditSubmit = async (id: number, data: UpdateServiceProviderRequest) => {
+async function handleEditSubmit(id: number, data: UpdateServiceProviderRequest) {
   try {
     await accountingStore.updateServiceProvider(id, data)
     toast.success('Servis sağlayıcı başarıyla güncellendi')
     showEditModal.value = false
     selectedProvider.value = null
     await loadProviders()
-  } catch (error: any) {
-    toast.error(error.message || 'Servis sağlayıcı güncellenirken hata oluştu')
+  } catch (error: unknown) {
+    toast.error(error instanceof Error ? error.message : 'Servis sağlayıcı güncellenirken hata oluştu')
   }
+}
+
+function toggleTypeFilter(type: ProviderType) {
+  selectedType.value = selectedType.value === type ? '' : type
 }
 
 let searchTimeout: number | undefined
 watch(searchQuery, () => {
   clearTimeout(searchTimeout)
   searchTimeout = window.setTimeout(() => {
-    handleSearch()
+    void handleSearch()
   }, 300)
 })
 </script>
 
 <template>
-  <div class="page-container">
-    <div class="page-header">
-      <div>
-        <h1 class="page-title">Servis Sağlayıcılar</h1>
-        <p class="page-subtitle">Bakım, onarım ve diğer hizmetleri sunan firmalar</p>
+  <div class="rc-page rca-providers">
+    <RcPageHeader
+      title="Servis Sağlayıcılar"
+      subtitle="Bakım, onarım ve diğer hizmetleri sunan firmalar"
+    >
+      <template #actions>
+        <RcButton variant="accent" @click="showCreateModal = true">
+          <RcIcon name="plus" :size="14" />
+          Yeni sağlayıcı
+        </RcButton>
+      </template>
+    </RcPageHeader>
+
+    <div class="rca-stats rca-stats--payables">
+      <div class="rca-stat">
+        <div class="rca-stat__label">Toplam</div>
+        <div class="rca-stat__value rc-num">{{ stats.total }}</div>
       </div>
-      <button class="btn btn-primary" @click="showCreateModal = true">
-        + Yeni Ekle
+      <div class="rca-stat">
+        <div class="rca-stat__label">Aktif</div>
+        <div class="rca-stat__value rca-stat__value--success rc-num">{{ stats.active }}</div>
+      </div>
+      <div class="rca-stat">
+        <div class="rca-stat__label">Pasif</div>
+        <div class="rca-stat__value rc-num">{{ stats.inactive }}</div>
+      </div>
+    </div>
+
+    <div v-if="stats.total > 0" class="rc-filterbar" style="margin-bottom: 14px">
+      <button
+        v-for="chip in typeChips"
+        :key="chip.id"
+        type="button"
+        class="rc-chip"
+        :class="{ 'rc-chip--on': selectedType === chip.id }"
+        @click="toggleTypeFilter(chip.id)"
+      >
+        {{ chip.label }}
+        <span v-if="chip.count > 0" class="rc-chip__count">{{ chip.count }}</span>
       </button>
     </div>
 
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-icon">🏢</div>
-        <div class="stat-body">
-          <span class="stat-value">{{ stats.total }}</span>
-          <span class="stat-label">Toplam Sağlayıcı</span>
-        </div>
-      </div>
-      <div class="stat-card stat-card--active">
-        <div class="stat-icon">✅</div>
-        <div class="stat-body">
-          <span class="stat-value text-green">{{ stats.active }}</span>
-          <span class="stat-label">Aktif</span>
-        </div>
-      </div>
-      <div class="stat-card stat-card--inactive">
-        <div class="stat-icon">⏸️</div>
-        <div class="stat-body">
-          <span class="stat-value text-gray">{{ stats.inactive }}</span>
-          <span class="stat-label">Pasif</span>
-        </div>
-      </div>
-    </div>
-
-    <div v-if="stats.total > 0" class="type-breakdown">
-      <h3 class="breakdown-title">Tip Dağılımı</h3>
-      <div class="breakdown-grid">
-        <div
-          v-for="(count, type) in stats.byType"
-          :key="type"
-          class="breakdown-chip"
-          :class="{ 'breakdown-chip--active': selectedType === type }"
-          @click="selectedType = selectedType === type ? '' : type as ProviderType"
-        >
-          <span class="chip-label">{{ translateProviderType(type) }}</span>
-          <span class="chip-count">{{ count }}</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="filters-section">
-      <div class="search-box">
+    <div class="rc-filterbar rcv-filterbar--slim">
+      <div class="rc-input-group" style="flex: 1; min-width: 240px">
+        <RcIcon name="search" class="rc-icon" :size="16" />
         <input
           v-model="searchQuery"
-          type="text"
-          class="search-input"
-          placeholder="Firma adı, vergi no veya yetkili kişi ara..."
+          type="search"
+          placeholder="Firma, vergi no veya yetkili…"
         />
       </div>
-
-      <div class="filter-group">
-        <SearchableSelect
-          :model-value="selectedType || null"
-          :options="providerTypeOptions"
-          placeholder="Tüm Tipler"
-          search-placeholder="Tip ara..."
-          clearable
-          class="filter-searchable"
-          @update:model-value="(v) => selectedType = v ?? ''"
-        />
-
-        <label class="checkbox-filter">
-          <input v-model="showInactive" type="checkbox" />
-          Pasif olanları göster
-        </label>
-      </div>
+      <label class="rca-filter-check">
+        <input v-model="showInactive" type="checkbox" />
+        Pasif olanları göster
+      </label>
     </div>
 
-    <div v-if="loading" class="loading">Yükleniyor...</div>
+    <div v-if="loading" class="rc-skeleton rc-card-skeleton" style="height: 280px" />
 
-    <div v-else-if="filteredProviders.length === 0" class="empty-state">
-      <p v-if="searchQuery || selectedType">Arama kriterlerine uygun servis sağlayıcı bulunamadı.</p>
-      <p v-else>Henüz servis sağlayıcı bulunmamaktadır.</p>
-      <button v-if="!searchQuery && !selectedType" class="btn btn-primary" @click="showCreateModal = true">
-        İlk Servis Sağlayıcıyı Ekle
-      </button>
-    </div>
+    <RcEmpty
+      v-else-if="filteredProviders.length === 0"
+      :title="searchQuery || selectedType ? 'Sonuç bulunamadı' : 'Sağlayıcı yok'"
+      :description="searchQuery || selectedType ? 'Arama kriterlerini değiştirin' : 'Henüz servis sağlayıcı kaydı yok'"
+    >
+      <template #icon><RcIcon name="wrench" :size="32" /></template>
+      <template v-if="!searchQuery && !selectedType" #action>
+        <RcButton variant="accent" @click="showCreateModal = true">İlk sağlayıcıyı ekle</RcButton>
+      </template>
+    </RcEmpty>
 
-    <div v-else class="providers-grid">
-      <ProviderCard
-        v-for="provider in filteredProviders"
-        :key="provider.id"
-        :provider="provider"
-        @click="handleProviderClick"
-        @edit="handleEditClick"
-      />
-    </div>
+    <ServiceProvidersTable
+      v-else
+      :providers="filteredProviders"
+      @row-click="handleProviderClick"
+      @edit="handleEditClick"
+    />
 
     <CreateProviderModal
       :show="showCreateModal"
@@ -259,270 +242,3 @@ watch(searchQuery, () => {
     />
   </div>
 </template>
-
-<style scoped>
-.page-container {
-  padding: 2rem;
-  max-width: 1400px;
-  margin: 0 auto;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 2rem;
-}
-
-.page-title {
-  font-size: 1.875rem;
-  font-weight: 700;
-  color: var(--color-text, #111827);
-  margin: 0 0 0.5rem 0;
-}
-
-.page-subtitle {
-  color: var(--color-text-secondary, #6b7280);
-  margin: 0;
-}
-
-.btn {
-  padding: 0.625rem 1.25rem;
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  border: none;
-  transition: all 0.2s;
-}
-
-.btn-primary {
-  background: var(--color-primary, #2563eb);
-  color: white;
-}
-
-.btn-primary:hover {
-  background: var(--color-primary-dark, #1d4ed8);
-}
-
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-
-.stat-card {
-  background: white;
-  border: 1px solid var(--color-border, #e5e7eb);
-  border-radius: 0.75rem;
-  padding: 1.25rem;
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.stat-card--active { border-left: 3px solid #22c55e; }
-.stat-card--inactive { border-left: 3px solid #9ca3af; }
-
-.stat-icon {
-  font-size: 1.5rem;
-  width: 2.75rem;
-  height: 2.75rem;
-  background: #f3f4f6;
-  border-radius: 0.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.stat-body {
-  display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
-}
-
-.stat-value {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--color-text, #111827);
-}
-
-.stat-label {
-  font-size: 0.8125rem;
-  color: var(--color-text-secondary, #6b7280);
-}
-
-.text-green { color: #15803d !important; }
-.text-gray { color: #6b7280 !important; }
-
-.type-breakdown {
-  background: white;
-  border: 1px solid var(--color-border, #e5e7eb);
-  border-radius: 0.75rem;
-  padding: 1rem 1.25rem;
-  margin-bottom: 1.5rem;
-}
-
-.breakdown-title {
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: var(--color-text-secondary, #6b7280);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin: 0 0 0.75rem 0;
-}
-
-.breakdown-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.breakdown-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0.3125rem 0.75rem;
-  background: #f3f4f6;
-  border: 1px solid transparent;
-  border-radius: 9999px;
-  cursor: pointer;
-  transition: all 0.15s;
-  font-size: 0.8125rem;
-}
-
-.breakdown-chip:hover {
-  background: #e5e7eb;
-}
-
-.breakdown-chip--active {
-  background: #eff6ff;
-  border-color: #93c5fd;
-  color: #1d4ed8;
-}
-
-.chip-label { font-weight: 500; color: inherit; }
-
-.chip-count {
-  background: white;
-  border-radius: 9999px;
-  padding: 0 0.375rem;
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: var(--color-text, #111827);
-  min-width: 1.25rem;
-  text-align: center;
-  border: 1px solid var(--color-border, #e5e7eb);
-}
-
-.filters-section {
-  display: flex;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-  flex-wrap: wrap;
-}
-
-.search-box {
-  flex: 1;
-  min-width: 250px;
-}
-
-.search-input {
-  width: 100%;
-  padding: 0.625rem 1rem;
-  border: 1px solid var(--color-border, #d1d5db);
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-  transition: all 0.2s;
-}
-
-.search-input:focus {
-  outline: none;
-  border-color: var(--color-primary, #2563eb);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-}
-
-.filter-group {
-  display: flex;
-  gap: 1rem;
-  align-items: center;
-}
-
-.filter-select {
-  padding: 0.625rem 2rem 0.625rem 0.75rem;
-  border: 1px solid var(--color-border, #d1d5db);
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-  background: white;
-  cursor: pointer;
-}
-
-.filter-select:focus {
-  outline: none;
-  border-color: var(--color-primary, #2563eb);
-}
-
-.checkbox-filter {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.875rem;
-  color: var(--color-text-secondary, #6b7280);
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.checkbox-filter input {
-  accent-color: var(--color-primary, #2563eb);
-}
-
-.loading {
-  text-align: center;
-  padding: 3rem;
-  color: var(--color-text-secondary, #6b7280);
-}
-
-.empty-state {
-  text-align: center;
-  padding: 3rem;
-  background: white;
-  border: 1px solid var(--color-border, #e5e7eb);
-  border-radius: 0.5rem;
-  color: var(--color-text-secondary, #6b7280);
-}
-
-.empty-state p {
-  margin: 0 0 1rem 0;
-}
-
-.providers-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-  gap: 1.5rem;
-}
-
-@media (max-width: 768px) {
-  .page-header {
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .stats-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .filters-section {
-    flex-direction: column;
-  }
-
-  .filter-group {
-    flex-wrap: wrap;
-  }
-
-  .providers-grid {
-    grid-template-columns: 1fr;
-  }
-}
-</style>

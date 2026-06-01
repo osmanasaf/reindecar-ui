@@ -4,6 +4,7 @@ import type {
     PaginationParams,
     Customer,
     CustomerStats,
+    CustomerOverview,
     CreatePersonalCustomerForm,
     CreateCompanyCustomerForm,
     UpdateCompanyCustomerForm,
@@ -24,6 +25,10 @@ class CustomersApiService extends BaseApi {
             : `/${customerId}/authorized-persons`
     }
 
+    async getOverview(): Promise<CustomerOverview> {
+        return this.get('/overview')
+    }
+
     async getAll(params?: PaginationParams): Promise<PaginatedResponse<Customer>> {
         return this.getList<Customer>('', params)
     }
@@ -37,8 +42,8 @@ class CustomersApiService extends BaseApi {
         return this.getList<Customer>('/search', searchParams)
     }
 
-    async getBlacklisted(): Promise<Customer[]> {
-        return this.get('/blacklisted')
+    async getBlacklisted(params?: PaginationParams): Promise<PaginatedResponse<Customer>> {
+        return this.getList<Customer>('/blacklisted', params)
     }
 
     async getById(id: number): Promise<Customer> {
@@ -91,7 +96,7 @@ class CustomersApiService extends BaseApi {
     }
 
     async deleteById(id: number): Promise<void> {
-        return this.remove(`/${id}`)
+        return this.deleteByPath(`/${id}`)
     }
 
     async getDrivers(customerId: number, active?: boolean): Promise<Driver[]> {
@@ -144,7 +149,7 @@ class CustomersApiService extends BaseApi {
     }
 
     async deleteAuthorizedPerson(customerId: number, id: number, legacy = false): Promise<void> {
-        return this.remove(`${this.getAuthorizedPersonsPath(customerId, legacy)}/${id}`)
+        return this.deleteByPath(`${this.getAuthorizedPersonsPath(customerId, legacy)}/${id}`)
     }
 
     async setPrimaryAuthorizedPerson(customerId: number, id: number, legacy = false): Promise<CompanyAuthorizedPerson> {

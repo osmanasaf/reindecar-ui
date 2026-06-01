@@ -4,8 +4,10 @@ import { useRouter } from 'vue-router'
 import { penaltiesApi } from '@/api'
 import { useToast, useEnumTranslations } from '@/composables'
 import PenaltyStatusBadge from '@/components/penalties/PenaltyStatusBadge.vue'
+import { RcPageHeader, RcButton, RcEmpty, RcBadge } from '@/components/rc'
+import { RcIcon } from '@/components/icons'
 import { formatCurrency, formatDate } from '@/utils/format'
-import type { PenaltyResponse, PenaltySearchCriteria } from '@/types'
+import type { PenaltyResponse } from '@/types'
 
 const router = useRouter()
 const toast = useToast()
@@ -20,352 +22,151 @@ const showOverdueOnly = ref(false)
 
 const paginatedPenalties = computed(() => {
   const start = currentPage.value * pageSize.value
-  const end = start + pageSize.value
-  return penalties.value.slice(start, end)
+  return penalties.value.slice(start, start + pageSize.value)
 })
 
 const totalPages = computed(() => Math.ceil(totalCount.value / pageSize.value))
 
-const loadPenalties = async () => {
+const overdueCount = computed(() => penalties.value.filter(p => p.isOverdue).length)
+
+async function loadPenalties() {
   loading.value = true
   try {
     const response = showOverdueOnly.value
       ? await penaltiesApi.getOverdue({ page: currentPage.value, size: pageSize.value })
       : await penaltiesApi.getAll({ page: currentPage.value, size: pageSize.value })
-    
+
     penalties.value = response.content
     totalCount.value = response.totalElements
-  } catch (error: any) {
-    toast.error(error.message || 'Cezalar yüklenemedi')
+  } catch (error: unknown) {
+    toast.error(error instanceof Error ? error.message : 'Cezalar yüklenemedi')
   } finally {
     loading.value = false
   }
 }
 
-const handlePenaltyClick = (id: number) => {
+function handlePenaltyClick(id: number) {
   router.push({ name: 'penalty-detail', params: { id } })
 }
 
-const handleToggleOverdue = () => {
-  showOverdueOnly.value = !showOverdueOnly.value
+function handleToggleOverdue() {
   currentPage.value = 0
-  loadPenalties()
+  void loadPenalties()
 }
 
-const handlePageChange = (page: number) => {
+function handlePageChange(page: number) {
   currentPage.value = page
-  loadPenalties()
+  void loadPenalties()
 }
 
 onMounted(() => {
-  loadPenalties()
+  void loadPenalties()
 })
 </script>
 
 <template>
-  <div class="page-container">
-    <div class="page-header">
-      <div>
-        <h1 class="page-title">Trafik Cezaları</h1>
-        <p class="page-subtitle">Araç kiralama sürecinde kesilen trafik cezaları</p>
+  <div class="rc-page rca-penalties">
+    <RcPageHeader
+      title="Trafik Cezaları"
+      subtitle="Araç kiralama sürecinde kesilen trafik cezaları"
+    />
+
+    <div class="rca-stats rca-stats--payables">
+      <div class="rca-stat">
+        <div class="rca-stat__label">Toplam kayıt</div>
+        <div class="rca-stat__value rc-num">{{ totalCount }}</div>
       </div>
-      <div class="header-actions">
-        <label class="toggle-label">
-          <input 
-            type="checkbox" 
-            v-model="showOverdueOnly"
-            @change="handleToggleOverdue"
-            class="toggle-checkbox"
-          />
-          <span class="toggle-text">Sadece vadesi geçmişler</span>
-        </label>
+      <div class="rca-stat">
+        <div class="rca-stat__label">Vadesi geçmiş</div>
+        <div class="rca-stat__value rca-stat__value--danger rc-num">{{ overdueCount }}</div>
       </div>
     </div>
 
-    <div v-if="loading" class="loading">Yükleniyor...</div>
-
-    <div v-else-if="penalties.length === 0" class="empty-state">
-      <p>{{ showOverdueOnly ? 'Vadesi geçmiş ceza bulunmamaktadır.' : 'Henüz trafik cezası kaydı bulunmamaktadır.' }}</p>
+    <div class="rc-filterbar rcv-filterbar--slim">
+      <button
+        type="button"
+        class="rc-chip"
+        :class="{ 'rc-chip--on': !showOverdueOnly }"
+        @click="showOverdueOnly = false; handleToggleOverdue()"
+      >
+        Hepsi
+      </button>
+      <button
+        type="button"
+        class="rc-chip"
+        :class="{ 'rc-chip--on': showOverdueOnly }"
+        @click="showOverdueOnly = true; handleToggleOverdue()"
+      >
+        Vadesi geçmiş
+        <span v-if="overdueCount > 0" class="rc-chip__count">{{ overdueCount }}</span>
+      </button>
     </div>
 
-    <div v-else>
-      <div class="table-container">
-        <table class="penalty-table">
-          <thead>
-            <tr>
-              <th>Ceza No</th>
-              <th>Plaka</th>
-              <th>İhlal Türü</th>
-              <th>İhlal Tarihi</th>
-              <th>Yer</th>
-              <th class="text-right">Tutar</th>
-              <th>Vade</th>
-              <th>Durum</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr 
-              v-for="penalty in paginatedPenalties" 
-              :key="penalty.id"
-              :class="{ 'overdue-row': penalty.isOverdue }"
-              @click="handlePenaltyClick(penalty.id)"
-            >
-              <td>
-                <div class="penalty-number">
-                  {{ penalty.penaltyNumber }}
-                  <span v-if="penalty.source === 'EXTERNAL'" class="source-badge">API</span>
-                </div>
-              </td>
-              <td class="font-medium">{{ penalty.plateNumber || '-' }}</td>
-              <td>{{ translateViolationType(penalty.violationType) }}</td>
-              <td>{{ formatDate(penalty.violationDate) }}</td>
-              <td class="location-cell">{{ penalty.violationLocation || '-' }}</td>
-              <td class="text-right font-medium">{{ formatCurrency(penalty.penaltyAmount, penalty.currency) }}</td>
-              <td>
-                <div class="due-date-cell">
-                  {{ penalty.dueDate ? formatDate(penalty.dueDate) : '-' }}
-                  <span v-if="penalty.isOverdue" class="overdue-badge">VADESİ GEÇTİ</span>
-                </div>
-              </td>
-              <td>
-                <PenaltyStatusBadge :status="penalty.status" size="sm" />
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+    <div v-if="loading" class="rc-skeleton rc-card-skeleton" style="height: 280px" />
 
-      <div v-if="totalPages > 1" class="pagination">
-        <button 
-          class="pagination-btn"
-          :disabled="currentPage === 0"
-          @click="handlePageChange(currentPage - 1)"
-        >
-          ← Önceki
-        </button>
-        <span class="pagination-info">
-          Sayfa {{ currentPage + 1 }} / {{ totalPages }}
-        </span>
-        <button 
-          class="pagination-btn"
-          :disabled="currentPage >= totalPages - 1"
-          @click="handlePageChange(currentPage + 1)"
-        >
-          Sonraki →
-        </button>
-      </div>
+    <RcEmpty
+      v-else-if="penalties.length === 0"
+      :title="showOverdueOnly ? 'Gecikmiş ceza yok' : 'Ceza kaydı yok'"
+      :description="showOverdueOnly ? 'Vadesi geçmiş ceza bulunmuyor' : 'Henüz trafik cezası kaydı yok'"
+    >
+      <template #icon><RcIcon name="warning" :size="32" /></template>
+    </RcEmpty>
+
+    <div v-else class="rc-card" style="overflow: hidden">
+      <table class="rc-table rcv-table--slim">
+        <thead>
+          <tr>
+            <th>Ceza no</th>
+            <th>Plaka</th>
+            <th>İhlal</th>
+            <th>Tarih</th>
+            <th>Yer</th>
+            <th class="rc-right">Tutar</th>
+            <th>Vade</th>
+            <th>Durum</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            v-for="penalty in paginatedPenalties"
+            :key="penalty.id"
+            :class="{ 'rca-row--danger': penalty.isOverdue }"
+            style="cursor: pointer"
+            @click="handlePenaltyClick(penalty.id)"
+          >
+            <td>
+              <div class="rcr-row__primary rcr-row__mono">{{ penalty.penaltyNumber }}</div>
+              <RcBadge v-if="penalty.source === 'EXTERNAL'" variant="info" style="margin-top: 4px">API</RcBadge>
+            </td>
+            <td>{{ penalty.plateNumber || '—' }}</td>
+            <td>{{ translateViolationType(penalty.violationType) }}</td>
+            <td class="rc-mono" style="font-size: 12.5px">{{ formatDate(penalty.violationDate) }}</td>
+            <td>
+              <span class="rcr-row__secondary" style="max-width: 180px; display: inline-block">
+                {{ penalty.violationLocation || '—' }}
+              </span>
+            </td>
+            <td class="rc-right rc-num">{{ formatCurrency(penalty.penaltyAmount, penalty.currency) }}</td>
+            <td>
+              <div>{{ penalty.dueDate ? formatDate(penalty.dueDate) : '—' }}</div>
+              <RcBadge v-if="penalty.isOverdue" variant="danger" style="margin-top: 4px">Geç</RcBadge>
+            </td>
+            <td>
+              <PenaltyStatusBadge :status="penalty.status" size="sm" />
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div v-if="!loading && totalPages > 1" class="rca-pagination">
+      <RcButton variant="secondary" :disabled="currentPage === 0" @click="handlePageChange(currentPage - 1)">
+        Önceki
+      </RcButton>
+      <span style="font-size: 13px; color: var(--rc-text-muted)">Sayfa {{ currentPage + 1 }} / {{ totalPages }}</span>
+      <RcButton variant="secondary" :disabled="currentPage >= totalPages - 1" @click="handlePageChange(currentPage + 1)">
+        Sonraki
+      </RcButton>
     </div>
   </div>
 </template>
-
-<style scoped>
-.page-container {
-  padding: 2rem;
-  max-width: 1400px;
-  margin: 0 auto;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 2rem;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-
-.page-title {
-  font-size: 1.875rem;
-  font-weight: 700;
-  color: var(--color-text, #111827);
-  margin: 0 0 0.5rem 0;
-}
-
-.page-subtitle {
-  color: var(--color-text-secondary, #6b7280);
-  margin: 0;
-}
-
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.toggle-label {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  cursor: pointer;
-  user-select: none;
-}
-
-.toggle-checkbox {
-  width: 1rem;
-  height: 1rem;
-  cursor: pointer;
-}
-
-.toggle-text {
-  font-size: 0.875rem;
-  color: var(--color-text-secondary, #6b7280);
-}
-
-.loading {
-  text-align: center;
-  padding: 3rem;
-  color: var(--color-text-secondary, #6b7280);
-}
-
-.empty-state {
-  text-align: center;
-  padding: 3rem;
-  background: white;
-  border: 1px solid var(--color-border, #e5e7eb);
-  border-radius: 0.5rem;
-  color: var(--color-text-secondary, #6b7280);
-}
-
-.table-container {
-  background: white;
-  border: 1px solid var(--color-border, #e5e7eb);
-  border-radius: 0.5rem;
-  overflow: hidden;
-}
-
-.penalty-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.penalty-table thead {
-  background: var(--color-background, #f9fafb);
-}
-
-.penalty-table th {
-  padding: 0.75rem 1rem;
-  text-align: left;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--color-text, #111827);
-  border-bottom: 1px solid var(--color-border, #e5e7eb);
-}
-
-.penalty-table tbody tr {
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.penalty-table tbody tr:hover {
-  background: var(--color-background, #f9fafb);
-}
-
-.penalty-table tbody tr.overdue-row {
-  background: #fef2f2;
-}
-
-.penalty-table tbody tr.overdue-row:hover {
-  background: #fee2e2;
-}
-
-.penalty-table td {
-  padding: 0.875rem 1rem;
-  font-size: 0.875rem;
-  color: var(--color-text, #111827);
-  border-bottom: 1px solid var(--color-border, #e5e7eb);
-}
-
-.penalty-number {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.source-badge {
-  display: inline-flex;
-  padding: 0.125rem 0.375rem;
-  background: #dbeafe;
-  color: #1e40af;
-  border-radius: 0.25rem;
-  font-size: 0.625rem;
-  font-weight: 600;
-}
-
-.location-cell {
-  max-width: 200px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.due-date-cell {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.overdue-badge {
-  display: inline-flex;
-  padding: 0.125rem 0.375rem;
-  background: #fee2e2;
-  color: #991b1b;
-  border-radius: 0.25rem;
-  font-size: 0.625rem;
-  font-weight: 600;
-}
-
-.text-right {
-  text-align: right;
-}
-
-.font-medium {
-  font-weight: 500;
-}
-
-.pagination {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 1rem;
-  margin-top: 1.5rem;
-}
-
-.pagination-btn {
-  padding: 0.5rem 1rem;
-  background: white;
-  border: 1px solid var(--color-border, #d1d5db);
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.pagination-btn:hover:not(:disabled) {
-  background: var(--color-background, #f3f4f6);
-}
-
-.pagination-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.pagination-info {
-  font-size: 0.875rem;
-  color: var(--color-text-secondary, #6b7280);
-}
-
-@media (max-width: 1024px) {
-  .penalty-table {
-    font-size: 0.75rem;
-  }
-  
-  .penalty-table th,
-  .penalty-table td {
-    padding: 0.625rem 0.75rem;
-  }
-  
-  .location-cell {
-    max-width: 150px;
-  }
-}
-</style>

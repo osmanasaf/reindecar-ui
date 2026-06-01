@@ -23,6 +23,10 @@ export function getZoneForLocation(location: DamageLocation): number {
   return 13
 }
 
+export function getDefaultLocationForZone(zoneId: number): DamageLocation {
+  return ZONE_LOCATION_MAP[zoneId]?.[0] ?? DamageLocation.ROOF
+}
+
 export const SEVERITY_COLORS: Record<DamageSeverity, string> = {
   [DamageSeverity.MINOR]: '#FFC107',
   [DamageSeverity.MODERATE]: '#FF9800',
@@ -57,4 +61,19 @@ export const ZONE_NAMES: Record<number, string> = {
   10: 'Sağ Arka Çamurluk & Tekerlek',
   12: 'Sağ Kapılar & Ayna',
   13: 'Tavan & İç Mekan'
+}
+
+/** CarDiagramSVG viewBox (0 0 240 430) pin merkezleri */
+export const ZONE_PIN_CENTERS: Record<number, { x: number; y: number }> = {
+  4: { x: 100, y: 62 },
+  1: { x: 140, y: 62 },
+  3: { x: 120, y: 116 },
+  2: { x: 120, y: 162 },
+  6: { x: 48, y: 245 },
+  13: { x: 120, y: 244 },
+  12: { x: 192, y: 245 },
+  9: { x: 120, y: 320 },
+  7: { x: 66, y: 376 },
+  8: { x: 120, y: 380 },
+  10: { x: 174, y: 376 }
 }

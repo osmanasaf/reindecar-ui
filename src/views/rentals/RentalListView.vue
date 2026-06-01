@@ -1,68 +1,97 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import { rentalsApi, vehiclesApi, customersApi } from '@/api'
-import { usePagination, useToast } from '@/composables'
-import { SearchableSelect } from '@/components/common'
-import type { Rental, RentalStatus, RentalType, Vehicle, Customer } from '@/types'
+import { rentalsApi, dashboardApi, vehiclesApi, customersApi } from '@/api'
+import type { RentalStats } from '@/api/dashboard.api'
+import { usePagination, useToast, usePageSearchHotkey } from '@/composables'
+import RentalQuickModal from '@/components/rentals/RentalQuickModal.vue'
+import { RcIcon } from '@/components/icons'
+import {
+  RcPageHeader,
+  RcButton,
+  RcBadge,
+  RcAvatar,
+  RcEmpty,
+  RcKbd,
+  RcStatusPill,
+} from '@/components/rc'
+import { fmtTRY, formatDate } from '@/utils/format'
+import { RentalStatus, RentalType } from '@/types/enums'
+import type { Rental, Vehicle, Customer } from '@/types'
+
+type StatusView = 'all' | RentalStatus
 
 const rentals = ref<Rental[]>([])
 const vehicleMap = ref<Map<number, Vehicle>>(new Map())
 const customerMap = ref<Map<number, Customer>>(new Map())
 const loading = ref(true)
-const statusFilter = ref<RentalStatus | ''>('')
+const searchQuery = ref('')
+const statusView = ref<StatusView>('all')
 const typeFilter = ref<RentalType | ''>('')
+const previewRental = ref<Rental | null>(null)
+const showPreview = ref(false)
+const searchInputRef = ref<HTMLInputElement | null>(null)
 
-const { page, size, totalElements, setPage, setTotal, getParams } = usePagination()
+usePageSearchHotkey(searchInputRef)
+
+const overview = ref({
+  total: 0,
+  active: 0,
+  overdue: 0,
+  reserved: 0,
+  returnPending: 0,
+  draft: 0,
+  closed: 0,
+  cancelled: 0,
+  todayReturns: 0,
+})
+
+const { page, totalElements, totalPages, setPage, setTotal, getParams } = usePagination()
 const toast = useToast()
-
-const statusOptions: { value: RentalStatus | '', label: string }[] = [
-  { value: '', label: 'Tüm Durumlar' },
-  { value: 'DRAFT', label: 'Taslak' },
-  { value: 'RESERVED', label: 'Rezerve' },
-  { value: 'ACTIVE', label: 'Aktif' },
-  { value: 'RETURN_PENDING', label: 'İade Bekliyor' },
-  { value: 'PENDING_PAYMENT', label: 'Ödeme Bekliyor' },
-  { value: 'OVERDUE', label: 'Gecikmiş' },
-  { value: 'CLOSED', label: 'Tamamlandı' },
-  { value: 'CANCELLED', label: 'İptal' }
-]
-
-const typeOptions: { value: RentalType | '', label: string }[] = [
-  { value: '', label: 'Tüm Tipler' },
-  { value: 'DAILY', label: 'Günlük' },
-  { value: 'WEEKLY', label: 'Haftalık' },
-  { value: 'MONTHLY', label: 'Aylık' },
-  { value: 'LEASING', label: 'Leasing' }
-]
-
-const statusLabels: Record<RentalStatus, string> = {
-  DRAFT: 'Taslak',
-  RESERVED: 'Rezerve',
-  ACTIVE: 'Aktif',
-  RETURN_PENDING: 'İade Bekliyor',
-  PENDING_PAYMENT: 'Ödeme Bekliyor',
-  OVERDUE: 'Gecikmiş',
-  CLOSED: 'Tamamlandı',
-  CANCELLED: 'İptal'
-}
-
-const statusColors: Record<RentalStatus, string> = {
-  DRAFT: 'secondary',
-  RESERVED: 'info',
-  ACTIVE: 'success',
-  RETURN_PENDING: 'warning',
-  PENDING_PAYMENT: 'pending-payment',
-  OVERDUE: 'danger',
-  CLOSED: 'muted',
-  CANCELLED: 'danger'
-}
 
 const typeLabels: Record<RentalType, string> = {
   DAILY: 'Günlük',
   WEEKLY: 'Haftalık',
   MONTHLY: 'Aylık',
-  LEASING: 'Leasing'
+  LEASING: 'Leasing',
+}
+
+const statusViews: { id: StatusView; label: string }[] = [
+  { id: 'all', label: 'Hepsi' },
+  { id: RentalStatus.ACTIVE, label: 'Aktif' },
+  { id: RentalStatus.RESERVED, label: 'Rezerve' },
+  { id: RentalStatus.DRAFT, label: 'Taslak' },
+  { id: RentalStatus.OVERDUE, label: 'Gecikmiş' },
+  { id: RentalStatus.RETURN_PENDING, label: 'İade bekliyor' },
+  { id: RentalStatus.CLOSED, label: 'Tamamlanan' },
+  { id: RentalStatus.CANCELLED, label: 'İptal' },
+]
+
+const typeChips: { id: RentalType | ''; label: string }[] = [
+  { id: '', label: 'Tüm tipler' },
+  { id: RentalType.DAILY, label: 'Günlük' },
+  { id: RentalType.WEEKLY, label: 'Haftalık' },
+  { id: RentalType.MONTHLY, label: 'Aylık' },
+  { id: RentalType.LEASING, label: 'Leasing' },
+]
+
+const pageSubtitle = computed(() => {
+  const parts = [`${overview.value.total} kayıt`]
+  if (overview.value.overdue > 0) parts.push(`${overview.value.overdue} gecikmiş`)
+  if (overview.value.reserved > 0) parts.push(`${overview.value.reserved} bekleyen teslimat`)
+  return parts.join(' · ')
+})
+
+function viewCount(id: StatusView): number {
+  if (id === 'all') return overview.value.total
+  if (id === RentalStatus.ACTIVE) return overview.value.active
+  if (id === RentalStatus.OVERDUE) return overview.value.overdue
+  if (id === RentalStatus.RESERVED) return overview.value.reserved
+  if (id === RentalStatus.RETURN_PENDING) return overview.value.returnPending
+  if (id === RentalStatus.DRAFT) return overview.value.draft
+  if (id === RentalStatus.CLOSED) return overview.value.closed
+  if (id === RentalStatus.CANCELLED) return overview.value.cancelled
+  return 0
 }
 
 function getVehicle(rental: Rental): Vehicle | undefined {
@@ -73,25 +102,144 @@ function getCustomer(rental: Rental): Customer | undefined {
   return rental.customer || customerMap.value.get(rental.customerId)
 }
 
-const filteredRentals = computed(() => {
-  let result = rentals.value
+function customerName(rental: Rental): string {
+  return rental.customerName || getCustomer(rental)?.displayName || '—'
+}
 
-  if (statusFilter.value) {
-    result = result.filter(r => r.status === statusFilter.value)
+function vehiclePlate(rental: Rental): string {
+  return rental.vehiclePlate || getVehicle(rental)?.plateNumber || '—'
+}
+
+function vehicleName(rental: Rental): string {
+  const v = getVehicle(rental)
+  return rental.vehicleName || (v ? `${v.brand} ${v.model}` : '—')
+}
+
+function initials(name: string): string {
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .map((s) => s[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase()
+}
+
+async function fetchOverview() {
+  try {
+    const [raw, upcoming] = await Promise.all([
+      dashboardApi.getRawStats(),
+      dashboardApi.getUpcomingReturns(1),
+    ])
+    const stats: RentalStats = raw.rentals ?? {
+      draft: 0,
+      reserved: 0,
+      active: 0,
+      returning: 0,
+      completed: 0,
+      cancelled: 0,
+      overdue: 0,
+    }
+    overview.value = {
+      total: raw.totalRentals ?? 0,
+      active: stats.active ?? 0,
+      overdue: stats.overdue ?? 0,
+      reserved: stats.reserved ?? 0,
+      returnPending: stats.returning ?? 0,
+      draft: stats.draft ?? 0,
+      closed: stats.completed ?? 0,
+      cancelled: stats.cancelled ?? 0,
+      todayReturns: upcoming.filter((r) => r.daysUntilReturn === 0).length,
+    }
+  } catch {
+    try {
+      const [all, active, overdue] = await Promise.all([
+        rentalsApi.getAll({ page: 0, size: 1 }),
+        rentalsApi.getActive({ page: 0, size: 1 }),
+        rentalsApi.getOverdue({ page: 0, size: 1 }),
+      ])
+      overview.value = {
+        ...overview.value,
+        total: all.totalElements,
+        active: active.totalElements,
+        overdue: overdue.totalElements,
+      }
+    } catch {
+      toast.error('Kiralama özeti yüklenemedi')
+    }
+  }
+}
+
+async function fetchRelatedData() {
+  const vehicleIds = [...new Set(rentals.value.filter((r) => r.vehicleId && !r.vehicle).map((r) => r.vehicleId))]
+  const customerIds = [
+    ...new Set(rentals.value.filter((r) => r.customerId && !r.customer).map((r) => r.customerId)),
+  ]
+
+  const promises: Promise<void>[] = []
+
+  for (const id of vehicleIds) {
+    promises.push(
+      vehiclesApi
+        .getById(id)
+        .then((v) => {
+          vehicleMap.value.set(id, v)
+        })
+        .catch(() => {}),
+    )
   }
 
+  for (const id of customerIds) {
+    promises.push(
+      customersApi
+        .getById(id)
+        .then((c) => {
+          customerMap.value.set(id, c)
+        })
+        .catch(() => {}),
+    )
+  }
+
+  await Promise.all(promises)
+}
+
+function buildListParams(search?: string) {
+  const p = getParams()
+  const params: Record<string, string | number> = {
+    page: p.page,
+    size: p.size,
+  }
+  if (p.sort) {
+    params.sort = p.sort
+    params.direction = p.direction
+  }
+  if (search) {
+    params.search = search
+  }
   if (typeFilter.value) {
-    result = result.filter(r => r.rentalType === typeFilter.value)
+    params.rentalType = typeFilter.value
   }
-
-  return result
-})
+  return params
+}
 
 async function fetchRentals() {
   loading.value = true
   try {
-    const params = { ...getParams(), status: statusFilter.value || undefined }
-    const response = await rentalsApi.getAll(params)
+    const q = searchQuery.value.trim()
+    const search = q.length >= 2 ? q : undefined
+    const params = buildListParams(search)
+    let response
+
+    if (statusView.value === RentalStatus.ACTIVE) {
+      response = await rentalsApi.getActive(params)
+    } else if (statusView.value === RentalStatus.OVERDUE) {
+      response = await rentalsApi.getOverdue(params)
+    } else if (statusView.value === 'all') {
+      response = await rentalsApi.getAll(params)
+    } else {
+      response = await rentalsApi.getAll({ ...params, status: statusView.value })
+    }
+
     rentals.value = response.content
     setTotal(response.totalElements, response.totalPages)
     await fetchRelatedData()
@@ -102,29 +250,18 @@ async function fetchRentals() {
   }
 }
 
-async function fetchRelatedData() {
-  const vehicleIds = [...new Set(rentals.value.filter(r => r.vehicleId && !r.vehicle).map(r => r.vehicleId))]
-  const customerIds = [...new Set(rentals.value.filter(r => r.customerId && !r.customer).map(r => r.customerId))]
+function setStatusView(next: StatusView) {
+  if (statusView.value === next) return
+  statusView.value = next
+  setPage(0)
+  fetchRentals()
+}
 
-  const promises: Promise<void>[] = []
-
-  for (const id of vehicleIds) {
-    promises.push(
-      vehiclesApi.getById(id)
-        .then(v => vehicleMap.value.set(id, v))
-        .catch(() => {})
-    )
-  }
-
-  for (const id of customerIds) {
-    promises.push(
-      customersApi.getById(id)
-        .then(c => customerMap.value.set(id, c))
-        .catch(() => {})
-    )
-  }
-
-  await Promise.all(promises)
+function setTypeFilter(next: RentalType | '') {
+  if (typeFilter.value === next) return
+  typeFilter.value = next
+  setPage(0)
+  fetchRentals()
 }
 
 function handlePageChange(newPage: number) {
@@ -132,434 +269,251 @@ function handlePageChange(newPage: number) {
   fetchRentals()
 }
 
-function formatDate(date: string): string {
-  return new Date(date).toLocaleDateString('tr-TR')
+function openPreview(rental: Rental) {
+  previewRental.value = rental
+  showPreview.value = true
 }
 
-function formatCurrency(amount: number | undefined | null): string {
-  if (amount === undefined || amount === null || Number.isNaN(amount)) return '-'
-  return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(amount)
+function closePreview() {
+  showPreview.value = false
+  previewRental.value = null
 }
 
-onMounted(fetchRentals)
+onMounted(async () => {
+  await fetchOverview()
+  await fetchRentals()
+})
+
+let searchTimer: ReturnType<typeof setTimeout> | undefined
+watch(searchQuery, () => {
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => {
+    setPage(0)
+    fetchRentals()
+  }, 300)
+})
 </script>
 
 <template>
-  <div class="rentals-page">
-    <header class="page-header responsive-page-header">
-      <div class="header-left">
-        <h1>Kiralamalar</h1>
-        <span class="count">{{ totalElements }} kiralama</span>
+  <div class="rc-page">
+    <RcPageHeader title="Kiralamalar" :subtitle="pageSubtitle">
+      <template #actions>
+        <RouterLink to="/rentals/create" class="rc-btn rc-btn--accent">
+          <RcIcon name="plus" :size="14" />
+          Yeni kiralama
+          <RcKbd>N</RcKbd>
+        </RouterLink>
+      </template>
+    </RcPageHeader>
+
+    <!-- Metrik şeridi -->
+    <div class="rcv-hero-strip rcv-hero-strip--rentals">
+      <div class="rcv-hs__zone">
+        <div class="rcv-hs__eyebrow">
+          <RcIcon name="key" :size="14" />
+          Aktif kiralamalar
+        </div>
+        <div class="rcv-hs__stat-value rc-num">{{ overview.active }}</div>
+        <div class="rcv-hs__legend">
+          <div class="rcv-hs__legend-row">
+            <span class="rc-dot rc-dot--accent" />
+            <span>Rezerve</span>
+            <span class="rc-num">{{ overview.reserved }}</span>
+          </div>
+          <div class="rcv-hs__legend-row">
+            <span class="rc-dot rc-dot--success" />
+            <span>Tamamlanan</span>
+            <span class="rc-num">{{ overview.closed }}</span>
+          </div>
+        </div>
       </div>
-      <RouterLink to="/rentals/create" class="btn btn-primary">
-        + Yeni Kiralama
-      </RouterLink>
-    </header>
 
-    <div class="filters responsive-filters">
-      <SearchableSelect
-        :model-value="statusFilter || null"
-        :options="statusOptions"
-        placeholder="Tüm Durumlar"
-        search-placeholder="Durum ara..."
-        clearable
-        class="filter-searchable"
-        @update:model-value="(v) => { statusFilter = v ?? ''; fetchRentals() }"
-      />
-      <SearchableSelect
-        :model-value="typeFilter || null"
-        :options="typeOptions"
-        placeholder="Tüm Tipler"
-        search-placeholder="Tip ara..."
-        clearable
-        class="filter-searchable"
-        @update:model-value="(v) => typeFilter = v ?? ''"
-      />
+      <div class="rcv-hs__zone">
+        <div class="rcv-hs__eyebrow">
+          <RcIcon name="calendar" :size="14" />
+          Bugün teslim
+        </div>
+        <div class="rcv-hs__lead">
+          <b>{{ overview.todayReturns }} kiralama</b> bugün iade edilecek.
+        </div>
+        <div class="rcv-hs__quick">
+          <button
+            type="button"
+            class="rcv-hs__chip rcv-hs__chip--accent"
+            @click="setStatusView(RentalStatus.RETURN_PENDING)"
+          >
+            <RcIcon name="key" :size="14" />
+            İade bekleyen
+            <span class="rcv-hs__chip-count">{{ overview.returnPending }}</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="rcv-hs__zone">
+        <div class="rcv-hs__eyebrow">
+          <RcIcon name="warning" :size="14" />
+          Geciken
+        </div>
+        <div class="rcv-hs__lead">
+          <em>{{ overview.overdue }} kiralama</em> süresi geçmiş durumda.
+        </div>
+        <div class="rcv-hs__quick">
+          <button
+            type="button"
+            class="rcv-hs__chip rcv-hs__chip--danger"
+            @click="setStatusView(RentalStatus.OVERDUE)"
+          >
+            <RcIcon name="warning" :size="14" />
+            Gecikmiş
+            <span class="rcv-hs__chip-count">{{ overview.overdue }}</span>
+          </button>
+        </div>
+      </div>
     </div>
 
-    <div v-if="loading" class="loading">Yükleniyor...</div>
-
-    <div v-else-if="filteredRentals.length === 0" class="empty-state">
-      <p>Kiralama bulunamadı</p>
+    <!-- Durum görünümleri -->
+    <div class="rc-views">
+      <button
+        v-for="view in statusViews"
+        :key="view.id"
+        type="button"
+        class="rc-view-tab"
+        :class="{ 'rc-view-tab--active': statusView === view.id }"
+        @click="setStatusView(view.id)"
+      >
+        {{ view.label }}
+        <span class="rc-view-tab__count">{{ viewCount(view.id) }}</span>
+      </button>
     </div>
 
-    <div v-else class="rentals-table responsive-table">
-      <table>
+    <!-- Filtre çubuğu -->
+    <div class="rc-filterbar rcv-filterbar--slim">
+      <div class="rc-input-group" style="width: 280px">
+        <RcIcon name="search" :size="16" />
+        <input
+          ref="searchInputRef"
+          v-model="searchQuery"
+          type="search"
+          placeholder="Müşteri, plaka, RNT-…"
+          autocomplete="off"
+        />
+        <RcKbd>/</RcKbd>
+      </div>
+      <span class="rc-filterbar__sep" />
+      <button
+        v-for="chip in typeChips"
+        :key="chip.id || 'all'"
+        type="button"
+        class="rc-chip"
+        :class="{ 'rc-chip--on': typeFilter === chip.id }"
+        @click="setTypeFilter(chip.id)"
+      >
+        {{ chip.label }}
+      </button>
+      <span style="margin-left: auto; font-size: 12px; color: var(--rc-text-muted)">
+        {{ rentals.length }} / {{ totalElements }} sonuç
+      </span>
+    </div>
+
+    <div v-if="loading" class="rc-skeleton rc-card-skeleton" style="height: 320px" />
+
+    <RcEmpty
+      v-else-if="rentals.length === 0"
+      title="Eşleşen kiralama yok"
+      description="Filtreyi veya aramayı değiştirin"
+    >
+      <template #icon>
+        <RcIcon name="search" :size="32" />
+      </template>
+    </RcEmpty>
+
+    <div v-else class="rc-card" style="overflow: hidden">
+      <table class="rc-table rcv-table--slim">
         <thead>
           <tr>
-            <th>ID</th>
+            <th>Kiralama</th>
             <th>Müşteri</th>
             <th>Araç</th>
+            <th>Tarih</th>
             <th>Tip</th>
-            <th>Tarih Aralığı</th>
-            <th>Toplam</th>
             <th>Durum</th>
+            <th class="rc-right">Tutar</th>
           </tr>
         </thead>
         <tbody>
-          <tr 
-            v-for="rental in filteredRentals" 
+          <tr
+            v-for="rental in rentals"
             :key="rental.id"
-            @click="$router.push(`/rentals/${rental.id}`)"
+            style="cursor: pointer"
+            @click="openPreview(rental)"
           >
-            <td class="rental-id">{{ rental.rentalNumber || `#${rental.id}` }}</td>
             <td>
-              <div class="customer-cell">
-                <strong>{{ rental.customerName || getCustomer(rental)?.displayName || '-' }}</strong>
-                <span class="customer-type">{{ getCustomer(rental)?.customerType === 'COMPANY' ? 'Kurumsal' : 'Bireysel' }}</span>
+              <div class="rcr-row__primary rcr-row__mono">
+                {{ rental.rentalNumber || `#${rental.id}` }}
+              </div>
+              <div class="rcr-row__secondary">
+                {{ rental.totalDays }} gün
+                <span v-if="rental.branchName"> · {{ rental.branchName }}</span>
               </div>
             </td>
             <td>
-              <div class="vehicle-cell">
-                <strong>{{ rental.vehiclePlate || getVehicle(rental)?.plateNumber || '-' }}</strong>
-                <span>{{ rental.vehicleName || (getVehicle(rental) ? `${getVehicle(rental)?.brand} ${getVehicle(rental)?.model}` : '-') }}</span>
+              <div style="display: flex; align-items: center; gap: 10px">
+                <RcAvatar size="sm">{{ initials(customerName(rental)) }}</RcAvatar>
+                <div style="min-width: 0">
+                  <div class="rcr-row__primary">{{ customerName(rental) }}</div>
+                  <div
+                    v-if="getCustomer(rental)?.customerType === 'COMPANY'"
+                    class="rcr-row__secondary"
+                  >
+                    Kurumsal
+                  </div>
+                </div>
               </div>
             </td>
             <td>
-              <span class="type-badge">{{ typeLabels[rental.rentalType] || rental.rentalType }}</span>
+              <div class="rcr-row__primary rcr-row__mono">{{ vehiclePlate(rental) }}</div>
+              <div class="rcr-row__secondary">{{ vehicleName(rental) }}</div>
             </td>
             <td>
-              <div class="date-range">
-                <span>{{ formatDate(rental.startDate) }}</span>
-                <span class="separator">→</span>
-                <span>{{ formatDate(rental.endDate) }}</span>
+              <div class="rcr-row__primary rc-num" style="font-size: 12.5px">
+                {{ formatDate(rental.startDate) }}
               </div>
+              <div class="rcr-row__secondary">→ {{ formatDate(rental.endDate) }}</div>
             </td>
-            <td class="amount">{{ formatCurrency(rental.grandTotal) }}</td>
             <td>
-              <span :class="['status-badge', statusColors[rental.status] || 'muted']">
-                {{ statusLabels[rental.status] || rental.status }}
-              </span>
+              <RcBadge>{{ typeLabels[rental.rentalType] || rental.rentalType }}</RcBadge>
+            </td>
+            <td>
+              <RcStatusPill :status="rental.status" />
+            </td>
+            <td class="rc-right">
+              <div class="rcr-row__primary rc-num">{{ fmtTRY(rental.grandTotal) }}</div>
             </td>
           </tr>
         </tbody>
       </table>
     </div>
 
-    <div v-if="!loading && filteredRentals.length > 0" class="mobile-cards">
-      <div
-        v-for="rental in filteredRentals"
-        :key="`mobile-${rental.id}`"
-        class="mobile-card"
-        @click="$router.push(`/rentals/${rental.id}`)"
+    <div
+      v-if="!loading && rentals.length > 0 && totalPages > 1"
+      class="rc-filterbar"
+      style="justify-content: center; margin-top: 20px"
+    >
+      <RcButton variant="secondary" :disabled="page === 0" @click="handlePageChange(page - 1)">
+        Önceki
+      </RcButton>
+      <span style="font-size: 13px; color: var(--rc-text-muted)">
+        Sayfa {{ page + 1 }} / {{ totalPages }} · {{ totalElements }} kayıt
+      </span>
+      <RcButton
+        variant="secondary"
+        :disabled="page + 1 >= totalPages"
+        @click="handlePageChange(page + 1)"
       >
-        <div class="mobile-card-header">
-          <div>
-            <div class="mobile-card-id">{{ rental.rentalNumber || `#${rental.id}` }}</div>
-            <div class="mobile-card-title">
-              {{ rental.customerName || getCustomer(rental)?.displayName || '-' }}
-            </div>
-          </div>
-          <span :class="['status-badge', statusColors[rental.status] || 'muted']">
-            {{ statusLabels[rental.status] || rental.status }}
-          </span>
-        </div>
-
-        <div class="mobile-card-grid">
-          <div class="mobile-field">
-            <span class="mobile-label">Araç</span>
-            <strong>{{ rental.vehiclePlate || getVehicle(rental)?.plateNumber || '-' }}</strong>
-            <span>{{ rental.vehicleName || (getVehicle(rental) ? `${getVehicle(rental)?.brand} ${getVehicle(rental)?.model}` : '-') }}</span>
-          </div>
-          <div class="mobile-field">
-            <span class="mobile-label">Tip</span>
-            <span class="type-badge">{{ typeLabels[rental.rentalType] || rental.rentalType }}</span>
-          </div>
-          <div class="mobile-field">
-            <span class="mobile-label">Tarih</span>
-            <span>{{ formatDate(rental.startDate) }} - {{ formatDate(rental.endDate) }}</span>
-          </div>
-          <div class="mobile-field">
-            <span class="mobile-label">Toplam</span>
-            <strong class="amount">{{ formatCurrency(rental.grandTotal) }}</strong>
-          </div>
-        </div>
-      </div>
+        Sonraki
+      </RcButton>
     </div>
 
-    <div v-if="!loading && filteredRentals.length > 0" class="pagination responsive-pagination">
-      <button :disabled="page === 0" @click="handlePageChange(page - 1)">
-        ← Önceki
-      </button>
-      <span>Sayfa {{ page + 1 }}</span>
-      <button :disabled="filteredRentals.length < size" @click="handlePageChange(page + 1)">
-        Sonraki →
-      </button>
-    </div>
+    <RentalQuickModal :open="showPreview" :rental="previewRental" @close="closePreview" />
   </div>
 </template>
-
-<style scoped>
-.rentals-page {
-  max-width: 1400px;
-  margin: 0 auto;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
-}
-
-.header-left {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-}
-
-.page-header h1 {
-  font-size: 28px;
-  font-weight: 600;
-  margin: 0;
-}
-
-.count {
-  color: var(--color-text-secondary);
-  font-size: 14px;
-}
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 20px;
-  border-radius: 8px;
-  font-weight: 500;
-  text-decoration: none;
-  transition: all 0.2s;
-}
-
-.btn-primary {
-  background: var(--color-primary);
-  color: white;
-}
-
-.btn-primary:hover {
-  background: var(--color-primary-hover);
-}
-
-.filters {
-  display: flex;
-  gap: 16px;
-  margin-bottom: 24px;
-}
-
-.filter-select {
-  padding: 10px 16px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  font-size: 14px;
-  background: var(--color-surface);
-  min-width: 160px;
-}
-
-.loading,
-.empty-state {
-  text-align: center;
-  padding: 60px;
-  color: var(--color-text-secondary);
-}
-
-.rentals-table {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-th {
-  text-align: left;
-  padding: 14px 20px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-text-secondary);
-  background: var(--color-bg-secondary);
-  border-bottom: 1px solid var(--color-border);
-}
-
-td {
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--color-border);
-  font-size: 14px;
-}
-
-tbody tr {
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-tbody tr:hover {
-  background: var(--color-bg-secondary);
-}
-
-tbody tr:last-child td {
-  border-bottom: none;
-}
-
-.rental-id {
-  font-weight: 600;
-  color: var(--color-primary);
-}
-
-.customer-cell,
-.vehicle-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.customer-cell strong,
-.vehicle-cell strong {
-  font-weight: 500;
-}
-
-.customer-type,
-.vehicle-cell span:last-child {
-  font-size: 12px;
-  color: var(--color-text-muted);
-}
-
-.type-badge {
-  padding: 4px 10px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 500;
-  background: var(--color-bg-secondary);
-  color: var(--color-text-secondary);
-}
-
-.date-range {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-}
-
-.separator {
-  color: var(--color-text-muted);
-}
-
-.amount {
-  font-weight: 600;
-}
-
-.status-badge {
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.status-badge.success { background: var(--color-success-light); color: var(--color-success); }
-.status-badge.warning { background: var(--color-warning-light); color: var(--color-warning); }
-.status-badge.info { background: var(--color-info-light); color: var(--color-info); }
-.status-badge.primary { background: var(--color-primary-light); color: var(--color-primary); }
-.status-badge.danger { background: var(--color-danger-light); color: var(--color-danger); }
-.status-badge.muted { background: var(--color-bg-secondary); color: var(--color-text-muted); }
-.status-badge.secondary { background: #f3f4f6; color: #4b5563; }
-.status-badge.pending-payment { background: #ede9fe; color: #6d28d9; }
-
-.mobile-cards {
-  display: none;
-}
-
-.pagination {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 16px;
-  margin-top: 24px;
-}
-
-.pagination button {
-  padding: 8px 16px;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  background: var(--color-surface);
-  cursor: pointer;
-}
-
-.pagination button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-@media (max-width: 768px) {
-  .header-left {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .btn {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .mobile-cards {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .mobile-card {
-    border: 1px solid var(--color-border);
-    border-radius: 12px;
-    background: var(--color-surface);
-    padding: 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    cursor: pointer;
-  }
-
-  .mobile-card-header {
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
-    align-items: flex-start;
-  }
-
-  .mobile-card-id {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--color-primary);
-  }
-
-  .mobile-card-title {
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--color-text);
-  }
-
-  .mobile-card-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 12px;
-  }
-
-  .mobile-field {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    color: var(--color-text-secondary);
-    font-size: 13px;
-  }
-
-  .mobile-label {
-    font-size: 12px;
-    color: var(--color-text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-  }
-
-  .rentals-table {
-    display: none;
-  }
-}
-</style>

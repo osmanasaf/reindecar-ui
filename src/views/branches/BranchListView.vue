@@ -4,6 +4,9 @@ import { branchesApi, vehiclesApi } from '@/api'
 import { useToast, useReferenceData } from '@/composables'
 import { validators, validate, formatPhoneInput } from '@/utils/validation'
 import { SearchableSelect } from '@/components/common'
+import BranchesTable from '@/components/branches/BranchesTable.vue'
+import { RcPageHeader, RcButton, RcEmpty, RcModal } from '@/components/rc'
+import { RcIcon } from '@/components/icons'
 import type { Branch } from '@/types'
 import type { District } from '@/types/reference'
 
@@ -290,728 +293,248 @@ function clearFilters() {
   filterStatus.value = 'all'
 }
 
-function branchLocation(branch: BranchWithCount): string {
-  const parts = [branch.address]
-  if (branch.district) parts.push(branch.district)
-  if (branch.city) parts.push(branch.city)
-  return parts.filter(Boolean).join(', ')
-}
-
 onMounted(fetchBranches)
 </script>
 
 <template>
-  <div class="branches-page">
-    <header class="page-header">
-      <div>
-        <h1 class="page-title">Şubeler</h1>
-        <p class="page-subtitle">Kiralama noktaları ve şube yönetimi</p>
-      </div>
-      <button class="btn btn-primary" @click="openCreateForm">
-        + Yeni Şube
-      </button>
-    </header>
+  <div class="rc-page rca-branches">
+    <RcPageHeader
+      title="Şubeler"
+      subtitle="Kiralama noktaları ve şube yönetimi"
+    >
+      <template #actions>
+        <RcButton variant="accent" @click="openCreateForm">
+          <RcIcon name="plus" :size="14" />
+          Yeni şube
+        </RcButton>
+      </template>
+    </RcPageHeader>
 
-    <div v-if="loading" class="loading">
-      <div class="loading-spinner"></div>
-      <span>Yükleniyor...</span>
-    </div>
+    <div v-if="loading" class="rc-skeleton rc-card-skeleton" style="height: 280px" />
 
     <template v-else>
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-icon stat-icon-blue">🏢</div>
-          <div class="stat-body">
-            <div class="stat-value">{{ totalBranches }}</div>
-            <div class="stat-label">Toplam Şube</div>
-          </div>
+      <div class="rca-stats rca-stats--claims">
+        <div class="rca-stat">
+          <div class="rca-stat__label">Toplam şube</div>
+          <div class="rca-stat__value rc-num">{{ totalBranches }}</div>
         </div>
-        <div class="stat-card stat-card--active">
-          <div class="stat-icon stat-icon-green">✓</div>
-          <div class="stat-body">
-            <div class="stat-value text-green">{{ activeBranches }}</div>
-            <div class="stat-label">Aktif</div>
-          </div>
+        <div class="rca-stat">
+          <div class="rca-stat__label">Aktif</div>
+          <div class="rca-stat__value rca-stat__value--success rc-num">{{ activeBranches }}</div>
         </div>
-        <div class="stat-card stat-card--inactive">
-          <div class="stat-icon stat-icon-gray">—</div>
-          <div class="stat-body">
-            <div class="stat-value text-gray">{{ inactiveBranches }}</div>
-            <div class="stat-label">Pasif</div>
-          </div>
+        <div class="rca-stat">
+          <div class="rca-stat__label">Pasif</div>
+          <div class="rca-stat__value rc-num">{{ inactiveBranches }}</div>
         </div>
-        <div class="stat-card">
-          <div class="stat-icon stat-icon-purple">🚗</div>
-          <div class="stat-body">
-            <div class="stat-value">{{ totalVehicles }}</div>
-            <div class="stat-label">Toplam Araç</div>
-          </div>
+        <div class="rca-stat">
+          <div class="rca-stat__label">Toplam araç</div>
+          <div class="rca-stat__value rc-num">{{ totalVehicles }}</div>
         </div>
       </div>
 
-      <div class="filter-bar">
-        <div class="search-box">
-          <input
-            v-model="searchQuery"
-            type="text"
-            class="search-input"
-            placeholder="Şube adı, kodu veya şehir ara..."
-          />
+      <div class="rc-filterbar rcv-filterbar--slim">
+        <div class="rc-input-group" style="flex: 1; min-width: 240px">
+          <RcIcon name="search" class="rc-icon" :size="16" />
+          <input v-model="searchQuery" type="search" placeholder="Şube adı, kodu veya şehir…" />
         </div>
-        <div class="status-chips">
-          <button
-            :class="['chip', { active: filterStatus === 'all' }]"
-            @click="filterStatus = 'all'"
-          >
-            Tümü
-          </button>
-          <button
-            :class="['chip', { active: filterStatus === 'active' }]"
-            @click="filterStatus = 'active'"
-          >
-            Aktif
-          </button>
-          <button
-            :class="['chip', { active: filterStatus === 'inactive' }]"
-            @click="filterStatus = 'inactive'"
-          >
-            Pasif
-          </button>
-        </div>
-        <button v-if="hasFilters" class="btn btn-ghost btn-sm" @click="clearFilters">
-          Temizle
-        </button>
-      </div>
-
-      <p v-if="hasFilters && filteredBranches.length > 0" class="result-count">
-        {{ filteredBranches.length }} şube listeleniyor
-      </p>
-
-      <div v-if="filteredBranches.length === 0" class="empty-state">
-        <div v-if="hasFilters">
-          <p class="empty-title">Sonuç bulunamadı</p>
-          <p class="empty-sub">Arama kriterlerine uygun şube bulunamadı.</p>
-          <button class="btn btn-outline" @click="clearFilters">Filtreleri Temizle</button>
-        </div>
-        <div v-else>
-          <p class="empty-title">Henüz şube eklenmemiş</p>
-          <p class="empty-sub">İlk şubeyi oluşturmak için aşağıdaki butona tıklayın.</p>
-          <button class="btn btn-primary" @click="openCreateForm">İlk Şubeyi Ekle</button>
-        </div>
-      </div>
-
-      <div v-else class="branches-grid">
-        <div
-          v-for="branch in filteredBranches"
-          :key="branch.id"
-          :class="['branch-card', { 'branch-card--inactive': !branch.active }]"
+        <button
+          type="button"
+          class="rc-chip"
+          :class="{ 'rc-chip--on': filterStatus === 'all' }"
+          @click="filterStatus = 'all'"
         >
-          <div class="card-header">
-            <div class="card-header-left">
-              <h3 class="branch-name">{{ branch.name }}</h3>
-              <span class="branch-code">{{ branch.branchCode || branch.code }}</span>
-            </div>
-            <span :class="['status-badge', branch.active ? 'status-badge--active' : 'status-badge--inactive']">
-              {{ branch.active ? 'Aktif' : 'Pasif' }}
-            </span>
-          </div>
-
-          <div class="card-body">
-            <div class="info-row">
-              <span class="info-icon">📍</span>
-              <span class="info-text">{{ branchLocation(branch) }}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-icon">📞</span>
-              <span class="info-text">{{ branch.phone || '—' }}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-icon">🚗</span>
-              <span class="info-text">{{ branch.vehicleCount ?? 0 }} araç</span>
-            </div>
-          </div>
-
-          <div class="card-footer">
-            <button class="btn-action" @click="openEditForm(branch)">
-              Düzenle
-            </button>
-            <button
-              :class="['btn-action', branch.active ? 'btn-action--danger' : 'btn-action--success']"
-              @click="toggleStatus(branch)"
-            >
-              {{ branch.active ? 'Pasifleştir' : 'Aktifleştir' }}
-            </button>
-          </div>
-        </div>
+          Tümü
+        </button>
+        <button
+          type="button"
+          class="rc-chip"
+          :class="{ 'rc-chip--on': filterStatus === 'active' }"
+          @click="filterStatus = 'active'"
+        >
+          Aktif
+        </button>
+        <button
+          type="button"
+          class="rc-chip"
+          :class="{ 'rc-chip--on': filterStatus === 'inactive' }"
+          @click="filterStatus = 'inactive'"
+        >
+          Pasif
+        </button>
+        <RcButton v-if="hasFilters" variant="ghost" size="sm" @click="clearFilters">Temizle</RcButton>
       </div>
+
+      <RcEmpty
+        v-if="filteredBranches.length === 0"
+        :title="hasFilters ? 'Sonuç bulunamadı' : 'Şube yok'"
+        :description="hasFilters ? 'Filtreleri değiştirmeyi deneyin' : 'İlk şubeyi oluşturarak başlayın'"
+      >
+        <template #icon><RcIcon name="building" :size="32" /></template>
+        <template v-if="!hasFilters" #action>
+          <RcButton variant="accent" @click="openCreateForm">İlk şubeyi ekle</RcButton>
+        </template>
+      </RcEmpty>
+
+      <BranchesTable
+        v-else
+        :branches="filteredBranches"
+        @edit="openEditForm"
+        @toggle="toggleStatus"
+      />
     </template>
 
-    <div v-if="showForm" class="modal-overlay" @click.self="showForm = false">
-      <div class="modal">
-        <div class="modal-header">
-          <h2>{{ editingBranch ? 'Şube Düzenle' : 'Yeni Şube' }}</h2>
-          <button class="modal-close" @click="showForm = false">✕</button>
+    <RcModal
+      :open="showForm"
+      :title="editingBranch ? 'Şube düzenle' : 'Yeni şube'"
+      wide
+      @close="showForm = false"
+    >
+      <form class="rca-branch-form" @submit.prevent="handleSubmit">
+        <div class="rca-branch-form__row">
+          <label
+            class="rc-field"
+            :class="{ 'rc-field--error': touchedFields.has('branchCode') && formErrors.branchCode }"
+          >
+            <span class="rc-field__label">Şube kodu *</span>
+            <input
+              id="field-branchCode"
+              v-model="formData.branchCode"
+              type="text"
+              class="rc-input"
+              placeholder="Örn: IST01"
+              @blur="handleBlur('branchCode')"
+              @input="touchedFields.has('branchCode') && validateField('branchCode')"
+            />
+            <span v-if="touchedFields.has('branchCode') && formErrors.branchCode" class="rc-field__error">
+              {{ formErrors.branchCode }}
+            </span>
+          </label>
+
+          <label
+            class="rc-field"
+            :class="{ 'rc-field--error': touchedFields.has('name') && formErrors.name }"
+          >
+            <span class="rc-field__label">Şube adı *</span>
+            <input
+              id="field-name"
+              v-model="formData.name"
+              type="text"
+              class="rc-input"
+              placeholder="Örn: İstanbul Merkez"
+              @blur="handleBlur('name')"
+              @input="touchedFields.has('name') && validateField('name')"
+            />
+            <span v-if="touchedFields.has('name') && formErrors.name" class="rc-field__error">
+              {{ formErrors.name }}
+            </span>
+          </label>
         </div>
 
-        <form @submit.prevent="handleSubmit">
-          <div class="form-row">
-            <div class="form-group">
-              <label for="field-branchCode">Şube Kodu <span class="required">*</span></label>
-              <input
-                id="field-branchCode"
-                v-model="formData.branchCode"
-                type="text"
-                :class="{ 'input-error': touchedFields.has('branchCode') && formErrors.branchCode }"
-                @blur="handleBlur('branchCode')"
-                @input="touchedFields.has('branchCode') && validateField('branchCode')"
-                placeholder="Örn: IST01"
-              />
-              <span v-if="touchedFields.has('branchCode') && formErrors.branchCode" class="error-message">
-                {{ formErrors.branchCode }}
-              </span>
-            </div>
+        <label
+          class="rc-field"
+          :class="{ 'rc-field--error': touchedFields.has('address') && formErrors.address }"
+        >
+          <span class="rc-field__label">Adres *</span>
+          <input
+            id="field-address"
+            v-model="formData.address"
+            type="text"
+            class="rc-input"
+            placeholder="Tam adres"
+            @blur="handleBlur('address')"
+            @input="touchedFields.has('address') && validateField('address')"
+          />
+          <span v-if="touchedFields.has('address') && formErrors.address" class="rc-field__error">
+            {{ formErrors.address }}
+          </span>
+        </label>
 
-            <div class="form-group">
-              <label for="field-name">Şube Adı <span class="required">*</span></label>
-              <input
-                id="field-name"
-                v-model="formData.name"
-                type="text"
-                :class="{ 'input-error': touchedFields.has('name') && formErrors.name }"
-                @blur="handleBlur('name')"
-                @input="touchedFields.has('name') && validateField('name')"
-                placeholder="Örn: İstanbul Merkez"
-              />
-              <span v-if="touchedFields.has('name') && formErrors.name" class="error-message">
-                {{ formErrors.name }}
-              </span>
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label for="field-address">Adres <span class="required">*</span></label>
-            <input
-              id="field-address"
-              v-model="formData.address"
-              type="text"
-              :class="{ 'input-error': touchedFields.has('address') && formErrors.address }"
-              @blur="handleBlur('address')"
-              @input="touchedFields.has('address') && validateField('address')"
-              placeholder="Tam adres"
+        <div class="rca-branch-form__row">
+          <label class="rc-field">
+            <span class="rc-field__label">Şehir *</span>
+            <SearchableSelect
+              v-model="selectedCityId"
+              :options="cityOptions"
+              placeholder="İl seçin"
+              search-placeholder="İl ara..."
+              clearable
+              :error="!!(touchedFields.has('city') && formErrors.city)"
+              @blur="handleBlur('city')"
             />
-            <span v-if="touchedFields.has('address') && formErrors.address" class="error-message">
-              {{ formErrors.address }}
+            <span v-if="touchedFields.has('city') && formErrors.city" class="rc-field__error">
+              {{ formErrors.city }}
             </span>
-          </div>
+          </label>
 
-          <div class="form-row">
-            <div class="form-group">
-              <label for="field-city">Şehir <span class="required">*</span></label>
-              <SearchableSelect
-                v-model="selectedCityId"
-                :options="cityOptions"
-                placeholder="İl seçin"
-                search-placeholder="İl ara..."
-                clearable
-                :error="!!(touchedFields.has('city') && formErrors.city)"
-                @blur="handleBlur('city')"
-              />
-              <span v-if="touchedFields.has('city') && formErrors.city" class="error-message">
-                {{ formErrors.city }}
-              </span>
-            </div>
-
-            <div class="form-group">
-              <label for="field-district">İlçe</label>
-              <SearchableSelect
-                v-model="selectedDistrictId"
-                :options="districtOptions"
-                :placeholder="selectedCityId ? 'İlçe seçin (opsiyonel)' : 'Önce il seçin'"
-                search-placeholder="İlçe ara..."
-                clearable
-                :disabled="!selectedCityId"
-              />
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label for="field-phone">Telefon <span class="required">*</span></label>
-            <input
-              id="field-phone"
-              v-model="formData.phone"
-              type="tel"
-              inputmode="numeric"
-              maxlength="13"
-              :class="{ 'input-error': touchedFields.has('phone') && formErrors.phone }"
-              @blur="handleBlur('phone')"
-              @input="handlePhoneInput"
-              placeholder="555 111 11 11"
+          <label class="rc-field">
+            <span class="rc-field__label">İlçe</span>
+            <SearchableSelect
+              v-model="selectedDistrictId"
+              :options="districtOptions"
+              :placeholder="selectedCityId ? 'İlçe seçin (opsiyonel)' : 'Önce il seçin'"
+              search-placeholder="İlçe ara..."
+              clearable
+              :disabled="!selectedCityId"
             />
-            <span v-if="touchedFields.has('phone') && formErrors.phone" class="error-message">
-              {{ formErrors.phone }}
-            </span>
-          </div>
+          </label>
+        </div>
 
-          <div class="form-actions">
-            <button type="button" class="btn btn-outline" @click="showForm = false">
-              İptal
-            </button>
-            <button type="submit" class="btn btn-primary">
-              {{ editingBranch ? 'Güncelle' : 'Oluştur' }}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <label
+          class="rc-field"
+          :class="{ 'rc-field--error': touchedFields.has('phone') && formErrors.phone }"
+        >
+          <span class="rc-field__label">Telefon *</span>
+          <input
+            id="field-phone"
+            v-model="formData.phone"
+            type="tel"
+            inputmode="numeric"
+            maxlength="13"
+            class="rc-input"
+            placeholder="555 111 11 11"
+            @blur="handleBlur('phone')"
+            @input="handlePhoneInput"
+          />
+          <span v-if="touchedFields.has('phone') && formErrors.phone" class="rc-field__error">
+            {{ formErrors.phone }}
+          </span>
+        </label>
+      </form>
+
+      <template #footer>
+        <RcButton variant="secondary" @click="showForm = false">İptal</RcButton>
+        <RcButton variant="accent" @click="handleSubmit">
+          {{ editingBranch ? 'Güncelle' : 'Oluştur' }}
+        </RcButton>
+      </template>
+    </RcModal>
   </div>
 </template>
 
 <style scoped>
-.branches-page {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 2rem;
+.rca-stats--claims {
+  grid-template-columns: repeat(4, 1fr);
 }
 
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 2rem;
-}
-
-.page-title {
-  font-size: 1.875rem;
-  font-weight: 700;
-  color: var(--color-text, #111827);
-  margin: 0 0 0.375rem 0;
-}
-
-.page-subtitle {
-  color: var(--color-text-secondary, #6b7280);
-  margin: 0;
-  font-size: 0.9375rem;
-}
-
-/* Stats */
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-}
-
-.stat-card {
-  background: white;
-  border: 1px solid var(--color-border, #e5e7eb);
-  border-radius: 0.75rem;
-  padding: 1.25rem;
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.stat-card--active { border-left: 3px solid #22c55e; }
-.stat-card--inactive { border-left: 3px solid #9ca3af; }
-
-.stat-icon {
-  width: 2.75rem;
-  height: 2.75rem;
-  border-radius: 0.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.125rem;
-  flex-shrink: 0;
-}
-
-.stat-icon-blue { background: #eff6ff; }
-.stat-icon-green { background: #f0fdf4; }
-.stat-icon-gray { background: #f3f4f6; font-weight: 700; color: #6b7280; }
-.stat-icon-purple { background: #faf5ff; }
-
-.stat-body { display: flex; flex-direction: column; gap: 0.125rem; }
-.stat-value { font-size: 1.5rem; font-weight: 700; color: var(--color-text, #111827); }
-.stat-label { font-size: 0.8125rem; color: var(--color-text-secondary, #6b7280); }
-.text-green { color: #15803d !important; }
-.text-gray { color: #6b7280 !important; }
-
-/* Filter bar */
-.filter-bar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  align-items: center;
-  background: white;
-  border: 1px solid var(--color-border, #e5e7eb);
-  border-radius: 0.5rem;
-  padding: 0.875rem 1.25rem;
-  margin-bottom: 1rem;
-}
-
-.search-box { flex: 1; min-width: 220px; }
-
-.search-input {
-  width: 100%;
-  padding: 0.5rem 0.875rem;
-  border: 1px solid var(--color-border, #d1d5db);
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-  transition: all 0.2s;
-  box-sizing: border-box;
-}
-
-.search-input:focus {
-  outline: none;
-  border-color: var(--color-primary, #2563eb);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-}
-
-.status-chips {
-  display: flex;
-  gap: 0.375rem;
-}
-
-.chip {
-  padding: 0.375rem 0.875rem;
-  border-radius: 9999px;
-  font-size: 0.8125rem;
-  font-weight: 500;
-  cursor: pointer;
-  border: 1px solid var(--color-border, #e5e7eb);
-  background: transparent;
-  color: var(--color-text-secondary, #6b7280);
-  transition: all 0.15s;
-}
-
-.chip:hover { background: #f3f4f6; }
-.chip.active { background: var(--color-primary, #2563eb); color: white; border-color: var(--color-primary, #2563eb); }
-
-.result-count {
-  font-size: 0.875rem;
-  color: var(--color-text-secondary, #6b7280);
-  margin-bottom: 1rem;
-}
-
-/* Loading */
-.loading {
+.rca-branch-form {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 1rem;
-  padding: 4rem;
-  color: var(--color-text-secondary, #6b7280);
+  gap: 14px;
 }
 
-.loading-spinner {
-  width: 2rem;
-  height: 2rem;
-  border: 3px solid var(--color-border, #e5e7eb);
-  border-top-color: var(--color-primary, #2563eb);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin { to { transform: rotate(360deg); } }
-
-/* Empty state */
-.empty-state {
-  text-align: center;
-  padding: 4rem 2rem;
-  background: white;
-  border: 1px solid var(--color-border, #e5e7eb);
-  border-radius: 0.75rem;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0;
-}
-
-.empty-title {
-  font-size: 1.0625rem;
-  font-weight: 600;
-  color: var(--color-text, #111827);
-  margin: 0 0 0.375rem 0;
-}
-
-.empty-sub {
-  font-size: 0.875rem;
-  color: var(--color-text-secondary, #6b7280);
-  margin: 0 0 1.25rem 0;
-}
-
-/* Grid */
-.branches-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 1.25rem;
-}
-
-/* Branch card */
-.branch-card {
-  background: white;
-  border: 1px solid var(--color-border, #e5e7eb);
-  border-radius: 0.75rem;
-  overflow: hidden;
-  transition: all 0.2s;
-}
-
-.branch-card:hover {
-  box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.08);
-}
-
-.branch-card--inactive {
-  opacity: 0.75;
-  border-left: 3px solid #9ca3af;
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  padding: 1.25rem 1.25rem 1rem;
-  border-bottom: 1px solid var(--color-border, #f3f4f6);
-}
-
-.card-header-left {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.branch-name {
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--color-text, #111827);
-  margin: 0;
-}
-
-.branch-code {
-  display: inline-block;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--color-primary, #2563eb);
-  background: #eff6ff;
-  padding: 0.125rem 0.5rem;
-  border-radius: 0.25rem;
-  letter-spacing: 0.05em;
-}
-
-.status-badge {
-  padding: 0.25rem 0.625rem;
-  border-radius: 9999px;
-  font-size: 0.75rem;
-  font-weight: 500;
-  flex-shrink: 0;
-}
-
-.status-badge--active {
-  background: #dcfce7;
-  color: #15803d;
-}
-
-.status-badge--inactive {
-  background: #f3f4f6;
-  color: #6b7280;
-}
-
-.card-body {
-  padding: 1rem 1.25rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.625rem;
-}
-
-.info-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.625rem;
-  font-size: 0.875rem;
-  color: var(--color-text-secondary, #6b7280);
-}
-
-.info-icon {
-  font-size: 0.9375rem;
-  flex-shrink: 0;
-  margin-top: 0.0625rem;
-}
-
-.info-text {
-  line-height: 1.4;
-}
-
-.card-footer {
-  display: flex;
-  gap: 0.5rem;
-  padding: 0.875rem 1.25rem;
-  background: #f9fafb;
-  border-top: 1px solid var(--color-border, #f3f4f6);
-}
-
-.btn-action {
-  flex: 1;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--color-border, #e5e7eb);
-  border-radius: 0.375rem;
-  font-size: 0.8125rem;
-  font-weight: 500;
-  cursor: pointer;
-  background: white;
-  color: var(--color-text, #111827);
-  transition: all 0.15s;
-}
-
-.btn-action:hover {
-  background: #f3f4f6;
-}
-
-.btn-action--danger:hover {
-  background: #fef2f2;
-  color: #dc2626;
-  border-color: #fca5a5;
-}
-
-.btn-action--success:hover {
-  background: #f0fdf4;
-  color: #15803d;
-  border-color: #86efac;
-}
-
-/* Modal */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-  padding: 1rem;
-}
-
-.modal {
-  background: white;
-  border-radius: 1rem;
-  padding: 1.75rem;
-  width: 100%;
-  max-width: 560px;
-  max-height: 90vh;
-  overflow-y: auto;
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.5rem;
-}
-
-.modal-header h2 {
-  font-size: 1.25rem;
-  font-weight: 600;
-  margin: 0;
-  color: var(--color-text, #111827);
-}
-
-.modal-close {
-  background: none;
-  border: none;
-  font-size: 1rem;
-  cursor: pointer;
-  color: var(--color-text-secondary, #6b7280);
-  padding: 0.25rem;
-  border-radius: 0.25rem;
-  line-height: 1;
-}
-
-.modal-close:hover { color: var(--color-text, #111827); }
-
-/* Form */
-.form-row {
+.rca-branch-form__row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1rem;
+  gap: 12px;
 }
-
-.form-group {
-  margin-bottom: 1.125rem;
-}
-
-.form-group label {
-  display: block;
-  font-size: 0.875rem;
-  font-weight: 500;
-  margin-bottom: 0.5rem;
-  color: var(--color-text, #111827);
-}
-
-.form-group input {
-  width: 100%;
-  padding: 0.625rem 0.875rem;
-  border: 1px solid var(--color-border, #d1d5db);
-  border-radius: 0.5rem;
-  font-size: 0.875rem;
-  transition: border-color 0.2s;
-  box-sizing: border-box;
-}
-
-.form-group input:focus {
-  outline: none;
-  border-color: var(--color-primary, #2563eb);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-}
-
-.form-group input.input-error {
-  border-color: #dc2626;
-  background: #fef2f2;
-}
-
-.required { color: #dc2626; }
-
-.error-message {
-  display: block;
-  margin-top: 0.25rem;
-  font-size: 0.75rem;
-  color: #dc2626;
-}
-
-.form-actions {
-  display: flex;
-  gap: 0.75rem;
-  margin-top: 1.5rem;
-}
-
-.form-actions .btn { flex: 1; }
-
-/* Buttons */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  padding: 0.625rem 1.25rem;
-  border-radius: 0.5rem;
-  font-weight: 500;
-  font-size: 0.875rem;
-  cursor: pointer;
-  border: none;
-  transition: all 0.2s;
-}
-
-.btn-primary { background: var(--color-primary, #2563eb); color: white; }
-.btn-primary:hover { background: var(--color-primary-dark, #1d4ed8); }
-.btn-outline { background: transparent; border: 1px solid var(--color-border, #e5e7eb); color: var(--color-text, #111827); }
-.btn-outline:hover { background: #f3f4f6; }
-.btn-ghost { background: transparent; border: 1px solid var(--color-border, #e5e7eb); color: var(--color-text-secondary, #6b7280); }
-.btn-ghost:hover { background: #f3f4f6; }
-.btn-sm { padding: 0.375rem 0.875rem; font-size: 0.8125rem; }
 
 @media (max-width: 640px) {
-  .branches-page { padding: 1rem; }
-  .page-header { flex-direction: column; gap: 1rem; }
-  .stats-grid { grid-template-columns: repeat(2, 1fr); }
-  .filter-bar { flex-direction: column; align-items: stretch; }
-  .branches-grid { grid-template-columns: 1fr; }
-  .form-row { grid-template-columns: 1fr; }
+  .rca-stats--claims {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .rca-branch-form__row {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

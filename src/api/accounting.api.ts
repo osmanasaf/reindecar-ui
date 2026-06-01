@@ -80,7 +80,7 @@ class ReceivablesApiService extends BaseApi {
   }
 
   async deleteReceivable(id: number): Promise<void> {
-    return this.remove(`/${id}`)
+    return this.deleteByPath(`/${id}`)
   }
 }
 
@@ -141,7 +141,7 @@ class PayablesApiService extends BaseApi {
   }
 
   async deletePayable(id: number): Promise<void> {
-    return this.remove(`/${id}`)
+    return this.deleteByPath(`/${id}`)
   }
 }
 
@@ -209,7 +209,7 @@ class InsuranceClaimsApiService extends BaseApi {
   }
 
   async deleteDocument(claimId: number, documentId: number): Promise<void> {
-    return this.remove(`/${claimId}/documents/${documentId}`)
+    return this.deleteByPath(`/${claimId}/documents/${documentId}`)
   }
 
   async downloadDocument(claimId: number, documentId: number): Promise<Blob> {
@@ -295,7 +295,7 @@ class VehicleInsurancesApiService extends BaseApi {
   }
 
   async deactivate(id: number): Promise<void> {
-    return this.remove(`/${id}`)
+    return this.deleteByPath(`/${id}`)
   }
 }
 

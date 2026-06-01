@@ -5,20 +5,27 @@ import { useAccountingStore } from '@/stores'
 import { usePagination, useToast, useEnumTranslations } from '@/composables'
 import { SearchableSelect } from '@/components/common'
 import DatePicker from '@/components/base/DatePicker.vue'
-import { PayableCard, CreatePayableModal, PaymentModal } from '@/components/accounting'
-import { formatCurrency } from '@/utils/format'
+import { PayablesTable, CreatePayableModal, PaymentModal, FinancePageLayout } from '@/components/accounting'
+import { RcButton, RcEmpty, RcSegTab } from '@/components/rc'
+import { RcIcon } from '@/components/icons'
+import { useFinancePageContext } from '@/composables/useFinancePageContext'
 import { rentalsApi, vehiclesApi } from '@/api'
 import type { CreatePayableRequest, PayableFilters, RecordPaymentRequest, Rental, Vehicle } from '@/types'
 import { PayableStatus, PayableType } from '@/types'
+import { isReceivableOverdue } from '@/utils/accounting'
+
+type ViewMode = 'all' | 'rental' | 'vehicle'
+type StatusChip = 'all' | PayableStatus
 
 const router = useRouter()
 const accountingStore = useAccountingStore()
+const financePage = useFinancePageContext()
 const toast = useToast()
-const { page, setPage, setTotal, getParams } = usePagination()
-const { payableTypes, payableStatuses } = useEnumTranslations()
+const { page, totalPages, setPage, setTotal, getParams } = usePagination()
+const { payableTypes } = useEnumTranslations()
 
-type ViewMode = 'all' | 'rental' | 'vehicle'
 const viewMode = ref<ViewMode>('all')
+const statusChip = ref<StatusChip>('all')
 const selectedRentalId = ref<number | null>(null)
 const selectedVehicleId = ref<number | null>(null)
 const rentalsList = ref<Rental[]>([])
@@ -26,7 +33,7 @@ const vehiclesList = ref<Vehicle[]>([])
 const loadingRentals = ref(false)
 const loadingVehicles = ref(false)
 
-const filters = ref<PayableFilters>({})
+const advancedFilters = ref<Pick<PayableFilters, 'type' | 'startDate' | 'endDate' | 'overdue'>>({})
 const showCreateModal = ref(false)
 const showPaymentModal = ref(false)
 const selectedPayableId = ref<number | null>(null)
@@ -36,24 +43,48 @@ const selectedPayableNumber = ref('')
 const payables = computed(() => accountingStore.payables)
 const loading = computed(() => accountingStore.payablesLoading)
 
-const totalPayable = computed(() => payables.value.reduce((s, p) => s + p.amount, 0))
-const outstandingPayable = computed(() => payables.value.reduce((s, p) => s + p.remainingAmount, 0))
-const overduePayables = computed(() => payables.value.filter(p => p.status === PayableStatus.OVERDUE))
-const overduePayablesTotal = computed(() =>
-  overduePayables.value.reduce((s, p) => s + p.remainingAmount, 0)
-)
-const paymentRate = computed(() => {
-  const total = totalPayable.value
-  if (!total) return 0
-  const paid = payables.value.reduce((s, p) => s + p.paidAmount, 0)
-  return Math.round((paid / total) * 100)
+const displayedPayables = computed(() => {
+  let items = payables.value
+  const f = advancedFilters.value
+  if (f.type) items = items.filter(p => p.type === f.type)
+  if (f.startDate) items = items.filter(p => p.dueDate >= f.startDate!)
+  if (f.endDate) items = items.filter(p => p.dueDate <= f.endDate!)
+  if (f.overdue) items = items.filter(p => isReceivableOverdue(p.dueDate, p.status))
+  return items
 })
 
-onMounted(() => {
-  loadPayables()
-})
+const viewModes = [
+  { id: 'all' as ViewMode, label: 'Tümü' },
+  { id: 'rental' as ViewMode, label: 'Kiralama' },
+  { id: 'vehicle' as ViewMode, label: 'Araç' },
+]
+
+const statusChips: { id: StatusChip; label: string }[] = [
+  { id: 'all', label: 'Hepsi' },
+  { id: PayableStatus.PENDING, label: 'Bekleyen' },
+  { id: PayableStatus.OVERDUE, label: 'Vadesi geçmiş' },
+  { id: PayableStatus.FULLY_PAID, label: 'Ödenmiş' },
+]
+
+const typeOptions = Object.values(PayableType).map(t => ({
+  value: t,
+  label: payableTypes[t] ?? t,
+}))
+
+const rentalOptions = computed(() =>
+  rentalsList.value.map(r => ({
+    value: r.id as number,
+    label: r.customerName ? `${r.rentalNumber} — ${r.customerName}` : r.rentalNumber,
+  }))
+)
+const vehicleOptions = computed(() =>
+  vehiclesList.value.map(v => ({ value: v.id as number, label: `${v.plateNumber} – ${v.brand} ${v.model}` }))
+)
+
+onMounted(() => loadPayables())
 
 watch(viewMode, (mode) => {
+  statusChip.value = 'all'
   if (mode === 'rental') {
     selectedVehicleId.value = null
     accountingStore.clearPayables()
@@ -73,15 +104,20 @@ watch(viewMode, (mode) => {
 watch(selectedRentalId, (id) => {
   if (viewMode.value === 'rental' && id != null) loadPayables()
 })
-
 watch(selectedVehicleId, (id) => {
   if (viewMode.value === 'vehicle' && id != null) loadPayables()
 })
+watch(statusChip, () => {
+  if (viewMode.value === 'all') {
+    setPage(0)
+    loadPayables()
+  }
+})
 
-const loadRentalsList = async () => {
+async function loadRentalsList() {
   loadingRentals.value = true
   try {
-    const res = await rentalsApi.getAll({ page: 0, size: 500, sort: 'startDate', direction: 'DESC' })
+    const res = await rentalsApi.getAll({ page: 0, size: 500, sort: 'startDate', direction: 'desc' })
     rentalsList.value = res.content
   } catch {
     rentalsList.value = []
@@ -90,10 +126,10 @@ const loadRentalsList = async () => {
   }
 }
 
-const loadVehiclesList = async () => {
+async function loadVehiclesList() {
   loadingVehicles.value = true
   try {
-    const res = await vehiclesApi.getAll({ page: 0, size: 500, sort: 'plateNumber', direction: 'ASC' })
+    const res = await vehiclesApi.getAll({ page: 0, size: 500, sort: 'plateNumber', direction: 'asc' })
     vehiclesList.value = res.content
   } catch {
     vehiclesList.value = []
@@ -102,7 +138,7 @@ const loadVehiclesList = async () => {
   }
 }
 
-const loadPayables = async () => {
+async function loadPayables() {
   try {
     if (viewMode.value === 'rental' && selectedRentalId.value != null) {
       await accountingStore.fetchPayablesByRental(selectedRentalId.value)
@@ -111,31 +147,30 @@ const loadPayables = async () => {
       await accountingStore.fetchPayablesByVehicle(selectedVehicleId.value)
       setTotal(payables.value.length, 1)
     } else if (viewMode.value === 'all') {
-      const response = await accountingStore.fetchPayables(filters.value, getParams())
+      const apiFilters: PayableFilters = {}
+      if (statusChip.value !== 'all') apiFilters.status = statusChip.value
+      const response = await accountingStore.fetchPayables(apiFilters, getParams())
       if (response) setTotal(response.totalElements, response.totalPages)
     }
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Verecekler yüklenemedi'
-    toast.error(message)
+    toast.error(error instanceof Error ? error.message : 'Verecekler yüklenemedi')
   }
 }
 
-const applyFilters = () => {
-  setPage(0)
-  loadPayables()
+function applyAdvancedFilters() {
+  if (viewMode.value === 'all') loadPayables()
 }
 
-const clearFilters = () => {
-  filters.value = {}
-  setPage(0)
-  loadPayables()
+function clearAdvancedFilters() {
+  advancedFilters.value = {}
+  if (viewMode.value === 'all') loadPayables()
 }
 
-const handleCardClick = (id: number) => {
+function handleRowClick(id: number) {
   router.push({ name: 'payable-detail', params: { id } })
 }
 
-const handlePayment = (id: number) => {
+function handlePayment(id: number) {
   const payable = payables.value.find(p => p.id === id)
   if (payable) {
     selectedPayableId.value = id
@@ -145,110 +180,66 @@ const handlePayment = (id: number) => {
   }
 }
 
-const submitPayment = async (data: RecordPaymentRequest) => {
+async function submitPayment(data: RecordPaymentRequest) {
   if (!selectedPayableId.value) return
   try {
     await accountingStore.recordPayablePayment(selectedPayableId.value, data)
     toast.success('Ödeme başarıyla kaydedildi')
     showPaymentModal.value = false
     selectedPayableId.value = null
-    loadPayables()
+    await loadPayables()
+    await financePage?.refresh()
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Ödeme kaydedilemedi'
-    toast.error(message)
+    toast.error(error instanceof Error ? error.message : 'Ödeme kaydedilemedi')
   }
 }
 
-const submitCreate = async (data: CreatePayableRequest) => {
+async function submitCreate(data: CreatePayableRequest) {
   try {
     await accountingStore.createPayable(data)
     toast.success('Verecek başarıyla oluşturuldu')
     showCreateModal.value = false
-    loadPayables()
+    await loadPayables()
+    await financePage?.refresh()
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Verecek oluşturulamadı'
-    toast.error(message)
+    toast.error(error instanceof Error ? error.message : 'Verecek oluşturulamadı')
   }
 }
 
-const handlePageChange = (newPage: number) => {
+function handlePageChange(newPage: number) {
   setPage(newPage)
   loadPayables()
 }
 
-const statusOptions = computed(() =>
-  Object.values(PayableStatus).map(s => ({ value: s, label: payableStatuses[s] ?? s }))
-)
-const typeOptions = computed(() =>
-  Object.values(PayableType).map(t => ({ value: t, label: payableTypes[t] ?? t }))
-)
-const rentalOptions = computed(() =>
-  rentalsList.value.map(r => ({
-    value: r.id as number,
-    label: r.customerName
-      ? `${r.rentalNumber} — ${r.customerName} (${r.startDate} - ${r.endDate})`
-      : `${r.rentalNumber} (${r.startDate} - ${r.endDate})`
-  }))
-)
-const vehicleOptions = computed(() =>
-  vehiclesList.value.map(v => ({ value: v.id as number, label: `${v.plateNumber} – ${v.brand} ${v.model}` }))
-)
+const showList = computed(() => {
+  if (viewMode.value === 'rental') return !!selectedRentalId.value
+  if (viewMode.value === 'vehicle') return !!selectedVehicleId.value
+  return true
+})
 </script>
 
 <template>
-  <div class="page-container">
-    <div class="page-header responsive-page-header">
-      <div>
-        <h1 class="page-title">Verecekler</h1>
-        <p class="page-subtitle">Servis sağlayıcılara ödenecek tutarlar</p>
-      </div>
-      <button class="btn btn-primary" @click="showCreateModal = true">Yeni Verecek</button>
+  <FinancePageLayout class="rca-payables">
+    <template #actions>
+      <RcButton variant="accent" @click="showCreateModal = true">
+        <RcIcon name="plus" :size="14" />
+        Yeni Verecek
+      </RcButton>
+    </template>
+
+    <div class="rc-segtabs" style="margin-bottom: 14px">
+      <RcSegTab
+        v-for="mode in viewModes"
+        :key="mode.id"
+        :id="mode.id"
+        :active="viewMode"
+        @select="(id) => viewMode = id as ViewMode"
+      >
+        {{ mode.label }}
+      </RcSegTab>
     </div>
 
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-label">Toplam Verecek</div>
-        <div class="stat-value">{{ formatCurrency(totalPayable) }}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Ödenecek</div>
-        <div class="stat-value text-orange">{{ formatCurrency(outstandingPayable) }}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Vadesi Geçmiş</div>
-        <div class="stat-value text-red">
-          {{ formatCurrency(overduePayablesTotal) }}
-          <span class="stat-count">({{ overduePayables.length }})</span>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Ödeme Oranı</div>
-        <div class="stat-value text-green">{{ paymentRate }}%</div>
-      </div>
-    </div>
-
-    <div class="view-tabs">
-      <button
-        :class="['tab-btn', { active: viewMode === 'all' }]"
-        @click="viewMode = 'all'"
-      >
-        Tümü
-      </button>
-      <button
-        :class="['tab-btn', { active: viewMode === 'rental' }]"
-        @click="viewMode = 'rental'"
-      >
-        Kiralama Bazlı
-      </button>
-      <button
-        :class="['tab-btn', { active: viewMode === 'vehicle' }]"
-        @click="viewMode = 'vehicle'"
-      >
-        Araç Bazlı
-      </button>
-    </div>
-
-    <div v-if="viewMode === 'rental'" class="filter-bar responsive-filters">
+    <div v-if="viewMode === 'rental'" class="rc-filterbar" style="margin-bottom: 14px">
       <SearchableSelect
         v-model="selectedRentalId"
         :options="rentalOptions"
@@ -256,11 +247,10 @@ const vehicleOptions = computed(() =>
         search-placeholder="Kiralama ara..."
         clearable
         :loading="loadingRentals"
-        class="filter-searchable rental-select"
+        style="min-width: 280px"
       />
     </div>
-
-    <div v-else-if="viewMode === 'vehicle'" class="filter-bar responsive-filters">
+    <div v-else-if="viewMode === 'vehicle'" class="rc-filterbar" style="margin-bottom: 14px">
       <SearchableSelect
         v-model="selectedVehicleId"
         :options="vehicleOptions"
@@ -268,78 +258,86 @@ const vehicleOptions = computed(() =>
         search-placeholder="Araç ara..."
         clearable
         :loading="loadingVehicles"
-        class="filter-searchable vehicle-select"
+        style="min-width: 280px"
       />
     </div>
 
-    <div v-else-if="viewMode === 'all'" class="filter-bar responsive-filters">
-      <SearchableSelect
-        :model-value="filters.status ?? null"
-        :options="statusOptions"
-        placeholder="Tüm Durumlar"
-        search-placeholder="Durum ara..."
-        clearable
-        class="filter-searchable"
-        @update:model-value="(v) => filters.status = v ?? undefined"
-      />
-      <SearchableSelect
-        :model-value="filters.type ?? null"
-        :options="typeOptions"
-        placeholder="Tüm Tipler"
-        search-placeholder="Tip ara..."
-        clearable
-        class="filter-searchable"
-        @update:model-value="(v) => filters.type = v ?? undefined"
-      />
-      <DatePicker v-model="filters.startDate" placeholder="Başlangıç" />
-      <DatePicker v-model="filters.endDate" placeholder="Bitiş" />
-      <label class="filter-check">
-        <input type="checkbox" v-model="filters.overdue" /> Yalnızca Vadesi Geçmiş
-      </label>
-      <button class="btn btn-secondary" @click="applyFilters">Filtrele</button>
-      <button class="btn btn-ghost" @click="clearFilters">Temizle</button>
+    <div v-if="viewMode === 'all'" class="rc-filterbar rcv-filterbar--slim">
+      <button
+        v-for="chip in statusChips"
+        :key="chip.id"
+        type="button"
+        class="rc-chip"
+        :class="{ 'rc-chip--on': statusChip === chip.id }"
+        @click="statusChip = chip.id"
+      >
+        {{ chip.label }}
+      </button>
+      <div class="rca-advanced-filters" style="width: 100%; margin-top: 0; padding-top: 0; border: none">
+        <SearchableSelect
+          :model-value="advancedFilters.type ?? null"
+          :options="typeOptions"
+          placeholder="Tüm tipler"
+          search-placeholder="Tip ara..."
+          clearable
+          @update:model-value="(v) => advancedFilters.type = v ?? undefined"
+        />
+        <DatePicker v-model="advancedFilters.startDate" placeholder="Başlangıç" />
+        <DatePicker v-model="advancedFilters.endDate" placeholder="Bitiş" />
+        <label class="rca-filter-check">
+          <input v-model="advancedFilters.overdue" type="checkbox" />
+          Yalnızca vadesi geçmiş
+        </label>
+        <RcButton variant="secondary" size="sm" @click="applyAdvancedFilters">Filtrele</RcButton>
+        <RcButton variant="ghost" size="sm" @click="clearAdvancedFilters">Temizle</RcButton>
+      </div>
+    </div>
+
+    <RcEmpty
+      v-if="!showList"
+      title="Seçim gerekli"
+      :description="`Verecekleri görüntülemek için bir ${viewMode === 'rental' ? 'kiralama' : 'araç'} seçin.`"
+    >
+      <template #icon><RcIcon name="search" :size="32" /></template>
+    </RcEmpty>
+
+    <div v-else-if="loading" class="rc-skeleton rc-card-skeleton" style="height: 280px" />
+
+    <RcEmpty
+      v-else-if="displayedPayables.length === 0"
+      title="Verecek kaydı yok"
+      description="Henüz kayıt bulunmuyor veya filtreye uyan sonuç yok"
+    />
+
+    <PayablesTable
+      v-else
+      :payables="displayedPayables"
+      @row-click="handleRowClick"
+      @payment="handlePayment"
+    />
+
+    <div
+      v-if="!loading && displayedPayables.length > 0 && viewMode !== 'all'"
+      class="rca-list-info"
+    >
+      {{ displayedPayables.length }} verecek kaydı listeleniyor.
     </div>
 
     <div
-      v-if="viewMode === 'rental' && !selectedRentalId"
-      class="empty-state-hint"
+      v-if="!loading && viewMode === 'all' && totalPages > 1"
+      class="rca-pagination"
     >
-      Verecekleri görüntülemek için yukarıdan bir kiralama seçin.
-    </div>
-    <div
-      v-else-if="viewMode === 'vehicle' && !selectedVehicleId"
-      class="empty-state-hint"
-    >
-      Verecekleri görüntülemek için yukarıdan bir araç seçin.
-    </div>
-
-    <div v-else-if="loading" class="loading">Yükleniyor...</div>
-
-    <div v-else-if="payables.length === 0" class="empty-state">
-      <p>Henüz verecek kaydı bulunmamaktadır.</p>
-    </div>
-
-    <div v-else class="cards-grid">
-      <PayableCard
-        v-for="payable in payables"
-        :key="payable.id"
-        :payable="payable"
-        @click="handleCardClick"
-        @payment="handlePayment"
-      />
-    </div>
-
-    <div v-if="!loading && payables.length > 0 && (viewMode === 'rental' || viewMode === 'vehicle')" class="list-info">
-      {{ payables.length }} verecek kaydı listeleniyor.
-    </div>
-    <div v-if="!loading && payables.length > 0 && viewMode === 'all'" class="pagination responsive-pagination">
-      <button class="page-btn" :disabled="page === 0" @click="handlePageChange(page - 1)">‹ Önceki</button>
-      <span class="page-info">Sayfa {{ page + 1 }}</span>
-      <button class="page-btn" @click="handlePageChange(page + 1)">Sonraki ›</button>
+      <RcButton variant="secondary" :disabled="page === 0" @click="handlePageChange(page - 1)">
+        Önceki
+      </RcButton>
+      <span style="font-size: 13px; color: var(--rc-text-muted)">Sayfa {{ page + 1 }} / {{ totalPages }}</span>
+      <RcButton variant="secondary" :disabled="page >= totalPages - 1" @click="handlePageChange(page + 1)">
+        Sonraki
+      </RcButton>
     </div>
 
     <CreatePayableModal
-      :show="showCreateModal"
+      :open="showCreateModal"
       @close="showCreateModal = false"
       @submit="submitCreate"
     />
@@ -347,121 +345,10 @@ const vehicleOptions = computed(() =>
     <PaymentModal
       :show="showPaymentModal"
       :remaining-amount="selectedPayableAmount"
-      :reference-number="selectedPayableNumber"
+      :receivable-number="selectedPayableNumber"
+      title="Ödeme kaydet"
       @close="showPaymentModal = false"
       @submit="submitPayment"
     />
-  </div>
+  </FinancePageLayout>
 </template>
-
-<style scoped>
-.page-container { padding: 2rem; max-width: 1400px; margin: 0 auto; }
-.page-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2rem; }
-.page-title { font-size: 1.875rem; font-weight: 700; color: var(--color-text, #111827); margin: 0 0 0.5rem 0; }
-.page-subtitle { color: var(--color-text-secondary, #6b7280); margin: 0; }
-.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
-.stat-card { background: white; border: 1px solid var(--color-border, #e5e7eb); border-radius: 0.5rem; padding: 1.5rem; }
-.stat-label { font-size: 0.875rem; color: var(--color-text-secondary, #6b7280); margin-bottom: 0.5rem; }
-.stat-value { font-size: 1.5rem; font-weight: 700; color: var(--color-text, #111827); }
-.stat-count { font-size: 1rem; font-weight: 400; color: var(--color-text-secondary, #6b7280); }
-.text-orange { color: #c2410c !important; }
-.text-red { color: #b91c1c !important; }
-.text-green { color: #15803d !important; }
-
-.view-tabs {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-  background: white;
-  border: 1px solid var(--color-border, #e5e7eb);
-  border-radius: 0.5rem;
-  padding: 0.375rem;
-  width: fit-content;
-}
-.tab-btn {
-  padding: 0.5rem 1.25rem;
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  border: none;
-  background: transparent;
-  color: var(--color-text-secondary, #6b7280);
-  transition: all 0.2s;
-}
-.tab-btn:hover { background: var(--color-background, #f3f4f6); color: var(--color-text, #111827); }
-.tab-btn.active { background: var(--color-primary, #2563eb); color: white; }
-
-.filter-bar { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; background: white; border: 1px solid var(--color-border, #e5e7eb); border-radius: 0.5rem; padding: 1rem 1.25rem; margin-bottom: 1.5rem; }
-.rental-select, .vehicle-select { min-width: 300px; }
-.list-info { font-size: 0.875rem; color: var(--color-text-secondary, #6b7280); margin-top: 1rem; }
-.filter-select, .filter-input { padding: 0.4rem 0.75rem; border: 1px solid var(--color-border, #e5e7eb); border-radius: 0.375rem; font-size: 0.875rem; background: white; }
-.filter-check { font-size: 0.875rem; display: flex; align-items: center; gap: 0.375rem; cursor: pointer; }
-.loading { text-align: center; padding: 3rem; color: var(--color-text-secondary, #6b7280); }
-.empty-state { text-align: center; padding: 3rem; background: white; border: 1px solid var(--color-border, #e5e7eb); border-radius: 0.5rem; color: var(--color-text-secondary, #6b7280); }
-.empty-state-hint {
-  text-align: center;
-  padding: 2.5rem;
-  background: #f8fafc;
-  border: 2px dashed var(--color-border, #e5e7eb);
-  border-radius: 0.5rem;
-  color: var(--color-text-secondary, #6b7280);
-  font-size: 0.9375rem;
-  margin-bottom: 1.5rem;
-}
-.cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 1.5rem; }
-.pagination { display: flex; justify-content: center; align-items: center; gap: 1rem; margin-top: 2rem; }
-.page-btn { padding: 0.5rem 1rem; border: 1px solid var(--color-border, #e5e7eb); border-radius: 0.375rem; background: white; cursor: pointer; font-size: 0.875rem; }
-.page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.page-info { font-size: 0.875rem; color: var(--color-text-secondary, #6b7280); }
-.btn { padding: 0.5rem 1.25rem; border-radius: 0.375rem; font-size: 0.875rem; font-weight: 500; cursor: pointer; border: none; transition: all 0.2s; }
-.btn-primary { background: var(--color-primary, #2563eb); color: white; }
-.btn-primary:hover { background: var(--color-primary-dark, #1d4ed8); }
-.btn-secondary { background: var(--color-secondary, #4b5563); color: white; }
-.btn-ghost { background: transparent; border: 1px solid var(--color-border, #e5e7eb); color: var(--color-text, #111827); }
-
-@media (max-width: 1024px) {
-  .page-container {
-    padding: 1.5rem 1rem;
-  }
-
-  .view-tabs {
-    width: 100%;
-    overflow-x: auto;
-  }
-
-  .tab-btn {
-    white-space: nowrap;
-  }
-
-  .rental-select,
-  .vehicle-select {
-    min-width: 0;
-  }
-}
-
-@media (max-width: 768px) {
-  .page-header,
-  .filter-check,
-  .pagination {
-    align-items: stretch;
-  }
-
-  .btn,
-  .page-btn {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .stats-grid,
-  .cards-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .stat-card,
-  .empty-state,
-  .empty-state-hint {
-    padding: 1rem;
-  }
-}
-</style>

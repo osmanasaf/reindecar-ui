@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { formatDate, formatCurrency, getStatusBadgeColor, getStatusLabel } from '@/utils/installmentHelpers'
-import type { InstallmentPaymentResponse, VehicleInstallmentResponse } from '@/types'
+import type { InstallmentPaymentResponse, VehicleInstallmentResponse, InstallmentPaymentStatus } from '@/types'
+import { RcBadge, RcButton } from '@/components/rc'
 import RecordPaymentButton from './RecordPaymentButton.vue'
 
 interface Props {
@@ -20,15 +21,25 @@ const emit = defineEmits<{
   viewInstallment: [installmentId: number]
 }>()
 
-const sortedPayments = computed(() => {
-  return [...props.payments].sort((a, b) => a.installmentNumber - b.installmentNumber)
-})
+const sortedPayments = computed(() =>
+  [...props.payments].sort((a, b) => a.installmentNumber - b.installmentNumber)
+)
+
+function badgeVariant(status: InstallmentPaymentStatus) {
+  const color = getStatusBadgeColor(status)
+  if (color === 'success' || color === 'danger' || color === 'info') return color
+  return 'default' as const
+}
 </script>
 
 <template>
-  <div class="payment-schedule-table">
-    <div class="table-wrapper">
-      <table class="table">
+  <div class="rc-veh-installment-table">
+    <div v-if="payments.length === 0" class="rc-veh-map__empty">
+      Ödeme kaydı bulunamadı
+    </div>
+
+    <div v-else class="rc-table-wrap">
+      <table class="rc-table">
         <thead>
           <tr>
             <th>Taksit No</th>
@@ -40,26 +51,35 @@ const sortedPayments = computed(() => {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="payment in sortedPayments" :key="payment.id" :class="{ 'overdue': payment.isOverdue, 'early-closed': props.installment?.earlyClosedAt && payment.dueDate > props.installment.earlyClosedAt }">
-            <td class="installment-number">{{ payment.installmentNumber }}</td>
+          <tr
+            v-for="payment in sortedPayments"
+            :key="payment.id"
+            :class="{
+              'rc-veh-installment-table__overdue': payment.isOverdue,
+              'rc-veh-installment-table__closed':
+                props.installment?.earlyClosedAt &&
+                payment.dueDate > props.installment.earlyClosedAt
+            }"
+          >
+            <td class="rc-mono">{{ payment.installmentNumber }}</td>
             <td>{{ formatDate(payment.dueDate) }}</td>
-            <td class="amount">{{ formatCurrency(payment.amount, payment.currency) }}</td>
+            <td class="rc-mono rc-num">{{ formatCurrency(payment.amount, payment.currency) }}</td>
             <td>
-              <span class="status-badge" :class="`status-${getStatusBadgeColor(payment.status)}`">
+              <RcBadge :variant="badgeVariant(payment.status)">
                 {{ getStatusLabel(payment.status) }}
-              </span>
+              </RcBadge>
             </td>
             <td>{{ formatDate(payment.paidDate) }}</td>
             <td>
-              <div class="actions">
-                <button
+              <div class="rc-veh-installment-table__actions">
+                <RcButton
                   v-if="showVehicleInfo"
-                  type="button"
-                  class="btn-link"
+                  variant="ghost"
+                  size="xs"
                   @click="emit('viewInstallment', payment.installmentId)"
                 >
                   Detay
-                </button>
+                </RcButton>
                 <RecordPaymentButton
                   v-if="payment.status === 'PENDING'"
                   :installment-id="payment.installmentId"
@@ -72,131 +92,5 @@ const sortedPayments = computed(() => {
         </tbody>
       </table>
     </div>
-    <div v-if="payments.length === 0" class="empty-state">
-      Ödeme kaydı bulunamadı
-    </div>
   </div>
 </template>
-
-<style scoped>
-.payment-schedule-table {
-  width: 100%;
-}
-
-.table-wrapper {
-  overflow-x: auto;
-}
-
-.table {
-  width: 100%;
-  min-width: 720px;
-  border-collapse: collapse;
-  font-size: 14px;
-}
-
-.table thead {
-  background: var(--color-bg-secondary);
-}
-
-.table th {
-  padding: 12px 16px;
-  text-align: left;
-  font-weight: 600;
-  color: var(--color-text-secondary);
-  border-bottom: 2px solid var(--color-border);
-}
-
-.table td {
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.table tbody tr:hover {
-  background: var(--color-bg-secondary);
-}
-
-.table tbody tr.overdue {
-  background: var(--color-danger-light);
-}
-
-.table tbody tr.early-closed .amount,
-.table tbody tr.early-closed .installment-number {
-  text-decoration: line-through;
-  opacity: 0.6;
-}
-
-.table tbody tr.early-closed {
-  background: #f8fafc;
-  color: var(--color-text-secondary);
-}
-
-.installment-number {
-  font-weight: 600;
-}
-
-.amount {
-  font-weight: 500;
-  font-family: monospace;
-}
-
-.status-badge {
-  display: inline-block;
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.status-success {
-  background: var(--color-success-light);
-  color: var(--color-success);
-}
-
-.status-info {
-  background: var(--color-info-light);
-  color: var(--color-info);
-}
-
-.status-danger {
-  background: var(--color-danger-light);
-  color: var(--color-danger);
-}
-
-.actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.btn-link {
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-primary);
-  padding: 6px 10px;
-  border-radius: 6px;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.btn-link:hover {
-  border-color: var(--color-primary);
-  background: var(--color-primary-light);
-}
-
-.empty-state {
-  padding: 40px;
-  text-align: center;
-  color: var(--color-text-secondary);
-}
-
-@media (max-width: 768px) {
-  .actions {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .btn-link {
-    width: 100%;
-  }
-}
-</style>

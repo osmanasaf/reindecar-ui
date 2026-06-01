@@ -1,0 +1,130 @@
+/* Paylaşılan belge bölümü (DocumentsSection) */
+
+.rcd-section {
+  /* rca-panel-card içinde veya bağımsız kullanılır */
+}
+
+.rcd-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.rcd-head__title {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--rc-text);
+}
+
+.rcd-head__meta {
+  font-size: 12px;
+  color: var(--rc-text-muted);
+  margin-left: 8px;
+  font-weight: 400;
+}
+
+.rcd-upload {
+  padding: 16px;
+  background: var(--rc-bg-subtle);
+  border: 1px solid var(--rc-border-subtle);
+  border-radius: var(--rc-radius-md);
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.rcd-drop {
+  border: 1.5px dashed var(--rc-border);
+  border-radius: var(--rc-radius-md);
+  padding: 24px 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  background: var(--rc-surface);
+}
+
+.rcd-drop:hover,
+.rcd-drop--drag {
+  border-color: var(--rc-accent);
+  background: var(--rc-accent-subtle);
+}
+
+.rcd-drop--filled {
+  cursor: default;
+  text-align: left;
+  padding: 12px 14px;
+}
+
+.rcd-drop__hint {
+  font-size: 13px;
+  color: var(--rc-text-muted);
+  margin: 8px 0 0;
+}
+
+.rcd-drop__sub {
+  font-size: 12px;
+  color: var(--rc-text-faint);
+  margin: 4px 0 0;
+}
+
+.rcd-selected {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.rcd-selected__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.rcd-selected__name {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--rc-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rcd-selected__size {
+  font-size: 12px;
+  color: var(--rc-text-muted);
+}
+
+.rcd-upload__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.rcd-upload__hint {
+  font-size: 12px;
+  color: var(--rc-text-muted);
+  margin: 0;
+}
+
+.rcd-file-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.rcd-file-name__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.rcd-actions {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+}

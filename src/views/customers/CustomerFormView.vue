@@ -5,6 +5,8 @@ import { customersApi, referenceDataApi } from '@/api'
 import { useValidation, rules, useToast, useReferenceData } from '@/composables'
 import { SearchableSelect } from '@/components/common'
 import DatePicker from '@/components/base/DatePicker.vue'
+import { RcIcon } from '@/components/icons'
+import { RcPageHeader, RcSegTab, RcButton } from '@/components/rc'
 import { SECTOR_OPTIONS } from '@/constants/sectors'
 import { formatPhoneInput } from '@/utils/phone'
 import type { ValidationRule } from '@/composables/useValidation'
@@ -394,29 +396,36 @@ watch(customerType, () => reset())
 </script>
 
 <template>
-  <div class="customer-form-page">
-    <header class="page-header">
-      <div class="header-left">
-        <button class="back-btn" @click="router.back()">← Geri</button>
-        <h1>{{ isEditMode ? 'Müşteriyi Düzenle' : 'Yeni Müşteri Ekle' }}</h1>
-      </div>
-    </header>
+  <div class="customer-form-page rc-page">
+    <RcPageHeader
+      :title="isEditMode ? 'Müşteriyi düzenle' : 'Yeni müşteri ekle'"
+      :subtitle="isEditMode ? 'Mevcut müşteri kaydını güncelleyin' : 'Bireysel veya kurumsal müşteri oluşturun'"
+    >
+      <template #actions>
+        <RcButton variant="ghost" @click="router.back()">
+          <RcIcon name="chevronLeft" :size="14" />
+          Geri
+        </RcButton>
+      </template>
+    </RcPageHeader>
 
     <div class="form-container">
 
-      <div v-if="!isEditMode" class="type-selector">
-        <button 
-          :class="['type-btn', { active: customerType === 'PERSONAL' }]"
-          @click="customerType = 'PERSONAL'"
+      <div v-if="!isEditMode" class="rc-segtabs rc-cust-form-type-tabs">
+        <RcSegTab
+          id="PERSONAL"
+          :active="customerType"
+          @select="customerType = $event as CustomerType"
         >
-          👤 Bireysel
-        </button>
-        <button 
-          :class="['type-btn', { active: customerType === 'COMPANY' }]"
-          @click="customerType = 'COMPANY'"
+          Bireysel
+        </RcSegTab>
+        <RcSegTab
+          id="COMPANY"
+          :active="customerType"
+          @select="customerType = $event as CustomerType"
         >
-          🏢 Kurumsal
-        </button>
+          Kurumsal
+        </RcSegTab>
       </div>
 
       <form @submit.prevent="handleSubmit" class="main-form">

@@ -4,6 +4,7 @@ import { penaltiesApi, rentalsApi, vehiclesApi, customersApi } from '@/api'
 import { useToast, useEnumTranslations } from '@/composables'
 import { SearchableSelect } from '@/components/common'
 import DatePicker from '@/components/base/DatePicker.vue'
+import { RcModal, RcButton } from '@/components/rc'
 import type { Rental, Vehicle, Customer, RentalDriver, ViolationType } from '@/types'
 
 interface Props {
@@ -252,15 +253,9 @@ watch(() => props.show, async (newVal) => {
 </script>
 
 <template>
-  <div v-if="show" class="modal-overlay" @click.self="handleClose">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2 class="modal-title">Yeni Trafik Cezası</h2>
-        <button class="close-btn" @click="handleClose">&times;</button>
-      </div>
-
-      <form @submit.prevent="handleSubmit">
-        <div class="modal-body">
+  <RcModal :open="show" title="Yeni trafik cezası" xl @close="handleClose">
+      <form id="create-penalty-form" @submit.prevent="handleSubmit">
+        <div class="rca-modal-form">
           <div class="form-group full-width">
             <label class="form-label">
               Kiralama <span class="required">*</span>
@@ -400,191 +395,24 @@ watch(() => props.show, async (newVal) => {
             ></textarea>
           </div>
         </div>
-
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" @click="handleClose">
-            İptal
-          </button>
-          <button type="submit" class="btn btn-primary" :disabled="isSubmitting || !selectedRentalId">
-            {{ isSubmitting ? 'Kaydediliyor...' : 'Kaydet' }}
-          </button>
-        </div>
       </form>
-    </div>
-  </div>
+    <template #footer>
+      <RcButton variant="secondary" @click="handleClose">İptal</RcButton>
+      <RcButton variant="primary" type="submit" form="create-penalty-form" :disabled="isSubmitting || !selectedRentalId">
+        {{ isSubmitting ? 'Kaydediliyor…' : 'Kaydet' }}
+      </RcButton>
+    </template>
+  </RcModal>
 </template>
 
 <style scoped>
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 1rem;
-}
-
-.modal-content {
-  background: var(--color-surface, white);
-  border-radius: 12px;
-  width: 100%;
-  max-width: 700px;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.5rem;
-  border-bottom: 1px solid var(--color-border, #e5e7eb);
-}
-
-.modal-title {
-  font-size: 1.25rem;
-  font-weight: 600;
-  margin: 0;
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  font-size: 2rem;
-  color: var(--color-text-secondary, #6b7280);
-  cursor: pointer;
-  padding: 0;
-  width: 2rem;
-  height: 2rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 0.25rem;
-}
-
-.close-btn:hover {
-  background: var(--color-bg-secondary, #f3f4f6);
-}
-
-.modal-body {
-  padding: 1.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-}
-
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.form-group.full-width {
-  grid-column: 1 / -1;
-}
-
-.form-label {
-  font-size: 0.875rem;
-  font-weight: 500;
-}
-
-.required {
-  color: #dc2626;
-}
-
-.form-input {
-  padding: 0.625rem 0.75rem;
-  border: 1px solid var(--color-border, #d1d5db);
-  border-radius: 0.5rem;
-  font-size: 0.875rem;
-  background: var(--color-bg-secondary, #f9fafb);
-  transition: border-color 0.2s;
-}
-
-.form-input:focus {
-  outline: none;
-  border-color: var(--color-primary, #2563eb);
-  background: var(--color-surface, white);
-}
-
-textarea.form-input {
-  resize: vertical;
-  min-height: 4rem;
-}
-
-.locked-field {
-  padding: 0.625rem 0.75rem;
-  border: 1px solid var(--color-border, #e5e7eb);
-  border-radius: 0.5rem;
-  font-size: 0.875rem;
-  background: var(--color-bg-secondary, #f3f4f6);
-  color: var(--color-text-secondary, #6b7280);
-  min-height: 38px;
-  display: flex;
-  align-items: center;
-}
-
-.field-hint {
-  font-size: 0.75rem;
-  color: var(--color-text-secondary, #9ca3af);
-}
-
-.modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.75rem;
-  padding: 1.5rem;
-  border-top: 1px solid var(--color-border, #e5e7eb);
-}
-
-.btn {
-  padding: 0.625rem 1.25rem;
-  border-radius: 0.5rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  border: none;
-  transition: all 0.2s;
-}
-
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn-secondary {
-  background: var(--color-surface, white);
-  border: 1px solid var(--color-border, #d1d5db);
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background: var(--color-bg-secondary, #f3f4f6);
-}
-
-.btn-primary {
-  background: var(--color-primary, #2563eb);
-  color: white;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: var(--color-primary-dark, #1d4ed8);
-}
-
-@media (max-width: 640px) {
-  .form-row {
-    grid-template-columns: 1fr;
-  }
-}
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+.form-group { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem; }
+.form-group.full-width { grid-column: 1 / -1; }
+.form-label { font-size: 13px; font-weight: 500; }
+.required { color: var(--rc-red-500); }
+.form-input { padding: 0.625rem 0.75rem; border: 1px solid var(--rc-border); border-radius: var(--rc-radius-sm); font-size: 14px; width: 100%; box-sizing: border-box; }
+.locked-field { padding: 0.625rem 0.75rem; border: 1px solid var(--rc-border-subtle); border-radius: var(--rc-radius-sm); font-size: 14px; background: var(--rc-bg-subtle); color: var(--rc-text-muted); min-height: 38px; display: flex; align-items: center; }
+.field-hint { font-size: 12px; color: var(--rc-text-muted); }
+@media (max-width: 640px) { .form-row { grid-template-columns: 1fr; } }
 </style>

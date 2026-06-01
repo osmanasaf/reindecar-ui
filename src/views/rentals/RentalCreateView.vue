@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { rentalsApi, branchesApi, kmPackagesApi, rentalExtraItemApi } from '@/api'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { useRouter, useRoute, RouterLink } from 'vue-router'
+import { rentalsApi, branchesApi, kmPackagesApi, rentalExtraItemApi, customersApi } from '@/api'
 import { useToast, useValidation, rules } from '@/composables'
 import { SearchableSelect } from '@/components/common'
+import { RcIcon } from '@/components/icons'
+import { RcButton, RcKbd, RcStepper, RcPageHeader, RcField } from '@/components/rc'
 import { formatCurrency } from '@/utils/format'
 import { RentalType, CustomerType } from '@/types'
 import type { Customer, CreateRentalForm, RentalExtraItem, Branch, KmPackage, Vehicle } from '@/types'
@@ -16,9 +18,11 @@ import QuickCustomerModal from '@/components/customers/QuickCustomerModal.vue'
 import RentalTypeSelector from '@/components/rentals/RentalTypeSelector.vue'
 import TermSelector from '@/components/rentals/TermSelector.vue'
 import ExtraItemsManager from '@/components/rentals/ExtraItemsManager.vue'
+import RentalCreateSummaryCard from '@/components/rentals/RentalCreateSummaryCard.vue'
 import DatePicker from '@/components/base/DatePicker.vue'
 
 const router = useRouter()
+const route = useRoute()
 const toast = useToast()
 
 const currentStep = ref(1)
@@ -48,6 +52,18 @@ const priceData = ref<PriceCalculationResponse | null>(null)
 const showQuickCustomerModal = ref(false)
 const selectedBranchId = ref<number | null>(null)
 const selectedReturnBranchId = ref<number | null>(null)
+const selectedVehicleLabel = ref('')
+const selectedCustomerLabel = ref('')
+
+const wizardSteps = [
+  { id: 1, label: 'Tip' },
+  { id: 2, label: 'Tarih' },
+  { id: 3, label: 'Araç' },
+  { id: 4, label: 'Müşteri' },
+  { id: 5, label: 'KM paketi' },
+  { id: 6, label: 'Ek kalemler' },
+  { id: 7, label: 'Onay' },
+] as const
 
 const branchOptions = computed(() => branches.value.map(b => ({ value: b.id as number, label: b.name })))
 
@@ -107,9 +123,8 @@ async function fetchBranches() {
   }
 }
 
-const stepTitles = computed(() => {
-  return ['Tip', 'Tarih', 'Araç', 'Müşteri', 'KM Paketi', 'Ek Kalemler', 'Özet']
-})
+
+const currentStepLabel = computed(() => wizardSteps.find((s) => s.id === currentStep.value)?.label ?? '')
 
 const canProceed = computed(() => {
   switch (currentStep.value) {
@@ -199,7 +214,10 @@ function handleLeasingPlanSelected(planId: number) {
 function handleVehicleSelected(vehicleId: number, categoryId: number, vehicle?: Vehicle) {
   selectedVehicleId.value = vehicleId
   selectedVehicleCategoryId.value = categoryId
-  
+  selectedVehicleLabel.value = vehicle
+    ? `${vehicle.plateNumber} · ${vehicle.brand} ${vehicle.model}`
+    : ''
+
   if (vehicle && vehicle.branchId) {
     selectedBranchId.value = vehicle.branchId
     selectedReturnBranchId.value = vehicle.branchId
@@ -213,8 +231,23 @@ function handleExtraItemsTotal(total: number) {
 
 function handleCustomerCreated(customer: Customer) {
   selectedCustomerId.value = customer.id
+  selectedCustomerLabel.value = customer.displayName
   showQuickCustomerModal.value = false
 }
+
+async function loadCustomerLabel(id: number) {
+  try {
+    const c = await customersApi.getById(id)
+    selectedCustomerLabel.value = c.displayName
+  } catch {
+    selectedCustomerLabel.value = ''
+  }
+}
+
+watch(selectedCustomerId, (id) => {
+  if (id) loadCustomerLabel(id)
+  else selectedCustomerLabel.value = ''
+})
 
 const totalDays = computed(() => {
   if (!startDate.value || !endDate.value) return 0
@@ -379,377 +412,374 @@ watch(selectedVehicleId, (newId) => {
 
 onMounted(() => {
   fetchBranches()
+  const qCustomer = route.query.customerId
+  if (qCustomer) {
+    const id = Number(qCustomer)
+    if (!Number.isNaN(id)) {
+      selectedCustomerId.value = id
+      loadCustomerLabel(id)
+    }
+  }
+  window.addEventListener('keydown', onWizardKeydown)
 })
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onWizardKeydown)
+})
+
+function onWizardKeydown(e: KeyboardEvent) {
+  if (e.key !== 'Enter') return
+  if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return
+  const target = e.target as HTMLElement | null
+  if (target?.matches('textarea, button, [contenteditable="true"]')) return
+  if (showQuickCustomerModal.value) return
+  if (isLastStep.value) {
+    if (canProceed.value && !submitting.value) {
+      e.preventDefault()
+      handleSubmit()
+    }
+    return
+  }
+  if (canProceed.value) {
+    e.preventDefault()
+    nextStep()
+  }
+}
 </script>
 
 <template>
-  <div class="rental-create">
-    <header class="page-header">
-      <button class="back-btn" @click="router.back()">← Geri</button>
-      <h1>Yeni Kiralama</h1>
-    </header>
-
-    <div class="wizard">
-      <div class="wizard-steps">
-        <div 
-          v-for="(title, index) in stepTitles" 
-          :key="index"
-          :class="['step', { 
-            active: currentStep === index + 1, 
-            completed: currentStep > index + 1,
-            clickable: canGoToStep(index + 1) 
-          }]"
-          @click="goToStep(index + 1)"
-        >
-          <span class="step-number">{{ index + 1 }}</span>
-          <span class="step-label">{{ title }}</span>
-        </div>
-      </div>
-
-      <div class="wizard-content">
-        <div v-if="currentStep === 1" key="step-1" class="step-content">
-          <h2>Kiralama Tipini Seçin</h2>
-          <RentalTypeSelector v-model="rentalType" />
-        </div>
-
-        <div v-else-if="currentStep === 2" key="step-2" class="step-content">
-          <h2>Tarih ve Süre Seçin</h2>
-            
-            <div class="date-section-full">
-              <div class="form-grid">
-                <div class="form-group" :class="{ error: hasError('startDate') }">
-                  <DatePicker
-                    v-model="startDate"
-                    label="Başlangıç Tarihi"
-                    placeholder="Başlangıç tarihi"
-                    @closed="touch('startDate')"
-                  />
-                  <span class="error-text">{{ getError('startDate') }}</span>
-                </div>
-                <div class="form-group" :class="{ error: hasError('endDate') }">
-                  <DatePicker
-                    v-model="endDate"
-                    label="Bitiş Tarihi"
-                    :min="endDatePickerMin"
-                    placeholder="Bitiş tarihi"
-                    @closed="touch('endDate')"
-                  />
-                  <span class="error-text">{{ getError('endDate') }}</span>
-                </div>
-              </div>
-
-              <p class="date-hint">Geçmişe dönük kiralamaları da kayıt edebilirsiniz; takvimde bugünden önceki tarihler seçilebilir. Bitiş, başlangıçtan en az bir gün sonra olmalıdır.</p>
-
-              <div v-if="isLeasing" class="leasing-notice">
-                <span class="notice-icon">ℹ️</span>
-                <p>Leasing için minimum süre <strong>12 ay (365 gün)</strong> olmalıdır.</p>
-              </div>
-
-              <div v-if="startDate && endDate && validateDates()" class="date-summary">
-                <div class="summary-item">
-                  <span class="label">Toplam Süre</span>
-                  <span class="value">
-                    {{ isLeasing ? `${selectedTermMonths} Ay` : `${totalDays} Gün` }}
-                  </span>
-                </div>
-              </div>
-
-            </div>
-        </div>
-
-        <div v-else-if="currentStep === 3" key="step-3" class="step-content">
-          <h2>Araç Seçin</h2>
-          <p class="step-description">
-            {{ startDate }} - {{ endDate }} tarihleri arasında müsait araçlar listeleniyor.
-          </p>
-          <VehicleSelector
-            v-model="selectedVehicleId"
-            :start-date="startDate"
-            :end-date="endDate"
-            :rental-type="rentalType"
-            @vehicle-selected="handleVehicleSelected"
-          />
-        </div>
-
-        <div v-else-if="currentStep === 4" key="step-4" class="step-content">
-          <h2>Müşteri ve Sürücü Seçin</h2>
-          <CustomerSelector
-            v-model="selectedCustomerId"
-            :rental-end-date="endDate"
-            @open-quick-create="showQuickCustomerModal = true"
-          />
-
-          <div v-if="selectedCustomerId" class="driver-section">
-            <h3>Sürücüler</h3>
-            <p class="section-description">
-              Kiralama için sürücü seçin. Birden fazla sürücü ekleyebilirsiniz.
-            </p>
-            <DriverSelector
-              v-model="selectedDriverIds"
-              v-model:primary-driver-id="primaryDriverId"
-              :customer-id="selectedCustomerId"
-              :rental-end-date="endDate"
-            />
-          </div>
-        </div>
-
-        <div v-else-if="currentStep === 5" key="step-5" class="step-content">
-          <h2>KM Paketi ve Vade</h2>
-          <p class="step-description">
-            Araca uygun KM paketini seçin. Bu adım opsiyoneldir.
-          </p>
-
-          <div v-if="isLeasing && selectedVehicleCategoryId" class="term-section">
-            <h3>Vade Süresi</h3>
-            <TermSelector
-              v-model="selectedTermMonths"
-              :category-id="selectedVehicleCategoryId"
-            />
-          </div>
-
-          <div v-if="isLeasing && !selectedVehicleCategoryId" class="term-notice">
-            <span>ℹ️</span>
-            <p>Vade seçimi için önce araç kategorisi belirlenmelidir.</p>
-          </div>
-
-          <div v-if="kmPackages.length > 0" class="km-package-section">
-            <h3>KM Paketi Seçimi</h3>
-            <div class="package-grid">
-              <div
-                v-for="pkg in kmPackages"
-                :key="pkg.id"
-                :class="['package-card', { selected: selectedKmPackageId === pkg.id }]"
-                @click="selectedKmPackageId = pkg.id"
-              >
-                <div class="package-header">
-                  <h4>{{ pkg.name }}</h4>
-                  <span v-if="selectedKmPackageId === pkg.id" class="check-icon">✓</span>
-                </div>
-                <div class="package-body">
-                  <div class="package-km">
-                    <span class="km-value">{{ pkg.includedKm?.toLocaleString('tr-TR') }}</span>
-                    <span class="km-label">KM</span>
-                  </div>
-                  <div class="package-price">
-                    <span class="price-label">Fazla KM:</span>
-                    <span class="price-value">{{ formatCurrency(pkg.extraKmPrice) }}/KM</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="km-override-section">
-            <h3>KM Override (Opsiyonel)</h3>
-            <p class="section-description">
-              Bu alanlar doldurulursa seçilen paketin dahili km ve fazla km ücreti override edilir.
-            </p>
-            <div class="form-grid">
-              <div class="form-group">
-                <label>Özel Dahil KM</label>
-                <input
-                  v-model.number="customIncludedKm"
-                  type="number"
-                  min="0"
-                  step="1"
-                  placeholder="Örn: 7500"
-                />
-              </div>
-              <div class="form-group">
-                <label>Özel Fazla KM Ücreti (₺)</label>
-                <input
-                  v-model.number="customExtraKmPrice"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="Örn: 0.75"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div v-if="kmPackages.length === 0" class="skip-notice">
-            <span>ℹ️</span>
-            <p>Bu kiralama tipi için aktif KM paketi bulunamadı. Paketsiz devam edebilirsiniz.</p>
-          </div>
-        </div>
-
-        <div v-else-if="currentStep === 6" key="step-6" class="step-content">
-          <h2>Ek Kalemler</h2>
-          <p class="step-description">
-            Kiralamaya bakım, sigorta veya diğer ek kalemleri ekleyebilirsiniz. Bu adım opsiyoneldir.
-          </p>
-
-          <ExtraItemsManager
-            v-model="extraItems"
-            :term-months="isLeasing ? selectedTermMonths : 1"
-            @total-changed="handleExtraItemsTotal"
-          />
-
-          <div v-if="extraItems.length === 0" class="skip-notice">
-            <span>💡</span>
-            <p>Ek kalem eklemeden devam edebilirsiniz.</p>
-          </div>
-        </div>
-
-        <div v-else-if="currentStep === 7" key="step-7" class="step-content">
-          <h2>Kiralama Özeti</h2>
-
-          <div class="summary-grid">
-            <div class="summary-card">
-              <h4>Kiralama Detayları</h4>
-              <div class="summary-row">
-                <span>Kiralama Tipi</span>
-                <strong>{{ rentalTypes.find(t => t.value === rentalType)?.label }}</strong>
-              </div>
-              <div class="summary-row">
-                <span>Başlangıç</span>
-                <strong>{{ startDate }}</strong>
-              </div>
-              <div class="summary-row">
-                <span>Bitiş</span>
-                <strong>{{ endDate }}</strong>
-              </div>
-              <div class="summary-row">
-                <span>Toplam Süre</span>
-                <strong>
-                  {{ isLeasing ? `${selectedTermMonths} Ay` : `${totalDays} Gün` }}
-                </strong>
-              </div>
-              <div class="summary-row">
-                <span>KM Paketi</span>
-                <strong>{{ selectedKmPackage?.name || 'Seçilmedi' }}</strong>
-              </div>
-              <div v-if="customIncludedKm && customIncludedKm > 0" class="summary-row">
-                <span>Özel Dahil KM</span>
-                <strong>{{ customIncludedKm.toLocaleString('tr-TR') }} KM</strong>
-              </div>
-              <div v-if="customExtraKmPrice && customExtraKmPrice > 0" class="summary-row">
-                <span>Özel Fazla KM</span>
-                <strong>{{ formatCurrency(customExtraKmPrice) }}/KM</strong>
-              </div>
-              <div class="summary-section summary-section--branches">
-                <h5 class="summary-section-title">Şubeler</h5>
-                <div class="branch-fields">
-                  <div class="branch-field">
-                    <label class="branch-label">Teslim Şubesi</label>
-                    <SearchableSelect
-                      v-model="selectedBranchId"
-                      :options="branchOptions"
-                      placeholder="Şube seçiniz"
-                      search-placeholder="Şube ara..."
-                      class="branch-select-searchable"
-                    />
-                  </div>
-                  <div class="branch-field">
-                    <label class="branch-label">İade Şubesi</label>
-                    <SearchableSelect
-                      v-model="selectedReturnBranchId"
-                      :options="branchOptions"
-                      placeholder="Şube seçiniz"
-                      search-placeholder="Şube ara..."
-                      class="branch-select-searchable"
-                    />
-                  </div>
-                </div>
-              </div>
-              <div v-if="extraItems.length > 0" class="summary-row">
-                <span>Ek Kalemler</span>
-                <strong>{{ extraItems.length }} kalem</strong>
-              </div>
-            </div>
-
-            <div class="summary-card pricing-card">
-              <h4>Fiyat Bilgisi</h4>
-              <PricingCalculator
-                v-if="selectedVehicleId && selectedCustomerId"
-                :vehicle-id="selectedVehicleId"
-                :customer-id="selectedCustomerId"
-                :rental-type="rentalType"
-                :start-date="startDate"
-                :end-date="endDate"
-                :term-months="isLeasing ? selectedTermMonths : undefined"
-                :km-package-id="selectedKmPackageId || undefined"
-                @calculated="handlePriceCalculated"
-                @leasing-plan-selected="handleLeasingPlanSelected"
-              />
-
-              <div class="discount-editor">
-                <h5>İndirim (Opsiyonel)</h5>
-                <div class="form-grid">
-                  <div class="form-group">
-                    <label>İndirim Tutarı (₺)</label>
-                    <input
-                      v-model.number="discountAmount"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      placeholder="0.00"
-                    />
-                  </div>
-                  <div class="form-group">
-                    <label>İndirim Sebebi</label>
-                    <input
-                      v-model="discountReason"
-                      type="text"
-                      placeholder="Örn: Sadık müşteri indirimi"
-                      :disabled="discountAmount <= 0"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div class="extra-items-summary">
-                <div class="summary-row">
-                  <span>Temel Tutar</span>
-                  <strong>{{ formatCurrency(baseTotal) }}</strong>
-                </div>
-                <div class="summary-row">
-                  <span>Ek Kalemler</span>
-                  <strong>{{ formatCurrency(extraItemsTotalComputed) }}</strong>
-                </div>
-                <div v-if="appliedDiscountAmount > 0" class="summary-row">
-                  <span>İndirim</span>
-                  <strong class="discount-value">-{{ formatCurrency(appliedDiscountAmount) }}</strong>
-                </div>
-                <div class="summary-row total">
-                  <span>Genel Toplam</span>
-                  <strong>{{ formatCurrency(finalTotalWithDiscount) }}</strong>
-                </div>
-                <div v-if="discountReason && appliedDiscountAmount > 0" class="discount-reason">
-                  {{ discountReason }}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="wizard-footer">
-        <button 
-          v-if="currentStep > 1" 
-          class="btn btn-outline"
-          @click="prevStep"
-        >
-          ← Geri
-        </button>
-        <div class="spacer"></div>
-        <button 
+  <div class="rc-page rcr-create">
+    <RcPageHeader
+      title="Yeni kiralama"
+      :subtitle="`Adım ${currentStep}/${totalSteps} · ${currentStepLabel}`"
+    >
+      <template #actions>
+        <RouterLink to="/rentals" class="rc-btn rc-btn--ghost rc-btn--sm">
+          <RcIcon name="chevronLeft" :size="14" />
+          Vazgeç
+        </RouterLink>
+        <RcButton v-if="currentStep > 1" variant="secondary" size="sm" @click="prevStep">
+          <RcIcon name="chevronLeft" :size="14" />
+          Geri
+        </RcButton>
+        <RcButton
           v-if="!isLastStep"
-          class="btn btn-primary"
+          variant="accent"
+          size="sm"
           :disabled="!canProceed"
           @click="nextStep"
         >
-          İleri →
-        </button>
-        <button 
-          v-if="isLastStep"
-          class="btn btn-success"
+          Devam et
+          <RcKbd>↵</RcKbd>
+        </RcButton>
+        <RcButton
+          v-else
+          variant="accent"
+          size="sm"
           :disabled="!canProceed || submitting"
           @click="handleSubmit"
         >
-          {{ submitting ? 'Oluşturuluyor...' : '✓ Kiralama Oluştur' }}
-        </button>
+          <RcIcon name="check" :size="14" />
+          {{ submitting ? 'Oluşturuluyor…' : 'Kiralama oluştur' }}
+        </RcButton>
+      </template>
+    </RcPageHeader>
+
+    <RcStepper
+      :steps="[...wizardSteps]"
+      :current="currentStep"
+      clickable
+      @select="goToStep"
+    />
+
+    <div class="rc-detail rcr-create__layout">
+      <div class="rc-detail__main rcr-create__main">
+        <!-- Step 1 -->
+        <div v-if="currentStep === 1" class="rc-card">
+          <div class="rc-card__head">
+            <div>
+              <div class="rc-card__title">Kiralama tipini seç</div>
+              <p class="rcr-create__card-hint">Tip, KM paketleri ve fiyatlandırma stratejisini belirler.</p>
+            </div>
+          </div>
+          <div class="rc-card__body">
+            <RentalTypeSelector v-model="rentalType" />
+          </div>
+        </div>
+
+        <!-- Step 2 -->
+        <div v-else-if="currentStep === 2" class="rc-card">
+          <div class="rc-card__head">
+            <div class="rc-card__title">Tarih ve süre</div>
+          </div>
+          <div class="rc-card__body rcr-create__step-body">
+            <div class="rcv-form-grid">
+              <RcField label="Başlangıç tarihi" :class="{ 'rc-field--error': hasError('startDate') }">
+                <DatePicker
+                  v-model="startDate"
+                  placeholder="Başlangıç tarihi"
+                  @closed="touch('startDate')"
+                />
+                <span v-if="hasError('startDate')" class="rc-field__hint rc-field__hint--error">{{ getError('startDate') }}</span>
+              </RcField>
+              <RcField label="Bitiş tarihi" :class="{ 'rc-field--error': hasError('endDate') }">
+                <DatePicker
+                  v-model="endDate"
+                  :min="endDatePickerMin"
+                  placeholder="Bitiş tarihi"
+                  @closed="touch('endDate')"
+                />
+                <span v-if="hasError('endDate')" class="rc-field__hint rc-field__hint--error">{{ getError('endDate') }}</span>
+              </RcField>
+            </div>
+            <p class="date-hint">
+              Geçmişe dönük kiralamalar da kaydedilebilir. Bitiş, başlangıçtan en az bir gün sonra olmalıdır.
+            </p>
+            <div v-if="isLeasing" class="rc-alert rc-alert--info">
+              <RcIcon name="info" :size="16" />
+              <span>Leasing için minimum süre <strong>12 ay (365 gün)</strong> olmalıdır.</span>
+            </div>
+            <div v-if="startDate && endDate && validateDates()" class="rcr-create__date-summary">
+              <span>Toplam süre</span>
+              <strong>{{ isLeasing ? `${selectedTermMonths} ay` : `${totalDays} gün` }}</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 3 -->
+        <div v-else-if="currentStep === 3" class="rc-card">
+          <div class="rc-card__head">
+            <div>
+              <div class="rc-card__title">Araç seç</div>
+              <p class="rcr-create__card-hint">{{ startDate }} – {{ endDate }} arasında müsait araçlar.</p>
+            </div>
+          </div>
+          <div class="rc-card__body">
+            <VehicleSelector
+              v-model="selectedVehicleId"
+              :start-date="startDate"
+              :end-date="endDate"
+              :rental-type="rentalType"
+              @vehicle-selected="handleVehicleSelected"
+            />
+          </div>
+        </div>
+
+        <!-- Step 4 -->
+        <div v-else-if="currentStep === 4" class="rc-card">
+          <div class="rc-card__head">
+            <div class="rc-card__title">Müşteri ve sürücü</div>
+          </div>
+          <div class="rc-card__body rcr-create__step-body">
+            <CustomerSelector
+              v-model="selectedCustomerId"
+              :rental-end-date="endDate"
+              @open-quick-create="showQuickCustomerModal = true"
+            />
+            <div v-if="selectedCustomerId" class="driver-section">
+              <h3 class="rcr-create__section-title">Sürücüler</h3>
+              <p class="section-description">En az bir sürücü ve ana sürücü seçilmelidir.</p>
+              <DriverSelector
+                v-model="selectedDriverIds"
+                v-model:primary-driver-id="primaryDriverId"
+                :customer-id="selectedCustomerId"
+                :rental-end-date="endDate"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 5 -->
+        <div v-else-if="currentStep === 5" class="rc-card">
+          <div class="rc-card__head">
+            <div class="rc-card__title">KM paketi ve vade</div>
+          </div>
+          <div class="rc-card__body rcr-create__step-body">
+            <div v-if="isLeasing && selectedVehicleCategoryId" class="term-section">
+              <h3 class="rcr-create__section-title">Vade süresi</h3>
+              <TermSelector v-model="selectedTermMonths" :category-id="selectedVehicleCategoryId" />
+            </div>
+            <div v-if="kmPackages.length > 0" class="km-package-section">
+              <h3 class="rcr-create__section-title">KM paketi</h3>
+              <div class="package-grid">
+                <button
+                  v-for="pkg in kmPackages"
+                  :key="pkg.id"
+                  type="button"
+                  class="rcr-package-card"
+                  :class="{ 'rcr-package-card--selected': selectedKmPackageId === pkg.id }"
+                  @click="selectedKmPackageId = pkg.id"
+                >
+                  <div class="rcr-package-card__head">
+                    <h4>{{ pkg.name }}</h4>
+                    <RcIcon v-if="selectedKmPackageId === pkg.id" name="check" :size="16" />
+                  </div>
+                  <div class="rcr-package-card__km rc-num">{{ pkg.includedKm?.toLocaleString('tr-TR') }} km</div>
+                  <div class="rcr-package-card__meta">
+                    Fazla: {{ formatCurrency(pkg.extraKmPrice) }}/km
+                  </div>
+                </button>
+              </div>
+            </div>
+            <div class="km-override-section">
+              <h3 class="rcr-create__section-title">KM override (opsiyonel)</h3>
+              <div class="rcv-form-grid">
+                <RcField label="Özel dahil KM">
+                  <input v-model.number="customIncludedKm" class="rc-input rc-num" type="number" min="0" step="1" placeholder="Örn: 7500" />
+                </RcField>
+                <RcField label="Özel fazla KM ücreti (₺)">
+                  <input v-model.number="customExtraKmPrice" class="rc-input rc-num" type="number" min="0" step="0.01" placeholder="0.75" />
+                </RcField>
+              </div>
+            </div>
+            <div v-if="kmPackages.length === 0" class="rc-alert rc-alert--info">
+              <RcIcon name="info" :size="16" />
+              <span>Aktif KM paketi bulunamadı; paketsiz devam edebilirsiniz.</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 6 -->
+        <div v-else-if="currentStep === 6" class="rc-card">
+          <div class="rc-card__head">
+            <div class="rc-card__title">Ek kalemler</div>
+          </div>
+          <div class="rc-card__body rcr-create__step-body">
+            <ExtraItemsManager
+              v-model="extraItems"
+              :term-months="isLeasing ? selectedTermMonths : 1"
+              @total-changed="handleExtraItemsTotal"
+            />
+            <div class="rc-alert rc-alert--info" style="margin-top: 14px">
+              <RcIcon name="info" :size="16" />
+              <span>Ek kalem eklemeden devam edebilirsiniz.</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 7 -->
+        <div v-else-if="currentStep === 7" class="rcr-create__review">
+          <div class="rc-alert rc-alert--info">
+            <RcIcon name="info" :size="16" />
+            <div>
+              <strong>Son adım — onay</strong>
+              <span> Bilgileri kontrol edin ve kiralamayı oluşturun.</span>
+            </div>
+          </div>
+          <div class="rc-card">
+            <div class="rc-card__head"><div class="rc-card__title">Sözleşme özeti</div></div>
+            <div class="rc-card__body">
+              <div class="summary-grid summary-grid--review">
+                <div class="summary-card">
+                  <div class="summary-row">
+                    <span>Tip</span>
+                    <strong>{{ rentalTypes.find((t) => t.value === rentalType)?.label }}</strong>
+                  </div>
+                  <div class="summary-row"><span>Başlangıç</span><strong>{{ startDate }}</strong></div>
+                  <div class="summary-row"><span>Bitiş</span><strong>{{ endDate }}</strong></div>
+                  <div class="summary-row">
+                    <span>Süre</span>
+                    <strong>{{ isLeasing ? `${selectedTermMonths} ay` : `${totalDays} gün` }}</strong>
+                  </div>
+                  <div class="summary-row">
+                    <span>KM paketi</span>
+                    <strong>{{ selectedKmPackage?.name || 'Seçilmedi' }}</strong>
+                  </div>
+                  <div class="summary-section summary-section--branches">
+                    <h5 class="summary-section-title">Şubeler</h5>
+                    <div class="branch-fields">
+                      <div class="branch-field">
+                        <label class="branch-label">Teslim</label>
+                        <SearchableSelect
+                          v-model="selectedBranchId"
+                          :options="branchOptions"
+                          placeholder="Şube seçiniz"
+                          search-placeholder="Şube ara..."
+                        />
+                      </div>
+                      <div class="branch-field">
+                        <label class="branch-label">İade</label>
+                        <SearchableSelect
+                          v-model="selectedReturnBranchId"
+                          :options="branchOptions"
+                          placeholder="Şube seçiniz"
+                          search-placeholder="Şube ara..."
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="summary-card">
+                  <h4>Fiyat</h4>
+                  <PricingCalculator
+                    v-if="selectedVehicleId && selectedCustomerId"
+                    :vehicle-id="selectedVehicleId"
+                    :customer-id="selectedCustomerId"
+                    :rental-type="rentalType"
+                    :start-date="startDate"
+                    :end-date="endDate"
+                    :term-months="isLeasing ? selectedTermMonths : undefined"
+                    :km-package-id="selectedKmPackageId || undefined"
+                    @calculated="handlePriceCalculated"
+                    @leasing-plan-selected="handleLeasingPlanSelected"
+                  />
+                  <div class="discount-editor">
+                    <h5>İndirim (opsiyonel)</h5>
+                    <div class="rcv-form-grid">
+                      <RcField label="İndirim tutarı (₺)">
+                        <input v-model.number="discountAmount" class="rc-input rc-num" type="number" min="0" step="0.01" placeholder="0" />
+                      </RcField>
+                      <RcField label="Sebep">
+                        <input
+                          v-model="discountReason"
+                          class="rc-input"
+                          type="text"
+                          placeholder="Sadık müşteri indirimi"
+                          :disabled="discountAmount <= 0"
+                        />
+                      </RcField>
+                    </div>
+                  </div>
+                  <div class="extra-items-summary">
+                    <div class="summary-row"><span>Temel</span><strong>{{ formatCurrency(baseTotal) }}</strong></div>
+                    <div class="summary-row"><span>Ek kalemler</span><strong>{{ formatCurrency(extraItemsTotalComputed) }}</strong></div>
+                    <div v-if="appliedDiscountAmount > 0" class="summary-row">
+                      <span>İndirim</span>
+                      <strong class="discount-value">−{{ formatCurrency(appliedDiscountAmount) }}</strong>
+                    </div>
+                    <div class="summary-row total">
+                      <span>Genel toplam</span>
+                      <strong>{{ formatCurrency(finalTotalWithDiscount) }}</strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rc-detail__side rcr-create__side">
+        <RentalCreateSummaryCard
+          :current-step="currentStep"
+          :rental-type="rentalType"
+          :type-label="rentalTypes.find((t) => t.value === rentalType)?.label ?? ''"
+          :start-date="startDate"
+          :end-date="endDate"
+          :total-days="totalDays"
+          :term-months="selectedTermMonths"
+          :is-leasing="isLeasing"
+          :customer-selected="!!selectedCustomerId"
+          :customer-label="selectedCustomerLabel"
+          :vehicle-selected="!!selectedVehicleId"
+          :vehicle-label="selectedVehicleLabel"
+          :km-package="selectedKmPackage"
+          :extra-items-count="extraItems.length"
+          :base-total="baseTotal"
+          :extras-total="extraItemsTotalComputed"
+          :discount-amount="appliedDiscountAmount"
+          :final-total="finalTotalWithDiscount"
+        />
       </div>
     </div>
 
@@ -761,734 +791,3 @@ onMounted(() => {
     />
   </div>
 </template>
-
-<style scoped>
-.rental-create {
-  max-width: 1000px;
-  margin: 0 auto;
-}
-
-.page-header {
-  margin-bottom: 32px;
-}
-
-.back-btn {
-  background: none;
-  border: none;
-  color: var(--color-text-secondary);
-  font-size: 14px;
-  cursor: pointer;
-  padding: 0;
-  margin-bottom: 12px;
-  display: block;
-}
-
-.page-header h1 {
-  font-size: 28px;
-  font-weight: 600;
-  margin: 0;
-}
-
-.wizard {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 16px;
-  overflow: hidden;
-}
-
-.wizard-steps {
-  display: flex;
-  background: var(--color-bg-secondary);
-  padding: 20px;
-  gap: 12px;
-  overflow-x: auto;
-}
-
-.step {
-  flex: 1;
-  min-width: 100px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 14px 16px;
-  border-radius: 10px;
-  background: var(--color-surface);
-  opacity: 0.5;
-  transition: all 0.2s;
-}
-
-.step.clickable {
-  cursor: pointer;
-}
-
-.step.clickable:hover {
-  opacity: 0.8;
-}
-
-.step.active {
-  opacity: 1;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-}
-
-.step.completed {
-  opacity: 0.7;
-}
-
-.step-number {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--color-bg-secondary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 600;
-  font-size: 13px;
-  flex-shrink: 0;
-}
-
-.step.active .step-number {
-  background: var(--color-primary);
-  color: white;
-}
-
-.step.completed .step-number {
-  background: var(--color-success);
-  color: white;
-}
-
-.step-label {
-  font-size: 13px;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.wizard-content {
-  padding: 32px;
-  min-height: 400px;
-}
-
-.step-content h2 {
-  font-size: 20px;
-  font-weight: 600;
-  margin: 0 0 24px 0;
-}
-
-.step-description {
-  color: var(--color-text-secondary);
-  margin: -16px 0 24px 0;
-  font-size: 14px;
-}
-
-.type-options {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.type-option {
-  padding: 20px;
-  border: 2px solid var(--color-border);
-  border-radius: 12px;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.type-option:hover {
-  border-color: var(--color-primary);
-}
-
-.type-option.selected {
-  border-color: var(--color-primary);
-  background: var(--color-primary-light);
-}
-
-.type-content {
-  flex: 1;
-}
-
-.type-content strong {
-  display: block;
-  font-size: 16px;
-  margin-bottom: 4px;
-}
-
-.type-content span {
-  font-size: 14px;
-  color: var(--color-text-secondary);
-}
-
-.check-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--color-primary);
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-}
-
-.date-section-full {
-  max-width: 500px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.date-summary {
-  background: var(--color-success-light);
-  padding: 16px;
-  border-radius: 10px;
-}
-
-.summary-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.summary-item .label {
-  color: var(--color-text-secondary);
-}
-
-.summary-item .value {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--color-success);
-}
-
-.summary-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
-}
-
-.summary-card {
-  background: var(--color-bg-secondary);
-  border-radius: 12px;
-  padding: 20px;
-}
-
-.summary-card h4 {
-  font-size: 16px;
-  font-weight: 600;
-  margin: 0 0 16px 0;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.summary-row {
-  display: flex;
-  justify-content: space-between;
-  padding: 8px 0;
-  font-size: 14px;
-}
-
-.summary-row span {
-  color: var(--color-text-secondary);
-}
-
-.summary-section {
-  margin-top: 12px;
-}
-
-.summary-section:first-of-type {
-  margin-top: 0;
-}
-
-.summary-section-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-text-secondary);
-  margin: 0 0 8px 0;
-}
-
-.summary-section--branches .branch-fields {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-  width: 100%;
-  max-width: 100%;
-}
-
-.branch-selector-inline {
-  flex: 1;
-  text-align: right;
-}
-
-.branch-field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.375rem;
-}
-
-.branch-label {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--color-text-secondary);
-}
-
-.branch-field :deep(.branch-select-searchable) {
-  min-width: 0;
-}
-
-.branch-select {
-  padding: 6px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  font-size: 13px;
-  background: var(--color-surface);
-  color: var(--color-text);
-  cursor: pointer;
-  min-width: 200px;
-}
-
-.branch-select:focus {
-  outline: none;
-  border-color: var(--color-primary);
-}
-
-.date-price-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 32px;
-}
-
-.date-section {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.form-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.form-group label {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--color-text-secondary);
-}
-
-.form-group input {
-  padding: 12px 14px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  font-size: 14px;
-  background: var(--color-bg-secondary);
-}
-
-.form-group input:focus {
-  outline: none;
-  border-color: var(--color-primary);
-  background: var(--color-surface);
-}
-
-.form-group.error input {
-  border-color: var(--color-danger);
-}
-
-.error-text {
-  font-size: 12px;
-  color: var(--color-danger);
-  min-height: 16px;
-}
-
-.date-hint {
-  margin: 0 0 8px;
-  font-size: 13px;
-  color: var(--color-text-muted);
-  line-height: 1.45;
-}
-
-.leasing-notice {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 16px;
-  background: var(--color-info-light);
-  border-radius: 10px;
-}
-
-.notice-icon {
-  font-size: 20px;
-}
-
-.leasing-notice p {
-  margin: 0;
-  font-size: 14px;
-  color: var(--color-info);
-}
-
-.price-section {
-  position: sticky;
-  top: 20px;
-}
-
-.wizard-footer {
-  display: flex;
-  padding: 20px 32px;
-  border-top: 1px solid var(--color-border);
-  background: var(--color-bg-secondary);
-}
-
-.spacer {
-  flex: 1;
-}
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 24px;
-  border-radius: 8px;
-  font-weight: 500;
-  cursor: pointer;
-  border: none;
-  transition: all 0.2s;
-}
-
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn-primary { background: var(--color-primary); color: white; }
-.btn-success { background: var(--color-success); color: white; }
-.btn-outline { background: transparent; border: 1px solid var(--color-border); color: var(--color-text); }
-
-.btn-primary:hover:not(:disabled) { background: var(--color-primary-hover); }
-.btn-success:hover:not(:disabled) { background: #059669; }
-.btn-outline:hover:not(:disabled) { background: var(--color-bg-secondary); }
-
-.term-section {
-  margin-top: 24px;
-  padding-top: 24px;
-  border-top: 1px solid var(--color-border);
-}
-
-.term-section h3 {
-  font-size: 16px;
-  font-weight: 600;
-  margin: 0 0 16px 0;
-  color: var(--color-text);
-}
-
-.term-notice {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 14px 16px;
-  background: var(--color-info-light);
-  border-radius: 10px;
-  margin-top: 20px;
-  font-size: 14px;
-  color: var(--color-info);
-}
-
-.term-notice span {
-  font-size: 20px;
-}
-
-.term-notice p {
-  margin: 0;
-}
-
-.driver-section {
-  margin-top: 32px;
-  padding-top: 32px;
-  border-top: 1px solid var(--color-border);
-}
-
-.driver-section h3 {
-  font-size: 18px;
-  font-weight: 600;
-  margin: 0 0 8px 0;
-}
-
-.section-description {
-  color: var(--color-text-secondary);
-  font-size: 14px;
-  margin: 0 0 20px 0;
-}
-
-.km-package-section {
-  margin-top: 20px;
-}
-
-.km-package-section h3 {
-  font-size: 16px;
-  font-weight: 600;
-  margin: 0 0 12px 0;
-}
-
-.km-override-section {
-  margin-top: 20px;
-  padding-top: 20px;
-  border-top: 1px solid var(--color-border);
-}
-
-.km-override-section h3 {
-  font-size: 16px;
-  font-weight: 600;
-  margin: 0 0 8px 0;
-}
-
-.package-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 12px;
-}
-
-.package-card {
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  padding: 14px;
-  background: var(--color-surface);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.package-card:hover {
-  border-color: var(--color-primary);
-}
-
-.package-card.selected {
-  border-color: var(--color-primary);
-  background: var(--color-primary-light);
-}
-
-.package-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.package-header h4 {
-  margin: 0;
-  font-size: 14px;
-}
-
-.package-km {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  margin-bottom: 6px;
-}
-
-.km-value {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--color-primary);
-}
-
-.km-label,
-.price-label {
-  font-size: 12px;
-  color: var(--color-text-secondary);
-}
-
-.price-value {
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.discount-editor {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid var(--color-border);
-}
-
-.discount-editor h5 {
-  margin: 0 0 12px 0;
-  font-size: 14px;
-}
-
-.discount-value {
-  color: var(--color-success);
-}
-
-.discount-reason {
-  margin-top: 10px;
-  font-size: 12px;
-  color: var(--color-text-secondary);
-}
-
-.skip-notice {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 14px 16px;
-  background: var(--color-bg-secondary);
-  border-radius: 10px;
-  margin-top: 20px;
-  font-size: 14px;
-  color: var(--color-text-secondary);
-}
-
-.skip-notice span {
-  font-size: 20px;
-}
-
-.skip-notice p {
-  margin: 0;
-}
-
-.extra-items-summary {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid var(--color-border);
-}
-
-.extra-items-summary .summary-row {
-  display: flex;
-  justify-content: space-between;
-  padding: 8px 0;
-  font-size: 14px;
-}
-
-.extra-items-summary .summary-row span {
-  color: var(--color-text-secondary);
-}
-
-.extra-items-summary .summary-row.total {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px dashed var(--color-border);
-}
-
-.extra-items-summary .summary-row.total strong {
-  font-size: 18px;
-  color: var(--color-primary);
-}
-
-@media (max-width: 768px) {
-  .rental-create {
-    max-width: 100%;
-  }
-
-  .page-header {
-    margin-bottom: 20px;
-  }
-
-  .date-price-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .summary-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .summary-section--branches .branch-fields {
-    grid-template-columns: 1fr;
-    max-width: none;
-  }
-  
-  .form-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .date-section-full {
-    max-width: none;
-  }
-
-  .wizard {
-    border-radius: 12px;
-  }
-  
-  .wizard-steps {
-    padding: 12px;
-    gap: 8px;
-  }
-  
-  .step {
-    padding: 10px 12px;
-    min-width: 64px;
-    justify-content: center;
-  }
-  
-  .step-label {
-    display: none;
-  }
-
-  .wizard-content {
-    padding: 20px 16px;
-    min-height: auto;
-  }
-
-  .wizard-footer {
-    padding: 16px;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .spacer {
-    display: none;
-  }
-
-  .btn {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .summary-card,
-  .date-summary,
-  .leasing-notice,
-  .term-notice,
-  .skip-notice {
-    padding: 16px;
-  }
-
-  .summary-row,
-  .extra-items-summary .summary-row,
-  .summary-item {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
-  }
-
-  .package-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 480px) {
-  .wizard-steps {
-    gap: 6px;
-  }
-
-  .step {
-    min-width: 52px;
-    padding: 8px;
-  }
-
-  .step-number {
-    width: 24px;
-    height: 24px;
-    font-size: 12px;
-  }
-
-  .page-header h1 {
-    font-size: 24px;
-  }
-
-  .step-content h2 {
-    font-size: 18px;
-    margin-bottom: 16px;
-  }
-}
-</style>

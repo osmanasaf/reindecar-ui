@@ -32,7 +32,7 @@ class DriversApiService extends BaseApi {
     }
 
     async delete(id: number): Promise<void> {
-        return this.remove(`/${id}`)
+        return this.deleteByPath(`/${id}`)
     }
 }
 

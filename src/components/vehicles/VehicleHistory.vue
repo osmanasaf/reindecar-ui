@@ -2,6 +2,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { vehiclesApi } from '@/api'
 import { useToast, useEnumTranslations } from '@/composables'
+import { RcIcon } from '@/components/icons'
+import type { IconName } from '@/components/icons/iconPaths'
 import type { VehicleHistory, RentalHistoryItem, DamageHistoryItem, MaintenanceHistoryItem } from '@/types'
 import RentalDetailModal from './RentalDetailModal.vue'
 import DamageDetailModal from './DamageDetailModal.vue'
@@ -11,11 +13,11 @@ interface TimelineEvent {
   id: string
   type: 'rental' | 'damage' | 'maintenance' | 'status'
   date: string
-  icon: string
-  color: string
+  icon: IconName
+  dotClass: string
   title: string
   subtitle: string
-  data: any
+  data: RentalHistoryItem | DamageHistoryItem | MaintenanceHistoryItem | unknown
 }
 
 const props = defineProps<{
@@ -34,51 +36,47 @@ const selectedMaintenance = ref<MaintenanceHistoryItem | null>(null)
 
 const allEvents = computed(() => {
   if (!history.value) return []
-  
+
   const events: TimelineEvent[] = []
-  
 
   history.value.rentals.forEach(r => {
     events.push({
       id: `rental-${r.id}`,
       type: 'rental',
       date: r.startDate,
-      icon: '🚗',
-      color: r.overdue ? '#F44336' : '#2196F3',
+      icon: 'key',
+      dotClass: 'rc-veh-history__dot--rental',
       title: `${r.rentalNumber} - ${r.rentalTypeDisplayName || r.rentalType}`,
       subtitle: `${r.customerName} | ${r.statusDisplayName || r.status}`,
       data: r
     })
   })
-  
 
   history.value.damages.forEach(d => {
     events.push({
       id: `damage-${d.id}`,
       type: 'damage',
       date: d.reportDate,
-      icon: '⚠️',
-      color: d.repaired ? '#4CAF50' : '#FF9800',
+      icon: 'warning',
+      dotClass: d.repaired ? 'rc-veh-history__dot--rental' : 'rc-veh-history__dot--damage',
       title: translateDamageType(d.damageType),
       subtitle: translateSeverity(d.severity),
       data: d
     })
   })
-  
 
   history.value.maintenances.forEach(m => {
     events.push({
       id: `maintenance-${m.id}`,
       type: 'maintenance',
       date: m.maintenanceDate,
-      icon: '🔧',
-      color: '#9C27B0',
+      icon: 'wrench',
+      dotClass: 'rc-veh-history__dot--maintenance',
       title: translateMaintenanceType(m.maintenanceType),
       subtitle: formatKm(m.currentKm),
       data: m
     })
   })
-  
 
   history.value.statusChanges.forEach(s => {
     if (!s.newStatus) return
@@ -89,15 +87,15 @@ const allEvents = computed(() => {
       id: `status-${s.id}`,
       type: 'status',
       date: s.changedAt,
-      icon: '🔄',
-      color: '#607D8B',
+      icon: 'sliders',
+      dotClass: '',
       title,
       subtitle: s.changedBy || 'Sistem',
       data: s
     })
   })
-  
-  return events.sort((a, b) => 
+
+  return events.sort((a, b) =>
     new Date(b.date).getTime() - new Date(a.date).getTime()
   )
 })
@@ -126,15 +124,16 @@ function formatKm(km: number): string {
 }
 
 function openDetailModal(event: TimelineEvent) {
+  if (event.type === 'status') return
   switch (event.type) {
     case 'rental':
-      selectedRental.value = event.data
+      selectedRental.value = event.data as RentalHistoryItem
       break
     case 'damage':
-      selectedDamage.value = event.data
+      selectedDamage.value = event.data as DamageHistoryItem
       break
     case 'maintenance':
-      selectedMaintenance.value = event.data
+      selectedMaintenance.value = event.data as MaintenanceHistoryItem
       break
   }
 }
@@ -151,39 +150,36 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="vehicle-history">
-    <div class="history-header">
-      <h2>Araç Geçmişi</h2>
-      <p v-if="history" class="vehicle-info">{{ history.vehicleName }} - {{ history.vehiclePlate }}</p>
+  <div class="rc-veh-history-wrap">
+    <div class="rc-veh-history__header">
+      <h2 class="rc-veh-history__title-main">Araç Geçmişi</h2>
+      <p v-if="history" class="rc-veh-history__sub">{{ history.vehicleName }} — {{ history.vehiclePlate }}</p>
     </div>
 
-    <div v-if="loading" class="loading">Yükleniyor...</div>
+    <div v-if="loading" class="rc-veh-history__loading">
+      <div class="rc-veh-history__spinner"></div>
+      <span>Yükleniyor...</span>
+    </div>
 
-    <div v-else-if="history && allEvents.length === 0" class="empty-state">
-      <div class="empty-icon">📋</div>
+    <div v-else-if="history && allEvents.length === 0" class="rc-veh-history__empty">
+      <RcIcon name="inbox" />
       <p>Henüz kayıt bulunmuyor</p>
     </div>
 
-    <div v-else-if="history" class="timeline-container">
-      <div class="timeline-line"></div>
-      
-      <div 
-        v-for="event in allEvents" 
+    <div v-else-if="history" class="rc-veh-history">
+      <div
+        v-for="event in allEvents"
         :key="event.id"
-        class="timeline-item"
+        class="rc-veh-history__item"
+        :class="{ 'rc-veh-history__item--clickable': event.type !== 'status' }"
         @click="openDetailModal(event)"
       >
-        <div class="timeline-icon" :style="{ background: event.color }">
-          <span class="icon-emoji">{{ event.icon }}</span>
+        <div class="rc-veh-history__dot" :class="event.dotClass">
+          <RcIcon :name="event.icon" />
         </div>
-        
-        <div class="timeline-card">
-          <div class="timeline-date">{{ formatDate(event.date) }}</div>
-          <div class="timeline-content">
-            <h4>{{ event.title }}</h4>
-            <p>{{ event.subtitle }}</p>
-          </div>
-          <div class="timeline-arrow">→</div>
+        <div class="rc-veh-history__body">
+          <h4 class="rc-veh-history__title">{{ event.title }}</h4>
+          <p class="rc-veh-history__meta">{{ formatDate(event.date) }} · {{ event.subtitle }}</p>
         </div>
       </div>
     </div>
@@ -209,180 +205,53 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.vehicle-history {
+.rc-veh-history-wrap {
   display: flex;
   flex-direction: column;
-  gap: 24px;
-}
-
-.history-header h2 {
-  margin: 0 0 8px 0;
-  font-size: 20px;
-  font-weight: 600;
-}
-
-.vehicle-info {
-  margin: 0;
-  color: var(--color-text-secondary);
-  font-size: 14px;
-}
-
-.loading {
-  text-align: center;
-  padding: 60px;
-  color: var(--color-text-secondary);
-}
-
-.empty-state {
-  text-align: center;
-  padding: 80px 20px;
-  color: var(--color-text-secondary);
-}
-
-.empty-icon {
-  font-size: 64px;
-  margin-bottom: 16px;
-  opacity: 0.5;
-}
-
-.empty-state p {
-  font-size: 16px;
-  margin: 0;
-}
-
-.timeline-container {
-  position: relative;
-  padding: 20px 0 20px 60px;
-}
-
-.timeline-line {
-  position: absolute;
-  left: 24px;
-  top: 40px;
-  bottom: 40px;
-  width: 3px;
-  background: linear-gradient(180deg, var(--color-primary) 0%, var(--color-border) 100%);
-  border-radius: 2px;
-}
-
-.timeline-item {
-  position: relative;
-  margin-bottom: 32px;
-  cursor: pointer;
-}
-
-.timeline-item:last-child {
-  margin-bottom: 0;
-}
-
-.timeline-icon {
-  position: absolute;
-  left: -36px;
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  border: 4px solid var(--color-surface);
-  z-index: 2;
-  transition: all 0.3s ease;
-}
-
-.timeline-item:hover .timeline-icon {
-  transform: scale(1.15);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
-}
-
-.icon-emoji {
-  font-size: 24px;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
-}
-
-.timeline-card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  padding: 20px 24px;
-  transition: all 0.3s ease;
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
   gap: 20px;
 }
 
-.timeline-card:hover {
-  transform: translateX(8px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-  border-color: var(--color-primary);
-}
-
-.timeline-date {
-  font-size: 13px;
+.rc-veh-history__header h2 {
+  margin: 0 0 4px;
+  font-size: 1.125rem;
   font-weight: 600;
-  color: var(--color-text-secondary);
-  padding: 6px 12px;
-  background: var(--color-bg-secondary);
-  border-radius: 8px;
-  white-space: nowrap;
+  color: var(--rc-text);
 }
 
-.timeline-content {
-  flex: 1;
-}
-
-.timeline-content h4 {
-  margin: 0 0 4px 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--color-text);
-}
-
-.timeline-content p {
+.rc-veh-history__sub {
   margin: 0;
-  font-size: 14px;
-  color: var(--color-text-secondary);
+  font-size: 13px;
+  color: var(--rc-text-muted);
 }
 
-.timeline-arrow {
-  font-size: 20px;
-  color: var(--color-text-muted);
-  transition: all 0.3s ease;
+.rc-veh-history__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 48px;
+  color: var(--rc-text-muted);
 }
 
-.timeline-item:hover .timeline-arrow {
-  color: var(--color-primary);
-  transform: translateX(4px);
+.rc-veh-history__item--clickable {
+  cursor: pointer;
 }
 
-@media (max-width: 768px) {
-  .timeline-container {
-    padding-left: 50px;
-  }
+.rc-veh-history__loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 48px;
+  color: var(--rc-text-muted);
+}
 
-  .timeline-line {
-    left: 20px;
-  }
-
-  .timeline-icon {
-    left: -30px;
-    width: 40px;
-    height: 40px;
-  }
-
-  .icon-emoji {
-    font-size: 20px;
-  }
-
-  .timeline-card {
-    padding: 16px;
-    grid-template-columns: 1fr;
-    gap: 12px;
-  }
-
-  .timeline-arrow {
-    display: none;
-  }
+.rc-veh-history__spinner {
+  width: 2rem;
+  height: 2rem;
+  border: 3px solid var(--rc-border);
+  border-top-color: var(--rc-blue-500);
+  border-radius: 50%;
+  animation: rc-veh-spin 0.8s linear infinite;
 }
 </style>

@@ -3,6 +3,8 @@ import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { publicUserInvitationsApi } from '@/api'
 import { useAuthStore } from '@/stores'
+import { RcButton, RcInput } from '@/components/rc'
+import { RcIcon } from '@/components/icons'
 import type { UserInvitationPreviewResponse } from '@/api/auth.api'
 
 const route = useRoute()
@@ -22,7 +24,7 @@ const form = ref({
   password: '',
   confirmPassword: '',
   firstName: '',
-  lastName: ''
+  lastName: '',
 })
 
 const validationErrors = computed(() => {
@@ -45,7 +47,7 @@ const validationErrors = computed(() => {
 
 const isFormValid = computed(() =>
   Object.keys(validationErrors.value).length === 0 &&
-  form.value.confirmPassword.length > 0
+  form.value.confirmPassword.length > 0,
 )
 
 function fieldError(field: string) {
@@ -89,7 +91,7 @@ async function handleSubmit() {
     username: form.value.username.trim(),
     password: form.value.password,
     firstName: form.value.firstName.trim(),
-    lastName: form.value.lastName.trim()
+    lastName: form.value.lastName.trim(),
   })
 
   if (success) {
@@ -101,252 +103,139 @@ async function handleSubmit() {
 </script>
 
 <template>
-  <div class="auth-page">
-    <section class="auth-card">
-      <div class="auth-header">
-        <RouterLink :to="{ name: 'login' }" class="back-link">← Girişe dön</RouterLink>
+  <div class="rc-auth-register">
+    <section class="rc-auth-register__card rc-auth-register__card--sm">
+      <div class="rc-auth-register__header">
+        <RouterLink :to="{ name: 'login' }" class="rc-auth-register__back">
+          <RcIcon name="chevronLeft" :size="16" />
+          Girişe dön
+        </RouterLink>
         <h1>Davet ile Kayıt</h1>
         <p>Hesabınızı oluşturup firmanıza katılın.</p>
       </div>
 
-      <div v-if="loadingPreview" class="state-box">Davet kontrol ediliyor...</div>
+      <div v-if="loadingPreview" class="rc-auth-register__state">
+        <span class="rc-spin" aria-hidden="true" />
+        Davet kontrol ediliyor…
+      </div>
 
-      <div v-else-if="previewError" class="error-message">
+      <div v-else-if="previewError" class="rc-alert rc-alert--danger" role="alert">
         {{ previewError }}
       </div>
 
-      <form v-else class="auth-form" @submit.prevent="handleSubmit">
-        <div v-if="preview" class="invite-summary">
+      <form v-else class="rc-auth-register__form" @submit.prevent="handleSubmit">
+        <div v-if="preview" class="rc-auth-register__invite">
           <strong>{{ preview.tenantName }}</strong>
           <span>{{ preview.email }} · {{ preview.role === 'ADMIN' ? 'Tenant admin' : 'Operatör' }}</span>
         </div>
 
-        <div v-if="submitError" class="error-message">
+        <div v-if="submitError" class="rc-alert rc-alert--danger" role="alert">
           {{ submitError }}
         </div>
 
-        <div class="form-group">
-          <label for="username">Kullanıcı adı</label>
-          <input
+        <label
+          class="rc-field"
+          :class="{ 'rc-field--error': fieldError('username') }"
+        >
+          <span class="rc-field__label">Kullanıcı adı</span>
+          <RcInput
             id="username"
             v-model="form.username"
-            :class="{ invalid: fieldError('username') }"
-            type="text"
             autocomplete="username"
-            required
-            @input="touch('username')"
+            @update:model-value="touch('username')"
             @blur="touch('username')"
           />
-          <small v-if="fieldError('username')" class="field-error">{{ fieldError('username') }}</small>
-        </div>
+          <span v-if="fieldError('username')" class="rc-field__error">{{ fieldError('username') }}</span>
+        </label>
 
-        <div class="form-grid">
-          <div class="form-group">
-            <label for="firstName">Ad</label>
-            <input
+        <div class="rc-auth-register__grid">
+          <label
+            class="rc-field"
+            :class="{ 'rc-field--error': fieldError('firstName') }"
+          >
+            <span class="rc-field__label">Ad</span>
+            <RcInput
               id="firstName"
               v-model="form.firstName"
-              :class="{ invalid: fieldError('firstName') }"
-              type="text"
               autocomplete="given-name"
-              required
-              @input="touch('firstName')"
+              @update:model-value="touch('firstName')"
               @blur="touch('firstName')"
             />
-            <small v-if="fieldError('firstName')" class="field-error">{{ fieldError('firstName') }}</small>
-          </div>
+            <span v-if="fieldError('firstName')" class="rc-field__error">{{ fieldError('firstName') }}</span>
+          </label>
 
-          <div class="form-group">
-            <label for="lastName">Soyad</label>
-            <input
+          <label
+            class="rc-field"
+            :class="{ 'rc-field--error': fieldError('lastName') }"
+          >
+            <span class="rc-field__label">Soyad</span>
+            <RcInput
               id="lastName"
               v-model="form.lastName"
-              :class="{ invalid: fieldError('lastName') }"
-              type="text"
               autocomplete="family-name"
-              required
-              @input="touch('lastName')"
+              @update:model-value="touch('lastName')"
               @blur="touch('lastName')"
             />
-            <small v-if="fieldError('lastName')" class="field-error">{{ fieldError('lastName') }}</small>
-          </div>
+            <span v-if="fieldError('lastName')" class="rc-field__error">{{ fieldError('lastName') }}</span>
+          </label>
         </div>
 
-        <div class="form-group">
-          <label for="password">Şifre</label>
-          <input
+        <label
+          class="rc-field"
+          :class="{ 'rc-field--error': fieldError('password') }"
+        >
+          <span class="rc-field__label">Şifre</span>
+          <RcInput
             id="password"
             v-model="form.password"
-            :class="{ invalid: fieldError('password') }"
             type="password"
             autocomplete="new-password"
-            required
-            @input="touch('password')"
+            @update:model-value="touch('password')"
             @blur="touch('password')"
           />
-          <small v-if="fieldError('password')" class="field-error">{{ fieldError('password') }}</small>
-        </div>
+          <span v-if="fieldError('password')" class="rc-field__error">{{ fieldError('password') }}</span>
+        </label>
 
-        <div class="form-group">
-          <label for="confirmPassword">Şifre tekrar</label>
-          <input
+        <label
+          class="rc-field"
+          :class="{ 'rc-field--error': fieldError('confirmPassword') }"
+        >
+          <span class="rc-field__label">Şifre tekrar</span>
+          <RcInput
             id="confirmPassword"
             v-model="form.confirmPassword"
-            :class="{ invalid: fieldError('confirmPassword') }"
             type="password"
             autocomplete="new-password"
-            required
-            @input="touch('confirmPassword')"
+            @update:model-value="touch('confirmPassword')"
             @blur="touch('confirmPassword')"
           />
-          <small>En az 8 karakter, bir büyük harf ve bir rakam içermelidir.</small>
-          <small v-if="fieldError('confirmPassword')" class="field-error">{{ fieldError('confirmPassword') }}</small>
-        </div>
+          <span class="rc-field__hint">En az 8 karakter, bir büyük harf ve bir rakam içermelidir.</span>
+          <span v-if="fieldError('confirmPassword')" class="rc-field__error">{{ fieldError('confirmPassword') }}</span>
+        </label>
 
-        <button class="submit-btn" type="submit" :disabled="authStore.loading">
-          {{ authStore.loading ? 'Kaydediliyor...' : 'Kaydı tamamla' }}
-        </button>
+        <RcButton
+          type="submit"
+          variant="primary"
+          size="lg"
+          :disabled="authStore.loading"
+        >
+          <span v-if="authStore.loading" class="rc-spin" aria-hidden="true" />
+          {{ authStore.loading ? 'Kaydediliyor…' : 'Kaydı tamamla' }}
+        </RcButton>
       </form>
     </section>
   </div>
 </template>
 
 <style scoped>
-.auth-page {
-  min-height: 100vh;
-  display: grid;
-  place-items: center;
-  padding: 32px 16px;
-  background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
-}
-
-.auth-card {
-  width: min(560px, 100%);
-  background: var(--color-surface);
-  border-radius: 18px;
-  padding: 32px;
-  box-shadow: 0 24px 60px rgb(15 23 42 / 0.25);
-}
-
-.auth-header {
-  text-align: center;
-  margin-bottom: 28px;
-}
-
-.back-link {
-  display: inline-block;
-  margin-bottom: 16px;
-  color: var(--color-primary);
-  text-decoration: none;
-  font-weight: 600;
-}
-
-.auth-header h1 {
-  margin: 0 0 8px;
-}
-
-.auth-header p {
-  margin: 0;
-  color: var(--color-text-secondary);
-}
-
-.auth-form,
-.form-group {
+.rc-auth-register__state {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
 }
 
-.auth-form {
-  gap: 18px;
-}
-
-.form-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-}
-
-.form-group {
-  gap: 6px;
-}
-
-.form-group label {
-  font-size: var(--font-size-sm);
-  font-weight: 600;
-  color: var(--color-text-secondary);
-}
-
-.form-group input {
-  padding: 12px 14px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-text);
-}
-
-.form-group input.invalid {
-  border-color: var(--color-danger);
-}
-
-.form-group small {
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-xs);
-}
-
-.form-group .field-error {
-  color: var(--color-danger);
-}
-
-.state-box,
-.invite-summary,
-.error-message {
-  padding: 12px 14px;
-  border-radius: var(--radius-md);
-}
-
-.state-box,
-.invite-summary {
-  background: var(--color-bg);
-  color: var(--color-text-secondary);
-}
-
-.invite-summary {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.invite-summary strong {
-  color: var(--color-text);
-}
-
-.error-message {
-  background: var(--color-danger-light);
-  color: var(--color-danger);
-}
-
-.submit-btn {
-  padding: 14px 18px;
-  border: 0;
-  border-radius: var(--radius-md);
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.submit-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-@media (max-width: 560px) {
-  .auth-card {
-    padding: 24px 18px;
-  }
-
-  .form-grid {
-    grid-template-columns: 1fr;
-  }
+:deep(.rc-btn) {
+  width: 100%;
 }
 </style>

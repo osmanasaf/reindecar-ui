@@ -2,12 +2,19 @@
 import { onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores'
+import { RcMark } from '@/components/rc'
 import LoginForm from '@/components/auth/LoginForm.vue'
 import type { LoginForm as LoginFormType } from '@/types'
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
+
+const stats = [
+  { value: '60sn', label: 'Yeni kiralama' },
+  { value: '190', label: 'Araç filosu' },
+  { value: '%99.8', label: 'Uptime' },
+]
 
 onMounted(() => {
   if (authStore.isAuthenticated) {
@@ -29,271 +36,63 @@ function redirectAfterLogin() {
 </script>
 
 <template>
-  <div class="login-page">
-    <div class="login-branding">
-      <div class="branding-content">
-        <div class="logo">
-          <span class="logo-icon">🦌</span>
-          <h1>Reindecar</h1>
-        </div>
-        <p class="tagline">Araç Kiralama Yönetim Paneli</p>
-        
-        <div class="features">
-          <div class="feature">
-            <div class="feature-icon">📊</div>
-            <div class="feature-text">
-              <h3>Dashboard</h3>
-              <p>Tüm operasyonlarınızı tek ekrandan yönetin</p>
-            </div>
-          </div>
-          <div class="feature">
-            <div class="feature-icon">🚗</div>
-            <div class="feature-text">
-              <h3>Filo Yönetimi</h3>
-              <p>Araç durumları, bakım ve KM takibi</p>
-            </div>
-          </div>
-          <div class="feature">
-            <div class="feature-icon">📋</div>
-            <div class="feature-text">
-              <h3>Kiralama Takibi</h3>
-              <p>Rezervasyondan iadeye tüm süreç</p>
-            </div>
-          </div>
-        </div>
+  <div class="rc-auth">
+    <div class="rc-auth__panel">
+      <div class="rc-auth__brand">
+        <RcMark />
       </div>
-      
-      <div class="branding-footer">
-        © 2026 Reindecar. Tüm hakları saklıdır.
-      </div>
-    </div>
 
-    <div class="login-form-section">
-      <div class="form-container">
-        <div class="form-header">
-          <h2>Hoş Geldiniz</h2>
-          <p>Devam etmek için giriş yapın</p>
+      <div class="rc-auth__hero">
+        <div>
+          <h1>Hoş geldin.</h1>
+          <p style="margin-top: 8px">
+            Filonu, kiralamalarını ve tahsilatlarını tek panelden yönet.
+          </p>
         </div>
-        
-        <LoginForm 
+
+        <LoginForm
           :loading="authStore.loading"
           :error="authStore.error"
           @submit="handleLogin"
         />
 
-        <div class="form-footer">
-          <p>Hesabınız yok mu? <RouterLink :to="{ name: 'register-tenant' }">Firma kaydı oluşturun</RouterLink></p>
-          <p>Şifrenizi mi unuttunuz? <a href="#">Yardım alın</a></p>
+        <div class="rc-auth__links">
+          <p>
+            Hesabınız yok mu?
+            <RouterLink :to="{ name: 'register-tenant' }">Firma kaydı oluşturun</RouterLink>
+          </p>
+        </div>
+      </div>
+
+      <div class="rc-auth__footer">
+        <span>© 2026 Reindecar</span>
+        <span class="rc-auth__footer-links">
+          <a href="#">Gizlilik</a>
+          <a href="#">Kullanım koşulları</a>
+          <a href="#">Destek</a>
+        </span>
+      </div>
+    </div>
+
+    <div class="rc-auth__visual">
+      <div class="rc-auth__visual-bg" />
+      <div class="rc-auth__visual-inner">
+        <div class="rc-auth__visual-badge">
+          <span class="rc-dot rc-dot--accent" />
+          Yenilik · v2.0
+        </div>
+        <h2>Filonu daha az tıklayarak yönet.</h2>
+        <p class="rc-auth__visual-desc">
+          Reindecar v2 ile yeni bir kiralama 60 saniyede oluşur. Klavye kısayolları,
+          akıllı arama ve tek-tıkla iade. Şube operatörleri için yeniden tasarlandı.
+        </p>
+        <div class="rc-auth__stats">
+          <div v-for="(stat, i) in stats" :key="i">
+            <div class="rc-auth__stat-value rc-num">{{ stat.value }}</div>
+            <div class="rc-auth__stat-label">{{ stat.label }}</div>
+          </div>
         </div>
       </div>
     </div>
   </div>
 </template>
-
-<style scoped>
-.login-page {
-  min-height: 100vh;
-  display: flex;
-}
-
-.login-branding {
-  flex: 1;
-  background: linear-gradient(135deg, #1e293b 0%, #334155 50%, #475569 100%);
-  color: white;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding: 60px;
-}
-
-.branding-content {
-  max-width: 520px;
-  margin: 0 auto;
-}
-
-.logo {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 8px;
-}
-
-.logo-icon {
-  font-size: 48px;
-}
-
-.logo h1 {
-  font-size: 42px;
-  font-weight: 700;
-  margin: 0;
-}
-
-.tagline {
-  font-size: 20px;
-  opacity: 0.85;
-  margin: 0 0 48px 0;
-}
-
-.features {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.feature {
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
-  padding: 20px;
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  backdrop-filter: blur(10px);
-}
-
-.feature-icon {
-  font-size: 28px;
-  width: 52px;
-  height: 52px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
-  flex-shrink: 0;
-}
-
-.feature-text h3 {
-  font-size: 18px;
-  font-weight: 600;
-  margin: 0 0 6px 0;
-}
-
-.feature-text p {
-  font-size: 15px;
-  opacity: 0.8;
-  margin: 0;
-  line-height: 1.5;
-}
-
-.branding-footer {
-  position: absolute;
-  bottom: 32px;
-  left: 60px;
-  font-size: 14px;
-  opacity: 0.5;
-}
-
-.login-form-section {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 60px;
-  background: var(--color-bg);
-}
-
-.form-container {
-  width: 100%;
-  max-width: 400px;
-}
-
-.form-header {
-  text-align: center;
-  margin-bottom: 32px;
-}
-
-.form-header h2 {
-  font-size: 28px;
-  font-weight: 600;
-  color: var(--color-text);
-  margin: 0 0 8px 0;
-}
-
-.form-header p {
-  color: var(--color-text-secondary);
-  margin: 0;
-  font-size: 16px;
-}
-
-.form-footer {
-  margin-top: 32px;
-  text-align: center;
-  font-size: 14px;
-  color: var(--color-text-secondary);
-}
-
-.form-footer a {
-  color: var(--color-primary);
-  text-decoration: none;
-  font-weight: 500;
-}
-
-.form-footer a:hover {
-  text-decoration: underline;
-}
-
-@media (max-width: 1024px) {
-  .login-branding {
-    display: none;
-  }
-  
-  .login-form-section {
-    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
-    min-height: 100vh;
-  }
-  
-  .form-container {
-    background: var(--color-surface);
-    padding: 40px;
-    border-radius: 16px;
-    box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
-  }
-}
-
-@media (max-width: 768px) {
-  .login-form-section {
-    padding: 24px 16px;
-    align-items: stretch;
-  }
-
-  .form-container {
-    max-width: 100%;
-    margin: auto 0;
-    padding: 28px 20px;
-    border-radius: 14px;
-  }
-
-  .form-header {
-    margin-bottom: 24px;
-  }
-
-  .form-header h2 {
-    font-size: 24px;
-  }
-
-  .form-header p {
-    font-size: 15px;
-  }
-}
-
-@media (max-width: 480px) {
-  .login-form-section {
-    padding: 16px;
-  }
-
-  .form-container {
-    padding: 20px 16px;
-    border-radius: 12px;
-    box-shadow: 0 16px 32px -16px rgb(0 0 0 / 0.3);
-  }
-
-  .form-header h2 {
-    font-size: 22px;
-  }
-
-  .form-footer {
-    margin-top: 24px;
-    font-size: 13px;
-  }
-}
-</style>

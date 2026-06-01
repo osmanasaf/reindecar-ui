@@ -3,12 +3,14 @@ import type {
     PaginatedResponse,
     PaginationParams,
     Vehicle,
+    VehicleOverview,
     CreateVehicleForm,
     UpdateVehicleForm,
     UpdateVehicleStatusForm,
     VehicleCategory,
     VehicleHistory
 } from '@/types'
+import { VehicleStatus } from '@/types/enums'
 
 export interface VehicleRecognitionResult {
     brand: string | null
@@ -24,8 +26,21 @@ export interface VehicleRecognitionResult {
 class VehiclesApiService extends BaseApi {
     protected readonly basePath = '/vehicles'
 
+    async getOverview(): Promise<VehicleOverview> {
+        return this.get('/overview')
+    }
+
     async getAll(params?: PaginationParams): Promise<PaginatedResponse<Vehicle>> {
         return this.getList<Vehicle>('', params)
+    }
+
+    async getByStatus(status: VehicleStatus, params?: PaginationParams): Promise<PaginatedResponse<Vehicle>> {
+        return this.getList<Vehicle>(`/status/${status}`, params)
+    }
+
+    async search(query: string, params?: PaginationParams): Promise<PaginatedResponse<Vehicle>> {
+        const searchParams = { q: query, ...params } as PaginationParams
+        return this.getList<Vehicle>('/search', searchParams)
     }
 
     async getAvailable(): Promise<Vehicle[]> {
@@ -70,7 +85,7 @@ class VehiclesApiService extends BaseApi {
     }
 
     async deleteById(id: number): Promise<void> {
-        return this.remove(`/${id}`)
+        return this.deleteByPath(`/${id}`)
     }
 
     async getHistory(id: number): Promise<VehicleHistory> {
@@ -90,7 +105,7 @@ class VehiclesApiService extends BaseApi {
     }
 
     async deleteImage(vehicleId: number): Promise<void> {
-        return this.remove(`/${vehicleId}/image`)
+        return this.deleteByPath(`/${vehicleId}/image`)
     }
 }
 
@@ -126,7 +141,7 @@ class VehicleCategoriesApiService extends BaseApi {
     }
 
     async deleteById(id: number): Promise<void> {
-        return this.remove(`/${id}`)
+        return this.deleteByPath(`/${id}`)
     }
 }
 

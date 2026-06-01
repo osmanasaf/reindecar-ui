@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import type { ExtraItemType, RentalExtraItem, CalculationType } from '@/types'
+import { CalculationType } from '@/types'
+import type { ExtraItemType, RentalExtraItem } from '@/types'
 
 interface Props {
   visible: boolean
@@ -21,14 +22,14 @@ const selectedTypeId = ref<number | null>(null)
 const customName = ref('')
 const description = ref('')
 const amount = ref<number | null>(null)
-const calculationType = ref<CalculationType>('FIXED')
+const calculationType = ref<CalculationType>(CalculationType.FIXED)
 
 const isEditing = computed(() => !!props.item)
 
 const calculationTypes: { value: CalculationType; label: string }[] = [
-  { value: 'FIXED', label: 'Sabit Tutar' },
-  { value: 'PER_MONTH', label: 'Aylık Bazlı' },
-  { value: 'PERCENTAGE', label: 'Yüzdelik' }
+  { value: CalculationType.FIXED, label: 'Sabit Tutar' },
+  { value: CalculationType.PER_MONTH, label: 'Aylık Bazlı' },
+  { value: CalculationType.PERCENTAGE, label: 'Yüzdelik' }
 ]
 
 function resetForm() {
@@ -36,7 +37,7 @@ function resetForm() {
   customName.value = ''
   description.value = ''
   amount.value = null
-  calculationType.value = 'FIXED'
+  calculationType.value = CalculationType.FIXED
 }
 
 function populateForm() {
@@ -209,7 +210,7 @@ watch(() => props.visible, (val) => {
 }
 
 .extra-item-modal-content {
-  background: var(--color-surface, #ffffff);
+  background: var(--rc-surface, #ffffff);
   border-radius: 16px;
   width: 100%;
   max-width: 480px;
@@ -225,14 +226,14 @@ watch(() => props.visible, (val) => {
   justify-content: space-between;
   align-items: center;
   padding: 20px 24px;
-  border-bottom: 1px solid var(--color-border, #e5e7eb);
+  border-bottom: 1px solid var(--rc-border, #e5e7eb);
 }
 
 .extra-item-modal-header h3 {
   font-size: 18px;
   font-weight: 600;
   margin: 0;
-  color: var(--color-text, #1f2937);
+  color: var(--rc-text, #1f2937);
 }
 
 .extra-item-close-btn {
@@ -240,10 +241,10 @@ watch(() => props.visible, (val) => {
   height: 32px;
   border: none;
   border-radius: 8px;
-  background: var(--color-bg-secondary, #f3f4f6);
+  background: var(--rc-surface-2, #f3f4f6);
   font-size: 20px;
   cursor: pointer;
-  color: var(--color-text, #1f2937);
+  color: var(--rc-text, #1f2937);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -251,7 +252,7 @@ watch(() => props.visible, (val) => {
 }
 
 .extra-item-close-btn:hover {
-  background: var(--color-bg-tertiary, #e5e7eb);
+  background: var(--rc-surface-3, #e5e7eb);
 }
 
 .extra-item-modal-body {
@@ -271,17 +272,17 @@ watch(() => props.visible, (val) => {
 .extra-item-form-group label {
   font-size: 14px;
   font-weight: 500;
-  color: var(--color-text-secondary, #6b7280);
+  color: var(--rc-text-muted, #6b7280);
 }
 
 .extra-item-form-group input[type="text"],
 .extra-item-form-group input[type="number"] {
   padding: 12px 14px;
-  border: 1px solid var(--color-border, #e5e7eb);
+  border: 1px solid var(--rc-border, #e5e7eb);
   border-radius: 8px;
   font-size: 14px;
-  background: var(--color-bg-secondary, #f3f4f6);
-  color: var(--color-text, #1f2937);
+  background: var(--rc-surface-2, #f3f4f6);
+  color: var(--rc-text, #1f2937);
   width: 100%;
   box-sizing: border-box;
 }
@@ -289,8 +290,8 @@ watch(() => props.visible, (val) => {
 .extra-item-form-group input[type="text"]:focus,
 .extra-item-form-group input[type="number"]:focus {
   outline: none;
-  border-color: var(--color-primary, #3b82f6);
-  background: var(--color-surface, #ffffff);
+  border-color: var(--rc-blue-500, #3b82f6);
+  background: var(--rc-surface, #ffffff);
 }
 
 .extra-item-form-group input:disabled {
@@ -306,23 +307,23 @@ watch(() => props.visible, (val) => {
 
 .extra-item-type-chip {
   padding: 8px 14px;
-  border: 1px solid var(--color-border, #e5e7eb);
+  border: 1px solid var(--rc-border, #e5e7eb);
   border-radius: 20px;
-  background: var(--color-surface, #ffffff);
+  background: var(--rc-surface, #ffffff);
   font-size: 13px;
   cursor: pointer;
   transition: all 0.2s;
-  color: var(--color-text, #1f2937);
+  color: var(--rc-text, #1f2937);
 }
 
 .extra-item-type-chip:hover {
-  border-color: var(--color-primary, #3b82f6);
+  border-color: var(--rc-blue-500, #3b82f6);
 }
 
 .extra-item-type-chip.selected {
-  background: var(--color-primary, #3b82f6);
+  background: var(--rc-blue-500, #3b82f6);
   color: white;
-  border-color: var(--color-primary, #3b82f6);
+  border-color: var(--rc-blue-500, #3b82f6);
 }
 
 .extra-item-type-chip.custom {
@@ -344,7 +345,7 @@ watch(() => props.visible, (val) => {
   right: 14px;
   top: 50%;
   transform: translateY(-50%);
-  color: var(--color-text-secondary, #6b7280);
+  color: var(--rc-text-muted, #6b7280);
   font-size: 14px;
   pointer-events: none;
 }
@@ -360,7 +361,7 @@ watch(() => props.visible, (val) => {
   align-items: center;
   gap: 8px;
   cursor: pointer;
-  color: var(--color-text, #1f2937);
+  color: var(--rc-text, #1f2937);
 }
 
 .extra-item-radio-item input[type="radio"] {
@@ -374,7 +375,7 @@ watch(() => props.visible, (val) => {
   justify-content: flex-end;
   gap: 12px;
   padding: 20px 24px;
-  border-top: 1px solid var(--color-border, #e5e7eb);
+  border-top: 1px solid var(--rc-border, #e5e7eb);
 }
 
 .extra-item-btn {
@@ -393,21 +394,21 @@ watch(() => props.visible, (val) => {
 
 .extra-item-btn-outline {
   background: transparent;
-  border: 1px solid var(--color-border, #e5e7eb);
-  color: var(--color-text, #1f2937);
+  border: 1px solid var(--rc-border, #e5e7eb);
+  color: var(--rc-text, #1f2937);
 }
 
 .extra-item-btn-outline:hover:not(:disabled) {
-  background: var(--color-bg-secondary, #f3f4f6);
+  background: var(--rc-surface-2, #f3f4f6);
 }
 
 .extra-item-btn-primary {
-  background: var(--color-primary, #3b82f6);
+  background: var(--rc-blue-500, #3b82f6);
   border: none;
   color: white;
 }
 
 .extra-item-btn-primary:hover:not(:disabled) {
-  background: var(--color-primary-hover, #2563eb);
+  background: var(--rc-blue-600, #2563eb);
 }
 </style>

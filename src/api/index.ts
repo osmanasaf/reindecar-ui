@@ -30,9 +30,11 @@ export type {
     KmPackageInfo
 } from './pricing.api'
 export { dashboardApi } from './dashboard.api'
+export { navSummaryApi, globalSearchApi } from './search.api'
+export type { NavSummary, GlobalSearchResult } from './search.api'
 export type { DashboardStats, RevenueData, VehicleStatusData, UpcomingReturn, DashboardResponse, AccountingStats } from './dashboard.api'
 export { usersApi } from './users.api'
-export type { UpdateProfileRequest, ChangePasswordRequest, UserSettings, UserResponse } from './users.api'
+export type { UpdateProfileRequest, ChangePasswordRequest, UserSettings, UserResponse, CreateUserRequest, UpdateUserRequest, UserRole } from './users.api'
 export { userInvitationsApi } from './user-invitations.api'
 export type {
     CreateUserInvitationRequest,
@@ -43,6 +45,7 @@ export type {
 export {
     receivablesApi,
     payablesApi,
+    accountingApi,
     insuranceClaimsApi,
     serviceProvidersApi,
     vehicleInsurancesApi
@@ -56,3 +59,4 @@ export { referenceDataApi } from './reference-data.api'
 export { filesApi } from './files.api'
 export type { FileRecord, FileReferenceType, FileUploadType } from './files.api'
 export { FILE_UPLOAD_TYPE_LABELS, ALLOWED_TYPES_BY_REFERENCE } from './files.api'
+export { notificationsApi } from './notifications.api'

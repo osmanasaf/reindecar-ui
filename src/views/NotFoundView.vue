@@ -1,53 +1,60 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
+import { RcButton } from '@/components/rc'
+import { RcIcon } from '@/components/icons'
 
 const router = useRouter()
-
-function goHome() {
-  router.push({ name: 'dashboard' })
-}
 </script>
 
 <template>
-  <div class="not-found">
-    <h1>404</h1>
-    <p>Sayfa bulunamadı</p>
-    <button @click="goHome">Ana Sayfaya Dön</button>
+  <div class="rc-page rc-not-found">
+    <div class="rc-not-found__inner">
+      <div class="rc-not-found__code rc-num">404</div>
+      <h1 class="rc-not-found__title">Sayfa bulunamadı</h1>
+      <p class="rc-not-found__desc">Aradığınız sayfa taşınmış, silinmiş veya hiç var olmamış olabilir.</p>
+      <RcButton variant="accent" @click="router.push({ name: 'dashboard' })">
+        <RcIcon name="chevronLeft" :size="14" />
+        Ana sayfaya dön
+      </RcButton>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.not-found {
-  min-height: 100vh;
+.rc-not-found {
+  min-height: calc(100vh - 120px);
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
+}
+
+.rc-not-found__inner {
   text-align: center;
+  max-width: 420px;
+  padding: 24px;
 }
 
-h1 {
-  font-size: 6rem;
-  color: var(--color-primary);
-  margin-bottom: var(--spacing-sm);
+.rc-not-found__code {
+  font-family: var(--rc-font-display);
+  font-size: 72px;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  color: var(--rc-text-faint);
+  line-height: 1;
+  margin-bottom: 12px;
 }
 
-p {
-  color: var(--color-text-secondary);
-  margin-bottom: var(--spacing-lg);
+.rc-not-found__title {
+  font-size: 22px;
+  font-weight: 600;
+  margin: 0 0 8px;
+  color: var(--rc-text);
 }
 
-button {
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-  border: none;
-  padding: var(--spacing-sm) var(--spacing-lg);
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-base);
-  transition: background var(--transition-fast);
-}
-
-button:hover {
-  background: var(--color-primary-hover);
+.rc-not-found__desc {
+  font-size: 14px;
+  color: var(--rc-text-muted);
+  margin: 0 0 20px;
+  line-height: 1.5;
 }
 </style>

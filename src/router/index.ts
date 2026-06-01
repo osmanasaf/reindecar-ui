@@ -61,14 +61,26 @@ const router = createRouter({
         {
             path: '/customers/new/:type?',
             name: 'customer-create',
-            component: () => import('@/views/customers/CustomerFormView.vue'),
-            meta: { requiresAuth: true }
+            redirect: (to) => {
+                const raw = to.params.type ? String(to.params.type).toUpperCase() : ''
+                const type = raw === 'COMPANY' || raw === 'PERSONAL' ? raw : undefined
+                return {
+                    name: 'customers',
+                    query: {
+                        create: '1',
+                        ...(type ? { type } : {}),
+                    },
+                }
+            },
         },
         {
             path: '/customers/:id/edit',
             name: 'customer-edit',
-            component: () => import('@/views/customers/CustomerFormView.vue'),
-            meta: { requiresAuth: true }
+            redirect: (to) => ({
+                name: 'customer-detail',
+                params: { id: to.params.id },
+                query: { edit: '1' },
+            }),
         },
         {
             path: '/customers/:id',
@@ -119,6 +131,12 @@ const router = createRouter({
             meta: { requiresAuth: true }
         },
 
+        {
+            path: '/accounting/finance',
+            name: 'finance',
+            redirect: { name: 'receivables' },
+            meta: { requiresAuth: true }
+        },
         {
             path: '/accounting/receivables',
             name: 'receivables',
@@ -203,6 +221,15 @@ const router = createRouter({
         }
     ]
 })
+
+if (import.meta.env.DEV) {
+    router.addRoute({
+        path: '/dev/components',
+        name: 'dev-components',
+        component: () => import('@/views/dev/ComponentsDevView.vue'),
+        meta: { requiresAuth: false }
+    })
+}
 
 router.beforeEach(authGuard)
 

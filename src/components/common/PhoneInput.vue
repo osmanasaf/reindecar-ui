@@ -38,7 +38,7 @@ function validateInput() {
   if (!touched.value) return
   
   const result = validate(props.modelValue, rules.value)
-  errorMessage.value = result.valid ? '' : result.errors[0]
+  errorMessage.value = result.valid ? '' : (result.errors[0] ?? '')
 }
 
 function handleInput(event: Event) {

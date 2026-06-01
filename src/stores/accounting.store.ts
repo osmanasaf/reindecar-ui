@@ -147,6 +147,7 @@ export const useAccountingStore = defineStore('accounting', () => {
     receivablesError.value = null
     try {
       const data = await receivablesApi.getByCustomer(customerId)
+      receivables.value = data
       return data
     } catch (error: any) {
       receivablesError.value = error.message || 'Müşteri alacakları yüklenirken hata oluştu'
@@ -714,7 +715,8 @@ export const useAccountingStore = defineStore('accounting', () => {
 
       const index = currentProviders.findIndex(p => p.id === id)
       if (index !== -1) {
-        currentProviders[index].active = false
+        const item = currentProviders[index]
+        if (item) item.active = false
       }
       serviceProviders.value = currentProviders
 

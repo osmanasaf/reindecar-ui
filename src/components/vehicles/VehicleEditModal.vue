@@ -6,6 +6,7 @@ import { SearchableSelect } from '@/components/common'
 import DatePicker from '@/components/base/DatePicker.vue'
 import { formatPlateInput } from '@/utils'
 import { isErrorResponse } from '@/utils/error'
+import { RcModal, RcButton, RcField, RcInput } from '@/components/rc'
 import type { Vehicle, VehicleCategory, Branch, UpdateVehicleForm } from '@/types'
 import type { CarModel } from '@/types/reference'
 import { FuelType, Transmission } from '@/types'
@@ -297,46 +298,41 @@ watch(() => props.visible, (isVisible) => {
 </script>
 
 <template>
-  <Teleport to="body">
-    <div v-if="visible" class="modal-overlay" @click.self="handleClose">
-      <div class="modal">
-        <header class="modal-header">
-          <h2>Araç Düzenle</h2>
-          <button class="close-btn" @click="handleClose">&times;</button>
-        </header>
+  <RcModal :open="visible" xl wide @close="handleClose">
+    <template #header>
+      <div>
+        <h2 class="rc-modal__title">Aracı düzenle</h2>
+        <div v-if="form.plateNumber" class="rc-modal__sub">{{ form.plateNumber }}</div>
+      </div>
+    </template>
 
-        <div v-if="loading" class="modal-loading">
-          <span>Yükleniyor...</span>
-        </div>
+    <div v-if="loading" style="padding: 48px; text-align: center; color: var(--rc-text-muted)">
+      Yükleniyor…
+    </div>
 
-        <form v-else class="modal-body" @submit.prevent="handleSubmit">
-          <section class="form-section">
+    <form v-else class="rc-veh-modal-form rcv-form-grid" @submit.prevent="handleSubmit">
+          <section class="form-section full-width">
             <h3>Temel Bilgiler</h3>
             <div class="form-grid">
-              <div class="form-group" :class="{ error: hasError('plateNumber') }">
-                <label>Plaka <span class="required">*</span></label>
-                <input 
-                  :value="form.plateNumber"
-                  type="text"
+              <RcField label="Plaka" required :error="getError('plateNumber')">
+                <RcInput
+                  :model-value="form.plateNumber"
+                  class="rc-mono"
                   placeholder="34 ABC 123"
                   maxlength="12"
-                  @input="form.plateNumber = formatPlateInput(($event.target as HTMLInputElement).value)"
+                  @update:model-value="form.plateNumber = formatPlateInput(String($event))"
                   @blur="handleBlur('plateNumber')"
                 />
-                <span class="error-text">{{ getError('plateNumber') }}</span>
-              </div>
+              </RcField>
 
-              <div class="form-group" :class="{ error: hasError('vinNumber') }">
-                <label>VIN Numarası <span class="required">*</span></label>
-                <input 
-                  v-model="form.vinNumber" 
-                  @blur="handleBlur('vinNumber')" 
-                  type="text" 
+              <RcField label="VIN Numarası" required :error="getError('vinNumber')">
+                <RcInput
+                  v-model="form.vinNumber"
                   maxlength="17"
                   placeholder="17 karakter"
+                  @blur="handleBlur('vinNumber')"
                 />
-                <span class="error-text">{{ getError('vinNumber') }}</span>
-              </div>
+              </RcField>
 
               <div class="form-group" :class="{ error: hasError('brand') }">
                 <label>Marka <span class="required">*</span></label>
@@ -368,17 +364,14 @@ watch(() => props.visible, (isVisible) => {
                 <span class="error-text">{{ getError('model') }}</span>
               </div>
 
-              <div class="form-group" :class="{ error: hasError('year') }">
-                <label>Yıl <span class="required">*</span></label>
-                <input 
-                  v-model.number="form.year" 
-                  @blur="handleBlur('year')" 
+              <RcField label="Yıl" required :error="getError('year')">
+                <RcInput
+                  :model-value="String(form.year)"
                   type="number"
-                  :min="2000"
-                  :max="currentYear"
+                  @update:model-value="form.year = Number($event)"
+                  @blur="handleBlur('year')"
                 />
-                <span class="error-text">{{ getError('year') }}</span>
-              </div>
+              </RcField>
 
               <div class="form-group" :class="{ error: hasError('color') }">
                 <label>Renk <span class="required">*</span></label>
@@ -462,28 +455,23 @@ watch(() => props.visible, (isVisible) => {
           <section class="form-section">
             <h3>Durum ve Fiyat</h3>
             <div class="form-grid">
-              <div class="form-group" :class="{ error: hasError('currentKm') }">
-                <label>Güncel KM</label>
-                <input 
-                  v-model.number="form.currentKm" 
-                  @blur="handleBlur('currentKm')" 
-                  type="number" 
-                  :min="minimumEditableKm"
+              <RcField label="Güncel KM" :error="getError('currentKm')">
+                <RcInput
+                  :model-value="String(form.currentKm)"
+                  type="number"
+                  @update:model-value="form.currentKm = Number($event)"
+                  @blur="handleBlur('currentKm')"
                 />
-                <span class="error-text">{{ getError('currentKm') }}</span>
-              </div>
+              </RcField>
 
-              <div class="form-group" :class="{ error: hasError('dailyPrice') }">
-                <label>Günlük Fiyat (₺) <span class="required">*</span></label>
-                <input 
-                  v-model.number="form.dailyPrice" 
-                  @blur="handleBlur('dailyPrice')" 
-                  type="number" 
-                  min="0"
-                  step="0.01"
+              <RcField label="Günlük Fiyat (₺)" required :error="getError('dailyPrice')">
+                <RcInput
+                  :model-value="String(form.dailyPrice)"
+                  type="number"
+                  @update:model-value="form.dailyPrice = Number($event)"
+                  @blur="handleBlur('dailyPrice')"
                 />
-                <span class="error-text">{{ getError('dailyPrice') }}</span>
-              </div>
+              </RcField>
 
               <div class="form-group">
                 <label>Haftalık Fiyat (₺)</label>
@@ -507,25 +495,28 @@ watch(() => props.visible, (isVisible) => {
 
               <div class="form-group">
                 <DatePicker
-                  v-model="form.registrationDate"
+                  :model-value="form.registrationDate ?? undefined"
                   label="Tescil Tarihi"
                   placeholder="Tescil tarihi"
+                  @update:model-value="form.registrationDate = $event"
                 />
               </div>
 
               <div class="form-group">
                 <DatePicker
-                  v-model="form.insuranceExpiryDate"
+                  :model-value="form.insuranceExpiryDate ?? undefined"
                   label="Sigorta Bitiş"
                   placeholder="Sigorta bitiş tarihi"
+                  @update:model-value="form.insuranceExpiryDate = $event"
                 />
               </div>
 
               <div class="form-group">
                 <DatePicker
-                  v-model="form.inspectionExpiryDate"
+                  :model-value="form.inspectionExpiryDate ?? undefined"
                   label="Muayene Bitiş"
                   placeholder="Muayene bitiş tarihi"
+                  @update:model-value="form.inspectionExpiryDate = $event"
                 />
               </div>
             </div>
@@ -539,215 +530,52 @@ watch(() => props.visible, (isVisible) => {
           </section>
         </form>
 
-        <footer class="modal-footer">
-          <button type="button" class="btn btn-outline" @click="handleClose">İptal</button>
-          <button 
-            type="button" 
-            class="btn btn-primary" 
-            :disabled="saving || loading"
-            @click="handleSubmit"
-          >
-            {{ saving ? 'Kaydediliyor...' : 'Kaydet' }}
-          </button>
-        </footer>
-      </div>
-    </div>
-  </Teleport>
+    <template v-if="!loading" #footer>
+      <RcButton variant="secondary" type="button" @click="handleClose">İptal</RcButton>
+      <RcButton variant="accent" type="button" :disabled="saving" @click="handleSubmit">
+        {{ saving ? 'Kaydediliyor…' : 'Kaydet' }}
+      </RcButton>
+    </template>
+  </RcModal>
 </template>
 
 <style scoped>
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 24px;
-}
-
-.modal {
-  background: var(--color-surface);
-  border-radius: 16px;
-  width: 100%;
-  max-width: 700px;
-  max-height: 90vh;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px 24px;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.modal-header h2 {
-  font-size: 18px;
-  font-weight: 600;
-  margin: 0;
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  font-size: 24px;
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  padding: 0;
-  line-height: 1;
-}
-
-.close-btn:hover {
-  color: var(--color-text);
-}
-
-.modal-loading {
-  padding: 60px;
-  text-align: center;
-  color: var(--color-text-secondary);
-}
-
-.modal-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: 24px;
-}
-
-.form-section {
-  margin-bottom: 24px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.form-section:last-child {
-  border-bottom: none;
-  margin-bottom: 0;
-  padding-bottom: 0;
-}
-
-.form-section h3 {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--color-text-secondary);
-  margin: 0 0 16px 0;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.form-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
-}
-
-.form-group {
+.rc-veh-edit-form .form-group {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.form-group.full {
-  grid-column: span 2;
+.rc-veh-edit-form .form-group label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--rc-text-soft);
 }
 
-.form-group label {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--color-text-secondary);
+.rc-veh-edit-form .form-group input,
+.rc-veh-edit-form .form-group textarea {
+  padding: 9px 12px;
+  border: 1px solid var(--rc-border);
+  border-radius: var(--rc-r-6);
+  font-size: 14px;
+  background: var(--rc-surface);
+}
+
+.rc-veh-edit-form .form-group.error input {
+  border-color: var(--rc-danger-400);
+}
+
+.rc-veh-edit-form .error-text {
+  font-size: 11.5px;
+  color: var(--rc-danger-600);
+}
+
+.rc-veh-edit-form .form-group.full {
+  grid-column: 1 / -1;
 }
 
 .required {
-  color: var(--color-danger);
-}
-
-.form-group input,
-.form-group select,
-.form-group textarea {
-  padding: 10px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  font-size: 14px;
-  background: var(--color-bg-secondary);
-  transition: all 0.2s;
-}
-
-.form-group input:focus,
-.form-group select:focus,
-.form-group textarea:focus {
-  outline: none;
-  border-color: var(--color-primary);
-  background: var(--color-surface);
-  box-shadow: 0 0 0 3px var(--color-primary-light);
-}
-
-.form-group.error input,
-.form-group.error select {
-  border-color: var(--color-danger);
-  background: #fff5f5;
-}
-
-.error-text {
-  font-size: 12px;
-  color: var(--color-danger);
-  min-height: 16px;
-}
-
-.modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  padding: 16px 24px;
-  border-top: 1px solid var(--color-border);
-  background: var(--color-bg-secondary);
-}
-
-.btn {
-  padding: 10px 20px;
-  border-radius: 8px;
-  font-weight: 500;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-primary {
-  background: var(--color-primary);
-  color: white;
-  border: none;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: var(--color-primary-hover);
-}
-
-.btn-primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.btn-outline {
-  background: transparent;
-  border: 1px solid var(--color-border);
-  color: var(--color-text);
-}
-
-.btn-outline:hover {
-  background: var(--color-bg-secondary);
-}
-
-@media (max-width: 640px) {
-  .form-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .form-group.full {
-    grid-column: span 1;
-  }
+  color: var(--rc-danger-500);
 }
 </style>
 

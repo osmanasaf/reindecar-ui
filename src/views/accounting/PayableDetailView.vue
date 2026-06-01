@@ -3,9 +3,14 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAccountingStore } from '@/stores'
 import { useToast, useEnumTranslations } from '@/composables'
-import { PayableStatusBadge, PaymentModal } from '@/components/accounting'
-import PaymentProgress from '@/components/accounting/PaymentProgress.vue'
-import DueStatusBadge from '@/components/accounting/DueStatusBadge.vue'
+import {
+  PaymentModal,
+  AccountingConfirmModal,
+  PaymentProgress,
+  DueStatusBadge,
+} from '@/components/accounting'
+import { RcButton, RcStatusPill, RcEmpty, resolvePaymentMethod } from '@/components/rc'
+import { RcIcon } from '@/components/icons'
 import { formatCurrency, formatDate } from '@/utils/format'
 import { payablesApi } from '@/api/accounting.api'
 import type { RecordPaymentRequest, PaymentTransactionResponse } from '@/types'
@@ -18,29 +23,30 @@ const toast = useToast()
 const { translatePayableType } = useEnumTranslations()
 
 const showPaymentModal = ref(false)
+const confirmWriteOff = ref(false)
+const confirmCancel = ref(false)
 const paymentHistory = ref<PaymentTransactionResponse[]>([])
 const historyLoading = ref(false)
 
 const payable = computed(() => accountingStore.selectedPayable)
 const loading = computed(() => accountingStore.payablesLoading)
 
-const canMakePayment = computed(() => {
-  return payable.value &&
-    payable.value.status !== PayableStatus.FULLY_PAID &&
-    payable.value.status !== PayableStatus.CANCELLED &&
-    payable.value.status !== PayableStatus.WRITTEN_OFF
-})
+const canMakePayment = computed(() =>
+  payable.value
+  && payable.value.status !== PayableStatus.FULLY_PAID
+  && payable.value.status !== PayableStatus.CANCELLED
+  && payable.value.status !== PayableStatus.WRITTEN_OFF
+)
 
-const canWriteOff = computed(() => {
-  return payable.value &&
-    payable.value.status === PayableStatus.OVERDUE &&
-    payable.value.remainingAmount > 0
-})
+const canWriteOff = computed(() =>
+  payable.value
+  && payable.value.status === PayableStatus.OVERDUE
+  && payable.value.remainingAmount > 0
+)
 
-const canCancel = computed(() => {
-  return payable.value &&
-    payable.value.status === PayableStatus.PENDING
-})
+const canCancel = computed(() =>
+  payable.value && payable.value.status === PayableStatus.PENDING
+)
 
 onMounted(async () => {
   const id = Number(route.params.id)
@@ -50,7 +56,7 @@ onMounted(async () => {
   }
 })
 
-const loadPaymentHistory = async (id: number) => {
+async function loadPaymentHistory(id: number) {
   historyLoading.value = true
   try {
     paymentHistory.value = await payablesApi.getPayments(id)
@@ -61,383 +67,199 @@ const loadPaymentHistory = async (id: number) => {
   }
 }
 
-const submitPayment = async (data: RecordPaymentRequest) => {
+async function submitPayment(data: RecordPaymentRequest) {
   if (!payable.value) return
   try {
     await accountingStore.recordPayablePayment(payable.value.id, data)
     toast.success('Ödeme başarıyla kaydedildi')
     showPaymentModal.value = false
+    await accountingStore.fetchPayableById(payable.value.id)
     loadPaymentHistory(payable.value.id)
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Ödeme kaydedilemedi'
-    toast.error(message)
+    toast.error(error instanceof Error ? error.message : 'Ödeme kaydedilemedi')
   }
 }
 
-const handleWriteOff = async () => {
+async function doWriteOff() {
   if (!payable.value) return
-  if (!confirm('Bu vereceği şüpheli olarak işaretlemek istediğinize emin misiniz?')) return
   try {
     await payablesApi.writeOff(payable.value.id)
     toast.success('Verecek şüpheli olarak işaretlendi')
+    confirmWriteOff.value = false
     await accountingStore.fetchPayableById(payable.value.id)
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'İşlem başarısız oldu'
-    toast.error(message)
+    toast.error(error instanceof Error ? error.message : 'İşlem başarısız oldu')
   }
 }
 
-const handleCancel = async () => {
+async function doCancel() {
   if (!payable.value) return
-  if (!confirm('Bu borcun ödemesini iptal etmek istediğinize emin misiniz?')) return
   try {
     await accountingStore.cancelPayable(payable.value.id)
     toast.success('Borç iptal edildi')
+    confirmCancel.value = false
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'İptal işlemi başarısız oldu'
-    toast.error(message)
+    toast.error(error instanceof Error ? error.message : 'İptal işlemi başarısız oldu')
   }
 }
 </script>
 
 <template>
-  <div class="page-container">
-    <button class="back-btn" @click="router.push({ name: 'payables' })">← Geri</button>
+  <div class="rc-page rca-detail">
+    <button type="button" class="rca-detail__back" @click="router.push({ name: 'payables' })">
+      <RcIcon name="chevronLeft" :size="14" />
+      Alacak / Verecek
+    </button>
 
-    <div v-if="loading" class="loading">Yükleniyor...</div>
-    <div v-else-if="!payable" class="error">Verecek bulunamadı</div>
+    <div v-if="loading" class="rc-skeleton rc-card-skeleton" style="height: 240px" />
 
-    <div v-else class="detail-container">
-      <div class="detail-header">
+    <RcEmpty v-else-if="!payable" title="Verecek bulunamadı" description="Kayıt silinmiş veya erişim yok olabilir" />
+
+    <template v-else>
+      <div class="rca-detail__head">
         <div>
-          <h1 class="detail-title">{{ payable.payableNumber }}</h1>
-          <p class="detail-subtitle">{{ payable.serviceProviderName }} - {{ translatePayableType(payable.type) }}</p>
+          <h1 class="rca-detail__title">{{ payable.payableNumber }}</h1>
+          <p class="rca-detail__subtitle">
+            {{ payable.serviceProviderName }} — {{ translatePayableType(payable.type) }}
+          </p>
         </div>
-        <div class="header-actions">
+        <div class="rca-detail__badges">
           <DueStatusBadge :due-date="payable.dueDate" :status="payable.status" />
-          <PayableStatusBadge :status="payable.status" size="lg" />
+          <RcStatusPill :status="payable.status" />
         </div>
       </div>
 
-      <div class="action-buttons">
-        <button
-          v-if="canMakePayment"
-          class="btn btn-primary"
-          @click="showPaymentModal = true"
-        >
-          Ödeme Yap
-        </button>
-        <button
-          v-if="canWriteOff"
-          class="btn btn-warning"
-          @click="handleWriteOff"
-        >
-          Şüpheli Olarak İşaretle
-        </button>
-        <button
-          v-if="canCancel"
-          class="btn btn-danger"
-          @click="handleCancel"
-        >
-          İptal Et
-        </button>
+      <div class="rca-detail__actions">
+        <RcButton v-if="canMakePayment" variant="accent" @click="showPaymentModal = true">
+          Ödeme yap
+        </RcButton>
+        <RcButton v-if="canWriteOff" variant="secondary" @click="confirmWriteOff = true">
+          Şüpheli olarak işaretle
+        </RcButton>
+        <RcButton v-if="canCancel" variant="danger" @click="confirmCancel = true">
+          İptal et
+        </RcButton>
       </div>
 
-      <div class="detail-grid">
-        <div class="detail-card">
-          <h3 class="card-title">Genel Bilgiler</h3>
-          <div class="info-grid">
-            <div v-if="payable.customerName" class="info-item">
-              <span class="label">Müşteri:</span>
-              <span class="value">{{ payable.customerName }}</span>
-            </div>
-            <div v-if="payable.vehiclePlate" class="info-item">
-              <span class="label">Araç:</span>
-              <span class="value">{{ payable.vehiclePlate }} — {{ payable.vehicleModel }}</span>
-            </div>
-            <div class="info-item">
-              <span class="label">Açıklama:</span>
-              <span class="value">{{ payable.description }}</span>
-            </div>
-            <div v-if="payable.invoiceNumber" class="info-item">
-              <span class="label">Fatura No:</span>
-              <span class="value">{{ payable.invoiceNumber }}</span>
-            </div>
-            <div v-if="payable.invoiceDate" class="info-item">
-              <span class="label">Fatura Tarihi:</span>
-              <span class="value">{{ formatDate(payable.invoiceDate) }}</span>
-            </div>
-            <div class="info-item">
-              <span class="label">Vade Tarihi:</span>
-              <span class="value">{{ formatDate(payable.dueDate) }}</span>
-            </div>
-            <div class="info-item">
-              <span class="label">Oluşturan:</span>
-              <span class="value">{{ payable.createdBy }}</span>
-            </div>
-            <div class="info-item">
-              <span class="label">Oluşturulma:</span>
-              <span class="value">{{ formatDate(payable.createdAt) }}</span>
-            </div>
+      <div class="rca-detail__grid">
+        <div class="rca-panel-card">
+          <h3 class="rca-panel-card__title">Genel bilgiler</h3>
+          <div v-if="payable.customerName" class="rca-meta-row">
+            <span class="rca-meta-row__label">Müşteri</span>
+            <span class="rca-meta-row__value">{{ payable.customerName }}</span>
+          </div>
+          <div v-if="payable.vehiclePlate" class="rca-meta-row">
+            <span class="rca-meta-row__label">Araç</span>
+            <span class="rca-meta-row__value">{{ payable.vehiclePlate }} — {{ payable.vehicleModel }}</span>
+          </div>
+          <div class="rca-meta-row">
+            <span class="rca-meta-row__label">Sağlayıcı</span>
+            <span class="rca-meta-row__value">{{ payable.serviceProviderName || '—' }}</span>
+          </div>
+          <div class="rca-meta-row">
+            <span class="rca-meta-row__label">Açıklama</span>
+            <span class="rca-meta-row__value">{{ payable.description }}</span>
+          </div>
+          <div v-if="payable.invoiceNumber" class="rca-meta-row">
+            <span class="rca-meta-row__label">Fatura no</span>
+            <span class="rca-meta-row__value">{{ payable.invoiceNumber }}</span>
+          </div>
+          <div class="rca-meta-row">
+            <span class="rca-meta-row__label">Vade</span>
+            <span class="rca-meta-row__value">{{ formatDate(payable.dueDate) }}</span>
+          </div>
+          <div class="rca-meta-row">
+            <span class="rca-meta-row__label">Oluşturan</span>
+            <span class="rca-meta-row__value">{{ payable.createdBy }}</span>
           </div>
         </div>
 
-        <div class="detail-card">
-          <h3 class="card-title">Tutar Bilgileri</h3>
-          <div class="amounts">
-            <div class="amount-row">
-              <span class="label">Toplam Tutar:</span>
-              <span class="value total">{{ formatCurrency(payable.amount, payable.currency) }}</span>
+        <div class="rca-panel-card">
+          <h3 class="rca-panel-card__title">Tutar bilgileri</h3>
+          <div class="rca-amounts">
+            <div class="rca-amount-row">
+              <span>Toplam</span>
+              <span>{{ formatCurrency(payable.amount, payable.currency) }}</span>
             </div>
-            <div class="amount-row">
-              <span class="label">Ödenen Tutar:</span>
-              <span class="value paid">{{ formatCurrency(payable.paidAmount, payable.currency) }}</span>
+            <div class="rca-amount-row">
+              <span>Ödenen</span>
+              <span style="color: var(--rc-green-600)">{{ formatCurrency(payable.paidAmount, payable.currency) }}</span>
             </div>
-            <div class="amount-row highlight">
-              <span class="label">Kalan Tutar:</span>
-              <span class="value remaining">{{ formatCurrency(payable.remainingAmount, payable.currency) }}</span>
+            <div class="rca-amount-row rca-amount-row--highlight">
+              <span>Kalan</span>
+              <span class="rca-amount-row__remaining">{{ formatCurrency(payable.remainingAmount, payable.currency) }}</span>
             </div>
           </div>
-
-          <PaymentProgress 
+          <PaymentProgress
             :amount="payable.amount"
             :paid-amount="payable.paidAmount"
             :currency="payable.currency"
           />
         </div>
       </div>
-    </div>
 
-    <div v-if="payable" class="detail-card history-card">
-      <h3 class="card-title">Ödeme Geçmişi</h3>
-      <div v-if="historyLoading" class="loading-sm">Yükleniyor...</div>
-      <div v-else-if="paymentHistory.length === 0" class="empty-sm">Henüz ödeme kaydı yok.</div>
-      <table v-else class="history-table">
-        <thead>
-          <tr>
-            <th>İşlem No</th>
-            <th>Tarih</th>
-            <th>Tutar</th>
-            <th>Yöntem</th>
-            <th>Referans</th>
-            <th>Kaydeden</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="tx in paymentHistory" :key="tx.id">
-            <td>{{ tx.transactionNumber }}</td>
-            <td>{{ formatDate(tx.transactionDate) }}</td>
-            <td>{{ formatCurrency(tx.amount, tx.currency) }}</td>
-            <td>{{ tx.paymentMethod }}</td>
-            <td>{{ tx.transactionRef || '-' }}</td>
-            <td>{{ tx.createdBy }}</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+      <div class="rca-panel-card">
+        <h3 class="rca-panel-card__title">Ödeme geçmişi</h3>
+        <div v-if="historyLoading" class="rc-skeleton" style="height: 80px" />
+        <RcEmpty
+          v-else-if="paymentHistory.length === 0"
+          title="Ödeme kaydı yok"
+          description="Henüz ödeme yapılmamış"
+        />
+        <div v-else class="rc-card" style="overflow: hidden; border: none; box-shadow: none; padding: 0">
+          <table class="rc-table rcv-table--slim">
+            <thead>
+              <tr>
+                <th>İşlem no</th>
+                <th>Tarih</th>
+                <th class="rc-right">Tutar</th>
+                <th>Yöntem</th>
+                <th>Referans</th>
+                <th>Kaydeden</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="tx in paymentHistory" :key="tx.id">
+                <td class="rc-mono">{{ tx.transactionNumber }}</td>
+                <td>{{ formatDate(tx.transactionDate) }}</td>
+                <td class="rc-right rc-num">{{ formatCurrency(tx.amount, tx.currency) }}</td>
+                <td>{{ resolvePaymentMethod(tx.paymentMethod) }}</td>
+                <td>{{ tx.transactionRef || '—' }}</td>
+                <td>{{ tx.createdBy }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </template>
 
     <PaymentModal
       v-if="payable"
       :show="showPaymentModal"
       :remaining-amount="payable.remainingAmount"
-      :reference-number="payable.payableNumber"
+      :receivable-number="payable.payableNumber"
+      title="Ödeme kaydet"
       @close="showPaymentModal = false"
       @submit="submitPayment"
     />
+
+    <AccountingConfirmModal
+      :open="confirmWriteOff"
+      title="Şüpheli verecek"
+      message="Bu vereceği şüpheli olarak işaretlemek istediğinize emin misiniz?"
+      confirm-label="İşaretle"
+      variant="warning"
+      @close="confirmWriteOff = false"
+      @confirm="doWriteOff"
+    />
+
+    <AccountingConfirmModal
+      :open="confirmCancel"
+      title="Vereceği iptal et"
+      message="Bu borcun ödemesini iptal etmek istediğinize emin misiniz?"
+      confirm-label="İptal et"
+      @close="confirmCancel = false"
+      @confirm="doCancel"
+    />
   </div>
 </template>
-
-<style scoped>
-.page-container {
-  padding: 2rem;
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-.back-btn {
-  background: none;
-  border: none;
-  color: var(--color-primary, #2563eb);
-  cursor: pointer;
-  font-size: 0.875rem;
-  padding: 0.5rem 0;
-  margin-bottom: 1rem;
-}
-
-.loading, .error {
-  text-align: center;
-  padding: 3rem;
-}
-
-.detail-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 2rem;
-}
-
-.header-actions {
-  display: flex;
-  gap: 0.75rem;
-  align-items: center;
-}
-
-.action-buttons {
-  display: flex;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-  margin-bottom: 2rem;
-}
-
-.detail-title {
-  font-size: 2rem;
-  font-weight: 700;
-  margin: 0 0 0.5rem 0;
-}
-
-.detail-subtitle {
-  color: var(--color-text-secondary, #6b7280);
-  margin: 0;
-}
-
-.detail-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1.5rem;
-}
-
-.detail-card {
-  background: white;
-  border: 1px solid var(--color-border, #e5e7eb);
-  border-radius: 0.5rem;
-  padding: 1.5rem;
-}
-
-.card-title {
-  font-size: 1.125rem;
-  font-weight: 600;
-  margin: 0 0 1rem 0;
-}
-
-.info-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.info-item {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.875rem;
-}
-
-.info-item .label {
-  color: var(--color-text-secondary, #6b7280);
-  font-weight: 500;
-}
-
-.amounts {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  padding: 1rem;
-  background: var(--color-background, #f9fafb);
-  border-radius: 0.375rem;
-}
-
-.amount-row {
-  display: flex;
-  justify-content: space-between;
-}
-
-.amount-row.highlight {
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--color-border, #e5e7eb);
-}
-
-.value.paid {
-  color: #15803d;
-  font-weight: 500;
-}
-
-.value.remaining {
-  font-weight: 700;
-  font-size: 1.125rem;
-  color: #c2410c;
-}
-
-.btn {
-  padding: 0.75rem 1.25rem;
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  border: none;
-  transition: all 0.2s;
-}
-
-.btn-primary {
-  background: var(--color-primary, #2563eb);
-  color: white;
-}
-
-.btn-primary:hover {
-  background: var(--color-primary-dark, #1d4ed8);
-}
-
-.btn-warning {
-  background: #f59e0b;
-  color: white;
-}
-
-.btn-warning:hover { background: #d97706; }
-
-.btn-danger {
-  background: #ef4444;
-  color: white;
-}
-
-.btn-danger:hover {
-  background: #dc2626;
-}
-
-.history-card {
-  margin-top: 1.5rem;
-}
-
-.loading-sm, .empty-sm {
-  font-size: 0.875rem;
-  color: var(--color-text-secondary, #6b7280);
-  padding: 0.75rem 0;
-}
-
-.history-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.875rem;
-}
-
-.history-table th,
-.history-table td {
-  text-align: left;
-  padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid var(--color-border, #e5e7eb);
-}
-
-.history-table th {
-  font-weight: 600;
-  color: var(--color-text-secondary, #6b7280);
-  background: var(--color-background, #f9fafb);
-}
-
-@media (max-width: 768px) {
-  .detail-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .header-actions {
-    flex-direction: column;
-    align-items: flex-end;
-  }
-}
-</style>
