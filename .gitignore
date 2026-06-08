@@ -27,3 +27,7 @@ dist-ssr
 /md-files/
 /.cursor/*
 /.cursor/
+
+# Tasarım prototipi — yalnızca lokal referans
+/redesign/
+build-errors.txt
