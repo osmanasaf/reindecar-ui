@@ -9,7 +9,7 @@ import {
   PaymentProgress,
   DueStatusBadge,
 } from '@/components/accounting'
-import { RcButton, RcStatusPill, RcEmpty, resolvePaymentMethod } from '@/components/rc'
+import { RcButton, RcStatusPill, RcEmpty, resolvePaymentMethod, RcDetailSkeleton, RcSkeletonText } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
 import { formatCurrency, formatDate } from '@/utils/format'
 import { receivablesApi } from '@/api/accounting.api'
@@ -119,7 +119,7 @@ function paymentMethodLabel(method: string): string {
       Alacak / Verecek
     </button>
 
-    <div v-if="loading" class="rc-skeleton rc-card-skeleton" style="height: 240px" />
+    <RcDetailSkeleton v-if="loading" :sections="2" />
 
     <RcEmpty v-else-if="!receivable" title="Alacak bulunamadı" description="Kayıt silinmiş veya erişim yok olabilir" />
 
@@ -205,7 +205,7 @@ function paymentMethodLabel(method: string): string {
 
       <div class="rca-panel-card">
         <h3 class="rca-panel-card__title">Ödeme geçmişi</h3>
-        <div v-if="historyLoading" class="rc-skeleton" style="height: 80px" />
+        <RcSkeletonText v-if="historyLoading" :lines="3" />
         <RcEmpty
           v-else-if="paymentHistory.length === 0"
           title="Ödeme kaydı yok"

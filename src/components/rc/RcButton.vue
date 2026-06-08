@@ -10,12 +10,14 @@ const props = withDefaults(defineProps<{
   icon?: boolean
   type?: 'button' | 'submit' | 'reset'
   disabled?: boolean
+  loading?: boolean
 }>(), {
   variant: 'default',
   size: 'default',
   icon: false,
   type: 'button',
   disabled: false,
+  loading: false,
 })
 
 const classes = computed(() => {
@@ -30,7 +32,15 @@ const classes = computed(() => {
 </script>
 
 <template>
-  <button :type="type" :class="classes" :disabled="disabled">
-    <slot />
+  <button
+    :type="type"
+    :class="[...classes, { 'rc-btn--loading': loading }]"
+    :disabled="disabled || loading"
+    :aria-busy="loading || undefined"
+  >
+    <span v-if="loading" class="rc-spin" aria-hidden="true" />
+    <span class="rc-btn__inner" :class="{ 'rc-btn__inner--hidden': loading }">
+      <slot />
+    </span>
   </button>
 </template>

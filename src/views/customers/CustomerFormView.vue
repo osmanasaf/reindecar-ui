@@ -701,9 +701,9 @@ watch(customerType, () => reset())
 
         <div class="form-actions">
           <button type="button" class="btn btn-outline" @click="router.back()">İptal</button>
-          <button type="submit" class="btn btn-primary" :disabled="loading">
-            {{ loading ? 'Kaydediliyor...' : 'Kaydet' }}
-          </button>
+          <RcButton type="submit" variant="accent" :loading="loading">
+            Kaydet
+          </RcButton>
         </div>
       </form>
     </div>

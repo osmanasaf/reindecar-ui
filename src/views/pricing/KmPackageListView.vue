@@ -4,7 +4,7 @@ import { kmPackagesApi } from '@/api/km-packages.api'
 import { useToast } from '@/composables'
 import { RentalType } from '@/types'
 import type { KmPackage, CreateKmPackageForm, UpdateKmPackageForm } from '@/types'
-import { RcPageHeader, RcButton, RcEmpty, RcSegTab, RcModal, RcBadge } from '@/components/rc'
+import { RcPageHeader, RcButton, RcEmpty, RcSegTab, RcModal, RcBadge, RcTableSkeleton } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
 
 const toast = useToast()
@@ -195,7 +195,7 @@ onMounted(fetchPackages)
       </RcSegTab>
     </div>
 
-    <div v-if="loading" class="rc-skeleton rc-card-skeleton" style="height: 240px" />
+    <RcTableSkeleton v-if="loading" :rows="6" :cols="4" />
 
     <RcEmpty
       v-else-if="filteredPackages.length === 0"

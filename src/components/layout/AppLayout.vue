@@ -6,10 +6,15 @@ import AppHeader from './AppHeader.vue'
 import { useShellHotkeys } from '@/composables/useShellHotkeys'
 import { useShellNavCounts } from '@/composables/useShellNavCounts'
 import { useShellSearch } from '@/composables/useShellSearch'
+import { useLocalStorage, UI_STORAGE_KEYS } from '@/composables'
 import ShellSearchModal from './ShellSearchModal.vue'
+import { RcBrandLoader } from '@/components/rc'
+import { useAuthStore } from '@/stores'
 
 const route = useRoute()
-const sidebarCollapsed = ref(false)
+const authStore = useAuthStore()
+const scrollEl = ref<HTMLElement | null>(null)
+const sidebarCollapsed = useLocalStorage(UI_STORAGE_KEYS.sidebarCollapsed, false)
 const sidebarOpen = ref(false)
 const viewportWidth = ref(globalThis.window === undefined ? 1280 : globalThis.window.innerWidth)
 
@@ -46,6 +51,7 @@ function closeSidebar() {
 }
 
 watch(() => route.path, () => {
+  scrollEl.value?.scrollTo({ top: 0 })
   if (isMobile.value) {
     sidebarOpen.value = false
   }
@@ -77,8 +83,19 @@ onBeforeUnmount(() => {
 
     <div class="rc-app__main">
       <AppHeader @toggle-sidebar="toggleSidebar" />
-      <main class="rc-app__scroll">
-        <RouterView />
+      <main ref="scrollEl" class="rc-app__scroll">
+        <RcBrandLoader
+          v-if="authStore.bootstrapping"
+          pane
+          mode="stroke-draw"
+          :size="32"
+          label="Yükleniyor…"
+        />
+        <RouterView v-else v-slot="{ Component }">
+          <Transition name="rc-page">
+            <component :is="Component" :key="route.path" />
+          </Transition>
+        </RouterView>
       </main>
     </div>
 

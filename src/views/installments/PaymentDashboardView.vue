@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { useInstallmentStore } from '@/stores/installment.store'
 import { formatCurrency } from '@/utils/installmentHelpers'
 import { FinancePageLayout } from '@/components/accounting'
-import { RcButton, RcEmpty } from '@/components/rc'
+import { RcButton, RcEmpty, RcKpiSkeleton, RcTableSkeleton } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
 import { useFinancePageContext } from '@/composables/useFinancePageContext'
 import PaymentScheduleTable from '@/components/installments/PaymentScheduleTable.vue'
@@ -53,7 +53,10 @@ async function retryLoad(): Promise<void> {
 
 <template>
   <FinancePageLayout class="rca-installments">
-    <div v-if="installmentStore.loading && !dashboard" class="rc-skeleton rc-card-skeleton" style="height: 320px" />
+    <div v-if="installmentStore.loading && !dashboard" style="display: flex; flex-direction: column; gap: 16px">
+      <RcKpiSkeleton :count="4" />
+      <RcTableSkeleton :rows="6" :cols="5" />
+    </div>
 
     <div v-else-if="installmentStore.error" class="rc-alert rc-alert--danger" role="alert">
       <p style="margin: 0 0 8px">{{ installmentStore.error }}</p>

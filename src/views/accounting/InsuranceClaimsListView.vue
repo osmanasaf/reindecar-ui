@@ -5,7 +5,7 @@ import { useAccountingStore } from '@/stores'
 import { useToast, useAccountingStats, useEnumTranslations } from '@/composables'
 import { SearchableSelect } from '@/components/common'
 import InsuranceClaimsTable from '@/components/accounting/insurance-claims/InsuranceClaimsTable.vue'
-import { RcPageHeader, RcButton, RcEmpty } from '@/components/rc'
+import { RcPageHeader, RcButton, RcEmpty, RcTableSkeleton } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
 import { fmtTRY } from '@/utils/format'
 import { ClaimStatus, ClaimType } from '@/types'
@@ -140,7 +140,7 @@ function clearFilters() {
       <RcButton v-if="hasFilters" variant="ghost" size="sm" @click="clearFilters">Temizle</RcButton>
     </div>
 
-    <div v-if="loading" class="rc-skeleton rc-card-skeleton" style="height: 280px" />
+    <RcTableSkeleton v-if="loading" :rows="8" :cols="5" />
 
     <RcEmpty
       v-else-if="filteredClaims.length === 0"

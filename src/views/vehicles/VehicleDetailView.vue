@@ -12,6 +12,7 @@ import {
   RcStatusPill,
   RcModal,
   RcEmpty,
+  RcDetailSkeleton,
 } from '@/components/rc'
 import { VehicleStatus } from '@/types'
 import type { Vehicle } from '@/types'
@@ -262,7 +263,7 @@ onMounted(async () => {
 
 <template>
   <div class="rc-page rc-veh-detail">
-    <div v-if="loading" class="rc-skeleton" style="height: 420px" />
+    <RcDetailSkeleton v-if="loading" :sections="3" />
 
     <template v-else-if="vehicle">
       <div class="rc-cust-detail-nav rc-veh-detail__nav">

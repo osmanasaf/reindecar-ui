@@ -13,7 +13,19 @@ import DocumentsSection from '@/components/shared/DocumentsSection.vue'
 import { SearchableSelect } from '@/components/common'
 import DatePicker from '@/components/base/DatePicker.vue'
 import { RcIcon } from '@/components/icons'
-import { RcButton, RcBadge, RcAvatar, RcSegTab, RcStatusPill, RcEmpty, RcField } from '@/components/rc'
+import {
+  RcButton,
+  RcBadge,
+  RcAvatar,
+  RcSegTab,
+  RcStatusPill,
+  RcEmpty,
+  RcField,
+  RcDetailSkeleton,
+  RcSkeleton,
+  RcTableSkeleton,
+  RcListSkeleton,
+} from '@/components/rc'
 
 const route = useRoute()
 const router = useRouter()
@@ -442,7 +454,7 @@ onMounted(() => {
 
 <template>
   <div class="customer-detail rc-page">
-    <div v-if="loading" class="loading">Yükleniyor...</div>
+    <RcDetailSkeleton v-if="loading" :sections="2" />
 
     <template v-else-if="customer">
       <div class="rc-cust-detail-nav">
@@ -525,7 +537,9 @@ onMounted(() => {
         <span>Bu müşteri kara listede: {{ customer.blacklistReason }}</span>
       </div>
 
-      <div v-if="loadingStats" class="rc-skeleton" style="height: 88px; margin-top: 14px" />
+      <div v-if="loadingStats" style="margin-top: 14px">
+        <RcSkeleton height="88px" />
+      </div>
       <div v-else class="rcv-stats rcv-stats--airy" style="margin-top: 14px">
         <div class="rcv-stat">
           <div class="rcv-stat__label">Toplam harcama</div>
@@ -578,7 +592,7 @@ onMounted(() => {
                 <RcIcon name="chevronRight" :size="14" />
               </RcButton>
             </div>
-            <div v-if="loadingPreviewRentals" class="rc-skeleton" style="height: 160px" />
+            <RcListSkeleton v-if="loadingPreviewRentals" :rows="3" />
             <RcEmpty
               v-else-if="previewRentals.length === 0"
               title="Kiralama kaydı yok"
@@ -706,7 +720,7 @@ onMounted(() => {
 
       <!-- Kiralamalar -->
       <div v-show="activeTab === 'rentals'">
-        <div v-if="loadingRentals" class="rc-skeleton rc-card-skeleton" style="height: 240px" />
+        <RcTableSkeleton v-if="loadingRentals" :rows="5" :cols="4" />
         <RcEmpty
           v-else-if="rentals.length === 0"
           title="Kiralama kaydı yok"
@@ -751,7 +765,7 @@ onMounted(() => {
 
       <!-- Finans -->
       <div v-show="activeTab === 'finance'">
-        <div v-if="loadingFinance" class="rc-skeleton rc-card-skeleton" style="height: 240px" />
+        <RcTableSkeleton v-if="loadingFinance" :rows="5" :cols="4" />
         <template v-else>
           <div class="rc-kpi-grid" style="margin-bottom: 16px">
             <div class="rc-kpi">
@@ -878,7 +892,7 @@ onMounted(() => {
           </div>
 
           <div v-if="loadingDrivers" class="rc-card__body">
-            <div class="rc-skeleton rc-card-skeleton" style="height: 120px" />
+            <RcSkeleton height="120px" radius="lg" />
           </div>
           <RcEmpty
             v-else-if="drivers.length === 0 && !showDriverForm"
@@ -1757,5 +1771,7 @@ onMounted(() => {
   }
 }
 </style>
+
+
 
 

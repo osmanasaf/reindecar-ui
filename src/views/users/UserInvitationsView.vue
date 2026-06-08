@@ -3,7 +3,7 @@ import { onMounted, ref } from 'vue'
 import { userInvitationsApi } from '@/api'
 import { useToast } from '@/composables'
 import { AccountingConfirmModal } from '@/components/accounting'
-import { RcPageHeader, RcButton, RcEmpty, RcStatusPill } from '@/components/rc'
+import { RcPageHeader, RcButton, RcEmpty, RcStatusPill, RcTableSkeleton } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
 import type { UserInvitationResponse, UserInvitationRole } from '@/api'
 
@@ -184,7 +184,7 @@ function formatDate(value: string | null) {
       </div>
     </div>
 
-    <div v-if="loading" class="rc-skeleton rc-card-skeleton" style="height: 240px" />
+    <RcTableSkeleton v-if="loading" :rows="6" :cols="4" />
 
     <RcEmpty
       v-else-if="invitations.length === 0"

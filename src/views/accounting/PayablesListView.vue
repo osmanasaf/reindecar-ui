@@ -6,7 +6,7 @@ import { usePagination, useToast, useEnumTranslations } from '@/composables'
 import { SearchableSelect } from '@/components/common'
 import DatePicker from '@/components/base/DatePicker.vue'
 import { PayablesTable, CreatePayableModal, PaymentModal, FinancePageLayout } from '@/components/accounting'
-import { RcButton, RcEmpty, RcSegTab } from '@/components/rc'
+import { RcButton, RcEmpty, RcSegTab, RcTableSkeleton } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
 import { useFinancePageContext } from '@/composables/useFinancePageContext'
 import { rentalsApi, vehiclesApi } from '@/api'
@@ -301,7 +301,7 @@ const showList = computed(() => {
       <template #icon><RcIcon name="search" :size="32" /></template>
     </RcEmpty>
 
-    <div v-else-if="loading" class="rc-skeleton rc-card-skeleton" style="height: 280px" />
+    <RcTableSkeleton v-else-if="loading" :rows="8" :cols="6" />
 
     <RcEmpty
       v-else-if="displayedPayables.length === 0"

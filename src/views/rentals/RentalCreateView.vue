@@ -476,11 +476,12 @@ function onWizardKeydown(e: KeyboardEvent) {
           v-else
           variant="accent"
           size="sm"
-          :disabled="!canProceed || submitting"
+          :disabled="!canProceed"
+          :loading="submitting"
           @click="handleSubmit"
         >
           <RcIcon name="check" :size="14" />
-          {{ submitting ? 'Oluşturuluyor…' : 'Kiralama oluştur' }}
+          Kiralama oluştur
         </RcButton>
       </template>
     </RcPageHeader>

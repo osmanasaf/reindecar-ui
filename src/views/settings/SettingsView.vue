@@ -3,7 +3,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useAuthStore } from '@/stores'
 import { useToast } from '@/composables'
 import { usersApi } from '@/api'
-import { RcPageHeader, RcButton, RcField, RcTabs } from '@/components/rc'
+import { RcPageHeader, RcButton, RcField, RcTabs, RcSkeletonText } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
 import BrandsManager from './BrandsManager.vue'
 import CitiesManager from './CitiesManager.vue'
@@ -192,8 +192,8 @@ async function handleNotificationSave() {
               </RcField>
             </div>
             <div class="rcs-card__foot" style="margin: 20px -20px -20px; padding-right: 20px">
-              <RcButton type="submit" variant="primary" :disabled="loading">
-                {{ loading ? 'Kaydediliyor…' : 'Kaydet' }}
+              <RcButton type="submit" variant="primary" :loading="loading">
+                Kaydet
               </RcButton>
             </div>
           </form>
@@ -217,16 +217,15 @@ async function handleNotificationSave() {
               </RcField>
             </div>
             <div class="rcs-card__foot" style="margin: 20px -20px -20px; padding-right: 20px">
-              <RcButton type="submit" variant="primary" :disabled="loading">
-                {{ loading ? 'Değiştiriliyor…' : 'Şifreyi değiştir' }}
+              <RcButton type="submit" variant="primary" :loading="loading">
+                Şifreyi değiştir
               </RcButton>
             </div>
           </form>
 
           <template v-else-if="activeTab === 'notifications'">
-            <div v-if="settingsLoading" class="rc-empty-state" style="padding: 24px 0">
-              <span class="rc-spin" aria-hidden="true" />
-              Yükleniyor…
+            <div v-if="settingsLoading" style="padding: 24px 0">
+              <RcSkeletonText :lines="4" />
             </div>
             <form v-else @submit.prevent="handleNotificationSave">
               <div class="rcs-notif-list">
@@ -253,8 +252,8 @@ async function handleNotificationSave() {
                 </label>
               </div>
               <div class="rcs-card__foot" style="margin: 20px -20px -20px; padding-right: 20px">
-                <RcButton type="submit" variant="primary" :disabled="loading">
-                  {{ loading ? 'Kaydediliyor…' : 'Kaydet' }}
+                <RcButton type="submit" variant="primary" :loading="loading">
+                  Kaydet
                 </RcButton>
               </div>
             </form>

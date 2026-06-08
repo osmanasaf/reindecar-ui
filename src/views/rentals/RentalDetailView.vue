@@ -27,6 +27,8 @@ import {
   RcStatusPill,
   RcEmpty,
   resolvePaymentMethod,
+  RcDetailSkeleton,
+  RcSkeletonText,
 } from '@/components/rc'
 import { PaymentStatus } from '@/types/enums'
 import { fmtTRY } from '@/utils/format'
@@ -580,7 +582,7 @@ onActivated(() => {
 
 <template>
   <div class="rc-page rcr-detail">
-    <div v-if="loading" class="rc-skeleton" style="height: 420px" />
+    <RcDetailSkeleton v-if="loading" :sections="3" />
 
     <template v-else-if="rental">
       <div class="rc-cust-detail-nav">
@@ -931,7 +933,7 @@ onActivated(() => {
             title="Hasar kaydı yok"
             description="Bu aşamada hasar kaydı görüntülenmiyor"
           />
-          <div v-else-if="loadingDamages" class="rc-skeleton" style="height: 80px" />
+          <RcSkeletonText v-else-if="loadingDamages" :lines="2" />
           <RcEmpty v-else-if="damages.length === 0" title="Hasar yok" description="Bu kiralamaya ait hasar kaydı bulunmuyor" />
           <div v-else class="damage-list">
             <div
@@ -973,7 +975,7 @@ onActivated(() => {
                 Ceza ekle
               </RcButton>
             </div>
-            <div v-if="loadingPenalties" class="rc-skeleton" style="height: 60px" />
+            <RcSkeletonText v-if="loadingPenalties" :lines="2" />
             <RcEmpty v-else-if="penalties.length === 0" title="Ceza yok" description="Trafik cezası kaydı bulunmuyor" />
             <div v-else class="penalty-list">
               <div v-for="p in penalties" :key="p.id" class="list-row">
@@ -998,7 +1000,7 @@ onActivated(() => {
                 Geçiş ekle
               </RcButton>
             </div>
-            <div v-if="loadingTolls" class="rc-skeleton" style="height: 60px" />
+            <RcSkeletonText v-if="loadingTolls" :lines="2" />
             <RcEmpty v-else-if="tolls.length === 0" title="Geçiş yok" description="HGS/OGS kaydı bulunmuyor" />
             <div v-else class="toll-list">
               <div v-for="t in tolls" :key="t.id" class="list-row">

@@ -12,7 +12,7 @@ import DocumentsSection from '@/components/shared/DocumentsSection.vue'
 import ApproveClaimModal from '@/components/accounting/insurance-claims/ApproveClaimModal.vue'
 import RejectClaimModal from '@/components/accounting/insurance-claims/RejectClaimModal.vue'
 import RecordPaymentModal from '@/components/accounting/insurance-claims/RecordPaymentModal.vue'
-import { RcButton, RcEmpty } from '@/components/rc'
+import { RcButton, RcEmpty, RcDetailSkeleton } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
 import { formatCurrency, formatDate } from '@/utils/format'
 
@@ -106,7 +106,7 @@ onMounted(() => {
       Sigorta Başvuruları
     </button>
 
-    <div v-if="loading" class="rc-skeleton rc-card-skeleton" style="height: 240px" />
+    <RcDetailSkeleton v-if="loading" :sections="2" />
 
     <RcEmpty v-else-if="!claim" title="Başvuru bulunamadı" description="Kayıt silinmiş veya erişim yok olabilir" />
 

@@ -8,6 +8,8 @@ import type { RegisterInvitedUserRequest, RegisterTenantRequest } from '@/api/au
 export const useAuthStore = defineStore('auth', () => {
     const user = ref<User | null>(null)
     const loading = ref(false)
+    const bootstrapped = ref(false)
+    const bootstrapping = ref(false)
     const error = ref<string | null>(null)
     const tokenStatus = ref<{ isValid: boolean; timeToExpiry: number }>({ isValid: false, timeToExpiry: -1 })
 
@@ -64,6 +66,7 @@ export const useAuthStore = defineStore('auth', () => {
             updateTokenStatus()
 
             await fetchUser()
+            bootstrapped.value = true
             return true
         } catch (e) {
             error.value = (e as Error).message || 'Giriş başarısız'
@@ -92,6 +95,7 @@ export const useAuthStore = defineStore('auth', () => {
             tokenManager.start()
             updateTokenStatus()
             await fetchUser()
+            bootstrapped.value = true
             return true
         } catch (e) {
             error.value = (e as Error).message || fallbackError
@@ -123,9 +127,14 @@ export const useAuthStore = defineStore('auth', () => {
     async function checkAuth(): Promise<boolean> {
         const token = tokenStorage.getAccessToken()
         if (!token) {
+            bootstrapping.value = false
+            bootstrapped.value = true
             return false
         }
 
+        if (!bootstrapped.value) {
+            bootstrapping.value = true
+        }
         try {
 
             setupTokenListeners()
@@ -150,6 +159,9 @@ export const useAuthStore = defineStore('auth', () => {
             removeTokenListeners()
             tokenManager.stop()
             return false
+        } finally {
+            bootstrapping.value = false
+            bootstrapped.value = true
         }
     }
 
@@ -170,6 +182,7 @@ export const useAuthStore = defineStore('auth', () => {
     return {
         user: readonly(user),
         loading: readonly(loading),
+        bootstrapping: readonly(bootstrapping),
         error: readonly(error),
         tokenStatus: readonly(tokenStatus),
         isAuthenticated,

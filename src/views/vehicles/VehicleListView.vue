@@ -2,7 +2,14 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { vehiclesApi } from '@/api'
-import { usePagination, useToast } from '@/composables'
+import {
+  usePagination,
+  useToast,
+  useLocalStorage,
+  UI_STORAGE_KEYS,
+  normalizeVehicleViewMode,
+  type VehicleListViewMode,
+} from '@/composables'
 import { RcIcon } from '@/components/icons'
 import {
   RcPageHeader,
@@ -11,21 +18,32 @@ import {
   RcEmpty,
   RcKbd,
   RcStatusPill,
+  RcTableSkeleton,
+  RcError,
 } from '@/components/rc'
 import { VehicleStatus } from '@/types'
 import type { Vehicle, VehicleOverview, VehicleHistory } from '@/types'
 import { fmtTRY, fmtNum } from '@/utils/format'
 
 type FilterKey = 'all' | VehicleStatus
-type ViewMode = 'table' | 'grid' | 'gantt'
 type SortKey = 'plate' | 'km' | 'daily' | 'year'
 
 const router = useRouter()
 const vehicles = ref<Vehicle[]>([])
 const loading = ref(true)
+const error = ref<string | null>(null)
 const searchQuery = ref('')
 const statusFilter = ref<FilterKey>('all')
-const viewMode = ref<ViewMode>('table')
+const viewMode = useLocalStorage<VehicleListViewMode>(
+  UI_STORAGE_KEYS.vehicleListView,
+  'table',
+  {
+    serializer: {
+      read: (raw) => normalizeVehicleViewMode(JSON.parse(raw)),
+      write: (value) => JSON.stringify(value),
+    },
+  },
+)
 const sortKey = ref<SortKey>('plate')
 const sortOpen = ref(false)
 const selected = ref<Set<number>>(new Set())
@@ -41,7 +59,17 @@ const overview = ref<VehicleOverview>({
   sold: 0,
 })
 
-const { page, totalElements, totalPages, setPage, setTotal, getParams } = usePagination()
+const {
+  page,
+  size,
+  totalElements,
+  totalPages,
+  pageSizeOptions,
+  setPage,
+  setSize,
+  setTotal,
+  getParams,
+} = usePagination()
 const toast = useToast()
 
 const sortLabels: Record<SortKey, string> = {
@@ -156,6 +184,7 @@ async function fetchOverview() {
 
 async function fetchVehicles() {
   loading.value = true
+  error.value = null
   try {
     const q = searchQuery.value.trim()
     const params = buildSortParams()
@@ -173,7 +202,8 @@ async function fetchVehicles() {
     setTotal(response.totalElements, response.totalPages)
     selected.value = new Set()
   } catch {
-    toast.error('Araçlar yüklenirken hata oluştu')
+    error.value = 'Araçlar yüklenirken hata oluştu'
+    toast.error(error.value)
   } finally {
     loading.value = false
   }
@@ -195,6 +225,12 @@ function setSort(next: SortKey) {
 
 function handlePageChange(newPage: number) {
   setPage(newPage)
+  fetchVehicles()
+}
+
+function handlePageSizeChange(event: Event) {
+  const next = Number((event.target as HTMLSelectElement).value)
+  setSize(next)
   fetchVehicles()
 }
 
@@ -569,7 +605,13 @@ onMounted(async () => {
       </div>
     </div>
 
-    <div v-if="loading" class="rc-skeleton rc-card-skeleton" style="height: 320px" />
+    <RcTableSkeleton v-if="loading" :rows="10" :cols="6" />
+
+    <RcError
+      v-else-if="error"
+      :message="error"
+      @retry="fetchVehicles"
+    />
 
     <RcEmpty
       v-else-if="vehicles.length === 0"
@@ -580,7 +622,7 @@ onMounted(async () => {
         <RcIcon name="search" :size="32" />
       </template>
       <template #action>
-        <RcButton variant="secondary" @click="setSavedView('all')">Tüm filoyu göster</RcButton>
+        <RcButton variant="secondary" @click="setFilter('all')">Tüm filoyu göster</RcButton>
       </template>
     </RcEmpty>
 
@@ -599,7 +641,7 @@ onMounted(async () => {
             <th>Durum</th>
           </tr>
         </thead>
-        <tbody>
+        <TransitionGroup name="rc-list" tag="tbody">
           <tr
             v-for="v in vehicles"
             :key="v.id"
@@ -659,7 +701,7 @@ onMounted(async () => {
               </div>
             </td>
           </tr>
-        </tbody>
+        </TransitionGroup>
       </table>
     </div>
 
@@ -802,23 +844,40 @@ onMounted(async () => {
 
     <!-- Sayfalama -->
     <div
-      v-if="!loading && vehicles.length > 0 && totalPages > 1"
+      v-if="!loading && vehicles.length > 0"
       class="rc-filterbar"
-      style="justify-content: center; margin-top: 20px"
+      style="justify-content: center; margin-top: 20px; flex-wrap: wrap; gap: 12px"
     >
-      <RcButton variant="secondary" :disabled="page === 0" @click="handlePageChange(page - 1)">
-        Önceki
-      </RcButton>
-      <span style="font-size: 13px; color: var(--rc-text-muted)">
-        Sayfa {{ page + 1 }} / {{ totalPages }} · {{ totalElements }} kayıt
+      <label class="rc-page-size" style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--rc-text-muted)">
+        Sayfa boyutu
+        <select
+          class="rc-select"
+          style="width: auto; min-width: 72px; height: 32px; padding: 0 8px"
+          :value="size"
+          aria-label="Sayfa boyutu"
+          @change="handlePageSizeChange"
+        >
+          <option v-for="opt in pageSizeOptions" :key="opt" :value="opt">{{ opt }}</option>
+        </select>
+      </label>
+      <template v-if="totalPages > 1">
+        <RcButton variant="secondary" :disabled="page === 0" @click="handlePageChange(page - 1)">
+          Önceki
+        </RcButton>
+        <span style="font-size: 13px; color: var(--rc-text-muted)">
+          Sayfa {{ page + 1 }} / {{ totalPages }} · {{ totalElements }} kayıt
+        </span>
+        <RcButton
+          variant="secondary"
+          :disabled="page + 1 >= totalPages"
+          @click="handlePageChange(page + 1)"
+        >
+          Sonraki
+        </RcButton>
+      </template>
+      <span v-else style="font-size: 13px; color: var(--rc-text-muted)">
+        {{ totalElements }} kayıt
       </span>
-      <RcButton
-        variant="secondary"
-        :disabled="page + 1 >= totalPages"
-        @click="handlePageChange(page + 1)"
-      >
-        Sonraki
-      </RcButton>
     </div>
 
     <!-- Toplu seçim -->

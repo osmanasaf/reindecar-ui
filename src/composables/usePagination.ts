@@ -1,15 +1,23 @@
 import { ref } from 'vue'
+import { readStoredValue, writeStoredValue } from './useLocalStorage'
+import { UI_STORAGE_KEYS, normalizePageSize, PAGE_SIZE_OPTIONS, type PageSizeOption } from './uiPreferences'
 
 interface PaginationOptions {
     defaultPage?: number
     defaultSize?: number
+    /** false verilirse sayfa boyutu localStorage'a yazılmaz */
+    persistSize?: boolean
 }
 
 export function usePagination(options: PaginationOptions = {}) {
-    const { defaultPage = 0, defaultSize = 20 } = options
+    const { defaultPage = 0, defaultSize = 20, persistSize = true } = options
+
+    const initialSize = persistSize
+        ? normalizePageSize(readStoredValue(UI_STORAGE_KEYS.pageSize, defaultSize), defaultSize)
+        : normalizePageSize(defaultSize, defaultSize)
 
     const page = ref(defaultPage)
-    const size = ref(defaultSize)
+    const size = ref<PageSizeOption>(initialSize)
     const sort = ref<string | undefined>(undefined)
     const direction = ref<'asc' | 'desc'>('asc')
     const totalElements = ref(0)
@@ -20,8 +28,12 @@ export function usePagination(options: PaginationOptions = {}) {
     }
 
     function setSize(newSize: number) {
-        size.value = newSize
+        const next = normalizePageSize(newSize, size.value)
+        size.value = next
         page.value = 0
+        if (persistSize) {
+            writeStoredValue(UI_STORAGE_KEYS.pageSize, next)
+        }
     }
 
     function setSort(field: string, dir: 'asc' | 'desc' = 'asc') {
@@ -36,7 +48,7 @@ export function usePagination(options: PaginationOptions = {}) {
 
     function reset() {
         page.value = defaultPage
-        size.value = defaultSize
+        size.value = normalizePageSize(defaultSize, defaultSize)
         sort.value = undefined
         direction.value = 'asc'
     }
@@ -57,11 +69,12 @@ export function usePagination(options: PaginationOptions = {}) {
         direction,
         totalElements,
         totalPages,
+        pageSizeOptions: PAGE_SIZE_OPTIONS,
         setPage,
         setSize,
         setSort,
         setTotal,
         reset,
-        getParams
+        getParams,
     }
 }

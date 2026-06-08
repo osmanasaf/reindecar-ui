@@ -7,7 +7,7 @@ import { ProviderType } from '@/types'
 import type { ServiceProviderResponse, CreateServiceProviderRequest, UpdateServiceProviderRequest } from '@/types'
 import { CreateProviderModal, EditProviderModal } from '@/components/accounting'
 import ServiceProvidersTable from '@/components/accounting/service-providers/ServiceProvidersTable.vue'
-import { RcPageHeader, RcButton, RcEmpty } from '@/components/rc'
+import { RcPageHeader, RcButton, RcEmpty, RcTableSkeleton } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
 
 const router = useRouter()
@@ -208,7 +208,7 @@ watch(searchQuery, () => {
       </label>
     </div>
 
-    <div v-if="loading" class="rc-skeleton rc-card-skeleton" style="height: 280px" />
+    <RcTableSkeleton v-if="loading" :rows="8" :cols="5" />
 
     <RcEmpty
       v-else-if="filteredProviders.length === 0"

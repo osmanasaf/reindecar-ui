@@ -8,7 +8,7 @@ import { formatCurrency, formatDate, calculateProgress } from '@/utils/installme
 import PaymentScheduleTable from '@/components/installments/PaymentScheduleTable.vue'
 import InstallmentEarlyClosureModal from '@/components/InstallmentEarlyClosureModal.vue'
 import DocumentsSection from '@/components/shared/DocumentsSection.vue'
-import { RcButton, RcEmpty, RcBadge } from '@/components/rc'
+import { RcButton, RcEmpty, RcBadge, RcDetailSkeleton } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
 
 const route = useRoute()
@@ -142,7 +142,7 @@ watch(() => route.params.id, loadInstallment)
       Araç taksitleri
     </button>
 
-    <div v-if="loading" class="rc-skeleton rc-card-skeleton" style="height: 280px" />
+    <RcDetailSkeleton v-if="loading" :sections="2" />
 
     <RcEmpty
       v-else-if="!installment"

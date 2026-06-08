@@ -532,8 +532,8 @@ watch(() => props.visible, (isVisible) => {
 
     <template v-if="!loading" #footer>
       <RcButton variant="secondary" type="button" @click="handleClose">İptal</RcButton>
-      <RcButton variant="accent" type="button" :disabled="saving" @click="handleSubmit">
-        {{ saving ? 'Kaydediliyor…' : 'Kaydet' }}
+      <RcButton variant="accent" type="button" :loading="saving" @click="handleSubmit">
+        Kaydet
       </RcButton>
     </template>
   </RcModal>

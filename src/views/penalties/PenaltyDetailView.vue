@@ -5,7 +5,7 @@ import { penaltiesApi } from '@/api'
 import { useToast, useEnumTranslations } from '@/composables'
 import PenaltyStatusBadge from '@/components/penalties/PenaltyStatusBadge.vue'
 import { AccountingConfirmModal } from '@/components/accounting'
-import { RcButton, RcEmpty, RcBadge } from '@/components/rc'
+import { RcButton, RcEmpty, RcBadge, RcDetailSkeleton } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
 import { formatCurrency, formatDate } from '@/utils/format'
 import type { PenaltyResponse } from '@/types'
@@ -124,7 +124,7 @@ onMounted(() => {
       Trafik Cezaları
     </button>
 
-    <div v-if="loading" class="rc-skeleton rc-card-skeleton" style="height: 240px" />
+    <RcDetailSkeleton v-if="loading" :sections="2" />
 
     <RcEmpty v-else-if="!penalty" title="Ceza bulunamadı" description="Kayıt silinmiş veya erişim yok olabilir" />
 

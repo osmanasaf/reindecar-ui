@@ -6,7 +6,7 @@ import { useEnumTranslations, useToast } from '@/composables'
 import { formatPhoneInput, normalizePhoneDigits } from '@/utils/phone'
 import type { UpdateServiceProviderRequest, ServiceProviderResponse } from '@/types'
 import { EditProviderModal } from '@/components/accounting'
-import { RcButton, RcEmpty, RcBadge } from '@/components/rc'
+import { RcButton, RcEmpty, RcBadge, RcDetailSkeleton } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
 
 const route = useRoute()
@@ -88,7 +88,7 @@ function toTelHref(phone?: string | null) {
       Servis Sağlayıcılar
     </button>
 
-    <div v-if="loading" class="rc-skeleton rc-card-skeleton" style="height: 240px" />
+    <RcDetailSkeleton v-if="loading" :sections="2" />
 
     <RcEmpty v-else-if="!provider" title="Sağlayıcı bulunamadı" description="Kayıt silinmiş veya erişim yok olabilir" />
 

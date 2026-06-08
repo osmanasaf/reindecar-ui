@@ -11,7 +11,7 @@ import { isErrorResponse } from '@/utils/error'
 import { FuelType, Transmission } from '@/types'
 import type { CreateVehicleForm, UpdateVehicleForm, VehicleCategory, Branch, Vehicle } from '@/types'
 import type { VehicleRecognitionResult } from '@/api/vehicles.api'
-import { RcPageHeader, RcButton, RcField, RcInput } from '@/components/rc'
+import { RcPageHeader, RcButton, RcField, RcInput, RcDetailSkeleton } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
 
 interface VehicleFormModel {
@@ -486,7 +486,7 @@ onMounted(fetchData)
       :subtitle="isEditMode ? 'Araç bilgilerini güncelleyin' : 'Filoya yeni araç kaydı oluşturun'"
     />
 
-    <div v-if="loading && !form.plateNumber" class="rc-skeleton" style="height: 320px" />
+    <RcDetailSkeleton v-if="loading && !form.plateNumber" :sections="2" />
 
     <form v-else class="form-container" @submit.prevent="handleSubmit">
 
@@ -794,8 +794,8 @@ onMounted(fetchData)
       </section>
       <div class="form-actions">
         <RcButton variant="secondary" type="button" @click="router.back()">İptal</RcButton>
-        <RcButton variant="accent" type="submit" :disabled="loading">
-          {{ loading ? 'Kaydediliyor…' : isEditMode ? 'Güncelle' : 'Kaydet' }}
+        <RcButton variant="accent" type="submit" :loading="loading">
+          {{ isEditMode ? 'Güncelle' : 'Kaydet' }}
         </RcButton>
       </div>
     </form>

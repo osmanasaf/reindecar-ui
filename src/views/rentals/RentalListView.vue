@@ -14,6 +14,8 @@ import {
   RcEmpty,
   RcKbd,
   RcStatusPill,
+  RcTableSkeleton,
+  RcError,
 } from '@/components/rc'
 import { fmtTRY, formatDate } from '@/utils/format'
 import { RentalStatus, RentalType } from '@/types/enums'
@@ -25,6 +27,7 @@ const rentals = ref<Rental[]>([])
 const vehicleMap = ref<Map<number, Vehicle>>(new Map())
 const customerMap = ref<Map<number, Customer>>(new Map())
 const loading = ref(true)
+const error = ref<string | null>(null)
 const searchQuery = ref('')
 const statusView = ref<StatusView>('all')
 const typeFilter = ref<RentalType | ''>('')
@@ -224,6 +227,7 @@ function buildListParams(search?: string) {
 
 async function fetchRentals() {
   loading.value = true
+  error.value = null
   try {
     const q = searchQuery.value.trim()
     const search = q.length >= 2 ? q : undefined
@@ -244,7 +248,8 @@ async function fetchRentals() {
     setTotal(response.totalElements, response.totalPages)
     await fetchRelatedData()
   } catch {
-    toast.error('Kiralamalar yüklenirken hata oluştu')
+    error.value = 'Kiralamalar yüklenirken hata oluştu'
+    toast.error(error.value)
   } finally {
     loading.value = false
   }
@@ -415,7 +420,13 @@ watch(searchQuery, () => {
       </span>
     </div>
 
-    <div v-if="loading" class="rc-skeleton rc-card-skeleton" style="height: 320px" />
+    <RcTableSkeleton v-if="loading" :rows="10" :cols="6" />
+
+    <RcError
+      v-else-if="error"
+      :message="error"
+      @retry="fetchRentals"
+    />
 
     <RcEmpty
       v-else-if="rentals.length === 0"

@@ -3,7 +3,7 @@ import { ref, onMounted } from 'vue'
 import { referenceDataApi } from '@/api'
 import { useToast } from '@/composables'
 import { AccountingConfirmModal } from '@/components/accounting'
-import { RcButton, RcField, RcModal, RcEmpty } from '@/components/rc'
+import { RcButton, RcField, RcModal, RcEmpty, RcTableSkeleton } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
 import type { VehicleColor } from '@/types/reference'
 
@@ -140,7 +140,7 @@ onMounted(fetchColors)
       </div>
     </div>
 
-    <div v-if="loading" class="rc-skeleton rc-card-skeleton" style="height: 200px" />
+    <RcTableSkeleton v-if="loading" :rows="5" :cols="3" />
 
     <RcEmpty
       v-else-if="!colors.length"

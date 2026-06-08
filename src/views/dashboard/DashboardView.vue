@@ -11,6 +11,11 @@ import {
   RcAvatar,
   RcEmpty,
   RcTabs,
+  RcKpiSkeleton,
+  RcSkeleton,
+  RcTableSkeleton,
+  RcListSkeleton,
+  RcError,
 } from '@/components/rc'
 import { useDashboardStats, useToast } from '@/composables'
 import { useAuthStore } from '@/stores'
@@ -303,24 +308,22 @@ onMounted(async () => {
       </template>
     </RcPageHeader>
 
-    <div v-if="error" class="rc-alert rc-alert--danger" role="alert">
-      {{ error }}
-      <RcButton variant="ghost" size="sm" @click="fetchAll(revenuePeriod)">Tekrar dene</RcButton>
-    </div>
+    <RcError
+      v-if="error"
+      :message="error"
+      @retry="fetchAll(revenuePeriod)"
+    />
 
     <!-- KPI -->
-    <div class="rc-kpi-grid">
-      <template v-if="loading && !stats">
-        <div v-for="i in 5" :key="i" class="rc-skeleton rc-kpi-skeleton" />
-      </template>
-      <template v-else>
-        <div
-          v-for="card in kpiCards"
-          :key="card.id"
-          class="rc-kpi"
-          :class="{ 'rc-kpi--link': !!card.route }"
-          @click="go(card.route)"
-        >
+    <RcKpiSkeleton v-if="loading && !stats" :count="5" />
+    <div v-else class="rc-kpi-grid">
+      <div
+        v-for="card in kpiCards"
+        :key="card.id"
+        class="rc-kpi"
+        :class="{ 'rc-kpi--link': !!card.route }"
+        @click="go(card.route)"
+      >
         <div class="rc-kpi__label">
           <RcIcon :name="card.icon" :size="14" />
           {{ card.label }}
@@ -339,8 +342,7 @@ onMounted(async () => {
           <RcSparkline :data="card.spark" :color="card.sparkColor" />
         </div>
         <span v-if="card.alert" class="rc-kpi__alert-dot" aria-label="Dikkat gerektiren kayıt" />
-        </div>
-      </template>
+      </div>
     </div>
 
     <!-- Revenue + Fleet -->
@@ -367,7 +369,7 @@ onMounted(async () => {
           </div>
         </div>
         <div class="rc-card__body" style="padding-top: 8px">
-          <div v-if="loading" class="rc-skeleton rc-card-skeleton" />
+          <RcSkeleton v-if="loading" height="220px" radius="lg" />
           <template v-else-if="revenue?.values.length">
             <div class="rc-dashboard-revenue-head">
               <span class="rc-dashboard-revenue-total">{{ formatCompactTRY(revenue.total) }}</span>
@@ -389,7 +391,7 @@ onMounted(async () => {
           </RcButton>
         </div>
         <div class="rc-card__body">
-          <div v-if="loading" class="rc-skeleton rc-card-skeleton" />
+          <RcSkeleton v-if="loading" height="220px" radius="lg" />
           <template v-else-if="hasFleetData">
             <RcFleetDonut :items="fleetItems" />
             <hr class="rc-hr">
@@ -413,7 +415,9 @@ onMounted(async () => {
           </div>
           <RcTabs v-model="returnsTab" :tabs="returnsTabOptions" />
         </div>
-        <div v-if="loading" class="rc-skeleton rc-card-skeleton" style="margin: 16px" />
+        <div v-if="loading" style="margin: 16px">
+          <RcTableSkeleton :rows="5" :cols="4" />
+        </div>
         <RcEmpty
           v-else-if="!filteredReturns.length"
           title="Yaklaşan iade yok"
@@ -471,7 +475,7 @@ onMounted(async () => {
         <div class="rc-card__head">
           <div class="rc-card__title">Etkinlik akışı</div>
         </div>
-        <div v-if="loading" class="rc-skeleton rc-card-skeleton" />
+        <RcListSkeleton v-if="loading" :rows="5" :show-avatar="false" />
         <RcEmpty v-else-if="!activityItems.length" title="Henüz etkinlik yok" />
         <div v-else>
           <div v-for="(item, i) in activityItems" :key="i" class="rc-activity">
@@ -495,7 +499,9 @@ onMounted(async () => {
             <RcIcon name="arrowRight" :size="14" />
           </RcButton>
         </div>
-        <div v-if="accountingRowsLoading" class="rc-skeleton rc-card-skeleton" style="margin: 16px" />
+        <div v-if="accountingRowsLoading" style="margin: 16px">
+          <RcTableSkeleton :rows="4" :cols="4" />
+        </div>
         <RcEmpty v-else-if="!receivableRows.length" title="Açık alacak yok" />
         <table v-else class="rc-table">
           <thead>
@@ -538,7 +544,9 @@ onMounted(async () => {
             <RcIcon name="arrowRight" :size="14" />
           </RcButton>
         </div>
-        <div v-if="accountingRowsLoading" class="rc-skeleton rc-card-skeleton" style="margin: 16px" />
+        <div v-if="accountingRowsLoading" style="margin: 16px">
+          <RcTableSkeleton :rows="4" :cols="3" />
+        </div>
         <RcEmpty v-else-if="!payableRows.length" title="Açık verecek yok" />
         <table v-else class="rc-table">
           <thead>

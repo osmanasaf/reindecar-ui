@@ -5,7 +5,7 @@ import { useToast, useReferenceData } from '@/composables'
 import { validators, validate, formatPhoneInput } from '@/utils/validation'
 import { SearchableSelect } from '@/components/common'
 import BranchesTable from '@/components/branches/BranchesTable.vue'
-import { RcPageHeader, RcButton, RcEmpty, RcModal } from '@/components/rc'
+import { RcPageHeader, RcButton, RcEmpty, RcModal, RcTableSkeleton } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
 import type { Branch } from '@/types'
 import type { District } from '@/types/reference'
@@ -310,7 +310,7 @@ onMounted(fetchBranches)
       </template>
     </RcPageHeader>
 
-    <div v-if="loading" class="rc-skeleton rc-card-skeleton" style="height: 280px" />
+    <RcTableSkeleton v-if="loading" :rows="8" :cols="5" />
 
     <template v-else>
       <div class="rca-stats rca-stats--claims">

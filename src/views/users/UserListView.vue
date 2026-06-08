@@ -4,7 +4,7 @@ import { usersApi } from '@/api'
 import type { UserResponse, UserRole, CreateUserRequest, UpdateUserRequest } from '@/api'
 import { useToast } from '@/composables'
 import { SearchableSelect } from '@/components/common'
-import { RcPageHeader, RcButton, RcEmpty, RcModal, RcAvatar, RcBadge, RcStatusPill } from '@/components/rc'
+import { RcPageHeader, RcButton, RcEmpty, RcModal, RcAvatar, RcBadge, RcStatusPill, RcTableSkeleton } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
 import { formatDate } from '@/utils/format'
 
@@ -158,7 +158,7 @@ onMounted(fetchUsers)
       </div>
     </div>
 
-    <div v-if="loading" class="rc-skeleton rc-card-skeleton" style="height: 280px" />
+    <RcTableSkeleton v-if="loading" :rows="8" :cols="5" />
 
     <RcEmpty
       v-else-if="users.length === 0"

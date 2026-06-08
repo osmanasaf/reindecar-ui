@@ -118,10 +118,10 @@ watch([username, password], () => reset())
       variant="primary"
       size="lg"
       class="rc-auth__submit"
-      :disabled="!isFormValid || loading"
+      :disabled="!isFormValid"
+      :loading="loading"
     >
-      <span v-if="loading" class="rc-spin" aria-hidden="true" />
-      {{ loading ? 'Giriş yapılıyor…' : 'Giriş yap' }}
+      Giriş yap
       <RcIcon v-if="!loading" name="arrowRight" :size="16" />
     </RcButton>
   </form>

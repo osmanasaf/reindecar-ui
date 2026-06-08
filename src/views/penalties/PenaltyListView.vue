@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { penaltiesApi } from '@/api'
 import { useToast, useEnumTranslations } from '@/composables'
 import PenaltyStatusBadge from '@/components/penalties/PenaltyStatusBadge.vue'
-import { RcPageHeader, RcButton, RcEmpty, RcBadge } from '@/components/rc'
+import { RcPageHeader, RcButton, RcEmpty, RcBadge, RcTableSkeleton } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
 import { formatCurrency, formatDate } from '@/utils/format'
 import type { PenaltyResponse } from '@/types'
@@ -102,7 +102,7 @@ onMounted(() => {
       </button>
     </div>
 
-    <div v-if="loading" class="rc-skeleton rc-card-skeleton" style="height: 280px" />
+    <RcTableSkeleton v-if="loading" :rows="8" :cols="5" />
 
     <RcEmpty
       v-else-if="penalties.length === 0"

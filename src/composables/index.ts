@@ -1,4 +1,7 @@
 export { useFetch } from './useFetch'
+export { useLocalStorage, readStoredValue, writeStoredValue } from './useLocalStorage'
+export { UI_STORAGE_KEYS, PAGE_SIZE_OPTIONS, normalizePageSize, normalizeVehicleViewMode } from './uiPreferences'
+export type { PageSizeOption, VehicleListViewMode } from './uiPreferences'
 export { usePagination } from './usePagination'
 export { useForm } from './useForm'
 export { useToast } from './useToast'

@@ -217,10 +217,9 @@ async function handleSubmit() {
           type="submit"
           variant="primary"
           size="lg"
-          :disabled="authStore.loading"
+          :loading="authStore.loading"
         >
-          <span v-if="authStore.loading" class="rc-spin" aria-hidden="true" />
-          {{ authStore.loading ? 'Kaydediliyor…' : 'Kaydı tamamla' }}
+          Kaydı tamamla
         </RcButton>
       </form>
     </section>

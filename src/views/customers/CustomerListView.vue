@@ -13,6 +13,8 @@ import {
   RcAvatar,
   RcEmpty,
   RcKbd,
+  RcListSkeleton,
+  RcError,
 } from '@/components/rc'
 import { formatPhone, fmtTRY, formatDate } from '@/utils/format'
 import { CustomerType } from '@/types'
@@ -25,6 +27,7 @@ const router = useRouter()
 
 const customers = ref<Customer[]>([])
 const loading = ref(true)
+const error = ref<string | null>(null)
 const searchQuery = ref('')
 const typeFilter = ref<FilterKey>('all')
 const previewCustomer = ref<Customer | null>(null)
@@ -123,6 +126,7 @@ async function fetchOverview() {
 
 async function fetchCustomers() {
   loading.value = true
+  error.value = null
   try {
     const q = searchQuery.value.trim()
 
@@ -165,7 +169,8 @@ async function fetchCustomers() {
     customers.value = response.content
     setTotal(response.totalElements, response.totalPages)
   } catch {
-    toast.error('Müşteriler yüklenirken hata oluştu')
+    error.value = 'Müşteriler yüklenirken hata oluştu'
+    toast.error(error.value)
   } finally {
     loading.value = false
   }
@@ -359,7 +364,13 @@ onMounted(async () => {
       </button>
     </div>
 
-    <div v-if="loading" class="rc-skeleton rc-card-skeleton" style="height: 320px" />
+    <RcListSkeleton v-if="loading" :rows="8" />
+
+    <RcError
+      v-else-if="error"
+      :message="error"
+      @retry="fetchCustomers"
+    />
 
     <RcEmpty
       v-else-if="customers.length === 0"

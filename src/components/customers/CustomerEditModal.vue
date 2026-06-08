@@ -745,9 +745,9 @@ watch(
     <template #footer>
       <RcButton variant="ghost" @click="emit('close')">İptal</RcButton>
       <span class="rc-spacer" />
-      <RcButton variant="accent" :disabled="loading || saving" @click="handleSubmit">
+      <RcButton variant="accent" :disabled="loading" :loading="saving" @click="handleSubmit">
         <RcIcon name="check" :size="14" />
-        {{ saving ? 'Kaydediliyor…' : isCreateMode ? 'Müşteri oluştur' : 'Değişiklikleri kaydet' }}
+        {{ isCreateMode ? 'Müşteri oluştur' : 'Değişiklikleri kaydet' }}
       </RcButton>
     </template>
   </RcModal>
