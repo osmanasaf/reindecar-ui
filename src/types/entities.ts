@@ -239,6 +239,8 @@ export interface Rental {
     totalDays: number
     startKm: number
     endKm: number
+    startFuelLiters?: number
+    endFuelLiters?: number
     totalKm: number
     kmPackageId?: number
     customIncludedKm?: number
@@ -449,6 +451,7 @@ export interface KmPackageResponse {
     includedKm: number
     extraKmPrice: number
     unlimited: boolean
+    totalIncludedKm?: number | null
 }
 
 export interface KmPackage {
@@ -463,6 +466,7 @@ export interface KmPackage {
     categoryId: number | null
     categoryName: string | null
     global: boolean
+    totalIncludedKm?: number | null
 }
 
 export interface RentalDriver {
@@ -708,6 +712,8 @@ export interface ReturnPreviewResponse {
     kmPenalty: MoneyLike
     lateDays: number
     lateFee: MoneyLike
+    earlyDays: number
+    earlyDiscount: MoneyLike
     totalExtra: MoneyLike
     penalties: PenaltySummaryItem[]
     damages: DamageSummaryItem[]
@@ -716,6 +722,7 @@ export interface ReturnPreviewResponse {
     damageTotal: MoneyLike
     tollTotal?: MoneyLike
     grandTotal: MoneyLike
+    fuelDeficitLiters?: number
 }
 
 export interface RentalPaymentSummaryResponse {

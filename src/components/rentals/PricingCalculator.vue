@@ -3,6 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { pricingApi, leasingApi } from '@/api'
 import { useToast } from '@/composables'
 import { formatCurrency } from '@/utils/format'
+import { resolveEffectiveIncludedKm, formatIncludedKmDisplay } from '@/utils/km'
 import type { PriceCalculationResponse, LeasingPlan } from '@/api'
 import type { RentalType } from '@/types'
 
@@ -43,6 +44,7 @@ const unitPriceLabel = computed(() => {
   switch (props.rentalType) {
     case 'LEASING':
     case 'MONTHLY':
+    case 'SERVICE':
       return 'Aylık Fiyat'
     case 'WEEKLY':
       return 'Haftalık Fiyat'
@@ -57,12 +59,27 @@ const unitPriceValue = computed(() => {
   return priceData.value.unitPrice || priceData.value.dailyPrice
 })
 
+const kmPackageDisplayLabel = computed(() => {
+  const pkg = priceData.value?.kmPackage
+  if (!pkg || pkg.unlimited) return ''
+  const totalDays = priceData.value?.totalDays ?? 0
+  const totalKm = resolveEffectiveIncludedKm({
+    perPeriodKm: pkg.includedKm,
+    totalIncludedKm: pkg.totalIncludedKm,
+    rentalType: props.rentalType,
+    totalDays,
+  })
+  const perPeriodLabel = formatIncludedKmDisplay(props.rentalType, pkg.includedKm, 0)
+  return `${totalKm.toLocaleString('tr-TR')} km dahil (${perPeriodLabel})`
+})
+
 const durationLabel = computed(() => {
   if (!priceData.value) return ''
   
   switch (props.rentalType) {
     case 'LEASING':
     case 'MONTHLY':
+    case 'SERVICE':
       return `${totalMonths.value} Ay`
     case 'WEEKLY': {
       const weeks = Math.floor(priceData.value.totalDays / 7)
@@ -246,7 +263,7 @@ watch([() => props.vehicleId, () => props.startDate, () => props.endDate, () => 
           <p>
             <strong>{{ priceData.kmPackage.name }}</strong>
             <br>
-            {{ priceData.kmPackage.unlimited ? 'Sınırsız KM' : `${priceData.kmPackage.includedKm.toLocaleString('tr-TR')} km dahil` }}
+            {{ priceData.kmPackage.unlimited ? 'Sınırsız KM' : kmPackageDisplayLabel }}
             <br>
             <span v-if="!priceData.kmPackage.unlimited">
               Ek km: {{ formatCurrency(priceData.kmPackage.extraKmPrice) }}/km

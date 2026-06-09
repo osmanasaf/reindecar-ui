@@ -17,7 +17,7 @@ import {
   RcListSkeleton,
   RcError,
 } from '@/components/rc'
-import { useDashboardStats, useToast } from '@/composables'
+import { useDashboardStats, useToast, usePermissions } from '@/composables'
 import { useAuthStore } from '@/stores'
 import { receivablesApi, payablesApi } from '@/api'
 import { fmtTRY, formatDate } from '@/utils/format'
@@ -42,6 +42,7 @@ const FLEET_COLORS = {
 const router = useRouter()
 const toast = useToast()
 const authStore = useAuthStore()
+const { canViewRevenue } = usePermissions()
 const {
   stats,
   revenue,
@@ -347,7 +348,7 @@ onMounted(async () => {
 
     <!-- Revenue + Fleet -->
     <div class="rc-two">
-      <div class="rc-card">
+      <div v-if="canViewRevenue" class="rc-card">
         <div class="rc-card__head">
           <div>
             <div class="rc-card__title">Aylık ciro</div>

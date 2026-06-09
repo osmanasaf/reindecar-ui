@@ -7,6 +7,7 @@ import { SearchableSelect } from '@/components/common'
 import { RcIcon } from '@/components/icons'
 import { RcButton, RcKbd, RcStepper, RcPageHeader, RcField } from '@/components/rc'
 import { formatCurrency } from '@/utils/format'
+import { formatIncludedKmDisplay } from '@/utils/km'
 import { RentalType, CustomerType } from '@/types'
 import type { Customer, CreateRentalForm, RentalExtraItem, Branch, KmPackage, Vehicle } from '@/types'
 import type { PriceCalculationResponse } from '@/api'
@@ -20,14 +21,15 @@ import TermSelector from '@/components/rentals/TermSelector.vue'
 import ExtraItemsManager from '@/components/rentals/ExtraItemsManager.vue'
 import RentalCreateSummaryCard from '@/components/rentals/RentalCreateSummaryCard.vue'
 import DatePicker from '@/components/base/DatePicker.vue'
+import DocumentsSection from '@/components/shared/DocumentsSection.vue'
 
 const router = useRouter()
 const route = useRoute()
 const toast = useToast()
 
 const currentStep = ref(1)
-const totalSteps = 7
 const submitting = ref(false)
+const createdRentalId = ref<number | null>(null)
 const branches = ref<Branch[]>([])
 const kmPackages = ref<KmPackage[]>([])
 
@@ -55,15 +57,23 @@ const selectedReturnBranchId = ref<number | null>(null)
 const selectedVehicleLabel = ref('')
 const selectedCustomerLabel = ref('')
 
-const wizardSteps = [
-  { id: 1, label: 'Tip' },
-  { id: 2, label: 'Tarih' },
-  { id: 3, label: 'Araç' },
-  { id: 4, label: 'Müşteri' },
-  { id: 5, label: 'KM paketi' },
-  { id: 6, label: 'Ek kalemler' },
-  { id: 7, label: 'Onay' },
-] as const
+const wizardSteps = computed(() => {
+  const steps = [
+    { id: 1, label: 'Tip' },
+    { id: 2, label: 'Tarih' },
+    { id: 3, label: 'Araç' },
+    { id: 4, label: 'Müşteri' },
+    { id: 5, label: 'KM paketi' },
+    { id: 6, label: 'Ek kalemler' },
+    { id: 7, label: 'Onay' },
+  ] as const
+  if (isService.value) {
+    return [...steps, { id: 8, label: 'Belgeler' }]
+  }
+  return [...steps]
+})
+
+const totalSteps = computed(() => wizardSteps.value.length)
 
 const branchOptions = computed(() => branches.value.map(b => ({ value: b.id as number, label: b.name })))
 
@@ -103,7 +113,8 @@ const rentalTypes: { value: RentalType; label: string; description: string; minD
   { value: RentalType.DAILY, label: 'Günlük Kiralama', description: '1-30 gün arası kısa süreli kiralama' },
   { value: RentalType.WEEKLY, label: 'Haftalık Kiralama', description: '7+ gün avantajlı fiyatlandırma' },
   { value: RentalType.MONTHLY, label: 'Aylık Kiralama', description: '1-12 ay arası orta süreli kiralama' },
-  { value: RentalType.LEASING, label: 'Uzun Dönem Leasing', description: '12+ ay uzun dönem anlaşma', minDays: 365 }
+  { value: RentalType.LEASING, label: 'Uzun Dönem Leasing', description: '12+ ay uzun dönem anlaşma', minDays: 365 },
+  { value: RentalType.SERVICE, label: 'Servis Kiralama', description: 'Minibüs / personel taşıma servisi', minDays: 30 }
 ]
 
 async function fetchBranches() {
@@ -124,7 +135,7 @@ async function fetchBranches() {
 }
 
 
-const currentStepLabel = computed(() => wizardSteps.find((s) => s.id === currentStep.value)?.label ?? '')
+const currentStepLabel = computed(() => wizardSteps.value.find((s) => s.id === currentStep.value)?.label ?? '')
 
 const canProceed = computed(() => {
   switch (currentStep.value) {
@@ -139,13 +150,15 @@ const canProceed = computed(() => {
     case 5: return kmPackages.value.length === 0 || !!selectedKmPackageId.value
     case 6: return true
     case 7: return true
+    case 8: return !!createdRentalId.value
     default: return false
   }
 })
 
-const isLastStep = computed(() => currentStep.value === totalSteps)
+const isLastStep = computed(() => currentStep.value === totalSteps.value)
 
 const isLeasing = computed(() => rentalType.value === RentalType.LEASING)
+const isService = computed(() => rentalType.value === RentalType.SERVICE)
 
 function validateDates(): boolean {
   if (!startDate.value || !endDate.value) return false
@@ -162,7 +175,11 @@ function validateDates(): boolean {
 }
 
 function nextStep() {
-  if (currentStep.value < totalSteps && canProceed.value) {
+  if (currentStep.value === 7 && isService.value) {
+    void handleSubmit()
+    return
+  }
+  if (currentStep.value < totalSteps.value && canProceed.value) {
     currentStep.value++
   }
 }
@@ -199,6 +216,7 @@ function isStepComplete(step: number): boolean {
     case 5: return kmPackages.value.length === 0 || !!selectedKmPackageId.value
     case 6: return true
     case 7: return true
+    case 8: return !!createdRentalId.value
     default: return false
   }
 }
@@ -314,6 +332,11 @@ async function fetchKmPackages() {
 
 
 async function handleSubmit() {
+  if (isService.value && currentStep.value === 8 && createdRentalId.value) {
+    router.push(`/rentals/${createdRentalId.value}`)
+    return
+  }
+
   if (!canProceed.value || !selectedVehicleId.value || !selectedCustomerId.value) return
   if (selectedDriverIds.value.length === 0 || !primaryDriverId.value) {
     toast.error('Lütfen en az bir sürücü ve ana sürücü seçiniz')
@@ -368,6 +391,13 @@ async function handleSubmit() {
     }
 
     toast.success(`Kiralama #${rental.rentalNumber} başarıyla oluşturuldu`)
+
+    if (isService.value) {
+      createdRentalId.value = rental.id
+      currentStep.value = 8
+      return
+    }
+
     router.push(`/rentals/${rental.id}`)
   } catch (err) {
     toast.apiError(err, 'Kiralama oluşturulamadı')
@@ -377,6 +407,7 @@ async function handleSubmit() {
 }
 
 watch(rentalType, () => {
+  createdRentalId.value = null
   if (currentStep.value > 1) {
     selectedVehicleId.value = null
     selectedCustomerId.value = null
@@ -412,6 +443,10 @@ watch(selectedVehicleId, (newId) => {
 
 onMounted(() => {
   fetchBranches()
+  const qType = route.query.type
+  if (qType === 'SERVICE' || qType === RentalType.SERVICE) {
+    rentalType.value = RentalType.SERVICE
+  }
   const qCustomer = route.query.customerId
   if (qCustomer) {
     const id = Number(qCustomer)
@@ -463,7 +498,7 @@ function onWizardKeydown(e: KeyboardEvent) {
           Geri
         </RcButton>
         <RcButton
-          v-if="!isLastStep"
+          v-if="!isLastStep && !(currentStep === 7 && isService)"
           variant="accent"
           size="sm"
           :disabled="!canProceed"
@@ -471,6 +506,16 @@ function onWizardKeydown(e: KeyboardEvent) {
         >
           Devam et
           <RcKbd>↵</RcKbd>
+        </RcButton>
+        <RcButton
+          v-else-if="currentStep === 7 && isService"
+          variant="accent"
+          size="sm"
+          :disabled="!canProceed"
+          :loading="submitting"
+          @click="handleSubmit"
+        >
+          Oluştur ve belgeleri yükle
         </RcButton>
         <RcButton
           v-else
@@ -481,13 +526,13 @@ function onWizardKeydown(e: KeyboardEvent) {
           @click="handleSubmit"
         >
           <RcIcon name="check" :size="14" />
-          Kiralama oluştur
+          {{ isService ? 'Tamamla' : 'Kiralama oluştur' }}
         </RcButton>
       </template>
     </RcPageHeader>
 
     <RcStepper
-      :steps="[...wizardSteps]"
+      :steps="wizardSteps"
       :current="currentStep"
       clickable
       @select="goToStep"
@@ -555,12 +600,20 @@ function onWizardKeydown(e: KeyboardEvent) {
               <p class="rcr-create__card-hint">{{ startDate }} – {{ endDate }} arasında müsait araçlar.</p>
             </div>
           </div>
+          <div v-if="isService" class="rc-alert rc-alert--info" style="margin: 0 16px 12px">
+            <RcIcon name="info" :size="16" />
+            <span>
+              Servis kiralamasında yalnızca <strong>Servis / Minibüs</strong> kategorisindeki (veya 8+ koltuklu) araçlar listelenir.
+              Araç göremiyorsanız filo → yeni araç eklerken kategoriyi Servis / Minibüs seçin.
+            </span>
+          </div>
           <div class="rc-card__body">
             <VehicleSelector
               v-model="selectedVehicleId"
               :start-date="startDate"
               :end-date="endDate"
               :rental-type="rentalType"
+              :service-mode="isService"
               @vehicle-selected="handleVehicleSelected"
             />
           </div>
@@ -615,7 +668,9 @@ function onWizardKeydown(e: KeyboardEvent) {
                     <h4>{{ pkg.name }}</h4>
                     <RcIcon v-if="selectedKmPackageId === pkg.id" name="check" :size="16" />
                   </div>
-                  <div class="rcr-package-card__km rc-num">{{ pkg.includedKm?.toLocaleString('tr-TR') }} km</div>
+                  <div class="rcr-package-card__km rc-num">
+                    {{ formatIncludedKmDisplay(rentalType, pkg.includedKm ?? 0, totalDays, pkg.unlimited) }}
+                  </div>
                   <div class="rcr-package-card__meta">
                     Fazla: {{ formatCurrency(pkg.extraKmPrice) }}/km
                   </div>
@@ -756,6 +811,23 @@ function onWizardKeydown(e: KeyboardEvent) {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- Step 8: Servis belgeleri -->
+        <div v-else-if="currentStep === 8 && createdRentalId" class="rc-card">
+          <div class="rc-card__head">
+            <div>
+              <div class="rc-card__title">Servis belgeleri</div>
+              <p class="rcr-create__card-hint">Güzergah izni, yolcu listesi ve diğer servis belgelerini yükleyin.</p>
+            </div>
+          </div>
+          <div class="rc-card__body">
+            <DocumentsSection
+              reference-type="RENTAL"
+              :reference-id="createdRentalId"
+              title="Servis Kiralama Belgeleri"
+            />
           </div>
         </div>
       </div>

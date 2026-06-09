@@ -58,7 +58,8 @@ export enum RentalType {
     DAILY = 'DAILY',
     WEEKLY = 'WEEKLY',
     MONTHLY = 'MONTHLY',
-    LEASING = 'LEASING'
+    LEASING = 'LEASING',
+    SERVICE = 'SERVICE'
 }
 
 
@@ -79,6 +80,7 @@ export enum PaymentStatus {
 
 
 export enum Role {
+    SUPER_ADMIN = 'SUPER_ADMIN',
     ADMIN = 'ADMIN',
     OPERATOR = 'OPERATOR'
 }

@@ -21,6 +21,7 @@ export interface KmPackageInfo {
     includedKm: number
     extraKmPrice: number
     unlimited: boolean
+    totalIncludedKm?: number | null
 }
 
 export interface PriceCalculationRequest {

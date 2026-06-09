@@ -1,23 +1,40 @@
 import { formatPhoneInput, normalizePhoneDigits } from './phone'
 
+let appDefaultCurrency = 'TRY'
+
+export function setDefaultCurrency(currency: string): void {
+    appDefaultCurrency = currency?.trim().toUpperCase() || 'TRY'
+}
+
+export function getDefaultCurrency(): string {
+    return appDefaultCurrency
+}
+
 export function safeNumber(value: unknown, defaultValue = 0): number {
     if (value === null || value === undefined) return defaultValue
     const num = Number(value)
     return isNaN(num) ? defaultValue : num
 }
 
-export function formatCurrency(amount: unknown, currency = 'TRY'): string {
+export function formatCurrency(amount: unknown, currency?: string): string {
     const num = safeNumber(amount)
+    const resolvedCurrency = currency ?? appDefaultCurrency
     return new Intl.NumberFormat('tr-TR', {
         style: 'currency',
-        currency,
+        currency: resolvedCurrency,
         minimumFractionDigits: 2
     }).format(num)
 }
 
-/** Prototip fmtTRY — sembol + binlik ayırıcı, ondalık yok */
+/** Prototip fmtTRY — sembol + binlik ayırıcı, ondalık yok (varsayılan para birimi) */
 export function fmtTRY(amount: unknown): string {
-    return '₺' + safeNumber(amount).toLocaleString('tr-TR')
+    const num = safeNumber(amount)
+    return new Intl.NumberFormat('tr-TR', {
+        style: 'currency',
+        currency: appDefaultCurrency,
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+    }).format(num)
 }
 
 /** Prototip fmtNum — TR locale sayı formatı */

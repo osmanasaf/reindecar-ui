@@ -33,6 +33,7 @@ const rentalTypes: RentalTypeOption[] = [
   { value: RentalType.WEEKLY, label: 'Haftalık', icon: '📆', description: '7–29 gün', advantage: 'Haftalık fiyat avantajı', minDays: 7, maxDays: 29 },
   { value: RentalType.MONTHLY, label: 'Aylık', icon: '🗓️', description: '1–11 ay', advantage: 'Aylık fiyat avantajı', minDays: 30, maxDays: 364 },
   { value: RentalType.LEASING, label: 'Leasing', icon: '📋', description: '12+ ay', advantage: 'Kurumsal uzun dönem', minDays: 365 },
+  { value: RentalType.SERVICE, label: 'Servis', icon: '🚌', description: 'Minibüs / shuttle', advantage: 'Personel taşıma servisi', minDays: 30 },
 ]
 
 const selectedType = computed(() => rentalTypes.find((t) => t.value === props.modelValue))

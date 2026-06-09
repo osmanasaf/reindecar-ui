@@ -32,6 +32,7 @@ import {
 } from '@/components/rc'
 import { PaymentStatus } from '@/types/enums'
 import { fmtTRY } from '@/utils/format'
+import { resolveEffectiveIncludedKm } from '@/utils/km'
 import type { Rental, RentalType, Vehicle, Customer, Branch, RentalDriver, KmPackage, Payment, PenaltyResponse, DamageReport, TollRecord, DamageHistoryItem, RentalExtraItem } from '@/types'
 import DocumentsSection from '@/components/shared/DocumentsSection.vue'
 
@@ -144,6 +145,7 @@ const typeLabels: Record<RentalType, string> = {
   WEEKLY: 'Haftalık',
   MONTHLY: 'Aylık',
   LEASING: 'Leasing',
+  SERVICE: 'Servis',
 }
 
 function handleAction(kind: RentalActionKind) {
@@ -378,6 +380,16 @@ const canCloseRental = computed(() => isPendingPayment.value && remainingAmount.
 
 const existingDriverIds = computed(() => drivers.value.map((d) => d.driverId))
 
+const effectiveIncludedKm = computed(() => {
+  if (!rental.value) return 0
+  return resolveEffectiveIncludedKm({
+    customIncludedKm: rental.value.customIncludedKm,
+    perPeriodKm: kmPackage.value?.includedKm,
+    rentalType: rental.value.rentalType,
+    totalDays: rental.value.totalDays,
+  })
+})
+
 async function fetchRental() {
   loading.value = true
   try {
@@ -471,7 +483,6 @@ function handleStartReturn() {
 
 function handleReturnCompleted(updatedRental: Rental) {
   rental.value = updatedRental
-  showReturnModal.value = false
   fetchRental()
 }
 
@@ -823,9 +834,9 @@ onActivated(() => {
           </div>
         </div>
 
-        <!-- KM -->
+        <!-- KM & Yakıt -->
         <div v-show="activeTab === 'km'" class="rc-card rcr-panel-card">
-          <h3 class="rcr-panel-card__title">Kilometre</h3>
+          <h3 class="rcr-panel-card__title">Kilometre & Yakıt</h3>
             <div class="km-grid">
               <div class="km-item">
                 <span class="label">Başlangıç KM</span>
@@ -849,6 +860,30 @@ onActivated(() => {
               </div>
             </div>
 
+            <div v-if="rental.startFuelLiters != null || rental.endFuelLiters != null" class="km-grid" style="margin-top: 16px">
+              <div class="km-item">
+                <span class="label">Çıkış depo</span>
+                <span class="value">
+                  {{ rental.startFuelLiters != null ? `${rental.startFuelLiters.toLocaleString('tr-TR')} L` : '-' }}
+                </span>
+              </div>
+              <div class="km-item">
+                <span class="label">İade depo</span>
+                <span class="value">
+                  {{ rental.endFuelLiters != null ? `${rental.endFuelLiters.toLocaleString('tr-TR')} L` : '-' }}
+                </span>
+              </div>
+              <div
+                v-if="rental.startFuelLiters != null && rental.endFuelLiters != null && rental.startFuelLiters > rental.endFuelLiters"
+                class="km-item total"
+              >
+                <span class="label">Depo farkı</span>
+                <span class="value text-danger">
+                  {{ (rental.startFuelLiters - rental.endFuelLiters).toLocaleString('tr-TR') }} L
+                </span>
+              </div>
+            </div>
+
             <div v-if="kmPackage || rental.customIncludedKm" class="km-package-info">
                 <div class="package-header">
                     <h4>KM Paketi: {{ kmPackage?.name || 'Özel Paket' }}</h4>
@@ -856,7 +891,7 @@ onActivated(() => {
                 <div class="package-details-grid">
                     <div class="detail-item">
                         <span class="label">Dahil Olan</span>
-                        <span class="value">{{ formatKm(rental.customIncludedKm || kmPackage?.includedKm || 0) }}</span>
+                        <span class="value">{{ formatKm(effectiveIncludedKm) }}</span>
                     </div>
                     <div class="detail-item">
                         <span class="label">Aşım Ücreti</span>
@@ -864,7 +899,7 @@ onActivated(() => {
                     </div>
                      <div class="detail-item">
                         <span class="label">Kullanılan</span>
-                        <span class="value" :class="{ 'text-danger': (rental.totalKm > (rental.customIncludedKm || kmPackage?.includedKm || 0)) }">
+                        <span class="value" :class="{ 'text-danger': rental.totalKm > effectiveIncludedKm }">
                             {{ formatKm(rental.totalKm) }}
                         </span>
                     </div>

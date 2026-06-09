@@ -19,6 +19,8 @@ export interface VehicleRecognitionResult {
     color: string | null
     bodyType: string | null
     plateNumber: string | null
+    vinNumber?: string | null
+    engineCapacity?: number | null
     confidence: number
     recognized: boolean
 }
@@ -30,11 +32,18 @@ class VehiclesApiService extends BaseApi {
         return this.get('/overview')
     }
 
-    async getAll(params?: PaginationParams): Promise<PaginatedResponse<Vehicle>> {
+    async getAll(params?: PaginationParams & {
+        categoryId?: number
+        status?: VehicleStatus
+        branchId?: number
+    }): Promise<PaginatedResponse<Vehicle>> {
         return this.getList<Vehicle>('', params)
     }
 
-    async getByStatus(status: VehicleStatus, params?: PaginationParams): Promise<PaginatedResponse<Vehicle>> {
+    async getByStatus(
+        status: VehicleStatus,
+        params?: PaginationParams & { categoryId?: number; branchId?: number }
+    ): Promise<PaginatedResponse<Vehicle>> {
         return this.getList<Vehicle>(`/status/${status}`, params)
     }
 
@@ -47,8 +56,16 @@ class VehiclesApiService extends BaseApi {
         return this.get('/available')
     }
 
-    async getAvailableForPeriod(startDate: string, endDate: string): Promise<Vehicle[]> {
-        const response = await this.getList<Vehicle>('/available-for-period', { startDate, endDate } as any)
+    async getAvailableForPeriod(
+        startDate: string,
+        endDate: string,
+        params?: PaginationParams & { categoryId?: number; branchId?: number }
+    ): Promise<PaginatedResponse<Vehicle>> {
+        return this.getList<Vehicle>('/available-for-period', { startDate, endDate, ...params } as PaginationParams)
+    }
+
+    async getAvailableForPeriodList(startDate: string, endDate: string): Promise<Vehicle[]> {
+        const response = await this.getAvailableForPeriod(startDate, endDate)
         return response.content
     }
 
@@ -96,6 +113,12 @@ class VehiclesApiService extends BaseApi {
         const formData = new FormData()
         formData.append('file', file)
         return this.postFormData(formData, '/recognize')
+    }
+
+    async recognizeRegistration(file: File): Promise<VehicleRecognitionResult> {
+        const formData = new FormData()
+        formData.append('file', file)
+        return this.postFormData(formData, '/recognize-registration')
     }
 
     async uploadImage(vehicleId: number, file: File): Promise<string> {

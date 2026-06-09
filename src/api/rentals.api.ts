@@ -80,8 +80,17 @@ class RentalsApiService extends BaseApi {
         return this.post(`/${id}/start-return`)
     }
 
-    async previewReturn(id: number, endKm: number, actualReturnDate: string): Promise<ReturnPreviewResponse> {
-        return this.get(`/${id}/return-preview`, { endKm, actualReturnDate })
+    async previewReturn(
+        id: number,
+        endKm: number,
+        actualReturnDate: string,
+        endFuelLiters?: number,
+    ): Promise<ReturnPreviewResponse> {
+        const params: Record<string, unknown> = { endKm, actualReturnDate }
+        if (endFuelLiters != null) {
+            params.endFuelLiters = endFuelLiters
+        }
+        return this.get(`/${id}/return-preview`, params)
     }
 
     async complete(id: number, form: VehicleReturnForm): Promise<Rental> {
@@ -94,6 +103,10 @@ class RentalsApiService extends BaseApi {
 
     async closeRental(id: number): Promise<Rental> {
         return this.post(`/${id}/close`, {})
+    }
+
+    async downloadHandoverPdf(id: number): Promise<Blob> {
+        return this.getBlob(`/${id}/handover-pdf`)
     }
 
     async downloadCompletionPdf(id: number): Promise<Blob> {

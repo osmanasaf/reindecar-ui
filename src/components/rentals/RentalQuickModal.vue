@@ -27,6 +27,7 @@ const typeLabels: Record<RentalType, string> = {
   WEEKLY: 'Haftalık',
   MONTHLY: 'Aylık',
   LEASING: 'Leasing',
+  SERVICE: 'Servis',
 }
 
 const lifecycleStages = [

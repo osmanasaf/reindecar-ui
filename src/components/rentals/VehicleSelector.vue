@@ -9,9 +9,12 @@ interface Props {
   endDate: string
   rentalType: RentalType
   modelValue: number | null
+  serviceMode?: boolean
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  serviceMode: false,
+})
 
 const emit = defineEmits<{
   'update:modelValue': [value: number | null]
@@ -24,6 +27,23 @@ const categories = ref<VehicleCategory[]>([])
 const searchQuery = ref('')
 const selectedCategoryId = ref<number | null>(null)
 
+const serviceCategoryId = computed(() => {
+  const match = categories.value.find(
+    (c) =>
+      c.code?.toUpperCase() === 'SERVIS' ||
+      c.name.toLowerCase().includes('servis') ||
+      c.name.toLowerCase().includes('minibüs')
+  )
+  return match?.id ?? null
+})
+
+const effectiveCategoryId = computed(() => {
+  if (props.serviceMode && serviceCategoryId.value) {
+    return serviceCategoryId.value
+  }
+  return selectedCategoryId.value
+})
+
 const categoryOptions = computed(() => [
   ...categories.value.map(c => ({ value: c.id as number, label: c.name }))
 ])
@@ -31,8 +51,11 @@ const categoryOptions = computed(() => [
 const filteredVehicles = computed(() => {
   let result = vehicles.value
 
-  if (selectedCategoryId.value) {
-    result = result.filter(v => v.categoryId === selectedCategoryId.value)
+  if (effectiveCategoryId.value) {
+    result = result.filter(v => v.categoryId === effectiveCategoryId.value)
+  } else if (props.serviceMode) {
+    // Kategori yoksa minibüs benzeri araçları koltuk sayısına göre göster
+    result = result.filter(v => v.seatCount >= 8)
   }
 
   if (searchQuery.value.trim()) {
@@ -55,10 +78,20 @@ const selectedVehicle = computed(() => {
 async function fetchVehicles() {
   loading.value = true
   try {
+    const categoryParams = effectiveCategoryId.value
+      ? { categoryId: effectiveCategoryId.value, size: 100 }
+      : { size: 100 }
+
     if (props.startDate && props.endDate) {
-      vehicles.value = await vehiclesApi.getAvailableForPeriod(props.startDate, props.endDate)
+      const response = await vehiclesApi.getAvailableForPeriod(
+        props.startDate,
+        props.endDate,
+        categoryParams
+      )
+      vehicles.value = response.content
     } else {
-      vehicles.value = await vehiclesApi.getAvailable()
+      const response = await vehiclesApi.getAll({ ...categoryParams, page: 0 })
+      vehicles.value = response.content.filter(v => v.status === 'AVAILABLE' || v.status === 'RESERVED')
     }
   } catch {
     vehicles.value = []
@@ -117,6 +150,7 @@ const priceUnitLabel = computed(() => {
   switch (props.rentalType) {
     case 'LEASING':
     case 'MONTHLY':
+    case 'SERVICE':
       return '/ ay'
     case 'WEEKLY':
       return '/ hafta'
@@ -131,6 +165,7 @@ function getVehiclePrice(vehicle: Vehicle): number {
   switch (props.rentalType) {
     case 'LEASING':
     case 'MONTHLY':
+    case 'SERVICE':
       return vehicle.monthlyPrice ?? baseDailyPrice * 30
     case 'WEEKLY':
       return vehicle.weeklyPrice ?? baseDailyPrice * 7
@@ -145,7 +180,20 @@ onMounted(() => {
   fetchVehicles()
 })
 
-watch([() => props.startDate, () => props.endDate], () => {
+watch(() => props.serviceMode, (mode) => {
+  if (mode && serviceCategoryId.value) {
+    selectedCategoryId.value = serviceCategoryId.value
+  }
+}, { immediate: true })
+
+watch(serviceCategoryId, (id) => {
+  if (props.serviceMode && id) {
+    selectedCategoryId.value = id
+    fetchVehicles()
+  }
+})
+
+watch([() => props.startDate, () => props.endDate, () => props.serviceMode], () => {
   if (props.startDate && props.endDate) {
     fetchVehicles()
   }
@@ -164,6 +212,7 @@ watch([() => props.startDate, () => props.endDate], () => {
           />
         </div>
         <SearchableSelect
+          v-if="!serviceMode"
           v-model="selectedCategoryId"
           :options="categoryOptions"
           placeholder="Tüm Kategoriler"
@@ -171,6 +220,9 @@ watch([() => props.startDate, () => props.endDate], () => {
           clearable
           class="category-filter-searchable"
         />
+        <span v-else-if="serviceCategoryId" class="rcr-service-category-badge">
+          Kategori: {{ categories.find(c => c.id === serviceCategoryId)?.name }}
+        </span>
       </div>
       <div class="result-count">
         {{ filteredVehicles.length }} araç bulundu
@@ -223,6 +275,7 @@ watch([() => props.startDate, () => props.endDate], () => {
               <span>{{ vehicle.year }}</span>
               <span>{{ fuelTypeLabels[vehicle.fuelType] }}</span>
               <span>{{ transmissionLabels[vehicle.transmission] }}</span>
+              <span v-if="vehicle.seatCount">{{ vehicle.seatCount }} koltuk</span>
             </div>
             <div class="meta">
               <span class="km">{{ formatKm(vehicle.currentKm) }}</span>
@@ -238,8 +291,36 @@ watch([() => props.startDate, () => props.endDate], () => {
       </template>
 
       <div v-else class="empty-state">
-        <p>Kriterlere uygun araç bulunamadı</p>
+        <p v-if="serviceMode">
+          Bu tarihlerde servis/minibüs aracı bulunamadı.
+        </p>
+        <p v-else>Kriterlere uygun araç bulunamadı</p>
+        <p v-if="serviceMode" class="empty-hint">
+          Araç eklerken kategoriyi <strong>Servis / Minibüs</strong> yapın veya
+          Ayarlar → Kategoriler'den bu kategoriyi oluşturun.
+        </p>
       </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+.rcr-service-category-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: var(--rc-r-8);
+  background: var(--rc-blue-50);
+  color: var(--rc-blue-700);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.empty-hint {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--rc-text-muted);
+  max-width: 420px;
+  line-height: 1.5;
+}
+</style>

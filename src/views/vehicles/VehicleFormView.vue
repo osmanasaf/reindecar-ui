@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { vehiclesApi, vehicleCategoriesApi, branchesApi, referenceDataApi } from '@/api'
+import { vehiclesApi, vehicleCategoriesApi, branchesApi, referenceDataApi, filesApi } from '@/api'
 import { useValidation, rules, useToast, useReferenceData } from '@/composables'
 import { SearchableSelect } from '@/components/common'
 import DatePicker from '@/components/base/DatePicker.vue'
@@ -11,6 +11,8 @@ import { isErrorResponse } from '@/utils/error'
 import { FuelType, Transmission } from '@/types'
 import type { CreateVehicleForm, UpdateVehicleForm, VehicleCategory, Branch, Vehicle } from '@/types'
 import type { VehicleRecognitionResult } from '@/api/vehicles.api'
+import type { FileUploadType } from '@/api/files.api'
+import DocumentsSection from '@/components/shared/DocumentsSection.vue'
 import { RcPageHeader, RcButton, RcField, RcInput, RcDetailSkeleton } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
 
@@ -256,6 +258,82 @@ function isBranchAvailabilityError(error: unknown): boolean {
   return false
 }
 
+function isServisCategoryId(categoryId: number): boolean {
+  const cat = categories.value.find((c) => c.id === categoryId)
+  if (!cat) return false
+  return (
+    cat.code?.toUpperCase() === 'SERVIS' ||
+    cat.name.toLowerCase().includes('servis') ||
+    cat.name.toLowerCase().includes('minibüs')
+  )
+}
+
+const isServisCategory = computed(() => isServisCategoryId(form.value.categoryId))
+
+const vehicleId = computed(() => (isEditMode.value ? Number(route.params.id) : null))
+
+type VehicleDocKey = 'registration' | 'insurance' | 'inspection' | 'transport'
+
+interface VehicleDocSlot {
+  key: VehicleDocKey
+  label: string
+  hint: string
+  uploadType: FileUploadType
+  icon: 'receipt' | 'shield' | 'wrench' | 'folder'
+  servisOnly?: boolean
+}
+
+const vehicleDocSlots = computed<VehicleDocSlot[]>(() => {
+  const slots: VehicleDocSlot[] = [
+    {
+      key: 'registration',
+      label: 'Ruhsat',
+      hint: 'Tescil belgesi',
+      uploadType: 'VEHICLE_REGISTRATION',
+      icon: 'receipt',
+    },
+    {
+      key: 'insurance',
+      label: 'Sigorta poliçesi',
+      hint: 'Trafik veya kasko poliçesi',
+      uploadType: 'INSURANCE_POLICY',
+      icon: 'shield',
+    },
+    {
+      key: 'inspection',
+      label: 'Muayene belgesi',
+      hint: 'Geçerli muayene kaydı',
+      uploadType: 'VEHICLE_INSPECTION',
+      icon: 'wrench',
+    },
+  ]
+  if (isServisCategory.value) {
+    slots.push({
+      key: 'transport',
+      label: 'Taşımacılık belgesi',
+      hint: 'D2 / servis taşımacılık izni',
+      uploadType: 'LICENSE_DOCUMENT',
+      icon: 'folder',
+      servisOnly: true,
+    })
+  }
+  return slots
+})
+
+watch(
+  () => form.value.categoryId,
+  (newId, oldId) => {
+    if (!newId || newId === oldId || !isServisCategoryId(newId)) return
+    if (form.value.seatCount <= 5) {
+      form.value.seatCount = 16
+    }
+    const cat = categories.value.find((c) => c.id === newId)
+    if (cat?.defaultDailyPrice && !form.value.dailyPrice) {
+      form.value.dailyPrice = cat.defaultDailyPrice
+    }
+  }
+)
+
 async function fetchData() {
   loading.value = true
   try {
@@ -329,6 +407,23 @@ async function fetchData() {
   }
 }
 
+async function uploadPendingDocuments(vehicleId: number) {
+  const pending = vehicleDocSlots.value
+    .map((slot) => ({
+      slot,
+      file: docFiles.value[slot.key],
+    }))
+    .filter((item): item is { slot: VehicleDocSlot; file: File } => item.file instanceof File)
+
+  for (const { slot, file } of pending) {
+    try {
+      await filesApi.upload(file, 'VEHICLE', vehicleId, slot.uploadType)
+    } catch {
+      toast.error(`${slot.label} yüklenemedi`)
+    }
+  }
+}
+
 async function handleSubmit() {
   if (!validateForm(formRules.value)) {
     toast.error('Lütfen formdaki hataları düzeltin')
@@ -348,6 +443,7 @@ async function handleSubmit() {
           toast.error('Araç güncellendi fakat görsel yüklenemedi')
         }
       }
+      await uploadPendingDocuments(updated.id)
       toast.success('Araç başarıyla güncellendi')
     } else {
       const created = await vehiclesApi.create(buildCreatePayload())
@@ -358,6 +454,7 @@ async function handleSubmit() {
           toast.error('Araç eklendi fakat görsel yüklenemedi')
         }
       }
+      await uploadPendingDocuments(created.id)
       toast.success('Araç başarıyla eklendi')
     }
     router.push('/vehicles')
@@ -381,6 +478,55 @@ const photoPreview = ref<string | null>(null)
 const recognizing = ref(false)
 const recognitionResult = ref<VehicleRecognitionResult | null>(null)
 const photoInputRef = ref<HTMLInputElement | null>(null)
+
+const docFiles = ref<Partial<Record<VehicleDocKey, File | null>>>({})
+const docPreviews = ref<Partial<Record<VehicleDocKey, string | null>>>({})
+const docInputRefs = ref<Partial<Record<VehicleDocKey, HTMLInputElement | null>>>({})
+
+function handleDocChange(key: VehicleDocKey, event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  docFiles.value[key] = file
+  docPreviews.value[key] = file.type.startsWith('image/') ? URL.createObjectURL(file) : null
+}
+
+function removeDoc(key: VehicleDocKey) {
+  docFiles.value[key] = null
+  docPreviews.value[key] = null
+  const input = docInputRefs.value[key]
+  if (input) input.value = ''
+}
+
+watch(isServisCategory, (isServis) => {
+  if (!isServis) {
+    removeDoc('transport')
+  }
+})
+
+const vinScanInputRef = ref<HTMLInputElement | null>(null)
+const scanningVin = ref(false)
+
+async function handleVinScan(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  scanningVin.value = true
+  try {
+    const result = await vehiclesApi.recognizeRegistration(file)
+    if (result.vinNumber) {
+      form.value.vinNumber = result.vinNumber.toUpperCase()
+      toast.success('Şasi numarası fotoğraftan okundu. Lütfen kontrol edin.')
+    } else {
+      toast.error('Şasi numarası okunamadı. Daha net bir fotoğraf deneyin veya elle girin.')
+    }
+  } catch {
+    toast.error('Fotoğraf analizi sırasında hata oluştu')
+  } finally {
+    scanningVin.value = false
+    if (vinScanInputRef.value) vinScanInputRef.value.value = ''
+  }
+}
 
 function handlePhotoChange(event: Event) {
   const input = event.target as HTMLInputElement
@@ -464,7 +610,7 @@ async function applyRecognitionResult(result: VehicleRecognitionResult) {
     form.value.year = result.year
   }
 
-  if (result.plateNumber) {
+  if (result.plateNumber && !form.value.plateNumber) {
     form.value.plateNumber = formatPlateInput(result.plateNumber)
   }
 }
@@ -548,11 +694,33 @@ onMounted(fetchData)
           </RcField>
 
           <RcField label="Şasi No (VIN)" required :error="getError('vinNumber')">
-            <RcInput
-              v-model="form.vinNumber"
-              maxlength="17"
-              placeholder="17 karakterli VIN"
-              @blur="handleBlur('vinNumber')"
+            <div class="vin-input-wrap">
+              <RcInput
+                v-model="form.vinNumber"
+                maxlength="17"
+                placeholder="17 karakterli VIN"
+                @blur="handleBlur('vinNumber')"
+              />
+              <button
+                type="button"
+                class="vin-scan-btn"
+                :disabled="scanningVin"
+                :title="scanningVin ? 'Okunuyor…' : 'Fotoğraftan şasi numarası oku'"
+                @click="vinScanInputRef?.click()"
+              >
+                <span v-if="scanningVin" class="vin-scan-spinner" />
+                <RcIcon v-else name="camera" :size="18" />
+              </button>
+            </div>
+            <span class="vin-scan-hint">
+              <RcIcon name="camera" :size="13" /> ile şasi numarasını fotoğraftan okutabilirsiniz
+            </span>
+            <input
+              ref="vinScanInputRef"
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              class="photo-file-input"
+              @change="handleVinScan"
             />
           </RcField>
 
@@ -660,6 +828,7 @@ onMounted(fetchData)
               @blur="handleBlur('seatCount')"
             />
             <span class="error-text">{{ getError('seatCount') }}</span>
+            <span v-if="isServisCategory" class="help-text">Servis/minibüs için genelde 8+ koltuk girilir</span>
           </div>
 
           <div class="form-group" :class="{ error: hasError('currentKm') }">
@@ -689,6 +858,9 @@ onMounted(fetchData)
               @blur="handleBlur('categoryId')"
             />
             <span class="error-text">{{ getError('categoryId') }}</span>
+            <p v-if="isServisCategory" class="category-hint">
+              Servis kategorisi seçildi — bu araç <strong>Kiralamalar → Servis</strong> akışında listelenir.
+            </p>
           </div>
 
           <div class="form-group" :class="{ error: hasError('branchId') }">
@@ -722,7 +894,7 @@ onMounted(fetchData)
             <span class="error-text">{{ getError('dailyPrice') }}</span>
           </div>
 
-          <div class="form-group">
+          <div v-if="!isServisCategory" class="form-group">
             <label>Haftalık Fiyat (TL)</label>
             <input 
               v-model.number="form.weeklyPrice" 
@@ -734,7 +906,7 @@ onMounted(fetchData)
             <span class="help-text">Boş bırakılırsa günlük fiyat × 7 kullanılır</span>
           </div>
 
-          <div class="form-group">
+          <div class="form-group" :class="{ 'form-group--highlight': isServisCategory }">
             <label>Aylık Fiyat (TL)</label>
             <input 
               v-model.number="form.monthlyPrice" 
@@ -743,55 +915,119 @@ onMounted(fetchData)
               step="0.01"
               placeholder="30000.00"
             />
-            <span class="help-text">Boş bırakılırsa günlük fiyat × 30 kullanılır</span>
+            <span class="help-text">
+              {{ isServisCategory ? 'Servis kiralamasında aylık fiyat kullanılır' : 'Boş bırakılırsa günlük fiyat × 30 kullanılır' }}
+            </span>
           </div>
         </div>
       </section>
       <section class="form-section">
-        <h3>Tarihler</h3>
-        <div class="form-grid">
-          <div class="form-group" :class="{ error: hasError('registrationDate') }">
+        <h3>Araç belgeleri</h3>
+        <p class="section-hint">
+          Ruhsat, sigorta ve muayene belgelerini yükleyin. Tarihler hatırlatma ve takip için kullanılır.
+          <template v-if="isServisCategory"> Servis araçları için taşımacılık belgesi de eklenebilir.</template>
+        </p>
+
+        <div v-if="isEditMode && vehicleId" class="veh-docs-existing">
+          <DocumentsSection
+            reference-type="VEHICLE"
+            :reference-id="vehicleId"
+            title="Kayıtlı belgeler"
+          />
+          <p class="section-hint section-hint--divider">Yeni belge eklemek için aşağıdan seçin veya tarihleri güncelleyin.</p>
+        </div>
+
+        <div class="doc-upload-grid">
+          <div
+            v-for="slot in vehicleDocSlots"
+            :key="slot.key"
+            class="doc-slot"
+            :class="{ 'doc-slot--filled': docFiles[slot.key] }"
+          >
+            <div class="doc-slot__head">
+              <RcIcon :name="slot.icon" :size="18" />
+              <div>
+                <strong>{{ slot.label }}</strong>
+                <span>{{ slot.hint }}</span>
+              </div>
+            </div>
+
+            <template v-if="docPreviews[slot.key]">
+              <img :src="docPreviews[slot.key]!" class="doc-slot__preview" :alt="slot.label" />
+            </template>
+            <div v-else-if="docFiles[slot.key]" class="doc-slot__file">
+              <RcIcon name="folder" :size="20" />
+              <span>{{ docFiles[slot.key]?.name }}</span>
+            </div>
+            <button
+              v-else
+              type="button"
+              class="doc-slot__pick"
+              @click="docInputRefs[slot.key]?.click()"
+            >
+              <RcIcon name="upload" :size="16" />
+              Belge seç
+            </button>
+
+            <div v-if="docFiles[slot.key]" class="doc-slot__actions">
+              <RcButton type="button" variant="ghost" size="sm" @click="removeDoc(slot.key)">
+                Kaldır
+              </RcButton>
+            </div>
+
+            <input
+              :ref="(el) => { docInputRefs[slot.key] = el as HTMLInputElement | null }"
+              type="file"
+              accept="image/jpeg,image/png,image/webp,application/pdf"
+              class="photo-file-input"
+              @change="handleDocChange(slot.key, $event)"
+            />
+          </div>
+        </div>
+
+        <h4 class="subsection-title">Belge tarihleri</h4>
+        <div class="form-grid form-grid--3">
+          <div class="form-group date-field" :class="{ error: hasError('registrationDate') }">
             <DatePicker
               v-model="form.registrationDate"
-              label="Tescil Tarihi *"
-              placeholder="Tescil tarihi"
+              label="Tescil tarihi *"
+              placeholder="gg.aa.yyyy"
               @closed="handleBlur('registrationDate')"
             />
             <span class="error-text">{{ getError('registrationDate') }}</span>
           </div>
 
-          <div class="form-group" :class="{ error: hasError('insuranceExpiryDate') }">
+          <div class="form-group date-field" :class="{ error: hasError('insuranceExpiryDate') }">
             <DatePicker
               v-model="form.insuranceExpiryDate"
-              label="Sigorta Bitiş Tarihi *"
-              placeholder="Sigorta bitiş tarihi"
+              label="Sigorta bitiş *"
+              placeholder="gg.aa.yyyy"
               @closed="handleBlur('insuranceExpiryDate')"
             />
             <span class="error-text">{{ getError('insuranceExpiryDate') }}</span>
           </div>
 
-          <div class="form-group" :class="{ error: hasError('inspectionExpiryDate') }">
+          <div class="form-group date-field" :class="{ error: hasError('inspectionExpiryDate') }">
             <DatePicker
               v-model="form.inspectionExpiryDate"
-              label="Muayene Bitiş Tarihi *"
-              placeholder="Muayene bitiş tarihi"
+              label="Muayene bitiş *"
+              placeholder="gg.aa.yyyy"
               @closed="handleBlur('inspectionExpiryDate')"
             />
             <span class="error-text">{{ getError('inspectionExpiryDate') }}</span>
           </div>
         </div>
-      </section>
-      <section class="form-section">
-        <h3>Ek Bilgiler</h3>
-        <div class="form-group full-width">
+
+        <div class="form-group full-width notes-field">
           <label>Notlar</label>
-          <textarea 
-            v-model="form.notes" 
-            rows="4"
-            placeholder="Araç hakkında ek notlar..."
-          ></textarea>
+          <textarea
+            v-model="form.notes"
+            rows="3"
+            placeholder="Araç hakkında ek notlar…"
+          />
         </div>
       </section>
+
       <div class="form-actions">
         <RcButton variant="secondary" type="button" @click="router.back()">İptal</RcButton>
         <RcButton variant="accent" type="submit" :loading="loading">
@@ -803,9 +1039,30 @@ onMounted(fetchData)
 </template>
 
 <style scoped>
+.category-hint {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-radius: var(--rc-r-6);
+  background: var(--rc-blue-50);
+  color: var(--rc-blue-700);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .photo-recognition-section {
   background: var(--rc-blue-50);
   border: 1px dashed var(--rc-blue-300);
+}
+
+.registration-section {
+  background: var(--rc-success-50);
+  border: 1px dashed var(--rc-success-300);
+}
+
+.registration-hint {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--rc-text-muted);
 }
 
 .photo-dropzone {
@@ -884,6 +1141,69 @@ onMounted(fetchData)
 
 .photo-file-input {
   display: none;
+}
+
+.vin-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.vin-input-wrap :deep(.rc-input) {
+  width: 100%;
+  padding-right: 42px;
+}
+
+.vin-scan-btn {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: var(--rc-r-6);
+  background: transparent;
+  color: var(--rc-text-muted);
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--rc-dur-fast), color var(--rc-dur-fast);
+}
+
+.vin-scan-btn:hover:not(:disabled) {
+  background: var(--rc-blue-50);
+  color: var(--rc-blue-600);
+}
+
+.vin-scan-btn:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.vin-scan-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--rc-border);
+  border-top-color: var(--rc-blue-500);
+  border-radius: 50%;
+  animation: vin-scan-spin 0.7s linear infinite;
+}
+
+@keyframes vin-scan-spin {
+  to { transform: rotate(360deg); }
+}
+
+.vin-scan-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--rc-text-muted);
 }
 
 @media (max-width: 768px) {

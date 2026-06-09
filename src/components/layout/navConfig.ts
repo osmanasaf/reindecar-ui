@@ -125,7 +125,9 @@ export function userInitials(fullName: string): string {
 }
 
 export function roleLabel(role: string | undefined): string {
+  if (role === 'SUPER_ADMIN') return 'Süper Yönetici'
   if (role === 'ADMIN') return 'Yönetici'
+  if (role === 'OPERATOR') return 'Operatör'
   if (role === 'USER') return 'Kullanıcı'
   return role ?? ''
 }

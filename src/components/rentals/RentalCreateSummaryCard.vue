@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { RcBadge } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
 import { fmtTRY } from '@/utils/format'
+import { formatIncludedKmDisplay } from '@/utils/km'
 import type { RentalType, KmPackage } from '@/types'
 
 const props = defineProps<{
@@ -60,6 +61,16 @@ const rows = computed((): SumRow[] => {
     {
       label: 'KM paketi',
       value: props.kmPackage?.name || '—',
+      sub: props.kmPackage && !props.kmPackage.unlimited
+        ? formatIncludedKmDisplay(
+            props.rentalType,
+            props.kmPackage.includedKm,
+            props.totalDays,
+            props.kmPackage.unlimited,
+          )
+        : props.kmPackage?.unlimited
+          ? 'Sınırsız KM'
+          : undefined,
       done: props.currentStep >= 5,
     },
     {

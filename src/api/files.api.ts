@@ -14,8 +14,10 @@ export type FileUploadType =
     | 'LICENSE_DOCUMENT'
     | 'HANDOVER_PHOTO'
     | 'HANDOVER_VIDEO'
+    | 'HANDOVER_PROTOCOL'
     | 'RETURN_PHOTO'
     | 'RETURN_VIDEO'
+    | 'RETURN_PROTOCOL'
     | 'SIGNED_CONTRACT'
     | 'LEASE_CONTRACT'
     | 'DAMAGE_PHOTO'
@@ -24,6 +26,8 @@ export type FileUploadType =
     | 'ACCIDENT_REPORT'
     | 'POLICE_REPORT'
     | 'MAINTENANCE_INVOICE'
+    | 'SERVICE_ROUTE_PERMIT'
+    | 'PASSENGER_LIST'
     | 'PROFILE_PHOTO'
     | 'OTHER'
 
@@ -36,11 +40,13 @@ export const FILE_UPLOAD_TYPE_LABELS: Record<FileUploadType, string> = {
     VEHICLE_REGISTRATION: 'Araç Ruhsatı',
     VEHICLE_INSPECTION: 'Muayene Belgesi',
     INSURANCE_POLICY: 'Sigorta Poliçesi',
-    LICENSE_DOCUMENT: 'Lisans Belgesi',
+    LICENSE_DOCUMENT: 'Taşımacılık / D2 Belgesi',
     HANDOVER_PHOTO: 'Teslim Fotoğrafı',
     HANDOVER_VIDEO: 'Teslim Videosu',
+    HANDOVER_PROTOCOL: 'Teslim Tutanağı',
     RETURN_PHOTO: 'İade Fotoğrafı',
     RETURN_VIDEO: 'İade Videosu',
+    RETURN_PROTOCOL: 'İade / Tamamlama Tutanağı',
     SIGNED_CONTRACT: 'İmzalı Sözleşme',
     LEASE_CONTRACT: 'Leasing Sözleşmesi',
     DAMAGE_PHOTO: 'Hasar Fotoğrafı',
@@ -49,6 +55,8 @@ export const FILE_UPLOAD_TYPE_LABELS: Record<FileUploadType, string> = {
     ACCIDENT_REPORT: 'Kaza Tutanağı',
     POLICE_REPORT: 'Trafik Kazası Tespit Tutanağı',
     MAINTENANCE_INVOICE: 'Bakım Faturası',
+    SERVICE_ROUTE_PERMIT: 'Servis Güzergah İzni',
+    PASSENGER_LIST: 'Yolcu Listesi',
     PROFILE_PHOTO: 'Profil Fotoğrafı',
     OTHER: 'Diğer',
 }
@@ -56,7 +64,7 @@ export const FILE_UPLOAD_TYPE_LABELS: Record<FileUploadType, string> = {
 export const ALLOWED_TYPES_BY_REFERENCE: Record<FileReferenceType, FileUploadType[]> = {
     CUSTOMER: ['IDENTITY_CARD', 'PASSPORT', 'DRIVER_LICENSE_FRONT', 'DRIVER_LICENSE_BACK', 'SIGNED_CONTRACT', 'OTHER'],
     VEHICLE: ['VEHICLE_PHOTO', 'VEHICLE_REGISTRATION', 'VEHICLE_INSPECTION', 'INSURANCE_POLICY', 'LICENSE_DOCUMENT', 'OTHER'],
-    RENTAL: ['SIGNED_CONTRACT', 'HANDOVER_PHOTO', 'HANDOVER_VIDEO', 'RETURN_PHOTO', 'RETURN_VIDEO', 'OTHER'],
+    RENTAL: ['SIGNED_CONTRACT', 'HANDOVER_PROTOCOL', 'HANDOVER_PHOTO', 'HANDOVER_VIDEO', 'RETURN_PROTOCOL', 'RETURN_PHOTO', 'RETURN_VIDEO', 'SERVICE_ROUTE_PERMIT', 'PASSENGER_LIST', 'OTHER'],
     LEASING: ['LEASE_CONTRACT', 'SIGNED_CONTRACT', 'HANDOVER_PHOTO', 'RETURN_PHOTO', 'OTHER'],
     DAMAGE: ['DAMAGE_PHOTO', 'ACCIDENT_REPORT', 'REPAIR_INVOICE', 'OTHER'],
     MAINTENANCE: ['MAINTENANCE_INVOICE', 'OTHER'],

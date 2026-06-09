@@ -12,11 +12,13 @@ interface Props {
   referenceId: number
   title?: string
   readonly?: boolean
+  uploadTypes?: FileUploadType[]
 }
 
 const props = withDefaults(defineProps<Props>(), {
   title: 'Belgeler',
   readonly: false,
+  uploadTypes: undefined,
 })
 
 const toast = useToast()
@@ -33,7 +35,9 @@ const selectedFile = ref<File | null>(null)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const isDragging = ref(false)
 
-const allowedTypes = computed(() => ALLOWED_TYPES_BY_REFERENCE[props.referenceType] || [])
+const allowedTypes = computed(() =>
+  props.uploadTypes ?? ALLOWED_TYPES_BY_REFERENCE[props.referenceType] ?? [],
+)
 
 const ACCEPTED_MIME = 'image/jpeg,image/png,image/webp,application/pdf'
 const MAX_SIZE_MB = 10

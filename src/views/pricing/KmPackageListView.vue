@@ -30,6 +30,7 @@ const rentalTypes: { value: RentalType; label: string }[] = [
   { value: RentalType.WEEKLY, label: 'Haftalık' },
   { value: RentalType.MONTHLY, label: 'Aylık' },
   { value: RentalType.LEASING, label: 'Leasing' },
+  { value: RentalType.SERVICE, label: 'Servis' },
 ]
 
 const tabs = computed(() => [

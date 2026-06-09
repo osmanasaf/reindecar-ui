@@ -1,5 +1,5 @@
 import type { NavigationGuardNext, RouteLocationNormalized } from 'vue-router'
-import { useAuthStore } from '@/stores'
+import { useAuthStore, useAppSettingsStore } from '@/stores'
 
 export async function authGuard(
     to: RouteLocationNormalized,
@@ -18,6 +18,11 @@ export async function authGuard(
     if (!isAuthenticated) {
         next({ name: 'login', query: { redirect: to.fullPath } })
         return
+    }
+
+    const appSettingsStore = useAppSettingsStore()
+    if (!appSettingsStore.loaded) {
+        await appSettingsStore.loadSettings()
     }
 
     if (to.meta.requiresAdmin && !authStore.isAdmin) {

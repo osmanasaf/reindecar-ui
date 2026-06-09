@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { vehiclesApi } from '@/api'
-import { useToast } from '@/composables'
+import { useToast, usePermissions } from '@/composables'
 import { RcButton, RcStatusPill } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
 import { fmtTRY } from '@/utils/format'
@@ -11,6 +11,7 @@ import RentalDetailModal from '../RentalDetailModal.vue'
 const props = defineProps<{ vehicleId: number }>()
 
 const toast = useToast()
+const { canViewRevenue } = usePermissions()
 const history = ref<VehicleHistory | null>(null)
 const loading = ref(false)
 const selectedRental = ref<RentalHistoryItem | null>(null)
@@ -159,7 +160,7 @@ onMounted(loadHistory)
           <div>
             <div class="rc-card__title">Kiralama geçmişi</div>
             <div class="rc-veh-rentals-tab__sub">
-              {{ rentals.length }} kayıt · {{ fmtTRY(totalRevenue) }} toplam ciro
+              {{ rentals.length }} kayıt<template v-if="canViewRevenue"> · {{ fmtTRY(totalRevenue) }} toplam ciro</template>
             </div>
           </div>
           <div class="rc-veh-rentals-tab__head-actions">
@@ -182,7 +183,7 @@ onMounted(loadHistory)
                 <th>Süre</th>
                 <th class="rc-right">KM</th>
                 <th>Durum</th>
-                <th class="rc-right">Gelir</th>
+                <th v-if="canViewRevenue" class="rc-right">Gelir</th>
               </tr>
             </thead>
             <tbody>
@@ -206,7 +207,7 @@ onMounted(loadHistory)
                 <td>
                   <RcStatusPill :status="r.status" />
                 </td>
-                <td class="rc-right rc-num">{{ fmtTRY(r.grandTotalAmount) }}</td>
+                <td v-if="canViewRevenue" class="rc-right rc-num">{{ fmtTRY(r.grandTotalAmount) }}</td>
               </tr>
             </tbody>
           </table>

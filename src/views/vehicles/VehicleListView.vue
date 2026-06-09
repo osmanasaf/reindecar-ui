@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
-import { vehiclesApi } from '@/api'
+import { vehiclesApi, vehicleCategoriesApi, branchesApi } from '@/api'
 import {
   usePagination,
   useToast,
@@ -22,8 +22,9 @@ import {
   RcError,
 } from '@/components/rc'
 import { VehicleStatus } from '@/types'
-import type { Vehicle, VehicleOverview, VehicleHistory } from '@/types'
-import { fmtTRY, fmtNum } from '@/utils/format'
+import type { Vehicle, VehicleOverview, VehicleHistory, VehicleCategory, Branch } from '@/types'
+import { fmtTRY, fmtNum, formatDate } from '@/utils/format'
+import DatePicker from '@/components/base/DatePicker.vue'
 
 type FilterKey = 'all' | VehicleStatus
 type SortKey = 'plate' | 'km' | 'daily' | 'year'
@@ -34,6 +35,12 @@ const loading = ref(true)
 const error = ref<string | null>(null)
 const searchQuery = ref('')
 const statusFilter = ref<FilterKey>('all')
+const categoryFilter = ref<number | null>(null)
+const branchFilter = ref<number | null>(null)
+const availabilityStart = ref('')
+const availabilityEnd = ref('')
+const categories = ref<VehicleCategory[]>([])
+const branches = ref<Branch[]>([])
 const viewMode = useLocalStorage<VehicleListViewMode>(
   UI_STORAGE_KEYS.vehicleListView,
   'table',
@@ -46,6 +53,7 @@ const viewMode = useLocalStorage<VehicleListViewMode>(
 )
 const sortKey = ref<SortKey>('plate')
 const sortOpen = ref(false)
+const filtersOpen = ref(false)
 const selected = ref<Set<number>>(new Set())
 
 const overview = ref<VehicleOverview>({
@@ -85,6 +93,9 @@ const filterChips: { id: FilterKey; label: string }[] = [
   { id: VehicleStatus.RENTED, label: 'Kirada' },
   { id: VehicleStatus.RESERVED, label: 'Rezerve' },
   { id: VehicleStatus.MAINTENANCE, label: 'Bakımda' },
+  { id: VehicleStatus.DAMAGED, label: 'Hasarlı' },
+  { id: VehicleStatus.INACTIVE, label: 'Pasif' },
+  { id: VehicleStatus.SOLD, label: 'Satıldı' },
 ]
 
 const monthPerfBars = computed(() => {
@@ -129,6 +140,9 @@ function chipCount(id: FilterKey): number {
   if (id === VehicleStatus.RENTED) return overview.value.rented
   if (id === VehicleStatus.RESERVED) return overview.value.reserved
   if (id === VehicleStatus.MAINTENANCE) return overview.value.maintenance
+  if (id === VehicleStatus.DAMAGED) return overview.value.damaged
+  if (id === VehicleStatus.INACTIVE) return overview.value.inactive
+  if (id === VehicleStatus.SOLD) return overview.value.sold
   return 0
 }
 
@@ -155,6 +169,163 @@ function vehicleSynthetics(v: Vehicle) {
             ? { label: 'Onarım', at: '—', icon: 'warning' as const }
             : { label: 'Hazır', at: '—', icon: 'check' as const }
   return { utilization, next }
+}
+
+const availabilityEndMin = computed(() =>
+  availabilityStart.value ? addDaysYmd(availabilityStart.value, 1) : undefined
+)
+
+const availabilityFilterActive = computed(
+  () => !!(availabilityStart.value && availabilityEnd.value)
+)
+
+const servisCategory = computed(() =>
+  categories.value.find(
+    (c) =>
+      c.code?.toUpperCase() === 'SERVIS' ||
+      c.name.toLowerCase().includes('servis') ||
+      c.name.toLowerCase().includes('minibüs')
+  ) ?? null
+)
+
+function addDaysYmd(ymd: string, days: number): string {
+  const d = new Date(ymd + 'T12:00:00')
+  d.setDate(d.getDate() + days)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+function toYmd(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+const monthPresets = computed(() => {
+  const now = new Date()
+  return Array.from({ length: 6 }, (_, i) => {
+    const monthStart = new Date(now.getFullYear(), now.getMonth() + i, 1)
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + i + 1, 0)
+    const fullLabel = monthStart.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })
+    const shortLabel = monthStart.toLocaleDateString('tr-TR', { month: 'short' })
+    return {
+      label: fullLabel,
+      shortLabel,
+      start: toYmd(monthStart),
+      end: toYmd(monthEnd),
+    }
+  })
+})
+
+const selectedCategoryName = computed(() =>
+  categories.value.find((c) => c.id === categoryFilter.value)?.name ?? null
+)
+
+const selectedBranchName = computed(() =>
+  branches.value.find((b) => b.id === branchFilter.value)?.name ?? null
+)
+
+const hasAdvancedFilters = computed(
+  () => availabilityFilterActive.value || categoryFilter.value !== null || branchFilter.value !== null
+)
+
+const activeFilterCount = computed(() => {
+  let n = 0
+  if (availabilityFilterActive.value) n++
+  if (categoryFilter.value !== null) n++
+  if (branchFilter.value !== null) n++
+  return n
+})
+
+function toggleFiltersPanel() {
+  filtersOpen.value = !filtersOpen.value
+  if (filtersOpen.value) sortOpen.value = false
+}
+
+function closeFiltersPanel() {
+  filtersOpen.value = false
+}
+
+function clearAllAdvancedFilters() {
+  availabilityStart.value = ''
+  availabilityEnd.value = ''
+  categoryFilter.value = null
+  branchFilter.value = null
+  closeFiltersPanel()
+  setPage(0)
+  fetchVehicles()
+}
+
+function removeAvailabilityFilter() {
+  availabilityStart.value = ''
+  availabilityEnd.value = ''
+  setPage(0)
+  fetchVehicles()
+}
+
+function removeCategoryFilter() {
+  categoryFilter.value = null
+  setPage(0)
+  fetchVehicles()
+}
+
+function removeBranchFilter() {
+  branchFilter.value = null
+  setPage(0)
+  fetchVehicles()
+}
+
+function buildListParams() {
+  return {
+    ...buildSortParams(),
+    ...(categoryFilter.value ? { categoryId: categoryFilter.value } : {}),
+    ...(branchFilter.value ? { branchId: branchFilter.value } : {}),
+  }
+}
+
+function applyClientFilters(content: Vehicle[]): Vehicle[] {
+  let result = content
+  if (categoryFilter.value) {
+    result = result.filter((v) => v.categoryId === categoryFilter.value)
+  }
+  if (branchFilter.value) {
+    result = result.filter((v) => v.branchId === branchFilter.value)
+  }
+  if (statusFilter.value !== 'all') {
+    result = result.filter((v) => v.status === statusFilter.value)
+  }
+  return result
+}
+
+function applyMonthPreset(start: string, end: string) {
+  availabilityStart.value = start
+  availabilityEnd.value = end
+}
+
+function applyServisCategoryFilter() {
+  if (!servisCategory.value) {
+    toast.error('Servis / Minibüs kategorisi bulunamadı. Ayarlar → Kategoriler\'den ekleyin.')
+    return
+  }
+  categoryFilter.value = servisCategory.value.id
+}
+
+function applyFiltersAndClose() {
+  const hasStart = Boolean(availabilityStart.value)
+  const hasEnd = Boolean(availabilityEnd.value)
+  if (hasStart !== hasEnd) {
+    toast.error('Müsaitlik için başlangıç ve bitiş tarihini birlikte seçin')
+    return
+  }
+  if (hasStart && hasEnd && availabilityEnd.value <= availabilityStart.value) {
+    toast.error('Bitiş tarihi başlangıçtan sonra olmalıdır')
+    return
+  }
+  closeFiltersPanel()
+  applyAdvancedFilters()
 }
 
 function buildSortParams() {
@@ -187,11 +358,23 @@ async function fetchVehicles() {
   error.value = null
   try {
     const q = searchQuery.value.trim()
-    const params = buildSortParams()
+    const params = buildListParams()
     let response
 
-    if (q.length >= 2) {
-      response = await vehiclesApi.search(q, params)
+    if (availabilityStart.value && availabilityEnd.value) {
+      response = await vehiclesApi.getAvailableForPeriod(
+        availabilityStart.value,
+        availabilityEnd.value,
+        params
+      )
+      if (statusFilter.value !== 'all') {
+        const filtered = response.content.filter((v) => v.status === statusFilter.value)
+        response = { ...response, content: filtered, totalElements: filtered.length }
+      }
+    } else if (q.length >= 2) {
+      response = await vehiclesApi.search(q, buildSortParams())
+      const filtered = applyClientFilters(response.content)
+      response = { ...response, content: filtered, totalElements: filtered.length }
     } else if (statusFilter.value !== 'all') {
       response = await vehiclesApi.getByStatus(statusFilter.value, params)
     } else {
@@ -209,6 +392,27 @@ async function fetchVehicles() {
   }
 }
 
+async function fetchCategories() {
+  try {
+    categories.value = await vehicleCategoriesApi.getAll()
+  } catch {
+    categories.value = []
+  }
+}
+
+async function fetchBranches() {
+  try {
+    branches.value = await branchesApi.getActive()
+  } catch {
+    branches.value = []
+  }
+}
+
+function applyAdvancedFilters() {
+  setPage(0)
+  fetchVehicles()
+}
+
 function setFilter(next: FilterKey) {
   if (statusFilter.value === next) return
   statusFilter.value = next
@@ -221,6 +425,11 @@ function setSort(next: SortKey) {
   sortOpen.value = false
   setPage(0)
   fetchVehicles()
+}
+
+function toggleSortPanel() {
+  sortOpen.value = !sortOpen.value
+  if (sortOpen.value) filtersOpen.value = false
 }
 
 function handlePageChange(newPage: number) {
@@ -361,7 +570,7 @@ watch(searchQuery, () => {
 })
 
 onMounted(async () => {
-  await fetchOverview()
+  await Promise.all([fetchOverview(), fetchCategories(), fetchBranches()])
   await fetchVehicles()
 })
 </script>
@@ -496,6 +705,27 @@ onMounted(async () => {
       </div>
     </div>
 
+    <!-- Aktif gelişmiş filtreler (kompakt) -->
+    <div v-if="hasAdvancedFilters" class="rcv-active-filters">
+      <span v-if="availabilityFilterActive" class="rcv-active-pill">
+        <RcIcon name="calendar" :size="12" />
+        {{ formatDate(availabilityStart) }} – {{ formatDate(availabilityEnd) }}
+        <button type="button" class="rcv-active-pill__clear" aria-label="Tarih filtresini kaldır" @click="removeAvailabilityFilter">×</button>
+      </span>
+      <span v-if="selectedCategoryName" class="rcv-active-pill">
+        {{ selectedCategoryName }}
+        <button type="button" class="rcv-active-pill__clear" aria-label="Kategori filtresini kaldır" @click="removeCategoryFilter">×</button>
+      </span>
+      <span v-if="selectedBranchName" class="rcv-active-pill">
+        <RcIcon name="building" :size="12" />
+        {{ selectedBranchName }}
+        <button type="button" class="rcv-active-pill__clear" aria-label="Şube filtresini kaldır" @click="removeBranchFilter">×</button>
+      </span>
+      <button type="button" class="rcv-active-filters__clear-all" @click="clearAllAdvancedFilters">
+        Tümünü temizle
+      </button>
+    </div>
+
     <!-- Filtre + görünüm -->
     <div class="rc-filterbar rcv-filterbar--slim">
       <div class="rc-input-group" style="width: 260px">
@@ -521,31 +751,100 @@ onMounted(async () => {
         <span class="rc-chip__count">{{ chipCount(chip.id) }}</span>
       </button>
 
+      <span class="rc-filterbar__sep" />
+
+      <div class="rcv-filter-trigger">
+        <button
+          type="button"
+          class="rc-chip"
+          :class="{ 'rc-chip--on': hasAdvancedFilters || filtersOpen }"
+          @click="toggleFiltersPanel"
+        >
+          <RcIcon name="sliders" :size="14" />
+          Filtreler
+          <span v-if="activeFilterCount" class="rc-chip__count">{{ activeFilterCount }}</span>
+        </button>
+        <template v-if="filtersOpen">
+          <div class="rcv-filter-backdrop" @click="closeFiltersPanel" />
+          <div class="rcv-filters-popover">
+            <div class="rcv-filters-popover__section">
+              <span class="rcv-filters-popover__label">Müsaitlik dönemi</span>
+              <div class="rcv-filters-popover__months">
+                <button
+                  v-for="preset in monthPresets"
+                  :key="preset.start"
+                  type="button"
+                  class="rcv-month-chip"
+                  :class="{ 'rcv-month-chip--on': availabilityStart === preset.start && availabilityEnd === preset.end }"
+                  :title="preset.label"
+                  @click="applyMonthPreset(preset.start, preset.end)"
+                >
+                  {{ preset.shortLabel }}
+                </button>
+              </div>
+              <div class="rcv-filters-popover__dates">
+                <DatePicker
+                  v-model="availabilityStart"
+                  label="Başlangıç"
+                  placeholder="Başlangıç"
+                />
+                <DatePicker
+                  v-model="availabilityEnd"
+                  label="Bitiş"
+                  placeholder="Bitiş"
+                  :min="availabilityEndMin"
+                />
+              </div>
+            </div>
+
+            <div class="rcv-filters-popover__section">
+              <span class="rcv-filters-popover__label">Şube</span>
+              <select v-model="branchFilter" class="rc-input rcv-filter-select">
+                <option :value="null">Tüm şubeler</option>
+                <option v-for="branch in branches" :key="branch.id" :value="branch.id">
+                  {{ branch.name }}
+                </option>
+              </select>
+            </div>
+
+            <div class="rcv-filters-popover__section">
+              <span class="rcv-filters-popover__label">Araç kategorisi</span>
+              <select v-model="categoryFilter" class="rc-input rcv-filter-select">
+                <option :value="null">Tüm kategoriler</option>
+                <option v-for="cat in categories" :key="cat.id" :value="cat.id">
+                  {{ cat.name }}
+                </option>
+              </select>
+              <button
+                v-if="servisCategory"
+                type="button"
+                class="rcv-quick-filter"
+                :class="{ 'rcv-quick-filter--on': categoryFilter === servisCategory.id }"
+                @click="applyServisCategoryFilter"
+              >
+                Servis / Minibüs
+              </button>
+            </div>
+
+            <div class="rcv-filters-popover__actions">
+              <RcButton variant="ghost" size="sm" @click="clearAllAdvancedFilters">Temizle</RcButton>
+              <RcButton variant="accent" size="sm" @click="applyFiltersAndClose">Uygula</RcButton>
+            </div>
+          </div>
+        </template>
+      </div>
+
       <span style="margin-left: auto" />
 
-      <div style="position: relative">
-        <button type="button" class="rc-chip" style="border-style: dashed" @click="sortOpen = !sortOpen">
+      <div class="rcv-filter-trigger">
+        <button type="button" class="rc-chip" style="border-style: dashed" @click="toggleSortPanel">
           <RcIcon name="chevronDown" :size="14" />
           {{ sortLabels[sortKey] }}
         </button>
         <template v-if="sortOpen">
+          <div class="rcv-filter-backdrop" @click="sortOpen = false" />
           <div
-            style="position: fixed; inset: 0; z-index: 5"
-            @click="sortOpen = false"
-          />
-          <div
-            style="
-              position: absolute;
-              right: 0;
-              top: calc(100% + 4px);
-              background: var(--rc-surface);
-              border: 1px solid var(--rc-border);
-              border-radius: var(--rc-r-8);
-              box-shadow: var(--rc-shadow-popover);
-              padding: 4px;
-              min-width: 200px;
-              z-index: 6;
-            "
+            class="rcv-filters-popover rcv-filters-popover--sort"
           >
           <button
             v-for="(label, key) in sortLabels"
@@ -900,3 +1199,174 @@ onMounted(async () => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.rcv-active-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.rcv-active-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px 4px 10px;
+  border-radius: 99px;
+  background: var(--rc-blue-50);
+  color: var(--rc-blue-700);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.rcv-active-pill__clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.rcv-active-pill__clear:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.rcv-active-filters__clear-all {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--rc-text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.rcv-filter-trigger {
+  position: relative;
+}
+
+.rcv-filter-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+}
+
+.rcv-filters-popover {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 6px);
+  z-index: 21;
+  width: min(320px, calc(100vw - 32px));
+  padding: 14px;
+  background: var(--rc-surface);
+  border: 1px solid var(--rc-border);
+  border-radius: var(--rc-r-10);
+  box-shadow: var(--rc-shadow-popover);
+}
+
+.rcv-filters-popover--sort {
+  left: auto;
+  right: 0;
+  width: 200px;
+  padding: 4px;
+}
+
+.rcv-filters-popover__section + .rcv-filters-popover__section {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--rc-border);
+}
+
+.rcv-filters-popover__label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--rc-text-muted);
+}
+
+.rcv-filters-popover__months {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.rcv-month-chip {
+  padding: 5px 10px;
+  border: 1px solid var(--rc-border);
+  border-radius: var(--rc-r-6);
+  background: var(--rc-surface);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.rcv-month-chip:hover {
+  border-color: var(--rc-blue-300);
+}
+
+.rcv-month-chip--on {
+  border-color: var(--rc-blue-400);
+  background: var(--rc-blue-50);
+  color: var(--rc-blue-700);
+}
+
+.rcv-filters-popover__dates {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.rcv-filters-popover__dates :deep(.rc-field) {
+  min-width: 0;
+}
+
+.rcv-quick-filter {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px dashed var(--rc-border);
+  border-radius: var(--rc-r-6);
+  background: transparent;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rcv-quick-filter--on {
+  border-style: solid;
+  border-color: var(--rc-blue-400);
+  background: var(--rc-blue-50);
+  color: var(--rc-blue-700);
+}
+
+.rcv-filters-popover__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--rc-border);
+}
+
+.rcv-filter-select {
+  width: 100%;
+}
+</style>

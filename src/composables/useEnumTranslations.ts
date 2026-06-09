@@ -90,6 +90,8 @@ export function useEnumTranslations() {
     [ReceivableType.DAMAGE_FEE]: 'Hasar Bedeli',
     [ReceivableType.INSURANCE_CLAIM]: 'Sigorta Tazminatı',
     [ReceivableType.TRAFFIC_PENALTY]: 'Trafik Cezası',
+    [ReceivableType.TOLL_FEE]: 'Geçiş Ücreti',
+    [ReceivableType.FUEL_FEE]: 'Yakıt / Depo Farkı',
     [ReceivableType.OTHER]: 'Diğer'
   }
 

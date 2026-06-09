@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useAuthStore } from '@/stores'
+import { useAppSettingsStore } from '@/stores/appSettings.store'
 import { useToast } from '@/composables'
 import { usersApi } from '@/api'
 import { RcPageHeader, RcButton, RcField, RcTabs, RcSkeletonText } from '@/components/rc'
@@ -10,10 +11,11 @@ import CitiesManager from './CitiesManager.vue'
 import ColorsManager from './ColorsManager.vue'
 import CategoriesManager from './CategoriesManager.vue'
 
-type SettingsTab = 'profile' | 'password' | 'notifications' | 'reference-data'
+type SettingsTab = 'profile' | 'password' | 'notifications' | 'general' | 'reference-data'
 type RefDataTab = 'brands' | 'cities' | 'colors' | 'categories'
 
 const authStore = useAuthStore()
+const appSettingsStore = useAppSettingsStore()
 const toast = useToast()
 
 const activeTab = ref<SettingsTab>('profile')
@@ -39,13 +41,23 @@ const notificationSettings = ref({
   pushNotifications: false,
 })
 
+const currencyOptions = [
+  { value: 'TRY', label: 'TRY — Türk Lirası' },
+  { value: 'USD', label: 'USD — Amerikan Doları' },
+  { value: 'EUR', label: 'EUR — Euro' },
+  { value: 'GBP', label: 'GBP — İngiliz Sterlini' },
+]
+const selectedCurrency = ref('TRY')
+const savingCurrency = ref(false)
+
 const navItems = computed(() => {
-  const items: { id: SettingsTab; label: string; icon: 'user' | 'key' | 'bell' | 'folder' }[] = [
+  const items: { id: SettingsTab; label: string; icon: 'user' | 'key' | 'bell' | 'folder' | 'sliders' }[] = [
     { id: 'profile', label: 'Profil', icon: 'user' },
     { id: 'password', label: 'Şifre', icon: 'key' },
     { id: 'notifications', label: 'Bildirimler', icon: 'bell' },
   ]
   if (authStore.isAdmin) {
+    items.push({ id: 'general', label: 'Genel', icon: 'sliders' })
     items.push({ id: 'reference-data', label: 'Referans Veriler', icon: 'folder' })
   }
   return items
@@ -62,6 +74,7 @@ const sectionTitles: Record<SettingsTab, string> = {
   profile: 'Profil Bilgileri',
   password: 'Şifre Değiştir',
   notifications: 'Bildirim Ayarları',
+  general: 'Genel Ayarlar',
   'reference-data': 'Referans Veriler',
 }
 
@@ -71,6 +84,10 @@ onMounted(async () => {
   profileForm.value.firstName = nameParts[0] || ''
   profileForm.value.lastName = nameParts.slice(1).join(' ') || ''
   await fetchSettings()
+  if (authStore.isAdmin) {
+    await appSettingsStore.loadSettings()
+    selectedCurrency.value = appSettingsStore.defaultCurrency
+  }
 })
 
 async function fetchSettings() {
@@ -147,6 +164,19 @@ async function handleNotificationSave() {
     toast.error(err.message || 'Ayarlar kaydedilirken hata oluştu')
   } finally {
     loading.value = false
+  }
+}
+
+async function handleCurrencySave() {
+  savingCurrency.value = true
+  try {
+    await appSettingsStore.updateDefaultCurrency(selectedCurrency.value)
+    toast.success('Para birimi ayarı kaydedildi')
+  } catch (error: unknown) {
+    const err = error as { message?: string }
+    toast.error(err.message || 'Para birimi kaydedilemedi')
+  } finally {
+    savingCurrency.value = false
   }
 }
 </script>
@@ -253,6 +283,23 @@ async function handleNotificationSave() {
               </div>
               <div class="rcs-card__foot" style="margin: 20px -20px -20px; padding-right: 20px">
                 <RcButton type="submit" variant="primary" :loading="loading">
+                  Kaydet
+                </RcButton>
+              </div>
+            </form>
+          </template>
+
+          <template v-else-if="activeTab === 'general'">
+            <form @submit.prevent="handleCurrencySave">
+              <RcField label="Varsayılan para birimi" hint="Tüm fiyat ve tutar gösterimlerinde kullanılır">
+                <select v-model="selectedCurrency" class="rc-input">
+                  <option v-for="opt in currencyOptions" :key="opt.value" :value="opt.value">
+                    {{ opt.label }}
+                  </option>
+                </select>
+              </RcField>
+              <div class="rcs-card__foot" style="margin: 20px -20px -20px; padding-right: 20px">
+                <RcButton type="submit" variant="primary" :loading="savingCurrency">
                   Kaydet
                 </RcButton>
               </div>

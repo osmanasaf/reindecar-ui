@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { vehiclesApi } from '@/api'
-import { useToast } from '@/composables'
+import { useToast, usePermissions } from '@/composables'
 import { RcIcon } from '@/components/icons'
 import type { IconName } from '@/components/icons/iconPaths'
 import {
@@ -46,6 +46,7 @@ const LEGACY_TAB_MAP: Record<string, TabKey> = {
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
+const { canViewRevenue } = usePermissions()
 
 const vehicle = ref<Vehicle | null>(null)
 const loading = ref(true)
@@ -62,8 +63,10 @@ const heroThumbs = ['Ön', 'Yan', 'Arka', 'İç']
 function normalizeTab(raw: string | undefined): TabKey {
   if (!raw) return 'overview'
   const mapped = LEGACY_TAB_MAP[raw]
-  if (mapped) return mapped
-  return VALID_TABS.has(raw as TabKey) ? (raw as TabKey) : 'overview'
+  const resolved = mapped ?? (VALID_TABS.has(raw as TabKey) ? (raw as TabKey) : 'overview')
+  // Finansal sekme operatör için erişilemez; genel bakışa yönlendir.
+  if (resolved === 'financial' && !canViewRevenue.value) return 'overview'
+  return resolved
 }
 
 function getTabFromQuery(): TabKey {
@@ -99,23 +102,29 @@ watch(
 
 const vehicleId = computed(() => Number(route.params.id))
 
-const detailTabs = computed(() => [
-  { id: 'overview' as TabKey, label: 'Genel bakış', icon: 'info' as IconName },
-  {
-    id: 'damage' as TabKey,
-    label: 'Hasar & Bakım',
-    icon: 'wrench' as IconName,
-    count: tabCounts.value.damage || undefined,
-  },
-  {
-    id: 'rentals' as TabKey,
-    label: 'Kiralama geçmişi',
-    icon: 'key' as IconName,
-    count: tabCounts.value.rentals || undefined,
-  },
-  { id: 'docs' as TabKey, label: 'Sigorta & Belgeler', icon: 'shield' as IconName },
-  { id: 'financial' as TabKey, label: 'Finansal', icon: 'receipt' as IconName },
-])
+const detailTabs = computed(() => {
+  const tabs = [
+    { id: 'overview' as TabKey, label: 'Genel bakış', icon: 'info' as IconName },
+    {
+      id: 'damage' as TabKey,
+      label: 'Hasar & Bakım',
+      icon: 'wrench' as IconName,
+      count: tabCounts.value.damage || undefined,
+    },
+    {
+      id: 'rentals' as TabKey,
+      label: 'Kiralama geçmişi',
+      icon: 'key' as IconName,
+      count: tabCounts.value.rentals || undefined,
+    },
+    { id: 'docs' as TabKey, label: 'Sigorta & Belgeler', icon: 'shield' as IconName },
+  ]
+  // Finansal sekme (ciro/kâr) yalnızca admin için.
+  if (canViewRevenue.value) {
+    tabs.push({ id: 'financial' as TabKey, label: 'Finansal', icon: 'receipt' as IconName })
+  }
+  return tabs
+})
 
 const FUEL_LABELS: Record<string, string> = {
   GASOLINE: 'Benzin',
@@ -458,7 +467,7 @@ onMounted(async () => {
           <VehicleDocsTab :vehicle-id="vehicleId" />
         </div>
 
-        <div v-show="activeTab === 'financial'">
+        <div v-if="canViewRevenue" v-show="activeTab === 'financial'">
           <VehicleFinancialTab :vehicle-id="vehicleId" />
         </div>
       </div>

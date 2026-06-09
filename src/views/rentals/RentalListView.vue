@@ -57,6 +57,7 @@ const typeLabels: Record<RentalType, string> = {
   WEEKLY: 'Haftalık',
   MONTHLY: 'Aylık',
   LEASING: 'Leasing',
+  SERVICE: 'Servis',
 }
 
 const statusViews: { id: StatusView; label: string }[] = [
@@ -76,6 +77,7 @@ const typeChips: { id: RentalType | ''; label: string }[] = [
   { id: RentalType.WEEKLY, label: 'Haftalık' },
   { id: RentalType.MONTHLY, label: 'Aylık' },
   { id: RentalType.LEASING, label: 'Leasing' },
+  { id: RentalType.SERVICE, label: 'Servis' },
 ]
 
 const pageSubtitle = computed(() => {
@@ -307,6 +309,9 @@ watch(searchQuery, () => {
           <RcIcon name="plus" :size="14" />
           Yeni kiralama
           <RcKbd>N</RcKbd>
+        </RouterLink>
+        <RouterLink to="/rentals/create?type=SERVICE" class="rc-btn rc-btn--secondary">
+          Servis kiralama
         </RouterLink>
       </template>
     </RcPageHeader>

@@ -14,7 +14,10 @@ export const useAuthStore = defineStore('auth', () => {
     const tokenStatus = ref<{ isValid: boolean; timeToExpiry: number }>({ isValid: false, timeToExpiry: -1 })
 
     const isAuthenticated = computed(() => !!tokenStorage.getAccessToken() && tokenStatus.value.isValid)
-    const isAdmin = computed(() => user.value?.role === 'ADMIN' as Role)
+    const role = computed(() => user.value?.role ?? null)
+    const isAdmin = computed(() => user.value?.role === ('ADMIN' as Role) || user.value?.role === ('SUPER_ADMIN' as Role))
+    const isSuperAdmin = computed(() => user.value?.role === ('SUPER_ADMIN' as Role))
+    const isOperator = computed(() => user.value?.role === ('OPERATOR' as Role))
     const userFullName = computed(() => user.value?.fullName ?? '')
 
 
@@ -186,7 +189,10 @@ export const useAuthStore = defineStore('auth', () => {
         error: readonly(error),
         tokenStatus: readonly(tokenStatus),
         isAuthenticated,
+        role,
         isAdmin,
+        isSuperAdmin,
+        isOperator,
         userFullName,
         login,
         registerTenant,

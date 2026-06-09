@@ -8,6 +8,7 @@ import DatePicker from '@/components/base/DatePicker.vue'
 import { SearchableSelect } from '@/components/common'
 import ExtraItemsManager from '@/components/rentals/ExtraItemsManager.vue'
 import type { Rental, Branch, KmPackage, RentalExtraItem, RentalType } from '@/types'
+import { resolveEffectiveIncludedKm, formatIncludedKmDisplay } from '@/utils/km'
 
 const props = defineProps<{
   open: boolean
@@ -48,6 +49,38 @@ const termMonths = computed(() => {
   const end = new Date(endDate.value + 'T12:00:00')
   const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
   return Math.max(1, Math.ceil(days / 30))
+})
+
+const editTotalDays = computed(() => {
+  if (!startDate.value || !endDate.value) return 0
+  const start = new Date(startDate.value + 'T12:00:00')
+  const end = new Date(endDate.value + 'T12:00:00')
+  return Math.max(0, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)))
+})
+
+const selectedKmPackage = computed(() =>
+  kmPackages.value.find(pkg => pkg.id === kmPackageId.value) ?? null,
+)
+
+const kmLimitPreview = computed(() => {
+  if (!props.rental) return ''
+  if (customIncludedKm.value != null && customIncludedKm.value > 0) {
+    return `Toplam dahil KM: ${customIncludedKm.value.toLocaleString('tr-TR')} km (özel)`
+  }
+  if (!selectedKmPackage.value || selectedKmPackage.value.unlimited) {
+    return selectedKmPackage.value?.unlimited ? 'Sınırsız KM' : ''
+  }
+  const totalKm = resolveEffectiveIncludedKm({
+    perPeriodKm: selectedKmPackage.value.includedKm,
+    rentalType: props.rental.rentalType,
+    totalDays: editTotalDays.value,
+  })
+  const perPeriodLabel = formatIncludedKmDisplay(
+    props.rental.rentalType,
+    selectedKmPackage.value.includedKm,
+    0,
+  )
+  return `Toplam dahil KM: ${totalKm.toLocaleString('tr-TR')} km (${perPeriodLabel})`
 })
 
 function resetForm() {
@@ -213,6 +246,7 @@ async function save() {
             <input v-model.number="customExtraKmPrice" class="rc-input rc-num" type="number" min="0" step="0.01" />
           </div>
         </div>
+        <p v-if="kmLimitPreview" class="rcr-edit-modal__hint">{{ kmLimitPreview }}</p>
       </section>
 
       <section class="rcr-edit-modal__section">
@@ -265,6 +299,12 @@ async function save() {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+  color: var(--rc-text-muted);
+}
+
+.rcr-edit-modal__hint {
+  margin: 0;
+  font-size: 13px;
   color: var(--rc-text-muted);
 }
 </style>

@@ -7,6 +7,15 @@ import { RcIcon } from '@/components/icons'
 import { fmtTRY } from '@/utils/format'
 import type { Rental, Vehicle, VehicleReturnForm, ReturnPreviewResponse } from '@/types'
 import DatePicker from '@/components/base/DatePicker.vue'
+import DocumentsSection from '@/components/shared/DocumentsSection.vue'
+import type { FileUploadType } from '@/api/files.api'
+
+const RETURN_UPLOAD_TYPES: FileUploadType[] = [
+  'RETURN_PROTOCOL',
+  'RETURN_PHOTO',
+  'SIGNED_CONTRACT',
+  'OTHER',
+]
 
 interface Props {
   visible: boolean
@@ -29,9 +38,17 @@ const rental = ref<Rental | null>(null)
 const vehicle = ref<Vehicle | null>(null)
 const step = ref<'input' | 'preview' | 'completed'>('input')
 const preview = ref<ReturnPreviewResponse | null>(null)
+const applyEarlyDiscount = ref(false)
+const applyLateFee = ref(false)
+const applyFuelFee = ref(false)
+const earlyDiscountAmount = ref(0)
+const lateFeeAmount = ref(0)
+const fuelFeeAmount = ref(0)
+const fuelPricePerLiter = ref(0)
 
 const form = ref({
   endKm: 0,
+  endFuelLiters: null as number | null,
   actualReturnDate: '',
   notes: '',
 })
@@ -83,6 +100,15 @@ const inputRules = computed(() => ({
       },
     ],
   },
+  endFuelLiters: {
+    value: form.value.endFuelLiters,
+    rules: [
+      {
+        validate: (v: unknown) => v == null || v === '' || Number(v) >= 0,
+        message: 'İade depo litre değeri negatif olamaz',
+      },
+    ],
+  },
 }))
 
 const { validateForm, getError, hasError, touch, reset } = useValidation(() => inputRules.value)
@@ -90,6 +116,57 @@ const { validateForm, getError, hasError, touch, reset } = useValidation(() => i
 const totalKm = computed(() => {
   if (!rental.value?.startKm) return 0
   return Math.max(0, form.value.endKm - rental.value.startKm)
+})
+
+function moneyAmount(amount: number | { amount: number; currency: string } | null | undefined): number {
+  if (amount == null) return 0
+  return typeof amount === 'number' ? amount : (amount.amount ?? 0)
+}
+
+const fuelDeficitLiters = computed(() => {
+  const deficit = preview.value?.fuelDeficitLiters ?? 0
+  return typeof deficit === 'number' ? deficit : Number(deficit) || 0
+})
+
+const suggestedFuelFee = computed(() => {
+  if (fuelDeficitLiters.value <= 0 || fuelPricePerLiter.value <= 0) return 0
+  return Math.round(fuelDeficitLiters.value * fuelPricePerLiter.value * 100) / 100
+})
+
+function initializePreviewAdjustments() {
+  if (!preview.value) return
+  applyEarlyDiscount.value = preview.value.earlyDays > 0
+  applyLateFee.value = preview.value.lateDays > 0
+  applyFuelFee.value = fuelDeficitLiters.value > 0
+  earlyDiscountAmount.value = moneyAmount(preview.value.earlyDiscount)
+  lateFeeAmount.value = moneyAmount(preview.value.lateFee)
+  fuelFeeAmount.value = suggestedFuelFee.value
+}
+
+const estimatedFinalTotal = computed(() => {
+  if (!preview.value || !rental.value) return 0
+
+  const baseRental = (rental.value.totalPrice || 0) - (rental.value.discountAmount || 0)
+  const kmPenalty = moneyAmount(preview.value.kmPenalty)
+  const penaltyTotal = moneyAmount(preview.value.penaltyTotal)
+  const damageTotal = moneyAmount(preview.value.damageTotal)
+  const tollTotal = moneyAmount(preview.value.tollTotal)
+
+  let total = baseRental + kmPenalty + penaltyTotal + damageTotal + tollTotal
+  if (applyLateFee.value) total += lateFeeAmount.value
+  if (applyFuelFee.value) total += fuelFeeAmount.value
+  if (applyEarlyDiscount.value) total -= earlyDiscountAmount.value
+  return Math.max(0, total)
+})
+
+const previewExtraTotal = computed(() => {
+  if (!preview.value) return 0
+  return (
+    moneyAmount(preview.value.kmPenalty) +
+    moneyAmount(preview.value.penaltyTotal) +
+    moneyAmount(preview.value.damageTotal) +
+    moneyAmount(preview.value.tollTotal)
+  )
 })
 
 async function fetchRental() {
@@ -130,7 +207,9 @@ async function calculatePreview() {
       props.rentalId,
       form.value.endKm,
       form.value.actualReturnDate,
+      form.value.endFuelLiters ?? undefined,
     )
+    initializePreviewAdjustments()
     step.value = 'preview'
   } catch (err) {
     toast.apiError(err, 'Hesaplama yapılamadı')
@@ -146,10 +225,34 @@ async function completeReturn() {
   try {
     const completeRequest: VehicleReturnForm = {
       endKm: form.value.endKm,
+      endFuelLiters: form.value.endFuelLiters ?? undefined,
       actualReturnDate: form.value.actualReturnDate,
-      notes: form.value.notes.trim(),
+      notes: form.value.notes.trim() || undefined,
     }
+
+    if (preview.value && preview.value.earlyDays > 0) {
+      completeRequest.applyEarlyDiscount = applyEarlyDiscount.value
+      if (applyEarlyDiscount.value) {
+        completeRequest.earlyDiscountAmount = earlyDiscountAmount.value
+      }
+    }
+
+    if (preview.value && preview.value.lateDays > 0) {
+      completeRequest.applyLateFee = applyLateFee.value
+      if (applyLateFee.value) {
+        completeRequest.lateFeeAmount = lateFeeAmount.value
+      }
+    }
+
+    if (preview.value && fuelDeficitLiters.value > 0) {
+      completeRequest.applyFuelFee = applyFuelFee.value
+      if (applyFuelFee.value) {
+        completeRequest.fuelFeeAmount = fuelFeeAmount.value
+      }
+    }
+
     const updatedRental = await rentalsApi.complete(props.rentalId, completeRequest)
+    rental.value = updatedRental
     toast.success('Kiralama başarıyla sonlandırıldı')
     emit('completed', updatedRental)
     step.value = 'completed'
@@ -169,12 +272,12 @@ async function downloadCompletionPdf() {
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `kiralama-teslim-tutanagi-${rental.value.rentalNumber}.pdf`
+    link.download = `iade-tamamlama-tutanagi-${rental.value.rentalNumber}.pdf`
     document.body.appendChild(link)
     link.click()
     link.remove()
     URL.revokeObjectURL(url)
-    toast.success('Teslim tutanağı indirildi')
+    toast.success('İade / tamamlama tutanağı indirildi')
   } catch (err) {
     toast.apiError(err, 'PDF indirilemedi')
   } finally {
@@ -186,15 +289,29 @@ function handleClose() {
   reset()
   step.value = 'input'
   preview.value = null
+  applyEarlyDiscount.value = false
+  applyLateFee.value = false
+  applyFuelFee.value = false
+  earlyDiscountAmount.value = 0
+  lateFeeAmount.value = 0
+  fuelFeeAmount.value = 0
+  fuelPricePerLiter.value = 0
   rental.value = null
   vehicle.value = null
-  form.value = { endKm: 0, actualReturnDate: '', notes: '' }
+  form.value = { endKm: 0, endFuelLiters: null, actualReturnDate: '', notes: '' }
   emit('close')
 }
 
 function handleBack() {
   step.value = 'input'
   preview.value = null
+  applyEarlyDiscount.value = false
+  applyLateFee.value = false
+  applyFuelFee.value = false
+  earlyDiscountAmount.value = 0
+  lateFeeAmount.value = 0
+  fuelFeeAmount.value = 0
+  fuelPricePerLiter.value = 0
 }
 
 function formatMoney(amount: number | { amount: number; currency: string } | null | undefined): string {
@@ -218,6 +335,11 @@ const vehicleLabel = computed(() => {
     return `${rental.value.vehiclePlate} · ${rental.value.vehicleName}`
   }
   return '—'
+})
+
+watch([fuelPricePerLiter, fuelDeficitLiters, applyFuelFee], () => {
+  if (!applyFuelFee.value || fuelDeficitLiters.value <= 0) return
+  fuelFeeAmount.value = suggestedFuelFee.value
 })
 
 watch(
@@ -289,6 +411,10 @@ watch(
               <span class="rc-meta-row__label">Çıkış KM</span>
               <span class="rc-meta-row__value rc-num">{{ rental.startKm.toLocaleString('tr-TR') }} km</span>
             </div>
+            <div v-if="rental.startFuelLiters != null" class="rc-meta-row">
+              <span class="rc-meta-row__label">Çıkış depo</span>
+              <span class="rc-meta-row__value rc-num">{{ rental.startFuelLiters.toLocaleString('tr-TR') }} L</span>
+            </div>
           </div>
         </div>
 
@@ -340,6 +466,20 @@ watch(
               </span>
               <span v-if="hasError('actualReturnDate')" class="rc-field__error">{{ getError('actualReturnDate') }}</span>
             </div>
+            <div class="rc-field" :class="{ 'rc-field--error': hasError('endFuelLiters') }">
+              <label class="rc-field__label">İade depo (litre)</label>
+              <input
+                v-model.number="form.endFuelLiters"
+                class="rc-input"
+                type="number"
+                min="0"
+                step="0.1"
+                placeholder="Örn. 30"
+                @blur="touch('endFuelLiters')"
+              />
+              <span class="rc-field__hint">İade anındaki yakıt miktarı (litre)</span>
+              <span v-if="hasError('endFuelLiters')" class="rc-field__error">{{ getError('endFuelLiters') }}</span>
+            </div>
             <div class="rc-field rcr-modal-form-grid__full">
               <label class="rc-field__label">İade notu (opsiyonel)</label>
               <textarea
@@ -351,6 +491,19 @@ watch(
             </div>
           </div>
         </form>
+
+        <div v-if="rental" class="rcr-modal-docs">
+          <DocumentsSection
+            :reference-type="'RENTAL'"
+            :reference-id="rental.id"
+            title="İade belgeleri"
+            :upload-types="RETURN_UPLOAD_TYPES"
+          />
+          <p class="rcr-modal-docs__hint">
+            İade fotoğrafı ve imzalı iade/tamamlama tutanağını burada yükleyebilirsiniz.
+            İşlemi tamamlamadan da belge eklenebilir.
+          </p>
+        </div>
       </template>
 
       <!-- Step: preview -->
@@ -373,6 +526,104 @@ watch(
             <span class="rcr-return-preview-box__label">Geç iade</span>
             <span class="rcr-return-preview-box__value">{{ preview.lateDays }} gün</span>
           </div>
+          <div v-if="preview.earlyDays > 0" class="rcr-return-preview-box rcr-return-preview-box--ok">
+            <span class="rcr-return-preview-box__label">Erken iade</span>
+            <span class="rcr-return-preview-box__value">{{ preview.earlyDays }} gün</span>
+          </div>
+          <div v-if="fuelDeficitLiters > 0" class="rcr-return-preview-box rcr-return-preview-box--warn">
+            <span class="rcr-return-preview-box__label">Depo farkı</span>
+            <span class="rcr-return-preview-box__value rc-num">{{ fuelDeficitLiters.toLocaleString('tr-TR') }} L</span>
+          </div>
+        </div>
+
+        <div
+          v-if="fuelDeficitLiters > 0"
+          class="rc-card rcr-return-adjustments"
+          style="margin-top: 14px"
+        >
+          <div class="rc-card__head"><div class="rc-card__title">Yakıt / depo düzenlemeleri</div></div>
+          <div class="rcr-return-adjustments__body">
+            <div class="rcr-return-adjustment">
+              <label class="rcr-return-adjustment__toggle">
+                <input v-model="applyFuelFee" type="checkbox" />
+                <span>Benzin ücretini uygula ({{ fuelDeficitLiters.toLocaleString('tr-TR') }} L eksik)</span>
+              </label>
+              <div v-if="applyFuelFee" class="rcr-return-adjustment__amount">
+                <label class="rc-field__label">Litre fiyatı (₺)</label>
+                <input
+                  v-model.number="fuelPricePerLiter"
+                  class="rc-input"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="Örn. 42.50"
+                />
+                <label class="rc-field__label">Ücret tutarı</label>
+                <input
+                  v-model.number="fuelFeeAmount"
+                  class="rc-input"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                />
+                <span class="rc-field__hint">
+                  Önerilen: {{ fmtTRY(suggestedFuelFee) }}
+                  <template v-if="fuelPricePerLiter > 0">
+                    ({{ fuelDeficitLiters.toLocaleString('tr-TR') }} L × {{ fmtTRY(fuelPricePerLiter) }})
+                  </template>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div
+          v-if="preview.earlyDays > 0 || preview.lateDays > 0"
+          class="rc-card rcr-return-adjustments"
+          style="margin-top: 14px"
+        >
+          <div class="rc-card__head"><div class="rc-card__title">Tarih farkı düzenlemeleri</div></div>
+          <div class="rcr-return-adjustments__body">
+            <div v-if="preview.earlyDays > 0" class="rcr-return-adjustment">
+              <label class="rcr-return-adjustment__toggle">
+                <input v-model="applyEarlyDiscount" type="checkbox" />
+                <span>Erken iade indirimini uygula ({{ preview.earlyDays }} gün)</span>
+              </label>
+              <div v-if="applyEarlyDiscount" class="rcr-return-adjustment__amount">
+                <label class="rc-field__label">İndirim tutarı</label>
+                <input
+                  v-model.number="earlyDiscountAmount"
+                  class="rc-input"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                />
+                <span class="rc-field__hint">
+                  Önerilen: {{ formatMoney(preview.earlyDiscount) }}
+                </span>
+              </div>
+            </div>
+
+            <div v-if="preview.lateDays > 0" class="rcr-return-adjustment">
+              <label class="rcr-return-adjustment__toggle">
+                <input v-model="applyLateFee" type="checkbox" />
+                <span>Geç iade cezasını uygula ({{ preview.lateDays }} gün)</span>
+              </label>
+              <div v-if="applyLateFee" class="rcr-return-adjustment__amount">
+                <label class="rc-field__label">Ceza tutarı</label>
+                <input
+                  v-model.number="lateFeeAmount"
+                  class="rc-input"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                />
+                <span class="rc-field__hint">
+                  Önerilen: {{ formatMoney(preview.lateFee) }} (günlük {{ formatMoney(rental?.dailyPrice ?? 0) }})
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="rc-card" style="margin-top: 14px">
@@ -382,9 +633,17 @@ watch(
               <span>KM ceza</span>
               <span class="rc-num">{{ formatMoney(preview.kmPenalty) }}</span>
             </div>
-            <div v-if="(preview.lateFee?.amount ?? 0) > 0" class="rcr-price-line">
+            <div v-if="applyEarlyDiscount && earlyDiscountAmount > 0" class="rcr-price-line rcr-price-line--discount">
+              <span>Erken iade indirimi</span>
+              <span class="rc-num">−{{ fmtTRY(earlyDiscountAmount) }}</span>
+            </div>
+            <div v-if="applyLateFee && lateFeeAmount > 0" class="rcr-price-line">
               <span>Geç iade bedeli</span>
-              <span class="rc-num">{{ formatMoney(preview.lateFee) }}</span>
+              <span class="rc-num">{{ fmtTRY(lateFeeAmount) }}</span>
+            </div>
+            <div v-if="applyFuelFee && fuelFeeAmount > 0" class="rcr-price-line">
+              <span>Benzin / depo farkı</span>
+              <span class="rc-num">{{ fmtTRY(fuelFeeAmount) }}</span>
             </div>
             <template v-if="preview.penalties?.length">
               <div v-for="(p, i) in preview.penalties" :key="`p-${i}`" class="rcr-price-line">
@@ -406,10 +665,14 @@ watch(
             </template>
             <hr class="rc-hr" />
             <div class="rcr-return-preview-total">
-              <span>Genel toplam</span>
+              <span>Ek ücretler toplamı</span>
               <span class="rc-num">
-                {{ preview.grandTotal?.amount === 0 ? 'Yok' : formatMoney(preview.grandTotal) }}
+                {{ previewExtraTotal === 0 ? 'Yok' : fmtTRY(previewExtraTotal) }}
               </span>
+            </div>
+            <div class="rcr-return-preview-total rcr-return-preview-total--final">
+              <span>Tahmini nihai tutar</span>
+              <span class="rc-num">{{ fmtTRY(estimatedFinalTotal) }}</span>
             </div>
           </div>
         </div>
@@ -423,12 +686,21 @@ watch(
           </div>
           <h3 class="rcr-return-modal__done-title">İade tamamlandı</h3>
           <p class="rcr-return-modal__done-sub">
-            Araç müsait duruma alındı. Teslim tutanağını PDF olarak indirebilirsiniz.
+            Araç müsait duruma alındı. İade / tamamlama tutanağını PDF olarak indirebilirsiniz.
           </p>
           <RcButton variant="accent" :disabled="downloadingPdf" @click="downloadCompletionPdf">
             <RcIcon name="download" :size="14" />
-            {{ downloadingPdf ? 'İndiriliyor…' : 'Teslim tutanağı (PDF)' }}
+            {{ downloadingPdf ? 'İndiriliyor…' : 'İade / Tamamlama Tutanağı (PDF)' }}
           </RcButton>
+
+          <div v-if="rental" class="rcr-modal-docs rcr-modal-docs--completed">
+            <DocumentsSection
+              :reference-type="'RENTAL'"
+              :reference-id="rental.id"
+              title="İade belgeleri"
+              :upload-types="RETURN_UPLOAD_TYPES"
+            />
+          </div>
         </div>
       </template>
     </template>
