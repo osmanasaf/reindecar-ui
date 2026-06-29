@@ -1,10 +1,12 @@
 import type { IconName } from '@/components/icons'
+import type { FeatureKey } from '@/types/feature'
 
 export interface NavItem {
   name: string
   label: string
   icon: IconName
   adminOnly?: boolean
+  featureKey?: FeatureKey
 }
 
 export interface NavSection {
@@ -19,6 +21,13 @@ export const navSections: NavSection[] = [
       { name: 'rentals', label: 'Kiralamalar', icon: 'key' },
       { name: 'vehicles', label: 'Araçlar', icon: 'car' },
       { name: 'customers', label: 'Müşteriler', icon: 'users' },
+    ],
+  },
+  {
+    section: 'Operasyon',
+    items: [
+      { name: 'service-manifests', label: 'UETDS Manifestoları', icon: 'globe', featureKey: 'UETDS_MANIFESTS' },
+      { name: 'kabis-notifications', label: 'KABİS Bildirimleri', icon: 'shield', featureKey: 'KABIS_NOTIFICATIONS' },
     ],
   },
   {
@@ -108,6 +117,18 @@ export function isNavItemActive(routeName: string | undefined, path: string, ite
 
   if (itemName === 'km-packages') {
     return routeName === 'km-packages' || path.startsWith('/km-packages')
+  }
+
+  if (itemName === 'service-manifests') {
+    return routeName === 'service-manifests'
+      || routeName === 'service-manifest-detail'
+      || path.startsWith('/service-manifests')
+  }
+
+  if (itemName === 'kabis-notifications') {
+    return routeName === 'kabis-notifications'
+      || routeName === 'kabis-notification-detail'
+      || path.startsWith('/kabis/notifications')
   }
 
   if (itemName === 'settings') {

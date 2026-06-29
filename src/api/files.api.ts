@@ -28,6 +28,7 @@ export type FileUploadType =
     | 'MAINTENANCE_INVOICE'
     | 'SERVICE_ROUTE_PERMIT'
     | 'PASSENGER_LIST'
+    | 'UETDS_SEFER_MANIFEST'
     | 'PROFILE_PHOTO'
     | 'OTHER'
 
@@ -57,6 +58,7 @@ export const FILE_UPLOAD_TYPE_LABELS: Record<FileUploadType, string> = {
     MAINTENANCE_INVOICE: 'Bakım Faturası',
     SERVICE_ROUTE_PERMIT: 'Servis Güzergah İzni',
     PASSENGER_LIST: 'Yolcu Listesi',
+    UETDS_SEFER_MANIFEST: 'UETDS Sefer Manifestosu',
     PROFILE_PHOTO: 'Profil Fotoğrafı',
     OTHER: 'Diğer',
 }

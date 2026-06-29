@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed, readonly } from 'vue'
 import { authApi, tokenStorage } from '@/api'
 import { tokenManager } from '@/services/tokenManager'
+import { useFeaturesStore } from './features.store'
 import type { User, LoginForm, Role } from '@/types'
 import type { RegisterInvitedUserRequest, RegisterTenantRequest } from '@/api/auth.api'
 
@@ -124,6 +125,7 @@ export const useAuthStore = defineStore('auth', () => {
             tokenManager.logout()
             removeTokenListeners()
             tokenStatus.value = { isValid: false, timeToExpiry: -1 }
+            useFeaturesStore().reset()
         }
     }
 

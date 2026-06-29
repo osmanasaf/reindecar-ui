@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
 import { RcIcon, RcAntlerMark } from '@/components/icons'
 import { RcAvatar, RcKbd } from '@/components/rc'
-import { useAuthStore } from '@/stores'
+import { useAuthStore, useFeaturesStore } from '@/stores'
 import { useShellNavCounts } from '@/composables/useShellNavCounts'
 import { useShellSearch } from '@/composables/useShellSearch'
 import {
@@ -26,26 +26,37 @@ const emit = defineEmits<{
 
 const route = useRoute()
 const authStore = useAuthStore()
+const featuresStore = useFeaturesStore()
 const { countForNavItem } = useShellNavCounts()
 const { openSearch } = useShellSearch()
 
-const searchKbdLabel = computed(() =>
-  typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.platform)
-    ? '⌘K'
-    : 'Ctrl+K',
-)
+function isNavItemVisible(item: NavItem): boolean {
+  if (item.adminOnly && !authStore.isAdmin) {
+    return false
+  }
+  if (item.featureKey && !authStore.isSuperAdmin && !featuresStore.isEnabled(item.featureKey)) {
+    return false
+  }
+  return true
+}
 
 const visibleSections = computed(() =>
   navSections
     .map((section) => ({
       ...section,
       section:
-        section.section === 'Sistem' && section.items.filter((i) => !i.adminOnly || authStore.isAdmin).length <= 1
+        section.section === 'Sistem' && section.items.filter(isNavItemVisible).length <= 1
           ? undefined
           : section.section,
-      items: section.items.filter((item) => !item.adminOnly || authStore.isAdmin),
+      items: section.items.filter(isNavItemVisible),
     }))
     .filter((section) => section.items.length > 0),
+)
+
+const searchKbdLabel = computed(() =>
+  typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.platform)
+    ? '⌘K'
+    : 'Ctrl+K',
 )
 
 const userMeta = computed(() => {

@@ -23,3 +23,9 @@ export * from './installment-early-close'
 export * from './reference'
 
 export * from './notification'
+
+export * from './feature'
+
+export * from './manifest'
+
+export * from './kabis'

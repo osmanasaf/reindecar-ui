@@ -3,7 +3,7 @@ import { ref, watch, computed } from 'vue'
 import { RcModal, RcButton } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
 import { rentalsApi } from '@/api'
-import { useToast, useValidation, rules } from '@/composables'
+import { useToast, useValidation, rules, useFeatures } from '@/composables'
 import { fmtTRY, formatDate } from '@/utils/format'
 import type { Rental, Vehicle } from '@/types'
 import DocumentsSection from '@/components/shared/DocumentsSection.vue'
@@ -29,6 +29,8 @@ const props = defineProps<{
 const emit = defineEmits<{ close: []; activated: [rental: Rental] }>()
 
 const toast = useToast()
+const { isEnabled } = useFeatures()
+const fuelTrackingEnabled = computed(() => isEnabled('RENTAL_FUEL_TRACKING'))
 const submitting = ref(false)
 const downloadingPdf = ref(false)
 const step = ref<'form' | 'completed'>('form')
@@ -233,7 +235,7 @@ async function downloadHandoverPdf() {
         </span>
         <span v-if="hasError('startKm')" class="rc-field__error">{{ getError('startKm') }}</span>
       </div>
-      <div class="rc-field" :class="{ 'rc-field--error': hasError('startFuelLiters') }">
+      <div v-if="fuelTrackingEnabled" class="rc-field" :class="{ 'rc-field--error': hasError('startFuelLiters') }">
         <label class="rc-field__label">Depo (litre)</label>
         <input
           v-model.number="startFuelLiters"

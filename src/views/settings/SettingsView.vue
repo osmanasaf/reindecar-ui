@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores'
 import { useAppSettingsStore } from '@/stores/appSettings.store'
 import { useToast } from '@/composables'
@@ -10,11 +11,13 @@ import BrandsManager from './BrandsManager.vue'
 import CitiesManager from './CitiesManager.vue'
 import ColorsManager from './ColorsManager.vue'
 import CategoriesManager from './CategoriesManager.vue'
+import FeaturesManager from './FeaturesManager.vue'
 
-type SettingsTab = 'profile' | 'password' | 'notifications' | 'general' | 'reference-data'
+type SettingsTab = 'profile' | 'password' | 'notifications' | 'general' | 'features' | 'reference-data'
 type RefDataTab = 'brands' | 'cities' | 'colors' | 'categories'
 
 const authStore = useAuthStore()
+const route = useRoute()
 const appSettingsStore = useAppSettingsStore()
 const toast = useToast()
 
@@ -51,13 +54,14 @@ const selectedCurrency = ref('TRY')
 const savingCurrency = ref(false)
 
 const navItems = computed(() => {
-  const items: { id: SettingsTab; label: string; icon: 'user' | 'key' | 'bell' | 'folder' | 'sliders' }[] = [
+  const items: { id: SettingsTab; label: string; icon: 'user' | 'key' | 'bell' | 'folder' | 'sliders' | 'sparkle' }[] = [
     { id: 'profile', label: 'Profil', icon: 'user' },
     { id: 'password', label: 'Şifre', icon: 'key' },
     { id: 'notifications', label: 'Bildirimler', icon: 'bell' },
   ]
   if (authStore.isAdmin) {
     items.push({ id: 'general', label: 'Genel', icon: 'sliders' })
+    items.push({ id: 'features', label: 'Modüller', icon: 'sparkle' })
     items.push({ id: 'reference-data', label: 'Referans Veriler', icon: 'folder' })
   }
   return items
@@ -75,10 +79,16 @@ const sectionTitles: Record<SettingsTab, string> = {
   password: 'Şifre Değiştir',
   notifications: 'Bildirim Ayarları',
   general: 'Genel Ayarlar',
+  features: 'Modül Ayarları',
   'reference-data': 'Referans Veriler',
 }
 
 onMounted(async () => {
+  const tab = route.query.tab
+  if (tab === 'features' && authStore.isAdmin) {
+    activeTab.value = 'features'
+  }
+
   const fullName = authStore.user?.fullName || ''
   const nameParts = fullName.split(' ')
   profileForm.value.firstName = nameParts[0] || ''
@@ -305,6 +315,8 @@ async function handleCurrencySave() {
               </div>
             </form>
           </template>
+
+          <FeaturesManager v-else-if="activeTab === 'features'" />
 
           <section v-else-if="activeTab === 'reference-data'">
             <RcTabs

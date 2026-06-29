@@ -62,3 +62,7 @@ export { FILE_UPLOAD_TYPE_LABELS, ALLOWED_TYPES_BY_REFERENCE } from './files.api
 export { notificationsApi } from './notifications.api'
 export { tenantSettingsApi } from './tenant-settings.api'
 export type { TenantSettings } from './tenant-settings.api'
+export { featuresApi, adminTenantFeaturesApi } from './features.api'
+export type { UpdateTenantFeaturePayload } from './features.api'
+export { serviceManifestsApi } from './service-manifests.api'
+export { kabisApi } from './kabis.api'

@@ -216,6 +216,30 @@ const router = createRouter({
             meta: { requiresAuth: true }
         },
         {
+            path: '/service-manifests',
+            name: 'service-manifests',
+            component: () => import('@/views/manifests/ServiceManifestListView.vue'),
+            meta: { requiresAuth: true, featureKey: 'UETDS_MANIFESTS' }
+        },
+        {
+            path: '/service-manifests/:id',
+            name: 'service-manifest-detail',
+            component: () => import('@/views/manifests/ServiceManifestDetailView.vue'),
+            meta: { requiresAuth: true, featureKey: 'UETDS_MANIFESTS' }
+        },
+        {
+            path: '/kabis/notifications',
+            name: 'kabis-notifications',
+            component: () => import('@/views/kabis/KabisNotificationListView.vue'),
+            meta: { requiresAuth: true, featureKey: 'KABIS_NOTIFICATIONS' }
+        },
+        {
+            path: '/kabis/notifications/:id',
+            name: 'kabis-notification-detail',
+            component: () => import('@/views/kabis/KabisNotificationDetailView.vue'),
+            meta: { requiresAuth: true, featureKey: 'KABIS_NOTIFICATIONS' }
+        },
+        {
             path: '/:pathMatch(.*)*',
             redirect: '/'
         }

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { rentalsApi, vehiclesApi } from '@/api'
-import { useValidation, rules, useToast } from '@/composables'
+import { useValidation, rules, useToast, useFeatures } from '@/composables'
 import { RcModal, RcButton } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
 import { fmtTRY } from '@/utils/format'
@@ -30,6 +30,8 @@ const emit = defineEmits<{
 }>()
 
 const toast = useToast()
+const { isEnabled } = useFeatures()
+const fuelTrackingEnabled = computed(() => isEnabled('RENTAL_FUEL_TRACKING'))
 const loading = ref(false)
 const calculating = ref(false)
 const saving = ref(false)
@@ -411,7 +413,7 @@ watch(
               <span class="rc-meta-row__label">Çıkış KM</span>
               <span class="rc-meta-row__value rc-num">{{ rental.startKm.toLocaleString('tr-TR') }} km</span>
             </div>
-            <div v-if="rental.startFuelLiters != null" class="rc-meta-row">
+            <div v-if="fuelTrackingEnabled && rental.startFuelLiters != null" class="rc-meta-row">
               <span class="rc-meta-row__label">Çıkış depo</span>
               <span class="rc-meta-row__value rc-num">{{ rental.startFuelLiters.toLocaleString('tr-TR') }} L</span>
             </div>
@@ -466,7 +468,7 @@ watch(
               </span>
               <span v-if="hasError('actualReturnDate')" class="rc-field__error">{{ getError('actualReturnDate') }}</span>
             </div>
-            <div class="rc-field" :class="{ 'rc-field--error': hasError('endFuelLiters') }">
+            <div v-if="fuelTrackingEnabled" class="rc-field" :class="{ 'rc-field--error': hasError('endFuelLiters') }">
               <label class="rc-field__label">İade depo (litre)</label>
               <input
                 v-model.number="form.endFuelLiters"
@@ -530,14 +532,14 @@ watch(
             <span class="rcr-return-preview-box__label">Erken iade</span>
             <span class="rcr-return-preview-box__value">{{ preview.earlyDays }} gün</span>
           </div>
-          <div v-if="fuelDeficitLiters > 0" class="rcr-return-preview-box rcr-return-preview-box--warn">
+          <div v-if="fuelTrackingEnabled && fuelDeficitLiters > 0" class="rcr-return-preview-box rcr-return-preview-box--warn">
             <span class="rcr-return-preview-box__label">Depo farkı</span>
             <span class="rcr-return-preview-box__value rc-num">{{ fuelDeficitLiters.toLocaleString('tr-TR') }} L</span>
           </div>
         </div>
 
         <div
-          v-if="fuelDeficitLiters > 0"
+          v-if="fuelTrackingEnabled && fuelDeficitLiters > 0"
           class="rc-card rcr-return-adjustments"
           style="margin-top: 14px"
         >
