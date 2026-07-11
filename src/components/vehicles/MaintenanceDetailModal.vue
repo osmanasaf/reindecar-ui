@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useEnumTranslations } from '@/composables'
 import DocumentsSection from '@/components/shared/DocumentsSection.vue'
+import FeatureGate from '@/components/common/FeatureGate.vue'
 import { RcModal, RcBadge, RcButton } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
 import type { MaintenanceHistoryItem, MaintenanceRecord } from '@/types'
@@ -96,11 +97,13 @@ function handleEdit() {
         </div>
       </div>
 
-      <DocumentsSection
-        reference-type="MAINTENANCE"
-        :reference-id="maintenance.id"
-        title="Bakım Belgeleri"
-      />
+      <FeatureGate feature="MAINTENANCE_ATTACHMENTS">
+        <DocumentsSection
+          reference-type="MAINTENANCE"
+          :reference-id="maintenance.id"
+          title="Bakım Belgeleri"
+        />
+      </FeatureGate>
     </div>
 
     <template #footer>

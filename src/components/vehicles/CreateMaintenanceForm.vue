@@ -4,6 +4,7 @@ import { maintenancesApi, serviceProvidersApi, vehiclesApi } from '@/api'
 import { useToast } from '@/composables'
 import { SearchableSelect } from '@/components/common'
 import DocumentsSection from '@/components/shared/DocumentsSection.vue'
+import FeatureGate from '@/components/common/FeatureGate.vue'
 import DatePicker from '@/components/base/DatePicker.vue'
 import { RcModal, RcButton, RcField, RcInput } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
@@ -256,11 +257,13 @@ onMounted(async () => {
           {{ selectedTypeCard?.label }} · belgeleri şimdi ekleyebilirsiniz.
         </div>
       </div>
-      <DocumentsSection
-        reference-type="MAINTENANCE"
-        :reference-id="savedMaintenanceId"
-        title="Bakım Belgeleri"
-      />
+      <FeatureGate feature="MAINTENANCE_ATTACHMENTS">
+        <DocumentsSection
+          reference-type="MAINTENANCE"
+          :reference-id="savedMaintenanceId"
+          title="Bakım Belgeleri"
+        />
+      </FeatureGate>
     </div>
 
     <form v-else id="create-maintenance-form" class="rc-veh-modal-form" @submit.prevent="handleSubmit">
