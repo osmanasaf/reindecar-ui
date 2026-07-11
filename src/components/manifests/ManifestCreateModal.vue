@@ -10,6 +10,9 @@ import type { CreateUetdsManifestRequest } from '@/types/manifest'
 
 const props = defineProps<{
   open: boolean
+  rentalId?: number
+  rentalLabel?: string
+  vehiclePlate?: string
 }>()
 
 const emit = defineEmits<{
@@ -25,6 +28,8 @@ const previewing = ref(false)
 const rentals = ref<Rental[]>([])
 const selectedFile = ref<File | null>(null)
 const plateWarning = ref('')
+
+const rentalLocked = computed(() => props.rentalId != null)
 
 const form = ref({
   rentalId: '' as string | number,
@@ -52,7 +57,12 @@ watch(
   (isOpen) => {
     if (!isOpen) return
     resetForm()
-    void loadRentals()
+    if (rentalLocked.value) {
+      form.value.rentalId = props.rentalId as number
+      form.value.vehiclePlate = props.vehiclePlate ?? ''
+    } else {
+      void loadRentals()
+    }
   },
 )
 
@@ -205,7 +215,8 @@ function onFileChange(event: Event) {
       </div>
 
       <RcField label="Servis kiralaması *">
-        <select v-model="form.rentalId" class="rc-input" :disabled="loadingRentals">
+        <input v-if="rentalLocked" class="rc-input" :value="rentalLabel || `Kiralama #${form.rentalId}`" disabled />
+        <select v-else v-model="form.rentalId" class="rc-input" :disabled="loadingRentals">
           <option value="">Kiralama seçin</option>
           <option v-for="rental in rentals" :key="rental.id" :value="rental.id">
             {{ rental.rentalNumber }} · {{ rental.vehiclePlate || '—' }} · {{ rental.customerName || 'Müşteri' }}
