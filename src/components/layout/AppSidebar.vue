@@ -31,6 +31,9 @@ const { countForNavItem } = useShellNavCounts()
 const { openSearch } = useShellSearch()
 
 function isNavItemVisible(item: NavItem): boolean {
+  if (item.superAdminOnly && !authStore.isSuperAdmin) {
+    return false
+  }
   if (item.adminOnly && !authStore.isAdmin) {
     return false
   }

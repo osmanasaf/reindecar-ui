@@ -240,6 +240,18 @@ const router = createRouter({
             meta: { requiresAuth: true, featureKey: 'KABIS_NOTIFICATIONS' }
         },
         {
+            path: '/admin/tenants',
+            name: 'admin-tenants',
+            component: () => import('@/views/admin/AdminTenantListView.vue'),
+            meta: { requiresAuth: true, roles: ['SUPER_ADMIN'] }
+        },
+        {
+            path: '/admin/tenants/:id',
+            name: 'admin-tenant-detail',
+            component: () => import('@/views/admin/AdminTenantDetailView.vue'),
+            meta: { requiresAuth: true, roles: ['SUPER_ADMIN'] }
+        },
+        {
             path: '/:pathMatch(.*)*',
             redirect: '/'
         }

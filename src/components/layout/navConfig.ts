@@ -6,6 +6,7 @@ export interface NavItem {
   label: string
   icon: IconName
   adminOnly?: boolean
+  superAdminOnly?: boolean
   featureKey?: FeatureKey
 }
 
@@ -47,6 +48,12 @@ export const navSections: NavSection[] = [
       { name: 'users', label: 'Kullanıcılar', icon: 'user', adminOnly: true },
       { name: 'user-invitations', label: 'Davetler', icon: 'mail', adminOnly: true },
       { name: 'settings', label: 'Ayarlar', icon: 'settings' },
+    ],
+  },
+  {
+    section: 'Süper Yönetici',
+    items: [
+      { name: 'admin-tenants', label: 'Firmalar', icon: 'building', superAdminOnly: true },
     ],
   },
 ]
@@ -133,6 +140,10 @@ export function isNavItemActive(routeName: string | undefined, path: string, ite
 
   if (itemName === 'settings') {
     return routeName === 'settings' || path.startsWith('/settings')
+  }
+
+  if (itemName === 'admin-tenants') {
+    return routeName === 'admin-tenants' || routeName === 'admin-tenant-detail' || path.startsWith('/admin/tenants')
   }
 
   return routeName === itemName
