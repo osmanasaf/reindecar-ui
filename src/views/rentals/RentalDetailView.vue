@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, onActivated, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { rentalsApi } from '@/api'
-import { useToast } from '@/composables'
+import { useToast, useFeatures } from '@/composables'
 import ReturnCompleteModal from '@/components/rentals/ReturnCompleteModal.vue'
 import RentalReserveModal from '@/components/rentals/RentalReserveModal.vue'
 import RentalActivateModal from '@/components/rentals/RentalActivateModal.vue'
@@ -47,6 +47,11 @@ const VALID_TABS = new Set<TabKey>([
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
+const { isEnabled } = useFeatures()
+
+const canUseContractOffers = computed(() =>
+  isEnabled('MODIFIABLE_CONTRACTS') && isEnabled('PRICE_OFFER_DOCUMENTS'),
+)
 
 const rental = ref<Rental | null>(null)
 const vehicle = ref<Vehicle | null>(null)
@@ -638,7 +643,7 @@ onActivated(() => {
             Teslim tutanağı
           </RcButton>
           <RcButton
-            v-if="['DRAFT', 'RESERVED'].includes(rental.status)"
+            v-if="!canUseContractOffers && ['DRAFT', 'RESERVED'].includes(rental.status)"
             variant="ghost"
             size="sm"
             :disabled="generatingOfferPdf"
