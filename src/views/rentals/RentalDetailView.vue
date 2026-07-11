@@ -35,6 +35,7 @@ import { fmtTRY } from '@/utils/format'
 import { resolveEffectiveIncludedKm } from '@/utils/km'
 import type { Rental, RentalType, Vehicle, Customer, Branch, RentalDriver, KmPackage, Payment, PenaltyResponse, DamageReport, TollRecord, DamageHistoryItem, RentalExtraItem } from '@/types'
 import DocumentsSection from '@/components/shared/DocumentsSection.vue'
+import RentalContractsSection from '@/components/rentals/RentalContractsSection.vue'
 
 type TabKey = 'overview' | 'vehicle' | 'drivers' | 'km' | 'damages' | 'penalties' | 'payments' | 'docs' | 'timeline'
 
@@ -201,7 +202,7 @@ const timelineEvents = computed(() => {
   const events: { label: string; at: string; tone?: string }[] = [
     { label: 'Kiralama oluşturuldu', at: formatDateTime(r.createdAt) },
     { label: 'Planlanan başlangıç', at: formatDate(r.startDate) },
-    { label: 'Planlanan bitiş', at: formatDate(r.endDate) },
+    { label: 'Planlanan bitiş', at: rental.value.openEnded ? 'Belirsiz' : formatDate(r.endDate) },
   ]
   if (r.actualReturnDate) {
     events.push({ label: 'Fiili iade', at: formatDateTime(r.actualReturnDate), tone: 'success' })
@@ -214,7 +215,7 @@ const timelineEvents = computed(() => {
 
 
 const remainingDays = computed(() => {
-  if (!rental.value) return 0
+  if (!rental.value || rental.value.openEnded || !rental.value.endDate) return 0
   const end = new Date(rental.value.endDate)
   const today = new Date()
   const diff = Math.ceil((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
@@ -222,7 +223,7 @@ const remainingDays = computed(() => {
 })
 
 const progressPercentage = computed(() => {
-  if (!rental.value) return 0
+  if (!rental.value || rental.value.openEnded || !rental.value.endDate) return 0
   const start = new Date(rental.value.startDate)
   const end = new Date(rental.value.endDate)
   const today = new Date()
@@ -246,6 +247,7 @@ const unitPriceLabel = computed(() => {
 
 const durationLabel = computed(() => {
   if (!rental.value) return ''
+  if (rental.value.openEnded) return 'Belirsiz süre'
   const days = rental.value.totalDays
   switch (rental.value.rentalType) {
     case 'MONTHLY':
@@ -551,7 +553,8 @@ function downloadBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url)
 }
 
-function formatDate(date: string): string {
+function formatDate(date: string | null | undefined): string {
+  if (!date) return 'Belirsiz'
   return new Date(date).toLocaleDateString('tr-TR', {
     day: '2-digit',
     month: 'long',
@@ -608,11 +611,12 @@ onActivated(() => {
           <div class="rcr-detail__badges">
             <span class="rcr-detail__no">{{ rental.rentalNumber }}</span>
             <RcBadge>{{ typeLabels[rental.rentalType] || rental.rentalType }}</RcBadge>
+            <RcBadge v-if="rental.openEnded" variant="info">Açık uçlu</RcBadge>
             <RcStatusPill :status="rental.status" />
           </div>
           <h1 class="rcr-detail__title">{{ pageTitle }}</h1>
           <p class="rcr-detail__sub">
-            {{ formatDate(rental.startDate) }} → {{ formatDate(rental.endDate) }}
+            {{ formatDate(rental.startDate) }} → {{ rental.openEnded ? 'Belirsiz' : formatDate(rental.endDate) }}
             · {{ durationLabel }}
             <span v-if="branch?.name"> · {{ branch.name }}</span>
             <span v-if="returnBranch?.name && returnBranch.name !== branch?.name"> → {{ returnBranch.name }}</span>
@@ -744,7 +748,7 @@ onActivated(() => {
               </div>
               <div class="date-item">
                 <span class="label">Bitiş</span>
-                <span class="value">{{ formatDate(rental.endDate) }}</span>
+                <span class="value">{{ rental.openEnded ? 'Belirsiz' : formatDate(rental.endDate) }}</span>
               </div>
               <div class="date-item highlight">
                 <span class="label">Toplam Süre</span>
@@ -1082,6 +1086,11 @@ onActivated(() => {
 
         <!-- Belgeler -->
         <div v-show="activeTab === 'docs'" class="rc-card rcr-panel-card">
+          <RentalContractsSection
+            v-if="rental"
+            :rental-id="rental.id"
+            :customer-name="customer?.displayName ?? rental.customerName"
+          />
           <DocumentsSection reference-type="RENTAL" :reference-id="rental.id" title="Kiralama belgeleri" />
         </div>
 

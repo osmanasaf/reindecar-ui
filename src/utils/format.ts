@@ -105,7 +105,7 @@ export function safeString(value: unknown, defaultValue = '-'): string {
     return String(value)
 }
 
-export function formatDate(date: string | Date, options?: Intl.DateTimeFormatOptions): string {
+export function formatDate(date: string | Date | null | undefined, options?: Intl.DateTimeFormatOptions): string {
     if (!date) return '-'
     const d = typeof date === 'string' ? new Date(date) : date
     if (isNaN(d.getTime())) return '-'
@@ -116,7 +116,7 @@ export function formatDate(date: string | Date, options?: Intl.DateTimeFormatOpt
     })
 }
 
-export function formatDateTime(date: string | Date): string {
+export function formatDateTime(date: string | Date | null | undefined): string {
     if (!date) return '-'
     const d = typeof date === 'string' ? new Date(date) : date
     if (isNaN(d.getTime())) return '-'

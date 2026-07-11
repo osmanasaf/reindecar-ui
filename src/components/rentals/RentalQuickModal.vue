@@ -89,8 +89,10 @@ const factCards = computed(() => {
   return [
     {
       label: 'Süre',
-      value: `${props.rental.totalDays} gün`,
-      sub: `${formatDate(props.rental.startDate)} → ${formatDate(props.rental.endDate)}`,
+      value: props.rental.openEnded ? 'Belirsiz' : `${props.rental.totalDays} gün`,
+      sub: props.rental.openEnded
+        ? `${formatDate(props.rental.startDate)} → Belirsiz`
+        : `${formatDate(props.rental.startDate)} → ${formatDate(props.rental.endDate)}`,
     },
     {
       label: 'Toplam',

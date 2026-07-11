@@ -8,7 +8,11 @@ import type {
     UpdateVehicleForm,
     UpdateVehicleStatusForm,
     VehicleCategory,
-    VehicleHistory
+    VehicleHistory,
+    VehicleDetails,
+    VehicleLocation,
+    UpdateVehicleDetailsForm,
+    RecordVehicleLocationForm,
 } from '@/types'
 import { VehicleStatus } from '@/types/enums'
 
@@ -107,6 +111,37 @@ class VehiclesApiService extends BaseApi {
 
     async getHistory(id: number): Promise<VehicleHistory> {
         return this.get(`/${id}/full-history`)
+    }
+
+    async getDetails(id: number): Promise<VehicleDetails> {
+        return this.get(`/${id}/details`)
+    }
+
+    async patchDetails(id: number, payload: UpdateVehicleDetailsForm): Promise<VehicleDetails> {
+        return this.patch(`/${id}/details`, payload)
+    }
+
+    async getCurrentLocation(id: number, date?: string): Promise<VehicleLocation> {
+        return this.get(`/${id}/locations/current`, date ? { date } : undefined)
+    }
+
+    async getLocationHistory(
+        id: number,
+        params?: PaginationParams,
+    ): Promise<PaginatedResponse<VehicleLocation>> {
+        return this.getList<VehicleLocation>(`/${id}/locations`, {
+            sort: 'locationDate',
+            direction: 'desc',
+            ...params,
+        })
+    }
+
+    async recordLocation(id: number, payload: RecordVehicleLocationForm): Promise<VehicleLocation> {
+        return this.post(`/${id}/locations`, payload)
+    }
+
+    async getVehiclesAtBranchOnDate(branchId: number, date: string): Promise<VehicleLocation[]> {
+        return this.get('/locations', { branchId, date })
     }
 
     async recognizeFromPhoto(file: File): Promise<VehicleRecognitionResult> {

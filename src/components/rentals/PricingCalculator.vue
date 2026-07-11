@@ -15,6 +15,7 @@ interface Props {
   rentalType: RentalType
   startDate: string
   endDate: string
+  openEnded?: boolean
   termMonths?: number
   kmPackageId?: number
 }
@@ -36,7 +37,9 @@ const selectedLeasingPlanId = ref<number | null>(null)
 const isLeasing = computed(() => props.rentalType === 'LEASING')
 
 const canCalculate = computed(() => {
-  return props.vehicleId && props.startDate && props.endDate
+  if (!props.vehicleId || !props.startDate) return false
+  if (props.openEnded) return true
+  return !!props.endDate
 })
 
 
@@ -74,6 +77,7 @@ const kmPackageDisplayLabel = computed(() => {
 })
 
 const durationLabel = computed(() => {
+  if (props.openEnded) return 'Belirsiz süre'
   if (!priceData.value) return ''
   
   switch (props.rentalType) {
@@ -180,6 +184,9 @@ watch([() => props.vehicleId, () => props.startDate, () => props.endDate, () => 
 
 <template>
   <div class="pricing-calculator rcr-pricing-calc">
+    <div v-if="openEnded" class="rc-alert rc-alert--info" style="margin-bottom: 12px">
+      <span>Açık uçlu kiralamada gösterilen birim fiyat referans içindir; genel toplam iade sırasında hesaplanır.</span>
+    </div>
     <div v-if="loading" class="loading-state">
       <div class="spinner"></div>
       <span>Fiyat hesaplanıyor...</span>
@@ -254,7 +261,8 @@ watch([() => props.vehicleId, () => props.startDate, () => props.endDate, () => 
 
           <div class="breakdown-item total">
             <span class="label">Toplam</span>
-            <span class="value">{{ formatCurrency(priceData.finalTotal) }}</span>
+            <span v-if="openEnded" class="value">İade sırasında</span>
+            <span v-else class="value">{{ formatCurrency(priceData.finalTotal) }}</span>
           </div>
         </div>
 

@@ -2,7 +2,8 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter, useRoute, RouterLink } from 'vue-router'
 import { rentalsApi, branchesApi, kmPackagesApi, rentalExtraItemApi, customersApi } from '@/api'
-import { useToast, useValidation, rules } from '@/composables'
+import { useToast, useValidation, rules, useFeatures } from '@/composables'
+import FeatureGate from '@/components/common/FeatureGate.vue'
 import { SearchableSelect } from '@/components/common'
 import { RcIcon } from '@/components/icons'
 import { RcButton, RcKbd, RcStepper, RcPageHeader, RcField } from '@/components/rc'
@@ -26,6 +27,7 @@ import DocumentsSection from '@/components/shared/DocumentsSection.vue'
 const router = useRouter()
 const route = useRoute()
 const toast = useToast()
+const { isEnabled } = useFeatures()
 
 const currentStep = ref(1)
 const submitting = ref(false)
@@ -41,6 +43,7 @@ const selectedDriverIds = ref<number[]>([])
 const primaryDriverId = ref<number | null>(null)
 const startDate = ref('')
 const endDate = ref('')
+const openEnded = ref(false)
 const selectedTermMonths = ref<number>(12)
 const selectedLeasingPlanId = ref<number | null>(null)
 const selectedKmPackageId = ref<number | null>(null)
@@ -89,23 +92,42 @@ function addDaysYmd(ymd: string, days: number): string {
 
 const endDatePickerMin = computed(() => (startDate.value ? addDaysYmd(startDate.value, 1) : undefined))
 
+const openEndedEnabled = computed(
+  () => isEnabled('OPEN_ENDED_RENTAL') && !isLeasing.value && !isService.value,
+)
+
+const pricingEndDate = computed(() => {
+  if (openEnded.value && !endDate.value && startDate.value) {
+    return addDaysYmd(startDate.value, 1)
+  }
+  return endDate.value
+})
+
 watch(startDate, (newStart) => {
-  if (!newStart || !endDate.value) return
+  if (!newStart || !endDate.value || openEnded.value) return
   const minEnd = addDaysYmd(newStart, 1)
   if (endDate.value < minEnd) {
     endDate.value = ''
   }
 })
 
+watch(openEnded, (enabled) => {
+  if (enabled) {
+    endDate.value = ''
+  }
+})
+
 const rentalDateFields = computed(() => ({
   startDate: { value: startDate.value, rules: [rules.required('Başlangıç tarihi seçiniz')] },
-  endDate: {
-    value: endDate.value,
-    rules: [
-      rules.required('Bitiş tarihi seçiniz'),
-      rules.dateAfter(startDate, 'Bitiş tarihi başlangıçtan sonra olmalıdır')
-    ]
-  }
+  endDate: openEnded.value
+    ? { value: endDate.value, rules: [] }
+    : {
+        value: endDate.value,
+        rules: [
+          rules.required('Bitiş tarihi seçiniz'),
+          rules.dateAfter(startDate, 'Bitiş tarihi başlangıçtan sonra olmalıdır'),
+        ],
+      },
 }))
 const { getError, hasError, touch } = useValidation(() => rentalDateFields.value)
 
@@ -140,7 +162,7 @@ const currentStepLabel = computed(() => wizardSteps.value.find((s) => s.id === c
 const canProceed = computed(() => {
   switch (currentStep.value) {
     case 1: return !!rentalType.value
-    case 2: return !!startDate.value && !!endDate.value && validateDates()
+    case 2: return !!startDate.value && validateDates()
     case 3: return !!selectedVehicleId.value
     case 4:
       return !!selectedCustomerId.value &&
@@ -161,16 +183,18 @@ const isLeasing = computed(() => rentalType.value === RentalType.LEASING)
 const isService = computed(() => rentalType.value === RentalType.SERVICE)
 
 function validateDates(): boolean {
-  if (!startDate.value || !endDate.value) return false
+  if (!startDate.value) return false
+  if (openEnded.value) return true
+  if (!endDate.value) return false
   const start = new Date(startDate.value)
   const end = new Date(endDate.value)
   if (end <= start) return false
-  
+
   if (rentalType.value === RentalType.LEASING) {
     const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
     if (days < 365) return false
   }
-  
+
   return true
 }
 
@@ -206,7 +230,7 @@ function canGoToStep(step: number): boolean {
 function isStepComplete(step: number): boolean {
   switch (step) {
     case 1: return !!rentalType.value
-    case 2: return !!startDate.value && !!endDate.value && validateDates()
+    case 2: return !!startDate.value && validateDates()
     case 3: return !!selectedVehicleId.value
     case 4:
       return !!selectedCustomerId.value &&
@@ -360,7 +384,8 @@ async function handleSubmit() {
       branchId: selectedBranchId.value,
       returnBranchId: selectedReturnBranchId.value || selectedBranchId.value,
       startDate: startDate.value,
-      endDate: endDate.value,
+      endDate: openEnded.value ? endDate.value || undefined : endDate.value,
+      openEnded: openEnded.value || undefined,
       termMonths: rentalType.value === RentalType.LEASING ? selectedTermMonths.value : undefined,
       kmPackageId: selectedKmPackageId.value || undefined,
       customIncludedKm: customIncludedKm.value && customIncludedKm.value > 0 ? customIncludedKm.value : undefined,
@@ -416,6 +441,7 @@ watch(rentalType, () => {
     primaryDriverId.value = null
     startDate.value = ''
     endDate.value = ''
+    openEnded.value = false
     selectedLeasingPlanId.value = null
   }
 
@@ -572,22 +598,38 @@ function onWizardKeydown(e: KeyboardEvent) {
                 <DatePicker
                   v-model="endDate"
                   :min="endDatePickerMin"
-                  placeholder="Bitiş tarihi"
+                  :disabled="openEnded"
+                  :placeholder="openEnded ? 'Belirsiz süre' : 'Bitiş tarihi'"
                   @closed="touch('endDate')"
                 />
                 <span v-if="hasError('endDate')" class="rc-field__hint rc-field__hint--error">{{ getError('endDate') }}</span>
               </RcField>
             </div>
+            <FeatureGate feature="OPEN_ENDED_RENTAL">
+              <label v-if="openEndedEnabled" class="rcr-create__open-ended">
+                <input v-model="openEnded" type="checkbox" />
+                <span>
+                  <strong>Açık uçlu kiralama</strong>
+                  <small>Bitiş tarihi belirsiz; iade sırasında kesinleşir</small>
+                </span>
+              </label>
+            </FeatureGate>
             <p class="date-hint">
-              Geçmişe dönük kiralamalar da kaydedilebilir. Bitiş, başlangıçtan en az bir gün sonra olmalıdır.
+              <template v-if="openEnded">
+                Açık uçlu kiralamada bitiş tarihi zorunlu değildir. Araç iade edilirken süre ve tutar hesaplanır.
+              </template>
+              <template v-else>
+                Geçmişe dönük kiralamalar da kaydedilebilir. Bitiş, başlangıçtan en az bir gün sonra olmalıdır.
+              </template>
             </p>
             <div v-if="isLeasing" class="rc-alert rc-alert--info">
               <RcIcon name="info" :size="16" />
               <span>Leasing için minimum süre <strong>12 ay (365 gün)</strong> olmalıdır.</span>
             </div>
-            <div v-if="startDate && endDate && validateDates()" class="rcr-create__date-summary">
+            <div v-if="startDate && validateDates()" class="rcr-create__date-summary">
               <span>Toplam süre</span>
-              <strong>{{ isLeasing ? `${selectedTermMonths} ay` : `${totalDays} gün` }}</strong>
+              <strong v-if="openEnded">Belirsiz</strong>
+              <strong v-else>{{ isLeasing ? `${selectedTermMonths} ay` : `${totalDays} gün` }}</strong>
             </div>
           </div>
         </div>
@@ -597,7 +639,10 @@ function onWizardKeydown(e: KeyboardEvent) {
           <div class="rc-card__head">
             <div>
               <div class="rc-card__title">Araç seç</div>
-              <p class="rcr-create__card-hint">{{ startDate }} – {{ endDate }} arasında müsait araçlar.</p>
+              <p class="rcr-create__card-hint">
+                <template v-if="openEnded">{{ startDate }} itibarıyla müsait araçlar.</template>
+                <template v-else>{{ startDate }} – {{ endDate }} arasında müsait araçlar.</template>
+              </p>
             </div>
           </div>
           <div v-if="isService" class="rc-alert rc-alert--info" style="margin: 0 16px 12px">
@@ -768,12 +813,13 @@ function onWizardKeydown(e: KeyboardEvent) {
                 <div class="summary-card">
                   <h4>Fiyat</h4>
                   <PricingCalculator
-                    v-if="selectedVehicleId && selectedCustomerId"
+                    v-if="selectedVehicleId && selectedCustomerId && (openEnded ? startDate : endDate)"
                     :vehicle-id="selectedVehicleId"
                     :customer-id="selectedCustomerId"
                     :rental-type="rentalType"
                     :start-date="startDate"
-                    :end-date="endDate"
+                    :end-date="pricingEndDate"
+                    :open-ended="openEnded"
                     :term-months="isLeasing ? selectedTermMonths : undefined"
                     :km-package-id="selectedKmPackageId || undefined"
                     @calculated="handlePriceCalculated"
@@ -839,6 +885,7 @@ function onWizardKeydown(e: KeyboardEvent) {
           :type-label="rentalTypes.find((t) => t.value === rentalType)?.label ?? ''"
           :start-date="startDate"
           :end-date="endDate"
+          :open-ended="openEnded"
           :total-days="totalDays"
           :term-months="selectedTermMonths"
           :is-leasing="isLeasing"

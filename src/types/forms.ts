@@ -137,7 +137,8 @@ export interface CreateRentalForm {
     returnBranchId: number
     rentalType: RentalType
     startDate: string
-    endDate: string
+    endDate?: string
+    openEnded?: boolean
     termMonths?: number
     kmPackageId?: number
     customIncludedKm?: number
@@ -153,9 +154,24 @@ export interface CreateRentalForm {
     notes?: string
 }
 
+export interface UpdateVehicleDetailsForm {
+    hasUtts?: boolean
+}
+
+export interface RecordVehicleLocationForm {
+    branchId: number
+    locationDate?: string
+    notes?: string
+}
+
+export interface UpdateBirthDateForm {
+    birthDate: string
+}
+
 export interface UpdateRentalForm {
     startDate: string
-    endDate: string
+    endDate?: string
+    openEnded?: boolean
     branchId: number
     returnBranchId?: number
     kmPackageId?: number

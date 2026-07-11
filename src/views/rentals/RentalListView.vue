@@ -468,7 +468,8 @@ watch(searchQuery, () => {
                 {{ rental.rentalNumber || `#${rental.id}` }}
               </div>
               <div class="rcr-row__secondary">
-                {{ rental.totalDays }} gün
+                <template v-if="rental.openEnded">Belirsiz süre</template>
+                <template v-else>{{ rental.totalDays }} gün</template>
                 <span v-if="rental.branchName"> · {{ rental.branchName }}</span>
               </div>
             </td>
@@ -494,7 +495,9 @@ watch(searchQuery, () => {
               <div class="rcr-row__primary rc-num" style="font-size: 12.5px">
                 {{ formatDate(rental.startDate) }}
               </div>
-              <div class="rcr-row__secondary">→ {{ formatDate(rental.endDate) }}</div>
+              <div class="rcr-row__secondary">
+                → {{ rental.openEnded ? 'Belirsiz' : formatDate(rental.endDate) }}
+              </div>
             </td>
             <td>
               <RcBadge>{{ typeLabels[rental.rentalType] || rental.rentalType }}</RcBadge>

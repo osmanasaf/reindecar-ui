@@ -29,3 +29,5 @@ export * from './feature'
 export * from './manifest'
 
 export * from './kabis'
+
+export * from './contract'

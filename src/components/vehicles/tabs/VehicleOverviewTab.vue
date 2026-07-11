@@ -8,6 +8,7 @@ import { RcIcon } from '@/components/icons'
 import { VehicleStatus } from '@/types'
 import type { Vehicle, RentalHistoryItem, VehicleHistory } from '@/types'
 import { fmtTRY, formatDate as formatDateUtil } from '@/utils/format'
+import VehicleFleetDetailsCard from '@/components/vehicles/VehicleFleetDetailsCard.vue'
 
 const props = defineProps<{ vehicle: Vehicle }>()
 
@@ -137,6 +138,8 @@ onMounted(loadHistory)
           </div>
         </div>
       </div>
+
+      <VehicleFleetDetailsCard :vehicle-id="vehicle.id" />
 
       <div class="rc-card">
         <div class="rc-card__head">

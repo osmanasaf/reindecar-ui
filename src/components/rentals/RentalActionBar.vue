@@ -74,11 +74,15 @@ const secondary = computed((): ActionDef[] => {
     ]
   }
   if (s === RentalStatus.ACTIVE) {
-    return [
+    const actions: ActionDef[] = [
       { label: 'Ödeme al', icon: 'cash', kind: 'payment' },
       { label: 'Hasar bildir', icon: 'wrench', kind: 'damage' },
       { label: 'Ceza ekle', icon: 'tag', kind: 'penalty' },
     ]
+    if (props.rental.openEnded) {
+      actions.unshift({ label: 'Bitiş belirle', icon: 'calendar', kind: 'edit' })
+    }
+    return actions
   }
   if (s === RentalStatus.OVERDUE) {
     return [

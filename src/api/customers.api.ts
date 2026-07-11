@@ -8,6 +8,7 @@ import type {
     CreatePersonalCustomerForm,
     CreateCompanyCustomerForm,
     UpdateCompanyCustomerForm,
+    UpdateBirthDateForm,
     CreateAuthorizedPersonRequest,
     UpdateAuthorizedPersonRequest,
     CompanyAuthorizedPerson,
@@ -85,6 +86,10 @@ class CustomersApiService extends BaseApi {
         } as CreatePersonalCustomerForm | UpdateCompanyCustomerForm
 
         return this.put(`/${id}`, payload)
+    }
+
+    async patchBirthDate(id: number, payload: UpdateBirthDateForm): Promise<Customer> {
+        return this.patch(`/${id}/birth-date`, payload)
     }
 
     async addToBlacklist(id: number, reason: string): Promise<Customer> {

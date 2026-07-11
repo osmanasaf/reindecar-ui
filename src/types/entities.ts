@@ -103,6 +103,48 @@ export interface Vehicle {
 
 export type VehicleResponse = Vehicle
 
+export interface VehicleDetails {
+    id: number
+    vehicleId: number
+    hgsNumber: string | null
+    hgsBalance: number | null
+    hgsCurrency: string | null
+    hgsLastUpdated: string | null
+    kabisNumber: string | null
+    mtvDate: string | null
+    registrationDate: string | null
+    nextServiceDate: string | null
+    nextServiceKm: number | null
+    lastServiceDate: string | null
+    nextTireChangeDate: string | null
+    creditEndDate: string | null
+    remainingCreditAmount: number | null
+    creditCurrency: string | null
+    purchaseDate: string | null
+    purchasePrice: number | null
+    purchaseCurrency: string | null
+    isHgsLow: boolean
+    isServiceDueSoon: boolean
+    isMtvDueSoon: boolean
+    isTireChangeDueSoon: boolean
+    hasUtts: boolean
+}
+
+export type VehicleLocationSource = 'MANUAL' | 'BRANCH_CHANGE'
+
+export interface VehicleLocation {
+    id: number | null
+    vehicleId: number
+    branchId: number
+    branchName: string
+    locationDate: string
+    notes: string | null
+    source: VehicleLocationSource
+    recordedBy: string | null
+    recordedAt: string | null
+    fromPermanentBranch: boolean
+}
+
 export interface VehicleOverview {
     total: number
     available: number
@@ -234,7 +276,8 @@ export interface Rental {
     returnBranch?: Branch
     returnBranchName?: string
     startDate: string
-    endDate: string
+    endDate?: string | null
+    openEnded?: boolean
     actualReturnDate?: string
     totalDays: number
     startKm: number

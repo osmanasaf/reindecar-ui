@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { customersApi, referenceDataApi } from '@/api'
-import { useValidation, rules, useToast, useReferenceData } from '@/composables'
+import { useValidation, rules, useToast, useReferenceData, useFeatures } from '@/composables'
 import { SearchableSelect } from '@/components/common'
 import DatePicker from '@/components/base/DatePicker.vue'
 import { RcModal, RcButton, RcField, RcInput, RcSegTab } from '@/components/rc'
@@ -33,6 +33,7 @@ const emit = defineEmits<{
 }>()
 
 const toast = useToast()
+const { isEnabled } = useFeatures()
 const loading = ref(false)
 const saving = ref(false)
 const customerType = ref<CustomerType>(CustomerType.PERSONAL)
@@ -40,6 +41,12 @@ const displayName = ref('')
 const publicId = ref('')
 
 const isCreateMode = computed(() => props.customerId == null)
+
+const birthDateReadOnly = computed(
+  () => !isCreateMode.value && isEnabled('MANUAL_BIRTH_DATE_EDIT') && customerType.value === 'PERSONAL',
+)
+
+const originalBirthDate = ref('')
 
 const { cities, loadCities } = useReferenceData()
 const selectedCityId = ref<number | null>(null)
@@ -213,7 +220,9 @@ const formRules = computed(() => {
       nationalId: { value: form.value.nationalId, rules: [rules.required(), rules.tckn()] },
       birthDate: {
         value: form.value.birthDate,
-        rules: [rules.required(), rules.minAge(18, 'Müşteri en az 18 yaşında olmalıdır')],
+        rules: birthDateReadOnly.value
+          ? []
+          : [rules.required(), rules.minAge(18, 'Müşteri en az 18 yaşında olmalıdır')],
       },
       licenseNumber: { value: form.value.licenseNumber, rules: [rules.required()] },
       licenseClassId: {
@@ -354,6 +363,7 @@ async function loadCustomer() {
     }
     const cityMatch = cities.value.find((c) => c.name === (data.city || ''))
     selectedCityId.value = cityMatch ? cityMatch.id : null
+    originalBirthDate.value = form.value.birthDate
   } catch {
     toast.error('Müşteri bilgileri yüklenemedi')
     emit('close')
@@ -428,7 +438,7 @@ async function handleSubmit() {
         firstName: form.value.firstName,
         lastName: form.value.lastName,
         nationalId: form.value.nationalId,
-        birthDate: form.value.birthDate,
+        birthDate: birthDateReadOnly.value ? originalBirthDate.value : form.value.birthDate,
         phone: form.value.phone,
         email: form.value.email,
         address: form.value.address,
@@ -551,8 +561,16 @@ watch(
             <span v-if="hasError('nationalId')" class="rc-field__hint rc-field__hint--error">{{ getError('nationalId') }}</span>
           </RcField>
           <RcField label="Doğum tarihi" :class="{ 'rc-field--error': hasError('birthDate') }">
-            <DatePicker v-model="form.birthDate" placeholder="Doğum tarihi" @closed="handleBlur('birthDate')" />
-            <span v-if="hasError('birthDate')" class="rc-field__hint rc-field__hint--error">{{ getError('birthDate') }}</span>
+            <DatePicker
+              v-model="form.birthDate"
+              placeholder="Doğum tarihi"
+              :disabled="birthDateReadOnly"
+              @closed="touch('birthDate')"
+            />
+            <span v-if="birthDateReadOnly" class="rc-field__hint">
+              Düzeltme için müşteri detayındaki «Doğum tarihini düzelt» aksiyonunu kullanın.
+            </span>
+            <span v-else-if="hasError('birthDate')" class="rc-field__hint rc-field__hint--error">{{ getError('birthDate') }}</span>
           </RcField>
         </template>
 

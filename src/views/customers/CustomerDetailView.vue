@@ -2,12 +2,14 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { customersApi, driversApi, referenceDataApi, rentalsApi, receivablesApi } from '@/api'
-import { useToast } from '@/composables'
+import { useToast, useFeatures } from '@/composables'
+import FeatureGate from '@/components/common/FeatureGate.vue'
 import { formatPhoneInput } from '@/utils/phone'
 import { fmtTRY, formatDate as formatDateUtil } from '@/utils/format'
 import type { Customer, CustomerType, CustomerStatus, CreditRating, CustomerStats, Driver, CreateDriverForm, UpdateDriverForm, Rental, ReceivableResponse } from '@/types'
 import CompanyAuthorizedPersonsSection from '@/components/customers/CompanyAuthorizedPersonsSection.vue'
 import CustomerEditModal from '@/components/customers/CustomerEditModal.vue'
+import BirthDateCorrectionModal from '@/components/customers/BirthDateCorrectionModal.vue'
 import CustomerDriverEditModal from '@/components/customers/CustomerDriverEditModal.vue'
 import DocumentsSection from '@/components/shared/DocumentsSection.vue'
 import { SearchableSelect } from '@/components/common'
@@ -30,6 +32,7 @@ import {
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
+const { isEnabled } = useFeatures()
 
 const customer = ref<Customer | null>(null)
 const loading = ref(true)
@@ -42,6 +45,7 @@ const savingDriver = ref(false)
 const editingDriver = ref<Driver | null>(null)
 const showDriverEditModal = ref(false)
 const showCustomerEditModal = ref(false)
+const showBirthDateModal = ref(false)
 const updatingDriver = ref(false)
 
 const previewRentals = ref<Rental[]>([])
@@ -161,6 +165,16 @@ async function onCustomerSaved() {
   financeLoaded.value = false
 }
 
+function onBirthDateUpdated(updated: Customer) {
+  customer.value = updated
+}
+
+const canCorrectBirthDate = computed(
+  () =>
+    isEnabled('MANUAL_BIRTH_DATE_EDIT') &&
+    customer.value?.customerType === 'PERSONAL',
+)
+
 const lastActivityLabel = computed(() => {
   const at = customer.value?.lastActivityAt
   if (at) return formatDate(at)
@@ -232,7 +246,7 @@ function formatPhone(phone: string): string {
   return formatted || phone
 }
 
-function formatDate(date: string): string {
+function formatDate(date: string | null | undefined): string {
   return formatDateUtil(date)
 }
 
@@ -658,6 +672,17 @@ onMounted(() => {
           <div v-if="customer.customerType === 'PERSONAL'" class="rc-card">
             <div class="rc-card__head">
               <h3 class="rc-card__title">Kimlik & ehliyet</h3>
+              <FeatureGate feature="MANUAL_BIRTH_DATE_EDIT">
+                <RcButton
+                  v-if="canCorrectBirthDate"
+                  variant="ghost"
+                  size="sm"
+                  @click="showBirthDateModal = true"
+                >
+                  <RcIcon name="edit" :size="14" />
+                  Doğum tarihini düzelt
+                </RcButton>
+              </FeatureGate>
             </div>
             <div class="rc-card__body">
               <div class="rc-meta-row">
@@ -950,6 +975,13 @@ onMounted(() => {
         :customer-id="customer.id"
         @close="showCustomerEditModal = false"
         @saved="onCustomerSaved"
+      />
+
+      <BirthDateCorrectionModal
+        :open="showBirthDateModal"
+        :customer="customer"
+        @close="showBirthDateModal = false"
+        @updated="onBirthDateUpdated"
       />
 
       <CustomerDriverEditModal

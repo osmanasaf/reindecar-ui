@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { vehiclesApi } from '@/api'
-import { useToast, usePermissions } from '@/composables'
+import { useToast, usePermissions, useFeatures } from '@/composables'
 import { RcIcon } from '@/components/icons'
 import type { IconName } from '@/components/icons/iconPaths'
 import {
@@ -23,10 +23,11 @@ import VehicleDamageMaintenanceTab from '@/components/vehicles/tabs/VehicleDamag
 import VehicleRentalsTab from '@/components/vehicles/tabs/VehicleRentalsTab.vue'
 import VehicleDocsTab from '@/components/vehicles/tabs/VehicleDocsTab.vue'
 import VehicleFinancialTab from '@/components/vehicles/tabs/VehicleFinancialTab.vue'
+import VehicleLocationTab from '@/components/vehicles/tabs/VehicleLocationTab.vue'
 
-type TabKey = 'overview' | 'damage' | 'rentals' | 'docs' | 'financial'
+type TabKey = 'overview' | 'damage' | 'rentals' | 'docs' | 'financial' | 'location'
 
-const VALID_TABS = new Set<TabKey>(['overview', 'damage', 'rentals', 'docs', 'financial'])
+const VALID_TABS = new Set<TabKey>(['overview', 'damage', 'rentals', 'docs', 'financial', 'location'])
 
 const LEGACY_TAB_MAP: Record<string, TabKey> = {
   info: 'overview',
@@ -41,12 +42,14 @@ const LEGACY_TAB_MAP: Record<string, TabKey> = {
   docs: 'docs',
   installments: 'financial',
   financial: 'financial',
+  location: 'location',
 }
 
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
 const { canViewRevenue } = usePermissions()
+const { isEnabled } = useFeatures()
 
 const vehicle = ref<Vehicle | null>(null)
 const loading = ref(true)
@@ -66,6 +69,7 @@ function normalizeTab(raw: string | undefined): TabKey {
   const resolved = mapped ?? (VALID_TABS.has(raw as TabKey) ? (raw as TabKey) : 'overview')
   // Finansal sekme operatör için erişilemez; genel bakışa yönlendir.
   if (resolved === 'financial' && !canViewRevenue.value) return 'overview'
+  if (resolved === 'location' && !isEnabled('VEHICLE_DAILY_LOCATION')) return 'overview'
   return resolved
 }
 
@@ -119,6 +123,9 @@ const detailTabs = computed(() => {
     },
     { id: 'docs' as TabKey, label: 'Sigorta & Belgeler', icon: 'shield' as IconName },
   ]
+  if (isEnabled('VEHICLE_DAILY_LOCATION')) {
+    tabs.push({ id: 'location' as TabKey, label: 'Konum', icon: 'pin' as IconName })
+  }
   // Finansal sekme (ciro/kâr) yalnızca admin için.
   if (canViewRevenue.value) {
     tabs.push({ id: 'financial' as TabKey, label: 'Finansal', icon: 'receipt' as IconName })
@@ -465,6 +472,10 @@ onMounted(async () => {
 
         <div v-show="activeTab === 'docs'">
           <VehicleDocsTab :vehicle-id="vehicleId" />
+        </div>
+
+        <div v-show="activeTab === 'location'">
+          <VehicleLocationTab :vehicle-id="vehicleId" :vehicle="vehicle" />
         </div>
 
         <div v-if="canViewRevenue" v-show="activeTab === 'financial'">

@@ -12,6 +12,7 @@ const props = defineProps<{
   typeLabel: string
   startDate: string
   endDate: string
+  openEnded?: boolean
   totalDays: number
   termMonths?: number
   isLeasing: boolean
@@ -44,9 +45,13 @@ const rows = computed((): SumRow[] => {
     { label: 'Tip', value: props.typeLabel, done: props.currentStep >= 1 && !!props.rentalType },
     {
       label: 'Tarih',
-      value: props.startDate && props.endDate ? `${props.startDate} → ${props.endDate}` : '—',
-      sub: duration,
-      done: props.currentStep >= 2 && !!props.startDate && !!props.endDate,
+      value: props.openEnded
+        ? (props.startDate ? `${props.startDate} → Belirsiz` : '—')
+        : props.startDate && props.endDate
+          ? `${props.startDate} → ${props.endDate}`
+          : '—',
+      sub: props.openEnded ? 'Açık uçlu' : duration,
+      done: props.currentStep >= 2 && !!props.startDate && (props.openEnded || !!props.endDate),
     },
     {
       label: 'Araç',

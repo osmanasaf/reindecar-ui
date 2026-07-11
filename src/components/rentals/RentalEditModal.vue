@@ -3,7 +3,8 @@ import { ref, watch, computed } from 'vue'
 import { RcModal, RcButton } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
 import { rentalsApi, branchesApi, kmPackagesApi } from '@/api'
-import { useToast } from '@/composables'
+import { useToast, useFeatures } from '@/composables'
+import FeatureGate from '@/components/common/FeatureGate.vue'
 import DatePicker from '@/components/base/DatePicker.vue'
 import { SearchableSelect } from '@/components/common'
 import ExtraItemsManager from '@/components/rentals/ExtraItemsManager.vue'
@@ -20,12 +21,14 @@ const props = defineProps<{
 const emit = defineEmits<{ close: []; updated: [rental: Rental] }>()
 
 const toast = useToast()
+const { isEnabled } = useFeatures()
 const submitting = ref(false)
 const branches = ref<Branch[]>([])
 const kmPackages = ref<KmPackage[]>([])
 
 const startDate = ref('')
 const endDate = ref('')
+const openEnded = ref(false)
 const branchId = ref<number | null>(null)
 const returnBranchId = ref<number | null>(null)
 const kmPackageId = ref<number | null>(null)
@@ -83,10 +86,15 @@ const kmLimitPreview = computed(() => {
   return `Toplam dahil KM: ${totalKm.toLocaleString('tr-TR')} km (${perPeriodLabel})`
 })
 
+const openEndedEditable = computed(
+  () => isEnabled('OPEN_ENDED_RENTAL') && props.rental?.rentalType !== 'LEASING' && props.rental?.rentalType !== 'SERVICE',
+)
+
 function resetForm() {
   if (!props.rental) return
   startDate.value = props.rental.startDate
-  endDate.value = props.rental.endDate
+  endDate.value = props.rental.endDate ?? ''
+  openEnded.value = props.rental.openEnded === true
   branchId.value = props.rental.branchId ?? null
   returnBranchId.value = props.rental.returnBranchId ?? props.rental.branchId ?? null
   kmPackageId.value = props.rental.kmPackageId ?? null
@@ -131,11 +139,15 @@ watch(
 )
 
 async function save() {
-  if (!props.rental || !branchId.value || !startDate.value || !endDate.value) {
+  if (!props.rental || !branchId.value || !startDate.value) {
     toast.error('Lütfen zorunlu alanları doldurun')
     return
   }
-  if (endDate.value <= startDate.value) {
+  if (!openEnded.value && !endDate.value) {
+    toast.error('Bitiş tarihi zorunludur')
+    return
+  }
+  if (!openEnded.value && endDate.value <= startDate.value) {
     toast.error('Bitiş tarihi başlangıçtan sonra olmalıdır')
     return
   }
@@ -144,7 +156,8 @@ async function save() {
   try {
     const updated = await rentalsApi.update(props.rental.id, {
       startDate: startDate.value,
-      endDate: endDate.value,
+      endDate: openEnded.value ? endDate.value || undefined : endDate.value,
+      openEnded: openEnded.value || undefined,
       branchId: branchId.value,
       returnBranchId: returnBranchId.value ?? branchId.value,
       kmPackageId: kmPackageId.value ?? undefined,
@@ -204,8 +217,16 @@ async function save() {
           </div>
           <div class="rc-field">
             <label class="rc-field__label">Bitiş</label>
-            <DatePicker v-model="endDate" :min="startDate" />
+            <DatePicker v-model="endDate" :min="startDate" :disabled="openEnded" />
           </div>
+          <FeatureGate feature="OPEN_ENDED_RENTAL">
+            <div v-if="openEndedEditable" class="rc-field rcr-modal-form-grid__full">
+              <label class="rcr-edit-modal__check">
+                <input v-model="openEnded" type="checkbox" @change="openEnded && (endDate = '')" />
+                <span>Açık uçlu kiralama (bitiş belirsiz)</span>
+              </label>
+            </div>
+          </FeatureGate>
           <div class="rc-field">
             <label class="rc-field__label">Teslim şubesi</label>
             <SearchableSelect
