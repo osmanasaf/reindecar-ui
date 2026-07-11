@@ -1,5 +1,4 @@
 import apiClient, { BaseApi } from './client'
-import type { ApiResponse } from '@/types'
 import type {
     ContractDetail,
     ContractContent,
@@ -71,13 +70,7 @@ class ContractTemplatesApiService extends BaseApi {
     protected readonly basePath = '/contract-templates'
 
     async findByDocumentType(documentType: ContractDocumentType): Promise<ContractTemplateSummary> {
-        const { data } = await apiClient.get<ApiResponse<ContractTemplateSummary> | ContractTemplateSummary>(
-            `${this.basePath}/by-document-type/${documentType}`,
-        )
-        if (data && typeof data === 'object' && 'data' in data) {
-            return (data as ApiResponse<ContractTemplateSummary>).data
-        }
-        return data as ContractTemplateSummary
+        return this.get<ContractTemplateSummary>(`/by-document-type/${documentType}`)
     }
 }
 
