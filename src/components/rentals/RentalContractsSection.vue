@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { reactive, ref, computed, onMounted, watch } from 'vue'
 import { contractsApi } from '@/api'
 import { useToast, useFeatures } from '@/composables'
 import FeatureGate from '@/components/common/FeatureGate.vue'
@@ -25,142 +25,171 @@ const props = defineProps<{
 const toast = useToast()
 const { isEnabled } = useFeatures()
 
-const loading = ref(true)
-const contract = ref<ContractDetail | null>(null)
-const contractContent = ref<ContractContent | null>(null)
-const working = ref(false)
+interface ContractSlotState {
+  documentType: ContractDocumentType
+  loading: boolean
+  working: boolean
+  contract: ContractDetail | null
+  content: ContractContent | null
+}
 
-const showEditor = ref(false)
-const editorMode = ref<'create' | 'edit'>('create')
-const editorDocumentType = ref<ContractDocumentType>('RENTAL_CONTRACT')
+function createSlot(documentType: ContractDocumentType): ContractSlotState {
+  return { documentType, loading: true, working: false, contract: null, content: null }
+}
 
-const showSignModal = ref(false)
-const signedBy = ref('')
-const signatureMethod = ref('MANUEL')
+const slots = reactive<Record<ContractDocumentType, ContractSlotState>>({
+  PRICE_OFFER: createSlot('PRICE_OFFER'),
+  RENTAL_CONTRACT: createSlot('RENTAL_CONTRACT'),
+})
 
 const canCreateOffer = computed(() => isEnabled('PRICE_OFFER_DOCUMENTS'))
 const canCreateRentalContract = computed(() => isEnabled('RENTAL_CONTRACT_DOCUMENTS'))
 const canExportPdf = computed(() => isEnabled('CONTRACT_PDF_EXPORT'))
 
-const hasContract = computed(() => contract.value != null)
-const isEditable = computed(
-  () => contract.value && !contract.value.signed && contract.value.status !== 'CANCELLED',
-)
-const canSign = computed(
-  () => contract.value && (contract.value.status === 'DRAFT' || contract.value.status === 'PENDING_SIGNATURE'),
+const visibleSlots = computed(() =>
+  (['PRICE_OFFER', 'RENTAL_CONTRACT'] as ContractDocumentType[]).filter((type) =>
+    type === 'PRICE_OFFER' ? canCreateOffer.value : canCreateRentalContract.value,
+  ),
 )
 
-const documentTypeLabel = computed(() => {
-  if (!contractContent.value) return ''
-  return CONTRACT_DOCUMENT_TYPE_LABELS[contractContent.value.documentType]
-})
+const showEditor = ref(false)
+const editorMode = ref<'create' | 'edit'>('create')
+const editorDocumentType = ref<ContractDocumentType>('RENTAL_CONTRACT')
+const editorContractId = ref<number | undefined>(undefined)
 
-async function loadContract() {
-  loading.value = true
-  contract.value = null
-  contractContent.value = null
+const showSignModal = ref(false)
+const signingDocumentType = ref<ContractDocumentType>('RENTAL_CONTRACT')
+const signedBy = ref('')
+const signatureMethod = ref('MANUEL')
+
+function isEditable(slot: ContractSlotState) {
+  return slot.contract != null && !slot.contract.signed && slot.contract.status !== 'CANCELLED'
+}
+
+function canSign(slot: ContractSlotState) {
+  return slot.contract != null && (slot.contract.status === 'DRAFT' || slot.contract.status === 'PENDING_SIGNATURE')
+}
+
+function documentTypeLabel(slot: ContractSlotState) {
+  if (!slot.content) return CONTRACT_DOCUMENT_TYPE_LABELS[slot.documentType]
+  return CONTRACT_DOCUMENT_TYPE_LABELS[slot.content.documentType]
+}
+
+async function loadSlot(documentType: ContractDocumentType) {
+  const slot = slots[documentType]
+  slot.loading = true
+  slot.contract = null
+  slot.content = null
   try {
-    const data = await contractsApi.getByRentalId(props.rentalId)
-    contract.value = data
-    contractContent.value = await contractsApi.getContent(data.id)
+    const data = await contractsApi.getByRentalId(props.rentalId, documentType)
+    slot.contract = data
+    slot.content = await contractsApi.getContent(data.id)
   } catch (err) {
     if (isErrorResponse(err) && err.code === 'E001') {
-      contract.value = null
+      slot.contract = null
     } else {
       toast.apiError(err, 'Sözleşme yüklenemedi')
     }
   } finally {
-    loading.value = false
+    slot.loading = false
   }
+}
+
+async function loadAll() {
+  await Promise.all([loadSlot('PRICE_OFFER'), loadSlot('RENTAL_CONTRACT')])
 }
 
 function openCreate(documentType: ContractDocumentType) {
   editorDocumentType.value = documentType
   editorMode.value = 'create'
+  editorContractId.value = undefined
   showEditor.value = true
 }
 
-function openEdit() {
-  if (!contractContent.value) return
-  editorDocumentType.value = contractContent.value.documentType
+function openEdit(slot: ContractSlotState) {
+  if (!slot.content || !slot.contract) return
+  editorDocumentType.value = slot.content.documentType
   editorMode.value = 'edit'
+  editorContractId.value = slot.contract.id
   showEditor.value = true
 }
 
-function openSign() {
+function openSign(slot: ContractSlotState) {
+  signingDocumentType.value = slot.documentType
   signedBy.value = props.customerName ?? ''
   signatureMethod.value = 'MANUEL'
   showSignModal.value = true
 }
 
-async function handleRegenerate() {
-  if (!contract.value) return
-  working.value = true
+async function handleRegenerate(slot: ContractSlotState) {
+  if (!slot.contract) return
+  slot.working = true
   try {
-    contractContent.value = await contractsApi.regenerate(contract.value.id)
+    slot.content = await contractsApi.regenerate(slot.contract.id)
     toast.success('İçerik şablondan yenilendi')
   } catch (err) {
     toast.apiError(err, 'Yenileme başarısız')
   } finally {
-    working.value = false
+    slot.working = false
   }
 }
 
-async function handleDownloadPdf() {
-  if (!contract.value) return
-  working.value = true
+async function handleDownloadPdf(slot: ContractSlotState) {
+  if (!slot.contract) return
+  slot.working = true
   try {
-    const blob = await contractsApi.downloadPdf(contract.value.id)
-    downloadBlob(blob, `${contract.value.contractNumber}.pdf`)
+    const blob = await contractsApi.downloadPdf(slot.contract.id)
+    downloadBlob(blob, `${slot.contract.contractNumber}.pdf`)
     toast.success('PDF indirildi')
   } catch (err) {
     toast.apiError(err, 'PDF indirilemedi')
   } finally {
-    working.value = false
+    slot.working = false
   }
 }
 
-async function handleCancel() {
-  if (!contract.value) return
-  working.value = true
+async function handleCancel(slot: ContractSlotState) {
+  if (!slot.contract) return
+  slot.working = true
   try {
-    await contractsApi.cancel(contract.value.id)
+    await contractsApi.cancel(slot.contract.id)
     toast.success('Sözleşme iptal edildi')
-    await loadContract()
+    await loadSlot(slot.documentType)
   } catch (err) {
     toast.apiError(err, 'İptal başarısız')
   } finally {
-    working.value = false
+    slot.working = false
   }
 }
 
 async function handleSign() {
-  if (!contract.value || !signedBy.value.trim()) {
+  const slot = slots[signingDocumentType.value]
+  if (!slot.contract || !signedBy.value.trim()) {
     toast.error('İmzalayan adı zorunludur')
     return
   }
-  working.value = true
+  slot.working = true
   try {
-    contract.value = await contractsApi.sign(contract.value.id, {
+    slot.contract = await contractsApi.sign(slot.contract.id, {
       signedBy: signedBy.value.trim(),
       signatureMethod: signatureMethod.value.trim() || 'MANUEL',
     })
     toast.success('Sözleşme imzalandı')
     showSignModal.value = false
-    await loadContract()
+    await loadSlot(slot.documentType)
   } catch (err) {
     toast.apiError(err, 'İmzalama başarısız')
   } finally {
-    working.value = false
+    slot.working = false
   }
 }
 
 function onEditorSaved() {
-  void loadContract()
+  void loadSlot(editorDocumentType.value)
 }
 
-onMounted(loadContract)
-watch(() => props.rentalId, loadContract)
+onMounted(loadAll)
+watch(() => props.rentalId, loadAll)
 </script>
 
 <template>
@@ -173,100 +202,96 @@ watch(() => props.rentalId, loadContract)
         </div>
       </div>
 
-      <div v-if="loading" class="rc-skeleton" style="height: 120px" />
-      <template v-else-if="hasContract && contract">
-        <div class="rcr-contracts__card">
-          <div class="rcr-contracts__meta">
-            <div>
-              <div class="rcr-contracts__number">{{ contract.contractNumber }}</div>
-              <div class="rcr-contracts__type">{{ documentTypeLabel }}</div>
+      <div v-for="type in visibleSlots" :key="type" class="rcr-contracts__slot">
+        <div v-if="slots[type].loading" class="rc-skeleton" style="height: 120px" />
+        <template v-else-if="slots[type].contract">
+          <div class="rcr-contracts__card">
+            <div class="rcr-contracts__meta">
+              <div>
+                <div class="rcr-contracts__number">{{ slots[type].contract!.contractNumber }}</div>
+                <div class="rcr-contracts__type">{{ documentTypeLabel(slots[type]) }}</div>
+              </div>
+              <RcBadge :variant="slots[type].contract!.signed ? 'success' : 'info'">
+                {{ CONTRACT_STATUS_LABELS[slots[type].contract!.status] }}
+              </RcBadge>
             </div>
-            <RcBadge :variant="contract.signed ? 'success' : 'info'">
-              {{ CONTRACT_STATUS_LABELS[contract.status] }}
-            </RcBadge>
-          </div>
 
-          <div class="rcr-contracts__grid">
-            <div><span>Geçerlilik</span><strong>{{ formatDate(contract.validFrom) }} – {{ contract.validTo ? formatDate(contract.validTo) : '—' }}</strong></div>
-            <div v-if="contract.signedAt"><span>İmza</span><strong>{{ contract.signedBy }} · {{ formatDateTime(contract.signedAt) }}</strong></div>
-            <div><span>Versiyon</span><strong>v{{ contract.contractVersion }}</strong></div>
-          </div>
+            <div class="rcr-contracts__grid">
+              <div>
+                <span>Geçerlilik</span>
+                <strong>{{ formatDate(slots[type].contract!.validFrom) }} – {{ slots[type].contract!.validTo ? formatDate(slots[type].contract!.validTo!) : '—' }}</strong>
+              </div>
+              <div v-if="slots[type].contract!.signedAt">
+                <span>İmza</span>
+                <strong>{{ slots[type].contract!.signedBy }} · {{ formatDateTime(slots[type].contract!.signedAt!) }}</strong>
+              </div>
+              <div><span>Versiyon</span><strong>v{{ slots[type].contract!.contractVersion }}</strong></div>
+            </div>
 
-          <div class="rcr-contracts__actions">
-            <RcButton v-if="isEditable" variant="secondary" size="sm" @click="openEdit">
-              <RcIcon name="edit" :size="14" />
-              Düzenle
-            </RcButton>
-            <RcButton
-              v-if="isEditable"
-              variant="ghost"
-              size="sm"
-              :disabled="working"
-              @click="handleRegenerate"
-            >
-              <RcIcon name="sparkle" :size="14" />
-              Şablondan yenile
-            </RcButton>
-            <RcButton
-              v-if="canExportPdf"
-              variant="ghost"
-              size="sm"
-              :disabled="working"
-              @click="handleDownloadPdf"
-            >
-              <RcIcon name="download" :size="14" />
-              PDF indir
-            </RcButton>
-            <RcButton v-if="canSign" variant="accent" size="sm" @click="openSign">
-              <RcIcon name="check" :size="14" />
-              İmzala
-            </RcButton>
-            <RcButton
-              v-if="contract.status !== 'CANCELLED' && contract.status !== 'SIGNED'"
-              variant="ghost"
-              size="sm"
-              :disabled="working"
-              @click="handleCancel"
-            >
-              İptal et
-            </RcButton>
-          </div>
-        </div>
-      </template>
-
-      <RcEmpty
-        v-else
-        title="Henüz sözleşme yok"
-        description="Kiralama için fiyat teklifi veya kiralama sözleşmesi oluşturabilirsiniz."
-      >
-        <template #action>
-          <div class="rcr-contracts__create-actions">
-            <RcButton
-              v-if="canCreateOffer"
-              variant="secondary"
-              size="sm"
-              @click="openCreate('PRICE_OFFER')"
-            >
-              <RcIcon name="receipt" :size="14" />
-              Fiyat teklifi oluştur
-            </RcButton>
-            <RcButton
-              v-if="canCreateRentalContract"
-              variant="accent"
-              size="sm"
-              @click="openCreate('RENTAL_CONTRACT')"
-            >
-              <RcIcon name="folder" :size="14" />
-              Sözleşme oluştur
-            </RcButton>
+            <div class="rcr-contracts__actions">
+              <RcButton v-if="isEditable(slots[type])" variant="secondary" size="sm" @click="openEdit(slots[type])">
+                <RcIcon name="edit" :size="14" />
+                Düzenle
+              </RcButton>
+              <RcButton
+                v-if="isEditable(slots[type])"
+                variant="ghost"
+                size="sm"
+                :disabled="slots[type].working"
+                @click="handleRegenerate(slots[type])"
+              >
+                <RcIcon name="sparkle" :size="14" />
+                Şablondan yenile
+              </RcButton>
+              <RcButton
+                v-if="canExportPdf"
+                variant="ghost"
+                size="sm"
+                :disabled="slots[type].working"
+                @click="handleDownloadPdf(slots[type])"
+              >
+                <RcIcon name="download" :size="14" />
+                PDF indir
+              </RcButton>
+              <RcButton v-if="canSign(slots[type])" variant="accent" size="sm" @click="openSign(slots[type])">
+                <RcIcon name="check" :size="14" />
+                İmzala
+              </RcButton>
+              <RcButton
+                v-if="slots[type].contract!.status !== 'CANCELLED' && slots[type].contract!.status !== 'SIGNED'"
+                variant="ghost"
+                size="sm"
+                :disabled="slots[type].working"
+                @click="handleCancel(slots[type])"
+              >
+                İptal et
+              </RcButton>
+            </div>
           </div>
         </template>
-      </RcEmpty>
+
+        <RcEmpty
+          v-else
+          :title="type === 'PRICE_OFFER' ? 'Henüz fiyat teklifi yok' : 'Henüz sözleşme yok'"
+          description="Kiralama için bu türde bir belge oluşturabilirsiniz."
+        >
+          <template #action>
+            <RcButton
+              :variant="type === 'PRICE_OFFER' ? 'secondary' : 'accent'"
+              size="sm"
+              @click="openCreate(type)"
+            >
+              <RcIcon :name="type === 'PRICE_OFFER' ? 'receipt' : 'folder'" :size="14" />
+              {{ type === 'PRICE_OFFER' ? 'Fiyat teklifi oluştur' : 'Sözleşme oluştur' }}
+            </RcButton>
+          </template>
+        </RcEmpty>
+      </div>
 
       <ContractEditorModal
         :open="showEditor"
         :rental-id="rentalId"
-        :contract-id="contract?.id"
+        :contract-id="editorContractId"
         :document-type="editorDocumentType"
         :mode="editorMode"
         @close="showEditor = false"
@@ -292,7 +317,7 @@ watch(() => props.rentalId, loadContract)
         <template #footer>
           <span class="rc-spacer" />
           <RcButton variant="ghost" @click="showSignModal = false">Vazgeç</RcButton>
-          <RcButton variant="accent" :disabled="working" @click="handleSign">İmzala</RcButton>
+          <RcButton variant="accent" :disabled="slots[signingDocumentType].working" @click="handleSign">İmzala</RcButton>
         </template>
       </RcModal>
     </div>
@@ -318,6 +343,14 @@ watch(() => props.rentalId, loadContract)
   margin: 4px 0 0;
   font-size: 13px;
   color: var(--rc-text-muted);
+}
+
+.rcr-contracts__slot {
+  margin-bottom: 12px;
+}
+
+.rcr-contracts__slot:last-child {
+  margin-bottom: 0;
 }
 
 .rcr-contracts__card {
@@ -364,12 +397,5 @@ watch(() => props.rentalId, loadContract)
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 16px;
-}
-
-.rcr-contracts__create-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: center;
 }
 </style>

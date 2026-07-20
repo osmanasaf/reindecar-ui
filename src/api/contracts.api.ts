@@ -33,8 +33,8 @@ class ContractsApiService extends BaseApi {
         return this.get<ContractDetail>(`/${id}`)
     }
 
-    async getByRentalId(rentalId: number): Promise<ContractDetail> {
-        return this.get<ContractDetail>(`/rental/${rentalId}`)
+    async getByRentalId(rentalId: number, documentType: ContractDocumentType): Promise<ContractDetail> {
+        return this.get<ContractDetail>(`/rental/${rentalId}`, { documentType })
     }
 
     async create(payload: CreateContractPayload): Promise<ContractDetail> {
