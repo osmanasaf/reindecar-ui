@@ -115,6 +115,10 @@ class ServiceManifestsApiService extends BaseApi {
     async deletePassenger(id: number, passengerId: number): Promise<void> {
         return this.deleteByPath(`/${id}/passengers/${passengerId}`)
     }
+
+    async downloadPassengerImportTemplateXlsx(): Promise<Blob> {
+        return this.getBlob('/passengers/import-template.xlsx')
+    }
 }
 
 export const serviceManifestsApi = new ServiceManifestsApiService()

@@ -178,10 +178,19 @@ async function handleAddPassenger() {
   }
 }
 
-function downloadImportTemplate() {
+function downloadCsvTemplate() {
   const csv = 'Ad Soyad,Koltuk No,Uyruk,Kimlik No\nAhmet Yılmaz,1,T.C.,12345678901\n'
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
   downloadBlob(blob, 'yolcu-listesi-sablon.csv')
+}
+
+async function downloadExcelTemplate() {
+  try {
+    const blob = await serviceManifestsApi.downloadPassengerImportTemplateXlsx()
+    downloadBlob(blob, 'yolcu-listesi-sablon.xlsx')
+  } catch (error: unknown) {
+    toast.error(error instanceof Error ? error.message : 'Şablon indirilemedi')
+  }
 }
 
 function openImportModal() {
@@ -447,17 +456,27 @@ onMounted(() => {
     <RcModal :open="showImportModal" title="Toplu yolcu listesi yükle (CSV)" @close="closeImportModal">
       <div class="rcs-import">
         <p class="rcr-row__secondary">
-          "Ad Soyad,Koltuk No,Uyruk,Kimlik No" başlıklı bir CSV dosyası yükleyin. Bu işlem
-          <strong>mevcut yolcu listesinin tamamının yerine geçer.</strong>
+          "Ad Soyad, Koltuk No, Uyruk, Kimlik No" başlıklı bir CSV veya Excel (.xlsx) dosyası yükleyin.
+          Bu işlem <strong>mevcut yolcu listesinin tamamının yerine geçer.</strong>
         </p>
         <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 12px">
-          <RcButton variant="ghost" size="sm" @click="downloadImportTemplate">
+          <RcButton variant="ghost" size="sm" @click="downloadCsvTemplate">
             <RcIcon name="download" :size="14" />
-            Örnek şablon indir
+            CSV şablon indir
+          </RcButton>
+          <RcButton variant="ghost" size="sm" @click="downloadExcelTemplate">
+            <RcIcon name="download" :size="14" />
+            Excel şablon indir
           </RcButton>
         </div>
-        <RcField label="CSV dosyası">
-          <input type="file" accept=".csv,text/csv" class="rc-input" :disabled="importing" @change="handleImportFile" />
+        <RcField label="CSV veya Excel dosyası">
+          <input
+            type="file"
+            accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            class="rc-input"
+            :disabled="importing"
+            @change="handleImportFile"
+          />
         </RcField>
 
         <template v-if="importRows.length > 0">
