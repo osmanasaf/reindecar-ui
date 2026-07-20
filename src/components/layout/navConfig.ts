@@ -40,6 +40,8 @@ export const navSections: NavSection[] = [
       { name: 'penalties', label: 'Cezalar', icon: 'warning' },
       { name: 'km-packages', label: 'KM Paketleri', icon: 'bolt' },
       { name: 'customer-contracts', label: 'Özel Fiyat Sözleşmeleri', icon: 'folder' },
+      { name: 'campaigns', label: 'Kampanyalar', icon: 'bolt' },
+      { name: 'rental-pricing', label: 'Araç/Müşteri Fiyat Kuralları', icon: 'cash' },
     ],
   },
   {
@@ -129,6 +131,14 @@ export function isNavItemActive(routeName: string | undefined, path: string, ite
 
   if (itemName === 'customer-contracts') {
     return routeName === 'customer-contracts' || path.startsWith('/customer-contracts')
+  }
+
+  if (itemName === 'campaigns') {
+    return routeName === 'campaigns' || path.startsWith('/campaigns')
+  }
+
+  if (itemName === 'rental-pricing') {
+    return routeName === 'rental-pricing' || path.startsWith('/rental-pricing')
   }
 
   if (itemName === 'service-manifests') {
