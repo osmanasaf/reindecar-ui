@@ -15,6 +15,7 @@ import type {
     RecordVehicleLocationForm,
 } from '@/types'
 import { VehicleStatus } from '@/types/enums'
+import type { VehicleCalendarRow } from '@/types/calendar'
 
 export interface VehicleRecognitionResult {
     brand: string | null
@@ -71,6 +72,26 @@ class VehiclesApiService extends BaseApi {
     async getAvailableForPeriodList(startDate: string, endDate: string): Promise<Vehicle[]> {
         const response = await this.getAvailableForPeriod(startDate, endDate)
         return response.content
+    }
+
+    async getFleetCalendar(params: {
+        from: string
+        to: string
+        branchId?: number | null
+        categoryId?: number | null
+        search?: string
+        page?: number
+        size?: number
+    }): Promise<PaginatedResponse<VehicleCalendarRow>> {
+        return this.getList<VehicleCalendarRow>('/calendar', {
+            from: params.from,
+            to: params.to,
+            ...(params.branchId ? { branchId: params.branchId } : {}),
+            ...(params.categoryId ? { categoryId: params.categoryId } : {}),
+            ...(params.search ? { search: params.search } : {}),
+            page: params.page ?? 0,
+            size: params.size ?? 50,
+        } as PaginationParams)
     }
 
     async getByBranch(branchId: number): Promise<Vehicle[]> {

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter, useRoute, RouterLink } from 'vue-router'
-import { rentalsApi, branchesApi, kmPackagesApi, rentalExtraItemApi, customersApi } from '@/api'
+import { rentalsApi, branchesApi, kmPackagesApi, rentalExtraItemApi, customersApi, vehiclesApi } from '@/api'
 import { useToast, useValidation, rules, useFeatures } from '@/composables'
 import FeatureGate from '@/components/common/FeatureGate.vue'
 import { SearchableSelect } from '@/components/common'
@@ -481,8 +481,36 @@ onMounted(() => {
       loadCustomerLabel(id)
     }
   }
+  prefillFromCalendarQuery()
   window.addEventListener('keydown', onWizardKeydown)
 })
+
+function prefillFromCalendarQuery() {
+  const qStartDate = route.query.startDate
+  const qEndDate = route.query.endDate
+  if (typeof qStartDate === 'string' && qStartDate) {
+    startDate.value = qStartDate
+  }
+  if (typeof qEndDate === 'string' && qEndDate) {
+    endDate.value = qEndDate
+  }
+
+  const qVehicleId = route.query.vehicleId
+  if (typeof qVehicleId !== 'string') return
+  const vehicleId = Number(qVehicleId)
+  if (Number.isNaN(vehicleId)) return
+  void prefillVehicleFromQuery(vehicleId)
+}
+
+async function prefillVehicleFromQuery(vehicleId: number) {
+  try {
+    const vehicle = await vehiclesApi.getById(vehicleId)
+    handleVehicleSelected(vehicle.id, vehicle.categoryId, vehicle)
+    currentStep.value = 3
+  } catch {
+    toast.error('Takvimden seçilen araç yüklenemedi')
+  }
+}
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onWizardKeydown)

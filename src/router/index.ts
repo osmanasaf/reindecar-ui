@@ -198,6 +198,12 @@ const router = createRouter({
             meta: { requiresAuth: true }
         },
         {
+            path: '/fleet/calendar',
+            name: 'fleet-calendar',
+            component: () => import('@/views/fleet/FleetCalendarView.vue'),
+            meta: { requiresAuth: true, featureKey: 'FLEET_CALENDAR' }
+        },
+        {
             path: '/reports/vehicle-profitability',
             name: 'vehicle-profitability',
             component: () => import('@/views/reports/VehicleProfitabilityView.vue'),

@@ -20,6 +20,7 @@ export const navSections: NavSection[] = [
     items: [
       { name: 'dashboard', label: 'Dashboard', icon: 'chart' },
       { name: 'rentals', label: 'Kiralamalar', icon: 'key' },
+      { name: 'fleet-calendar', label: 'Filo Takvimi', icon: 'calendar', featureKey: 'FLEET_CALENDAR' },
       { name: 'vehicles', label: 'Araçlar', icon: 'car' },
       { name: 'customers', label: 'Müşteriler', icon: 'users' },
     ],
