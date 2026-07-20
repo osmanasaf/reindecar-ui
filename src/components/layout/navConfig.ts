@@ -39,6 +39,7 @@ export const navSections: NavSection[] = [
       { name: 'service-providers', label: 'Servis Sağlayıcılar', icon: 'wrench' },
       { name: 'penalties', label: 'Cezalar', icon: 'warning' },
       { name: 'km-packages', label: 'KM Paketleri', icon: 'bolt' },
+      { name: 'customer-contracts', label: 'Özel Fiyat Sözleşmeleri', icon: 'folder' },
     ],
   },
   {
@@ -124,6 +125,10 @@ export function isNavItemActive(routeName: string | undefined, path: string, ite
 
   if (itemName === 'km-packages') {
     return routeName === 'km-packages' || path.startsWith('/km-packages')
+  }
+
+  if (itemName === 'customer-contracts') {
+    return routeName === 'customer-contracts' || path.startsWith('/customer-contracts')
   }
 
   if (itemName === 'service-manifests') {

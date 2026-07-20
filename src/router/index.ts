@@ -204,6 +204,12 @@ const router = createRouter({
             meta: { requiresAuth: true }
         },
         {
+            path: '/customer-contracts',
+            name: 'customer-contracts',
+            component: () => import('@/views/pricing/CustomerContractListView.vue'),
+            meta: { requiresAuth: true }
+        },
+        {
             path: '/penalties',
             name: 'penalties',
             component: () => import('@/views/penalties/PenaltyListView.vue'),
