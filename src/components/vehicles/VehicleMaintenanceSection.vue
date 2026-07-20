@@ -257,7 +257,10 @@ function tickPct(km: number): number {
               class="rc-veh-maintenance-section__row"
               @click="handleRowClick(record)"
             >
-              <td class="rc-mono rc-veh-maintenance-section__date">{{ formatDate(record.maintenanceDate) }}</td>
+              <td class="rc-mono rc-veh-maintenance-section__date">
+                {{ formatDate(record.maintenanceDate) }}
+                <template v-if="record.endDate">→ {{ formatDate(record.endDate) }}</template>
+              </td>
               <td>
                 <span class="rc-badge">{{ record.maintenanceTypeDisplayName }}</span>
               </td>

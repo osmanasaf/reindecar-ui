@@ -260,6 +260,7 @@ export interface CreateMaintenanceRecordForm {
     vehicleId: number
     maintenanceType: MaintenanceType
     maintenanceDate: string
+    endDate?: string
     currentKm: number
     costAmount?: number
     costCurrency?: string

@@ -48,6 +48,12 @@ function serviceProviderDisplay(m: MaintenanceDetail | null): string | null {
   return (r.serviceProvider as string) ?? (r.serviceProviderName as string) ?? null
 }
 
+function endDateOf(m: MaintenanceDetail | null): string | null {
+  if (!m) return null
+  const r = m as unknown as Record<string, unknown>
+  return (r.endDate as string) ?? null
+}
+
 function handleEdit() {
   if (props.maintenance) {
     emit('edit', props.maintenance.id)
@@ -75,6 +81,10 @@ function handleEdit() {
           <div class="detail-item">
             <span class="label">Bakım Tarihi</span>
             <span class="value">{{ formatDate(maintenance.maintenanceDate) }}</span>
+          </div>
+          <div v-if="endDateOf(maintenance)" class="detail-item">
+            <span class="label">Aracın Hazır Olacağı Tarih</span>
+            <span class="value">{{ formatDate(endDateOf(maintenance)!) }}</span>
           </div>
           <div class="detail-item">
             <span class="label">Güncel KM</span>

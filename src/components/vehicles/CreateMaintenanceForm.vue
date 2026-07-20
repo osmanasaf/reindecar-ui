@@ -41,6 +41,7 @@ const form = ref<CreateMaintenanceRecordForm>({
   vehicleId: props.vehicleId,
   maintenanceType: MaintenanceType.SERVICE,
   maintenanceDate: new Date().toISOString().split('T')[0] ?? '',
+  endDate: undefined,
   currentKm: props.initialCurrentKm ?? 0,
   costAmount: undefined,
   costCurrency: 'TRY',
@@ -161,6 +162,7 @@ async function loadMaintenanceForEdit() {
       vehicleId: record.vehicleId,
       maintenanceType: record.maintenanceType,
       maintenanceDate: record.maintenanceDate.split('T')[0] ?? '',
+      endDate: record.endDate ? (record.endDate.split('T')[0] ?? undefined) : undefined,
       currentKm: record.currentKm,
       costAmount: record.costAmount ?? undefined,
       costCurrency: record.costCurrency ?? 'TRY',
@@ -181,6 +183,11 @@ async function loadMaintenanceForEdit() {
 async function handleSubmit() {
   if (!form.value.currentKm || form.value.currentKm <= 0) {
     toast.error('Lütfen geçerli bir KM değeri girin')
+    return
+  }
+
+  if (form.value.endDate && form.value.endDate < form.value.maintenanceDate) {
+    toast.error('Bitiş tarihi servis tarihinden önce olamaz')
     return
   }
 
@@ -297,6 +304,14 @@ onMounted(async () => {
           label="Servis tarihi"
           placeholder="Tarih seçin"
         />
+
+        <RcField label="Araç ne zaman hazır olacak? (opsiyonel)">
+          <DatePicker
+            v-model="form.endDate"
+            :min="form.maintenanceDate || undefined"
+            placeholder="Tarih seçin"
+          />
+        </RcField>
 
         <RcField label="KM *">
           <div class="rc-input-group">

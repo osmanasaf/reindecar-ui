@@ -585,6 +585,7 @@ export interface MaintenanceRecord {
     maintenanceTypeDisplayName: string
     maintenanceTypeColorCode: string
     maintenanceDate: string
+    endDate: string | null
     currentKm: number
     costAmount: number | null
     costCurrency: string | null
