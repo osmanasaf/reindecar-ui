@@ -310,6 +310,8 @@ export interface Payment {
     status: PaymentStatus
     transactionRef?: string
     invoiceRef?: string
+    discountAmount?: number
+    discountReason?: string
     paidAt?: string
     createdBy: string
     createdAt: string

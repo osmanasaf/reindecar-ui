@@ -1,6 +1,16 @@
 import { BaseApi } from './client'
 import type { Payment, PaymentMethod } from '@/types'
 
+export interface RecordPaymentRequest {
+    amount: number
+    method: PaymentMethod
+    transactionRef?: string
+    invoiceRef?: string
+    notes?: string
+    discountAmount?: number
+    discountReason?: string
+}
+
 class PaymentApiService extends BaseApi {
     protected readonly basePath = '/payments'
 
@@ -8,21 +18,8 @@ class PaymentApiService extends BaseApi {
         return this.get(`/rental/${rentalId}`)
     }
 
-    async recordPayment(
-        rentalId: number,
-        amount: number,
-        method: PaymentMethod,
-        transactionRef?: string,
-        invoiceRef?: string,
-        notes?: string
-    ): Promise<Payment> {
-        return this.post(`/rental/${rentalId}`, {
-            amount,
-            method,
-            transactionRef,
-            invoiceRef,
-            notes
-        })
+    async recordPayment(rentalId: number, request: RecordPaymentRequest): Promise<Payment> {
+        return this.post(`/rental/${rentalId}`, request)
     }
 }
 

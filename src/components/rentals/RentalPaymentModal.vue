@@ -22,6 +22,9 @@ const amount = ref(0)
 const method = ref<PaymentMethod>(PaymentMethod.CASH)
 const transactionRef = ref('')
 const notes = ref('')
+const applyDiscount = ref(false)
+const discountAmount = ref(0)
+const discountReason = ref('')
 
 const paymentMethods: { value: PaymentMethod; label: string }[] = [
   { value: PaymentMethod.CASH, label: 'Nakit' },
@@ -39,6 +42,9 @@ watch(
     method.value = PaymentMethod.CASH
     transactionRef.value = ''
     notes.value = ''
+    applyDiscount.value = false
+    discountAmount.value = 0
+    discountReason.value = ''
   },
   { immediate: true },
 )
@@ -55,7 +61,28 @@ const formRules = computed(() => ({
       },
     ],
   },
+  discountAmount: {
+    value: discountAmount.value,
+    rules: applyDiscount.value
+      ? [
+          {
+            validate: (v: unknown) => Number(v) > 0,
+            message: 'İndirim tutarı 0\'dan büyük olmalıdır',
+          },
+          {
+            validate: (v: unknown) => Number(v) <= amount.value,
+            message: 'İndirim tutarı ödeme tutarından fazla olamaz',
+          },
+        ]
+      : [],
+  },
 }))
+
+const netAmount = computed(() =>
+  applyDiscount.value && discountAmount.value > 0
+    ? Math.max(0, Math.round((amount.value - discountAmount.value) * 100) / 100)
+    : amount.value,
+)
 
 const { validateForm, getError, hasError, touch, reset } = useValidation(() => formRules.value)
 
@@ -77,14 +104,14 @@ async function confirm() {
   if (!props.rental || !validateForm(formRules.value)) return
   submitting.value = true
   try {
-    const payment = await paymentApi.recordPayment(
-      props.rental.id,
-      amount.value,
-      method.value,
-      transactionRef.value || undefined,
-      undefined,
-      notes.value || undefined,
-    )
+    const payment = await paymentApi.recordPayment(props.rental.id, {
+      amount: amount.value,
+      method: method.value,
+      transactionRef: transactionRef.value || undefined,
+      notes: notes.value || undefined,
+      discountAmount: applyDiscount.value && discountAmount.value > 0 ? discountAmount.value : undefined,
+      discountReason: applyDiscount.value && discountReason.value ? discountReason.value : undefined,
+    })
     toast.success('Ödeme kaydedildi')
     emit('recorded', payment)
     emit('close')
@@ -196,6 +223,37 @@ function handleClose() {
         <label class="rc-field__label">Not (opsiyonel)</label>
         <textarea v-model="notes" class="rc-textarea" rows="2" placeholder="Tahsilat notu" />
       </div>
+
+      <div class="rc-field rcr-modal-form-grid__full">
+        <label class="rc-field__checkbox">
+          <input v-model="applyDiscount" type="checkbox" />
+          İndirim uygula
+        </label>
+      </div>
+
+      <template v-if="applyDiscount">
+        <div class="rc-field" :class="{ 'rc-field--error': hasError('discountAmount') }">
+          <label class="rc-field__label">İndirim tutarı (₺)</label>
+          <input
+            v-model.number="discountAmount"
+            class="rc-input"
+            type="number"
+            min="0"
+            :max="amount"
+            step="0.01"
+            placeholder="0,00"
+            @blur="touch('discountAmount')"
+          />
+          <span v-if="hasError('discountAmount')" class="rc-field__error">{{ getError('discountAmount') }}</span>
+        </div>
+        <div class="rc-field">
+          <label class="rc-field__label">İndirim sebebi (opsiyonel)</label>
+          <input v-model="discountReason" class="rc-input" type="text" placeholder="Vade iskontosu, kampanya…" />
+        </div>
+        <div class="rc-field rcr-modal-form-grid__full">
+          <span class="rc-field__hint">Net tahsil edilecek tutar: <strong>{{ fmtTRY(netAmount) }}</strong></span>
+        </div>
+      </template>
     </div>
 
     <template #footer>
@@ -208,3 +266,13 @@ function handleClose() {
     </template>
   </RcModal>
 </template>
+
+<style scoped>
+.rc-field__checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+</style>
