@@ -9,6 +9,10 @@ import type {
     SignContractPayload,
     ContractDocumentType,
     ContractTemplateSummary,
+    ContractTemplateDetail,
+    ContractTermSummary,
+    CreateContractTemplatePayload,
+    CreateContractTermPayload,
 } from '@/types/contract'
 
 class ContractsApiService extends BaseApi {
@@ -71,6 +75,46 @@ class ContractTemplatesApiService extends BaseApi {
 
     async findByDocumentType(documentType: ContractDocumentType): Promise<ContractTemplateSummary> {
         return this.get<ContractTemplateSummary>(`/by-document-type/${documentType}`)
+    }
+
+    async findAll(): Promise<ContractTemplateDetail[]> {
+        return this.get<ContractTemplateDetail[]>('')
+    }
+
+    async findById(id: number): Promise<ContractTemplateDetail> {
+        return this.get<ContractTemplateDetail>(`/${id}`)
+    }
+
+    async create(payload: CreateContractTemplatePayload): Promise<ContractTemplateDetail> {
+        return this.post<ContractTemplateDetail>('', payload)
+    }
+
+    async updateContent(id: number, content: string): Promise<ContractTemplateDetail> {
+        return this.put<ContractTemplateDetail>(`/${id}/content`, { content })
+    }
+
+    async activate(id: number): Promise<void> {
+        await this.post(`/${id}/activate`)
+    }
+
+    async deactivate(id: number): Promise<void> {
+        await this.post(`/${id}/deactivate`)
+    }
+
+    async remove(id: number): Promise<void> {
+        await this.deleteByPath(`/${id}`)
+    }
+
+    async addTerm(id: number, payload: CreateContractTermPayload): Promise<ContractTermSummary> {
+        return this.post<ContractTermSummary>(`/${id}/terms`, payload)
+    }
+
+    async removeTerm(templateId: number, termId: number): Promise<void> {
+        await this.deleteByPath(`/${templateId}/terms/${termId}`)
+    }
+
+    async bootstrapDefaults(): Promise<void> {
+        await this.post('/bootstrap-defaults')
     }
 }
 

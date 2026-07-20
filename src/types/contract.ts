@@ -1,3 +1,5 @@
+import { RentalType } from './enums'
+
 export type ContractDocumentType = 'PRICE_OFFER' | 'RENTAL_CONTRACT'
 
 export type ContractStatus =
@@ -80,4 +82,40 @@ export const CONTRACT_STATUS_LABELS: Record<ContractStatus, string> = {
 export const CONTRACT_DOCUMENT_TYPE_LABELS: Record<ContractDocumentType, string> = {
     PRICE_OFFER: 'Fiyat teklifi',
     RENTAL_CONTRACT: 'Kiralama sözleşmesi',
+}
+
+export interface ContractTermSummary {
+    id: number
+    title: string
+    content: string
+    required: boolean
+    sortOrder: number
+}
+
+export interface ContractTemplateDetail {
+    id: number
+    code: string
+    name: string
+    rentalType: RentalType
+    documentType: ContractDocumentType
+    content: string
+    version: number
+    active: boolean
+    terms: ContractTermSummary[]
+    createdAt: string
+}
+
+export interface CreateContractTemplatePayload {
+    code: string
+    name: string
+    rentalType: RentalType
+    documentType?: ContractDocumentType
+    content: string
+}
+
+export interface CreateContractTermPayload {
+    title: string
+    content: string
+    required: boolean
+    sortOrder: number
 }

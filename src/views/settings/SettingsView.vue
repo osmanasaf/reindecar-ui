@@ -3,7 +3,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores'
 import { useAppSettingsStore } from '@/stores/appSettings.store'
-import { useToast } from '@/composables'
+import { useToast, useFeatures } from '@/composables'
 import { usersApi } from '@/api'
 import { RcPageHeader, RcButton, RcField, RcTabs, RcSkeletonText } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
@@ -12,14 +12,16 @@ import CitiesManager from './CitiesManager.vue'
 import ColorsManager from './ColorsManager.vue'
 import CategoriesManager from './CategoriesManager.vue'
 import FeaturesManager from './FeaturesManager.vue'
+import ContractTemplatesManager from './ContractTemplatesManager.vue'
 
-type SettingsTab = 'profile' | 'password' | 'notifications' | 'general' | 'features' | 'reference-data'
+type SettingsTab = 'profile' | 'password' | 'notifications' | 'general' | 'features' | 'reference-data' | 'contract-templates'
 type RefDataTab = 'brands' | 'cities' | 'colors' | 'categories'
 
 const authStore = useAuthStore()
 const route = useRoute()
 const appSettingsStore = useAppSettingsStore()
 const toast = useToast()
+const { isEnabled: isFeatureEnabled } = useFeatures()
 
 const activeTab = ref<SettingsTab>('profile')
 const refDataSubTab = ref<RefDataTab>('brands')
@@ -62,6 +64,9 @@ const navItems = computed(() => {
   if (authStore.isAdmin) {
     items.push({ id: 'general', label: 'Genel', icon: 'sliders' })
     items.push({ id: 'features', label: 'Modüller', icon: 'sparkle' })
+    if (isFeatureEnabled('MODIFIABLE_CONTRACTS')) {
+      items.push({ id: 'contract-templates', label: 'Sözleşme Şablonları', icon: 'folder' })
+    }
     items.push({ id: 'reference-data', label: 'Referans Veriler', icon: 'folder' })
   }
   return items
@@ -81,6 +86,7 @@ const sectionTitles: Record<SettingsTab, string> = {
   general: 'Genel Ayarlar',
   features: 'Modül Ayarları',
   'reference-data': 'Referans Veriler',
+  'contract-templates': 'Sözleşme Şablonları',
 }
 
 onMounted(async () => {
@@ -317,6 +323,8 @@ async function handleCurrencySave() {
           </template>
 
           <FeaturesManager v-else-if="activeTab === 'features'" />
+
+          <ContractTemplatesManager v-else-if="activeTab === 'contract-templates'" />
 
           <section v-else-if="activeTab === 'reference-data'">
             <RcTabs
