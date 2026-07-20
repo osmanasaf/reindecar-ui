@@ -13,8 +13,9 @@ import ColorsManager from './ColorsManager.vue'
 import CategoriesManager from './CategoriesManager.vue'
 import FeaturesManager from './FeaturesManager.vue'
 import ContractTemplatesManager from './ContractTemplatesManager.vue'
+import CompanyProfileManager from './CompanyProfileManager.vue'
 
-type SettingsTab = 'profile' | 'password' | 'notifications' | 'general' | 'features' | 'reference-data' | 'contract-templates'
+type SettingsTab = 'profile' | 'password' | 'notifications' | 'general' | 'company-profile' | 'features' | 'reference-data' | 'contract-templates'
 type RefDataTab = 'brands' | 'cities' | 'colors' | 'categories'
 
 const authStore = useAuthStore()
@@ -56,12 +57,13 @@ const selectedCurrency = ref('TRY')
 const savingCurrency = ref(false)
 
 const navItems = computed(() => {
-  const items: { id: SettingsTab; label: string; icon: 'user' | 'key' | 'bell' | 'folder' | 'sliders' | 'sparkle' }[] = [
+  const items: { id: SettingsTab; label: string; icon: 'user' | 'key' | 'bell' | 'folder' | 'sliders' | 'sparkle' | 'building' }[] = [
     { id: 'profile', label: 'Profil', icon: 'user' },
     { id: 'password', label: 'Şifre', icon: 'key' },
     { id: 'notifications', label: 'Bildirimler', icon: 'bell' },
   ]
   if (authStore.isAdmin) {
+    items.push({ id: 'company-profile', label: 'Firma Bilgileri', icon: 'building' })
     items.push({ id: 'general', label: 'Genel', icon: 'sliders' })
     items.push({ id: 'features', label: 'Modüller', icon: 'sparkle' })
     if (isFeatureEnabled('MODIFIABLE_CONTRACTS')) {
@@ -87,6 +89,7 @@ const sectionTitles: Record<SettingsTab, string> = {
   features: 'Modül Ayarları',
   'reference-data': 'Referans Veriler',
   'contract-templates': 'Sözleşme Şablonları',
+  'company-profile': 'Firma Bilgileri',
 }
 
 onMounted(async () => {
@@ -321,6 +324,8 @@ async function handleCurrencySave() {
               </div>
             </form>
           </template>
+
+          <CompanyProfileManager v-else-if="activeTab === 'company-profile'" />
 
           <FeaturesManager v-else-if="activeTab === 'features'" />
 
