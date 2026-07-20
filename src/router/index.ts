@@ -198,6 +198,12 @@ const router = createRouter({
             meta: { requiresAuth: true }
         },
         {
+            path: '/reports/vehicle-profitability',
+            name: 'vehicle-profitability',
+            component: () => import('@/views/reports/VehicleProfitabilityView.vue'),
+            meta: { requiresAuth: true, roles: ['ADMIN', 'SUPER_ADMIN'], featureKey: 'VEHICLE_PROFITABILITY' }
+        },
+        {
             path: '/km-packages',
             name: 'km-packages',
             component: () => import('@/views/pricing/KmPackageListView.vue'),

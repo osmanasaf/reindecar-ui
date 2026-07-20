@@ -34,6 +34,7 @@ export const navSections: NavSection[] = [
   {
     section: 'Finans',
     items: [
+      { name: 'vehicle-profitability', label: 'Araç Kârlılık Raporu', icon: 'trend', adminOnly: true, featureKey: 'VEHICLE_PROFITABILITY' },
       { name: 'finance', label: 'Alacak / Verecek', icon: 'receipt' },
       { name: 'insurance-claims', label: 'Sigorta Başvuruları', icon: 'shield' },
       { name: 'service-providers', label: 'Servis Sağlayıcılar', icon: 'wrench' },

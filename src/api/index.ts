@@ -30,6 +30,8 @@ export type {
     KmPackageInfo
 } from './pricing.api'
 export { dashboardApi } from './dashboard.api'
+export { vehicleProfitabilityApi } from './reports.api'
+export type { VehicleProfitabilityParams } from './reports.api'
 export { navSummaryApi, globalSearchApi } from './search.api'
 export type { NavSummary, GlobalSearchResult } from './search.api'
 export type { DashboardStats, RevenueData, VehicleStatusData, UpcomingReturn, DashboardResponse, AccountingStats } from './dashboard.api'
