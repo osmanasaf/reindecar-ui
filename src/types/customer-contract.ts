@@ -38,8 +38,9 @@ export const CUSTOMER_CONTRACT_STATUS_LABELS: Record<CustomerContractStatus, str
     COMPLETED: 'Tamamlandı',
 }
 
-// Backend state machine metodları (activate/suspend/terminate/complete) durum geçişi
-// doğrulaması yapmıyor; bu izin verilen geçişler yalnızca UI tarafında uygulanan bir kısıtlamadır.
+// Backend CustomerContract.ContractStatus (canActivate/canSuspend/canTerminate/canComplete)
+// ile birebir aynı geçiş kuralları; burada backend'in reddedeceği geçişleri UI'da
+// önceden gizlemek için tekrarlanıyor.
 export const CUSTOMER_CONTRACT_ALLOWED_TRANSITIONS: Record<CustomerContractStatus, CustomerContractStatus[]> = {
     DRAFT: ['ACTIVE'],
     ACTIVE: ['SUSPENDED', 'TERMINATED', 'COMPLETED'],
