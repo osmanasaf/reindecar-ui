@@ -4,6 +4,7 @@ import type { FileRecord, FileUploadType } from './files.api'
 import type {
     CreateUetdsManifestRequest,
     CreateUetdsPassengerRequest,
+    PassengerImportPreviewResponse,
     UetdsManifest,
     UetdsManifestPreviewResponse,
     UetdsPassenger,
@@ -98,6 +99,17 @@ class ServiceManifestsApiService extends BaseApi {
 
     async replacePassengers(id: number, requests: CreateUetdsPassengerRequest[]): Promise<UetdsPassenger[]> {
         return this.put(`/${id}/passengers`, requests)
+    }
+
+    async previewPassengerImport(id: number, file: File): Promise<PassengerImportPreviewResponse> {
+        const formData = new FormData()
+        formData.append('file', file)
+        const { data } = await apiClient.post<ApiResponse<PassengerImportPreviewResponse>>(
+            `${this.basePath}/${id}/passengers/import-preview`,
+            formData,
+            { headers: { 'Content-Type': 'multipart/form-data' } },
+        )
+        return data.data
     }
 
     async deletePassenger(id: number, passengerId: number): Promise<void> {

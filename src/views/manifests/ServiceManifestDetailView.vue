@@ -6,11 +6,12 @@ import { FILE_UPLOAD_TYPE_LABELS, type FileUploadType } from '@/api/files.api'
 import { useToast, useFeatures } from '@/composables'
 import FeatureGate from '@/components/common/FeatureGate.vue'
 import { AccountingConfirmModal } from '@/components/accounting'
-import { RcButton, RcEmpty, RcField, RcBadge, RcDetailSkeleton } from '@/components/rc'
+import { RcButton, RcEmpty, RcField, RcBadge, RcDetailSkeleton, RcModal } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
 import { formatDateTime } from '@/utils/format'
 import { toApiDateTime, toInputDateTime } from '@/utils/datetime'
-import type { UetdsManifest, UetdsPassenger, CreateUetdsPassengerRequest } from '@/types/manifest'
+import { downloadBlob } from '@/utils/download'
+import type { UetdsManifest, UetdsPassenger, CreateUetdsPassengerRequest, PassengerImportRowResult } from '@/types/manifest'
 import type { FileRecord } from '@/api/files.api'
 
 const route = useRoute()
@@ -33,6 +34,12 @@ const passengerForm = ref<CreateUetdsPassengerRequest>({
   idNumber: '',
 })
 const docUploadType = ref<FileUploadType>('UETDS_SEFER_MANIFEST')
+
+const showImportModal = ref(false)
+const importing = ref(false)
+const importRows = ref<PassengerImportRowResult[]>([])
+const importSelection = ref<Set<number>>(new Set())
+const selectedImportCount = computed(() => importSelection.value.size)
 
 const manifestId = computed(() => Number(route.params.id))
 
@@ -171,6 +178,75 @@ async function handleAddPassenger() {
   }
 }
 
+function downloadImportTemplate() {
+  const csv = 'Ad Soyad,Koltuk No,Uyruk,Kimlik No\nAhmet Yılmaz,1,T.C.,12345678901\n'
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+  downloadBlob(blob, 'yolcu-listesi-sablon.csv')
+}
+
+function openImportModal() {
+  importRows.value = []
+  importSelection.value = new Set()
+  showImportModal.value = true
+}
+
+function closeImportModal() {
+  showImportModal.value = false
+}
+
+async function handleImportFile(event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0]
+  if (!file) return
+  importing.value = true
+  try {
+    const preview = await serviceManifestsApi.previewPassengerImport(manifestId.value, file)
+    importRows.value = preview.rows
+    importSelection.value = new Set(
+      preview.rows.filter((r) => r.passenger !== null).map((r) => r.rowNumber),
+    )
+    if (preview.errorCount > 0) {
+      toast.error(`${preview.errorCount} satırda hata var, hatalı satırlar listeden çıkarıldı`)
+    }
+  } catch (error: unknown) {
+    toast.error(error instanceof Error ? error.message : 'Dosya ayrıştırılamadı')
+  } finally {
+    importing.value = false
+    ;(event.target as HTMLInputElement).value = ''
+  }
+}
+
+function toggleImportRow(rowNumber: number) {
+  if (importSelection.value.has(rowNumber)) {
+    importSelection.value.delete(rowNumber)
+  } else {
+    importSelection.value.add(rowNumber)
+  }
+  importSelection.value = new Set(importSelection.value)
+}
+
+async function confirmImport() {
+  const selected = importRows.value
+    .filter((r) => r.passenger !== null && importSelection.value.has(r.rowNumber))
+    .map((r) => r.passenger as CreateUetdsPassengerRequest)
+
+  if (selected.length === 0) {
+    toast.error('Kaydedilecek yolcu seçilmedi')
+    return
+  }
+
+  importing.value = true
+  try {
+    await serviceManifestsApi.replacePassengers(manifestId.value, selected)
+    toast.success(`${selected.length} yolcu kaydedildi (mevcut liste değiştirildi)`)
+    closeImportModal()
+    await loadPassengers()
+  } catch (error: unknown) {
+    toast.error(error instanceof Error ? error.message : 'Yolcu listesi kaydedilemedi')
+  } finally {
+    importing.value = false
+  }
+}
+
 async function handleDeletePassenger(passengerId: number) {
   try {
     await serviceManifestsApi.deletePassenger(manifestId.value, passengerId)
@@ -286,6 +362,10 @@ onMounted(() => {
         <div class="rc-card" style="margin-bottom: 16px">
           <div class="rc-card__head">
             <h2 class="rc-card__title">Yolcular</h2>
+            <RcButton variant="secondary" size="sm" @click="openImportModal">
+              <RcIcon name="upload" :size="14" />
+              Toplu yükle (CSV)
+            </RcButton>
           </div>
           <div class="rc-card__body">
             <form class="rcs-form-grid" style="margin-bottom: 16px" @submit.prevent="handleAddPassenger">
@@ -364,6 +444,73 @@ onMounted(() => {
       </FeatureGate>
     </template>
 
+    <RcModal :open="showImportModal" title="Toplu yolcu listesi yükle (CSV)" @close="closeImportModal">
+      <div class="rcs-import">
+        <p class="rcr-row__secondary">
+          "Ad Soyad,Koltuk No,Uyruk,Kimlik No" başlıklı bir CSV dosyası yükleyin. Bu işlem
+          <strong>mevcut yolcu listesinin tamamının yerine geçer.</strong>
+        </p>
+        <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 12px">
+          <RcButton variant="ghost" size="sm" @click="downloadImportTemplate">
+            <RcIcon name="download" :size="14" />
+            Örnek şablon indir
+          </RcButton>
+        </div>
+        <RcField label="CSV dosyası">
+          <input type="file" accept=".csv,text/csv" class="rc-input" :disabled="importing" @change="handleImportFile" />
+        </RcField>
+
+        <template v-if="importRows.length > 0">
+          <p class="rcr-row__secondary" style="margin-top: 12px">
+            {{ selectedImportCount }} / {{ importRows.length }} satır seçili
+          </p>
+          <table class="rc-table rcv-table--slim">
+            <thead>
+              <tr>
+                <th />
+                <th>#</th>
+                <th>Ad soyad</th>
+                <th>Koltuk</th>
+                <th>Uyruk</th>
+                <th>Kimlik</th>
+                <th>Hata</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in importRows" :key="row.rowNumber" :class="{ 'rcs-import-row--error': row.error }">
+                <td>
+                  <input
+                    type="checkbox"
+                    :disabled="!row.passenger"
+                    :checked="importSelection.has(row.rowNumber)"
+                    @change="toggleImportRow(row.rowNumber)"
+                  />
+                </td>
+                <td>{{ row.rowNumber }}</td>
+                <td>{{ row.passenger?.fullName ?? '—' }}</td>
+                <td>{{ row.passenger?.seatNumber ?? '—' }}</td>
+                <td>{{ row.passenger?.nationality ?? '—' }}</td>
+                <td>{{ row.passenger?.idNumber ?? '—' }}</td>
+                <td class="rcs-import-row__error">{{ row.error ?? '' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </template>
+      </div>
+
+      <template #footer>
+        <RcButton variant="secondary" @click="closeImportModal">Vazgeç</RcButton>
+        <RcButton
+          variant="primary"
+          :disabled="importing || selectedImportCount === 0"
+          :loading="importing"
+          @click="confirmImport"
+        >
+          {{ selectedImportCount }} yolcuyu kaydet
+        </RcButton>
+      </template>
+    </RcModal>
+
     <AccountingConfirmModal
       :open="showDeleteConfirm"
       title="Manifestoyu sil"
@@ -393,5 +540,14 @@ onMounted(() => {
   padding: 10px 12px;
   border: 1px solid var(--rc-border-subtle);
   border-radius: var(--rc-radius-md, 6px);
+}
+
+.rcs-import-row--error {
+  background: var(--rc-danger-bg, rgba(220, 38, 38, 0.06));
+}
+
+.rcs-import-row__error {
+  color: var(--rc-danger, #dc2626);
+  font-size: 12px;
 }
 </style>

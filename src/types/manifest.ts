@@ -96,3 +96,15 @@ export interface UetdsManifestPreviewResponse {
     rentalVehiclePlate: string
     parsedVehiclePlate: string
 }
+
+export interface PassengerImportRowResult {
+    rowNumber: number
+    passenger: CreateUetdsPassengerRequest | null
+    error: string | null
+}
+
+export interface PassengerImportPreviewResponse {
+    rows: PassengerImportRowResult[]
+    validCount: number
+    errorCount: number
+}
