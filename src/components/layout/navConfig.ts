@@ -52,9 +52,9 @@ export const navSections: NavSection[] = [
             icon: 'folder',
             featureKey: 'CUSTOMER_PRICING_AGREEMENTS',
           },
+          { name: 'rental-pricing', label: 'Araç/Müşteri Fiyat Kuralları', icon: 'cash' },
         ],
       },
-      { name: 'rental-pricing', label: 'Araç/Müşteri Fiyat Kuralları', icon: 'cash' },
     ],
   },
   {
