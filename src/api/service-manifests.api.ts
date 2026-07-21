@@ -101,6 +101,10 @@ class ServiceManifestsApiService extends BaseApi {
         return this.put(`/${id}/passengers`, requests)
     }
 
+    async updatePassenger(id: number, passengerId: number, request: CreateUetdsPassengerRequest): Promise<UetdsPassenger> {
+        return this.put(`/${id}/passengers/${passengerId}`, request)
+    }
+
     async previewPassengerImport(id: number, file: File): Promise<PassengerImportPreviewResponse> {
         const formData = new FormData()
         formData.append('file', file)

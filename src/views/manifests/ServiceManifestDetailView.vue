@@ -35,6 +35,15 @@ const passengerForm = ref<CreateUetdsPassengerRequest>({
 })
 const docUploadType = ref<FileUploadType>('UETDS_SEFER_MANIFEST')
 
+const editingPassengerId = ref<number | null>(null)
+const editPassengerForm = ref<CreateUetdsPassengerRequest>({
+  seatNumber: undefined,
+  fullName: '',
+  nationality: '',
+  idNumber: '',
+})
+const savingPassengerEdit = ref(false)
+
 const showImportModal = ref(false)
 const importing = ref(false)
 const importRows = ref<PassengerImportRowResult[]>([])
@@ -256,6 +265,44 @@ async function confirmImport() {
   }
 }
 
+function startEditPassenger(passenger: UetdsPassenger) {
+  editingPassengerId.value = passenger.id
+  editPassengerForm.value = {
+    seatNumber: passenger.seatNumber ?? undefined,
+    fullName: passenger.fullName,
+    nationality: passenger.nationality ?? '',
+    idNumber: passenger.idNumber ?? '',
+  }
+}
+
+function cancelEditPassenger() {
+  editingPassengerId.value = null
+}
+
+async function handleUpdatePassenger() {
+  if (!editingPassengerId.value) return
+  if (!editPassengerForm.value.fullName.trim()) {
+    toast.error('Yolcu adı zorunludur')
+    return
+  }
+  savingPassengerEdit.value = true
+  try {
+    await serviceManifestsApi.updatePassenger(manifestId.value, editingPassengerId.value, {
+      seatNumber: editPassengerForm.value.seatNumber,
+      fullName: editPassengerForm.value.fullName.trim(),
+      nationality: editPassengerForm.value.nationality || undefined,
+      idNumber: editPassengerForm.value.idNumber || undefined,
+    })
+    editingPassengerId.value = null
+    await loadPassengers()
+    toast.success('Yolcu güncellendi')
+  } catch (error: unknown) {
+    toast.error(error instanceof Error ? error.message : 'Yolcu güncellenemedi')
+  } finally {
+    savingPassengerEdit.value = false
+  }
+}
+
 async function handleDeletePassenger(passengerId: number) {
   try {
     await serviceManifestsApi.deletePassenger(manifestId.value, passengerId)
@@ -408,13 +455,26 @@ onMounted(() => {
               </thead>
               <tbody>
                 <tr v-for="passenger in passengers" :key="passenger.id">
-                  <td>{{ passenger.seatNumber ?? '—' }}</td>
-                  <td>{{ passenger.fullName }}</td>
-                  <td>{{ passenger.nationality || '—' }}</td>
-                  <td>{{ passenger.idNumber || '—' }}</td>
-                  <td class="rc-right">
-                    <RcButton variant="ghost" size="sm" @click="handleDeletePassenger(passenger.id)">Sil</RcButton>
-                  </td>
+                  <template v-if="editingPassengerId === passenger.id">
+                    <td><input v-model.number="editPassengerForm.seatNumber" type="number" min="1" class="rc-input rc-num" /></td>
+                    <td><input v-model="editPassengerForm.fullName" class="rc-input" required /></td>
+                    <td><input v-model="editPassengerForm.nationality" class="rc-input" /></td>
+                    <td><input v-model="editPassengerForm.idNumber" class="rc-input" /></td>
+                    <td class="rc-right">
+                      <RcButton variant="accent" size="sm" :disabled="savingPassengerEdit" @click="handleUpdatePassenger">Kaydet</RcButton>
+                      <RcButton variant="ghost" size="sm" :disabled="savingPassengerEdit" @click="cancelEditPassenger">Vazgeç</RcButton>
+                    </td>
+                  </template>
+                  <template v-else>
+                    <td>{{ passenger.seatNumber ?? '—' }}</td>
+                    <td>{{ passenger.fullName }}</td>
+                    <td>{{ passenger.nationality || '—' }}</td>
+                    <td>{{ passenger.idNumber || '—' }}</td>
+                    <td class="rc-right">
+                      <RcButton variant="ghost" size="sm" @click="startEditPassenger(passenger)">Düzenle</RcButton>
+                      <RcButton variant="ghost" size="sm" @click="handleDeletePassenger(passenger.id)">Sil</RcButton>
+                    </td>
+                  </template>
                 </tr>
               </tbody>
             </table>
