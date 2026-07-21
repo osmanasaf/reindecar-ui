@@ -79,6 +79,12 @@ apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
     return config
 })
 
+const PUBLIC_AUTH_PATHS = ['/auth/login', '/auth/register', '/auth/register-invited-user']
+
+function isPublicAuthRequest(url?: string): boolean {
+    return !!url && PUBLIC_AUTH_PATHS.some((path) => url.includes(path))
+}
+
 apiClient.interceptors.response.use(
     (response) => response,
     async (error: AxiosError<ErrorResponse | ApiError>) => {
@@ -86,6 +92,11 @@ apiClient.interceptors.response.use(
 
         const responseData = error.response?.data
         const isBackendError = responseData && isErrorResponse(responseData)
+
+        if (isPublicAuthRequest(originalRequest?.url)) {
+            if (isBackendError) throw responseData
+            throw error
+        }
 
         if (isBackendError && isAuthError(responseData)) {
             const errorCode = responseData.code
