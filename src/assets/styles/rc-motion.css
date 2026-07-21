@@ -1,0 +1,93 @@
+/* ===========================================================
+   REINDECAR · Global motion layer
+   Entrance animations · list/card stagger · micro-interactions
+   Imported last so it can layer on top of module styles.
+   =========================================================== */
+
+/* ── Keyframes ── */
+@keyframes rcRise {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes rcFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ── Entrance utilities (opt-in) ── */
+.rc-animate-in {
+  animation: rcRise var(--rc-dur-base) var(--rc-ease-out) both;
+}
+.rc-fade-in {
+  animation: rcFadeIn var(--rc-dur-base) var(--rc-ease-out) both;
+}
+
+/* Stagger: direct children rise in sequence.
+   Apply to any grid/list container: <div class="rc-stagger"> */
+.rc-stagger > * {
+  animation: rcRise var(--rc-dur-base) var(--rc-ease-out) both;
+}
+.rc-stagger > *:nth-child(1)  { animation-delay: 0ms; }
+.rc-stagger > *:nth-child(2)  { animation-delay: 40ms; }
+.rc-stagger > *:nth-child(3)  { animation-delay: 80ms; }
+.rc-stagger > *:nth-child(4)  { animation-delay: 120ms; }
+.rc-stagger > *:nth-child(5)  { animation-delay: 160ms; }
+.rc-stagger > *:nth-child(6)  { animation-delay: 200ms; }
+.rc-stagger > *:nth-child(7)  { animation-delay: 240ms; }
+.rc-stagger > *:nth-child(8)  { animation-delay: 280ms; }
+.rc-stagger > *:nth-child(9)  { animation-delay: 320ms; }
+.rc-stagger > *:nth-child(n + 10) { animation-delay: 360ms; }
+
+/* ── Dashboard KPI grid: staggered entrance (mount-once) ── */
+.rc-kpi-grid > .rc-kpi {
+  animation: rcRise var(--rc-dur-base) var(--rc-ease-out) both;
+}
+.rc-kpi-grid > .rc-kpi:nth-child(1) { animation-delay: 0ms; }
+.rc-kpi-grid > .rc-kpi:nth-child(2) { animation-delay: 50ms; }
+.rc-kpi-grid > .rc-kpi:nth-child(3) { animation-delay: 100ms; }
+.rc-kpi-grid > .rc-kpi:nth-child(4) { animation-delay: 150ms; }
+.rc-kpi-grid > .rc-kpi:nth-child(5) { animation-delay: 200ms; }
+.rc-kpi-grid > .rc-kpi:nth-child(n + 6) { animation-delay: 250ms; }
+
+/* ── Interactive card hover lift ── */
+.rc-kpi--link {
+  transition: border-color var(--rc-dur-fast) var(--rc-ease-out),
+              background var(--rc-dur-fast) var(--rc-ease-out),
+              box-shadow var(--rc-dur-fast) var(--rc-ease-out),
+              transform var(--rc-dur-fast) var(--rc-ease-out);
+}
+.rc-kpi--link:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--rc-shadow-sm);
+}
+.rc-kpi--link:active {
+  transform: translateY(0);
+}
+
+/* Opt-in hover raise for any interactive card: <div class="rc-card rc-hover-raise"> */
+.rc-hover-raise {
+  transition: transform var(--rc-dur-fast) var(--rc-ease-out),
+              box-shadow var(--rc-dur-fast) var(--rc-ease-out),
+              border-color var(--rc-dur-fast) var(--rc-ease-out);
+}
+.rc-hover-raise:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--rc-shadow-md);
+}
+.rc-hover-raise:active {
+  transform: translateY(0);
+}
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  .rc-animate-in,
+  .rc-fade-in,
+  .rc-stagger > *,
+  .rc-kpi-grid > .rc-kpi {
+    animation: none !important;
+  }
+  .rc-kpi--link:hover,
+  .rc-hover-raise:hover {
+    transform: none !important;
+  }
+}

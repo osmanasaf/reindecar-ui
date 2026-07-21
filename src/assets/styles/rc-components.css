@@ -45,9 +45,11 @@
   transition: background var(--rc-dur-fast) var(--rc-ease-out),
               border-color var(--rc-dur-fast) var(--rc-ease-out),
               color var(--rc-dur-fast) var(--rc-ease-out),
-              box-shadow var(--rc-dur-fast) var(--rc-ease-out);
+              box-shadow var(--rc-dur-fast) var(--rc-ease-out),
+              transform var(--rc-dur-fast) var(--rc-ease-out);
 }
 .rc-btn:focus-visible { outline: none; box-shadow: var(--rc-focus-ring); }
+.rc-btn:not(:disabled):active { transform: translateY(0.5px) scale(0.985); }
 .rc-btn:disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
 .rc-btn--loading { position: relative; }
 .rc-btn--loading .rc-spin {
@@ -71,6 +73,17 @@
   border-color: var(--rc-ink-1000);
 }
 .rc-btn--primary:hover { background: var(--rc-ink-800); border-color: var(--rc-ink-800); }
+/* Dark: ink-1000 stays #0A0A0A, so a black-on-black button would be invisible.
+   Invert to the theme-aware light-on-dark fill. */
+[data-theme="dark"] .rc-btn--primary {
+  background: var(--rc-text);
+  color: var(--rc-text-inverse);
+  border-color: var(--rc-text);
+}
+[data-theme="dark"] .rc-btn--primary:hover {
+  background: var(--rc-ink-300);
+  border-color: var(--rc-ink-300);
+}
 
 .rc-btn--accent {
   background: var(--rc-blue-500);
@@ -404,6 +417,7 @@
 .rc-badge--accent  { background: var(--rc-blue-50);    color: var(--rc-blue-700); }
 .rc-badge--purple  { background: var(--rc-purple-50);  color: var(--rc-purple-500); }
 .rc-badge--solid   { background: var(--rc-ink-1000);   color: #fff; }
+[data-theme="dark"] .rc-badge--solid { background: var(--rc-text); color: var(--rc-text-inverse); }
 
 /* ───────── Card / panel ───────── */
 .rc-card {
@@ -719,15 +733,18 @@
 
 /* ───────── Page & list transitions ───────── */
 .rc-page-enter-active {
-  transition: opacity var(--rc-dur-fast) var(--rc-ease-out),
-              transform var(--rc-dur-fast) var(--rc-ease-out);
+  transition: opacity var(--rc-dur-base) var(--rc-ease-out),
+              transform var(--rc-dur-base) var(--rc-ease-out);
 }
 .rc-page-enter-from {
-  opacity: 0.7;
-  transform: translateY(3px);
+  opacity: 0;
+  transform: translateY(6px);
 }
 .rc-page-leave-active {
-  transition: none;
+  transition: opacity var(--rc-dur-fast) var(--rc-ease-out);
+}
+.rc-page-leave-to {
+  opacity: 0;
 }
 
 .rc-list-enter-active {

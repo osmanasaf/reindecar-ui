@@ -16,6 +16,7 @@ import './assets/styles/rc-settings.css'
 import './assets/styles/rc-documents.css'
 import './assets/styles/rc-datepicker.css'
 import './assets/styles/rc-bridge.css'
+import './assets/styles/rc-motion.css'
 import { clickOutside } from './directives'
 import { initTheme } from './composables/useTheme'
 

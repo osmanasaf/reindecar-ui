@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores'
 import { useAppSettingsStore } from '@/stores/appSettings.store'
+import { useFeaturesStore } from '@/stores/features.store'
 import { useToast } from '@/composables'
 import { usersApi } from '@/api'
 import { RcPageHeader, RcButton, RcField, RcTabs, RcSkeletonText } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
+import type { IconName } from '@/components/icons/iconPaths'
 import BrandsManager from './BrandsManager.vue'
 import CitiesManager from './CitiesManager.vue'
 import ColorsManager from './ColorsManager.vue'
@@ -18,21 +20,36 @@ import DocumentTemplatesManager from './DocumentTemplatesManager.vue'
 type SettingsTab = 'profile' | 'password' | 'notifications' | 'general' | 'features' | 'branding' | 'document-templates' | 'reference-data'
 type RefDataTab = 'brands' | 'cities' | 'colors' | 'categories'
 
+interface NavItemMeta {
+  id: SettingsTab
+  label: string
+  desc: string
+  icon: IconName
+  keywords: string
+}
+
+const SKELETON_MS = 850
+const COUNTER_MS = 750
+
 const authStore = useAuthStore()
 const route = useRoute()
 const appSettingsStore = useAppSettingsStore()
+const featuresStore = useFeaturesStore()
 const toast = useToast()
 
 const activeTab = ref<SettingsTab>('profile')
 const refDataSubTab = ref<RefDataTab>('brands')
 const loading = ref(false)
 const settingsLoading = ref(false)
+const loaded = ref(false)
+const query = ref('')
 
 const profileForm = ref({
   firstName: '',
   lastName: '',
   email: authStore.user?.email || '',
 })
+const profileSnapshot = ref({ firstName: '', lastName: '', email: '' })
 
 const passwordForm = ref({
   currentPassword: '',
@@ -46,6 +63,12 @@ const notificationSettings = ref({
   pushNotifications: false,
 })
 
+const notificationItems: { key: keyof typeof notificationSettings.value; title: string; desc: string; icon: IconName }[] = [
+  { key: 'emailNotifications', title: 'E-posta bildirimleri', desc: 'Kiralamalar, ödemeler ve hatırlatmalar için e-posta al', icon: 'mail' },
+  { key: 'smsNotifications', title: 'SMS bildirimleri', desc: 'Önemli güncellemeler için SMS al', icon: 'phone' },
+  { key: 'pushNotifications', title: 'Push bildirimleri', desc: 'Tarayıcı bildirimleri al', icon: 'bell' },
+]
+
 const currencyOptions = [
   { value: 'TRY', label: 'TRY — Türk Lirası' },
   { value: 'USD', label: 'USD — Amerikan Doları' },
@@ -55,21 +78,75 @@ const currencyOptions = [
 const selectedCurrency = ref('TRY')
 const savingCurrency = ref(false)
 
-const navItems = computed(() => {
-  const items: { id: SettingsTab; label: string; icon: 'user' | 'key' | 'bell' | 'folder' | 'sliders' | 'sparkle' | 'building' | 'edit' }[] = [
-    { id: 'profile', label: 'Profil', icon: 'user' },
-    { id: 'password', label: 'Şifre', icon: 'key' },
-    { id: 'notifications', label: 'Bildirimler', icon: 'bell' },
+const currencyPreviewRows = computed(() => {
+  const fmt = (value: number) => {
+    try {
+      return new Intl.NumberFormat('tr-TR', {
+        style: 'currency',
+        currency: selectedCurrency.value,
+        maximumFractionDigits: 2,
+      }).format(value)
+    } catch {
+      return String(value)
+    }
+  }
+  return [
+    { label: 'Günlük araç fiyatı', value: fmt(1450) },
+    { label: 'Aylık ciro', value: fmt(1284500) },
+    { label: 'Depozito tutarı', value: fmt(7500) },
+  ]
+})
+
+const DEFAULT_META: NavItemMeta = { id: 'profile', label: 'Profil', desc: 'Ad, soyad ve iletişim bilgileri', icon: 'user', keywords: 'profil ad soyad e-posta email isim hesap' }
+
+const accountItems: NavItemMeta[] = [
+  DEFAULT_META,
+  { id: 'password', label: 'Şifre & Güvenlik', desc: 'Hesap parolanı güncelle', icon: 'key', keywords: 'şifre parola güvenlik password değiştir' },
+  { id: 'notifications', label: 'Bildirimler', desc: 'E-posta, SMS ve push tercihleri', icon: 'bell', keywords: 'bildirim e-posta sms push uyarı hatırlatma' },
+]
+
+const systemItems: NavItemMeta[] = [
+  { id: 'general', label: 'Genel', desc: 'Para birimi ve bölgesel ayarlar', icon: 'sliders', keywords: 'genel para birimi currency bölge dil try usd euro' },
+  { id: 'branding', label: 'Firma / Marka', desc: 'Logo, renk ve firma bilgileri', icon: 'building', keywords: 'firma marka logo renk kurumsal branding' },
+  { id: 'document-templates', label: 'Belge Şablonları', desc: 'Sözleşme ve fatura şablonları', icon: 'edit', keywords: 'belge şablon sözleşme fatura döküman template' },
+  { id: 'features', label: 'Modüller', desc: 'Aktif modülleri yönet', icon: 'sparkle', keywords: 'modül özellik feature aktif' },
+  { id: 'reference-data', label: 'Referans Veriler', desc: 'Marka, il, renk ve kategori tanımları', icon: 'folder', keywords: 'referans veri marka model il ilçe renk kategori' },
+]
+
+const moduleCountDisplay = ref(0)
+const moduleTotal = computed(() => featuresStore.features.length)
+const moduleActive = computed(() => featuresStore.enabledKeys.size)
+
+function badgeFor(id: SettingsTab): string | null {
+  if (id === 'features' && moduleTotal.value > 0) {
+    return `${moduleCountDisplay.value}/${moduleTotal.value}`
+  }
+  return null
+}
+
+const navGroups = computed(() => {
+  const q = query.value.trim().toLowerCase()
+  const matches = (item: NavItemMeta) =>
+    !q || item.label.toLowerCase().includes(q) || item.keywords.toLowerCase().includes(q)
+
+  const groups: { section: string; items: NavItemMeta[] }[] = [
+    { section: 'Hesap', items: accountItems.filter(matches) },
   ]
   if (authStore.isAdmin) {
-    items.push({ id: 'general', label: 'Genel', icon: 'sliders' })
-    items.push({ id: 'branding', label: 'Firma / Marka', icon: 'building' })
-    items.push({ id: 'document-templates', label: 'Belge Şablonları', icon: 'edit' })
-    items.push({ id: 'features', label: 'Modüller', icon: 'sparkle' })
-    items.push({ id: 'reference-data', label: 'Referans Veriler', icon: 'folder' })
+    groups.push({ section: 'Sistem', items: systemItems.filter(matches) })
   }
-  return items
+  return groups.filter((group) => group.items.length > 0)
 })
+
+const hasMatches = computed(() => navGroups.value.length > 0)
+
+const allItems = computed(() =>
+  authStore.isAdmin ? [...accountItems, ...systemItems] : accountItems,
+)
+
+const activeMeta = computed(
+  () => allItems.value.find((item) => item.id === activeTab.value) ?? DEFAULT_META,
+)
 
 const refDataTabs = [
   { id: 'brands' as const, label: 'Markalar / Modeller' },
@@ -78,15 +155,40 @@ const refDataTabs = [
   { id: 'categories' as const, label: 'Kategoriler' },
 ]
 
-const sectionTitles: Record<SettingsTab, string> = {
-  profile: 'Profil Bilgileri',
-  password: 'Şifre Değiştir',
-  notifications: 'Bildirim Ayarları',
-  general: 'Genel Ayarlar',
-  features: 'Modül Ayarları',
-  branding: 'Firma / Marka',
-  'document-templates': 'Belge Şablonları',
-  'reference-data': 'Referans Veriler',
+let counterRaf = 0
+let loadTimer: ReturnType<typeof setTimeout> | undefined
+
+function animateModuleCount() {
+  const target = moduleActive.value
+  const prefersReduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  if (prefersReduced || target === 0) {
+    moduleCountDisplay.value = target
+    return
+  }
+  const start = performance.now()
+  const step = (now: number) => {
+    const progress = Math.min(1, (now - start) / COUNTER_MS)
+    const eased = 1 - Math.pow(1 - progress, 3)
+    moduleCountDisplay.value = Math.round(target * eased)
+    if (progress < 1) counterRaf = requestAnimationFrame(step)
+  }
+  counterRaf = requestAnimationFrame(step)
+}
+
+watch(moduleActive, (value) => {
+  moduleCountDisplay.value = value
+})
+
+function selectTab(id: SettingsTab) {
+  activeTab.value = id
+}
+
+function clearQuery() {
+  query.value = ''
+}
+
+function resetProfile() {
+  profileForm.value = { ...profileSnapshot.value }
 }
 
 onMounted(async () => {
@@ -99,11 +201,24 @@ onMounted(async () => {
   const nameParts = fullName.split(' ')
   profileForm.value.firstName = nameParts[0] || ''
   profileForm.value.lastName = nameParts.slice(1).join(' ') || ''
+  profileSnapshot.value = { ...profileForm.value }
+
+  loadTimer = setTimeout(() => {
+    loaded.value = true
+  }, SKELETON_MS)
+
   await fetchSettings()
   if (authStore.isAdmin) {
     await appSettingsStore.loadSettings()
     selectedCurrency.value = appSettingsStore.defaultCurrency
+    await featuresStore.loadFeatures()
+    animateModuleCount()
   }
+})
+
+onBeforeUnmount(() => {
+  if (loadTimer) clearTimeout(loadTimer)
+  if (counterRaf) cancelAnimationFrame(counterRaf)
 })
 
 async function fetchSettings() {
@@ -131,6 +246,7 @@ async function handleProfileSave() {
       lastName: profileForm.value.lastName,
     })
     await authStore.fetchUser()
+    profileSnapshot.value = { ...profileForm.value }
     toast.success('Profil başarıyla güncellendi')
   } catch (error: unknown) {
     const err = error as { message?: string }
@@ -201,30 +317,75 @@ async function handleCurrencySave() {
   <div class="rc-page">
     <RcPageHeader
       title="Ayarlar"
-      subtitle="Hesap, bildirim ve referans veri yapılandırması"
+      subtitle="Hesap, bildirim ve sistem yapılandırmasını tek yerden yönet"
     />
 
-    <div class="rcs-layout">
-      <nav class="rcs-nav" aria-label="Ayarlar menüsü">
-        <button
-          v-for="item in navItems"
-          :key="item.id"
-          type="button"
-          class="rcs-nav__item"
-          :class="{ 'rcs-nav__item--active': activeTab === item.id }"
-          @click="activeTab = item.id"
-        >
-          <RcIcon :name="item.icon" class="rc-icon" />
-          {{ item.label }}
-        </button>
-      </nav>
+    <!-- Skeleton -->
+    <div v-if="!loaded" class="rcs-layout rcs-fade">
+      <div class="rcs-skel-nav">
+        <span class="rcs-skel rcs-skel--search" />
+        <span v-for="n in 6" :key="n" class="rcs-skel rcs-skel--item" />
+      </div>
+      <div class="rcs-skel rcs-skel--panel" />
+    </div>
 
-      <div class="rcs-card">
-        <div class="rcs-card__head">
-          <h2 class="rcs-card__title">{{ sectionTitles[activeTab] }}</h2>
+    <!-- Two-pane master · detail -->
+    <div v-else class="rcs-layout rcs-fade">
+      <nav class="rcs-nav" aria-label="Ayarlar menüsü">
+        <div class="rcs-search">
+          <RcIcon name="search" :size="15" class="rcs-search__icon" />
+          <input
+            v-model="query"
+            type="text"
+            class="rcs-search__input"
+            placeholder="Ayarlarda ara…"
+            aria-label="Ayarlarda ara"
+          />
+          <button
+            v-if="query"
+            type="button"
+            class="rcs-search__clear"
+            aria-label="Aramayı temizle"
+            @click="clearQuery"
+          >
+            <RcIcon name="close" :size="14" />
+          </button>
         </div>
 
-        <div class="rcs-card__body">
+        <template v-for="group in navGroups" :key="group.section">
+          <div class="rcs-nav__group-title">{{ group.section }}</div>
+          <button
+            v-for="item in group.items"
+            :key="item.id"
+            type="button"
+            class="rcs-nav__item"
+            :class="{ 'rcs-nav__item--active': activeTab === item.id }"
+            @click="selectTab(item.id)"
+          >
+            <RcIcon :name="item.icon" :size="16" class="rcs-nav__icon" />
+            <span class="rcs-nav__label">{{ item.label }}</span>
+            <span v-if="badgeFor(item.id)" class="rcs-nav__badge">{{ badgeFor(item.id) }}</span>
+          </button>
+        </template>
+
+        <div v-if="!hasMatches" class="rcs-nav__empty">
+          "{{ query }}" için eşleşme yok
+        </div>
+      </nav>
+
+      <div class="rcs-panel">
+        <div class="rcs-panel__head">
+          <span class="rcs-panel__icon">
+            <RcIcon :name="activeMeta.icon" :size="18" />
+          </span>
+          <div class="rcs-panel__heading">
+            <h2 class="rcs-panel__title">{{ activeMeta.label }}</h2>
+            <div class="rcs-panel__desc">{{ activeMeta.desc }}</div>
+          </div>
+        </div>
+
+        <div :key="activeTab" class="rcs-panel__body rcs-section">
+          <!-- Profil -->
           <form v-if="activeTab === 'profile'" @submit.prevent="handleProfileSave">
             <div class="rcs-form-grid">
               <RcField label="Ad">
@@ -237,87 +398,105 @@ async function handleCurrencySave() {
                 <input v-model="profileForm.email" type="email" class="rc-input" required />
               </RcField>
             </div>
-            <div class="rcs-card__foot" style="margin: 20px -20px -20px; padding-right: 20px">
-              <RcButton type="submit" variant="primary" :loading="loading">
-                Kaydet
-              </RcButton>
+            <div class="rcs-foot">
+              <RcButton type="button" variant="ghost" @click="resetProfile">Vazgeç</RcButton>
+              <RcButton type="submit" variant="primary" :loading="loading">Kaydet</RcButton>
             </div>
           </form>
 
+          <!-- Şifre & Güvenlik -->
           <form v-else-if="activeTab === 'password'" @submit.prevent="handlePasswordChange">
-            <div class="rcs-form-grid rcs-form-grid--single">
+            <div class="rcs-form-grid rcs-form-grid--single rcs-form-grid--narrow">
               <RcField label="Mevcut şifre">
-                <input v-model="passwordForm.currentPassword" type="password" class="rc-input" required />
+                <input v-model="passwordForm.currentPassword" type="password" class="rc-input" placeholder="••••••••" required />
               </RcField>
               <RcField label="Yeni şifre" hint="En az 8 karakter">
                 <input
                   v-model="passwordForm.newPassword"
                   type="password"
                   class="rc-input"
+                  placeholder="En az 8 karakter"
                   minlength="8"
                   required
                 />
               </RcField>
               <RcField label="Yeni şifre (tekrar)">
-                <input v-model="passwordForm.confirmPassword" type="password" class="rc-input" required />
+                <input v-model="passwordForm.confirmPassword" type="password" class="rc-input" placeholder="••••••••" required />
               </RcField>
+              <div class="rcs-info">
+                <RcIcon name="info" :size="16" class="rcs-info__icon" />
+                <span>Güçlü bir şifre en az 8 karakter içermeli; bir büyük harf, bir rakam ve bir sembol önerilir.</span>
+              </div>
             </div>
-            <div class="rcs-card__foot" style="margin: 20px -20px -20px; padding-right: 20px">
-              <RcButton type="submit" variant="primary" :loading="loading">
-                Şifreyi değiştir
-              </RcButton>
+            <div class="rcs-foot">
+              <RcButton type="submit" variant="primary" :loading="loading">Şifreyi değiştir</RcButton>
             </div>
           </form>
 
+          <!-- Bildirimler -->
           <template v-else-if="activeTab === 'notifications'">
-            <div v-if="settingsLoading" style="padding: 24px 0">
+            <div v-if="settingsLoading" style="padding: 8px 0">
               <RcSkeletonText :lines="4" />
             </div>
             <form v-else @submit.prevent="handleNotificationSave">
-              <div class="rcs-notif-list">
-                <label class="rcs-notif-item">
-                  <input v-model="notificationSettings.emailNotifications" type="checkbox" />
-                  <span class="rcs-notif-item__text">
-                    <span class="rcs-notif-item__title">E-posta bildirimleri</span>
-                    <span class="rcs-notif-item__desc">Kiralamalar, ödemeler ve hatırlatmalar için e-posta al</span>
+              <div class="rcs-toggle-list">
+                <button
+                  v-for="item in notificationItems"
+                  :key="item.key"
+                  type="button"
+                  class="rcs-toggle-row"
+                  :aria-pressed="notificationSettings[item.key]"
+                  @click="notificationSettings[item.key] = !notificationSettings[item.key]"
+                >
+                  <span class="rcs-toggle-row__icon">
+                    <RcIcon :name="item.icon" :size="16" />
                   </span>
-                </label>
-                <label class="rcs-notif-item">
-                  <input v-model="notificationSettings.smsNotifications" type="checkbox" />
-                  <span class="rcs-notif-item__text">
-                    <span class="rcs-notif-item__title">SMS bildirimleri</span>
-                    <span class="rcs-notif-item__desc">Önemli güncellemeler için SMS al</span>
+                  <span class="rcs-toggle-row__text">
+                    <span class="rcs-toggle-row__title">{{ item.title }}</span>
+                    <span class="rcs-toggle-row__desc">{{ item.desc }}</span>
                   </span>
-                </label>
-                <label class="rcs-notif-item">
-                  <input v-model="notificationSettings.pushNotifications" type="checkbox" />
-                  <span class="rcs-notif-item__text">
-                    <span class="rcs-notif-item__title">Push bildirimleri</span>
-                    <span class="rcs-notif-item__desc">Tarayıcı bildirimleri al</span>
+                  <span
+                    class="rcs-toggle__track"
+                    :class="{ 'rcs-toggle__track--on': notificationSettings[item.key] }"
+                  >
+                    <span class="rcs-toggle__thumb" />
                   </span>
-                </label>
+                </button>
               </div>
-              <div class="rcs-card__foot" style="margin: 20px -20px -20px; padding-right: 20px">
-                <RcButton type="submit" variant="primary" :loading="loading">
-                  Kaydet
-                </RcButton>
+              <div class="rcs-foot">
+                <RcButton type="submit" variant="primary" :loading="loading">Kaydet</RcButton>
               </div>
             </form>
           </template>
 
+          <!-- Genel — canlı önizleme -->
           <template v-else-if="activeTab === 'general'">
             <form @submit.prevent="handleCurrencySave">
-              <RcField label="Varsayılan para birimi" hint="Tüm fiyat ve tutar gösterimlerinde kullanılır">
-                <select v-model="selectedCurrency" class="rc-input">
-                  <option v-for="opt in currencyOptions" :key="opt.value" :value="opt.value">
-                    {{ opt.label }}
-                  </option>
-                </select>
-              </RcField>
-              <div class="rcs-card__foot" style="margin: 20px -20px -20px; padding-right: 20px">
-                <RcButton type="submit" variant="primary" :loading="savingCurrency">
-                  Kaydet
-                </RcButton>
+              <div class="rcs-form-grid">
+                <RcField label="Varsayılan para birimi" hint="Tüm fiyat ve tutar gösterimlerinde kullanılır">
+                  <select v-model="selectedCurrency" class="rc-input">
+                    <option v-for="opt in currencyOptions" :key="opt.value" :value="opt.value">
+                      {{ opt.label }}
+                    </option>
+                  </select>
+                </RcField>
+              </div>
+
+              <div class="rcs-preview">
+                <div class="rcs-preview__head">
+                  <RcIcon name="eye" :size="14" class="rcs-preview__icon" />
+                  <span>Canlı önizleme</span>
+                </div>
+                <div class="rcs-preview__body">
+                  <div v-for="row in currencyPreviewRows" :key="row.label" class="rcs-preview__row">
+                    <span class="rcs-preview__label">{{ row.label }}</span>
+                    <span class="rcs-preview__value rc-mono">{{ row.value }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="rcs-foot">
+                <RcButton type="submit" variant="primary" :loading="savingCurrency">Kaydet</RcButton>
               </div>
             </form>
           </template>
@@ -334,10 +513,12 @@ async function handleCurrencySave() {
               :tabs="refDataTabs"
               style="margin-bottom: 16px"
             />
-            <BrandsManager v-if="refDataSubTab === 'brands'" />
-            <CitiesManager v-else-if="refDataSubTab === 'cities'" />
-            <ColorsManager v-else-if="refDataSubTab === 'colors'" />
-            <CategoriesManager v-else-if="refDataSubTab === 'categories'" />
+            <div :key="refDataSubTab" class="rcs-section">
+              <BrandsManager v-if="refDataSubTab === 'brands'" />
+              <CitiesManager v-else-if="refDataSubTab === 'cities'" />
+              <ColorsManager v-else-if="refDataSubTab === 'colors'" />
+              <CategoriesManager v-else-if="refDataSubTab === 'categories'" />
+            </div>
           </section>
         </div>
       </div>

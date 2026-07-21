@@ -1128,6 +1128,9 @@
   background: var(--rc-ink-1000);
   transition: width var(--rc-dur-base) var(--rc-ease-out);
 }
+[data-theme="dark"] .rc-auth-register__progress-bar span {
+  background: var(--rc-text);
+}
 
 .rc-auth-register__section {
   display: flex;
@@ -1157,6 +1160,10 @@
   font-size: var(--rc-fs-13);
   font-weight: 700;
   flex-shrink: 0;
+}
+[data-theme="dark"] .rc-auth-register__section-num {
+  background: var(--rc-text);
+  color: var(--rc-text-inverse);
 }
 
 .rc-auth-register__section-title h2 {
