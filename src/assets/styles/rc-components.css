@@ -121,6 +121,10 @@
   font-size: var(--rc-fs-11);
   color: var(--rc-text-muted);
 }
+.rc-field__required {
+  margin-left: 2px;
+  color: var(--rc-danger-500);
+}
 .rc-input, .rc-select, .rc-textarea {
   display: flex;
   align-items: center;
