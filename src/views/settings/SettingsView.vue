@@ -12,8 +12,10 @@ import CitiesManager from './CitiesManager.vue'
 import ColorsManager from './ColorsManager.vue'
 import CategoriesManager from './CategoriesManager.vue'
 import FeaturesManager from './FeaturesManager.vue'
+import BrandingManager from './BrandingManager.vue'
+import DocumentTemplatesManager from './DocumentTemplatesManager.vue'
 
-type SettingsTab = 'profile' | 'password' | 'notifications' | 'general' | 'features' | 'reference-data'
+type SettingsTab = 'profile' | 'password' | 'notifications' | 'general' | 'features' | 'branding' | 'document-templates' | 'reference-data'
 type RefDataTab = 'brands' | 'cities' | 'colors' | 'categories'
 
 const authStore = useAuthStore()
@@ -54,13 +56,15 @@ const selectedCurrency = ref('TRY')
 const savingCurrency = ref(false)
 
 const navItems = computed(() => {
-  const items: { id: SettingsTab; label: string; icon: 'user' | 'key' | 'bell' | 'folder' | 'sliders' | 'sparkle' }[] = [
+  const items: { id: SettingsTab; label: string; icon: 'user' | 'key' | 'bell' | 'folder' | 'sliders' | 'sparkle' | 'building' | 'edit' }[] = [
     { id: 'profile', label: 'Profil', icon: 'user' },
     { id: 'password', label: 'Şifre', icon: 'key' },
     { id: 'notifications', label: 'Bildirimler', icon: 'bell' },
   ]
   if (authStore.isAdmin) {
     items.push({ id: 'general', label: 'Genel', icon: 'sliders' })
+    items.push({ id: 'branding', label: 'Firma / Marka', icon: 'building' })
+    items.push({ id: 'document-templates', label: 'Belge Şablonları', icon: 'edit' })
     items.push({ id: 'features', label: 'Modüller', icon: 'sparkle' })
     items.push({ id: 'reference-data', label: 'Referans Veriler', icon: 'folder' })
   }
@@ -80,6 +84,8 @@ const sectionTitles: Record<SettingsTab, string> = {
   notifications: 'Bildirim Ayarları',
   general: 'Genel Ayarlar',
   features: 'Modül Ayarları',
+  branding: 'Firma / Marka',
+  'document-templates': 'Belge Şablonları',
   'reference-data': 'Referans Veriler',
 }
 
@@ -315,6 +321,10 @@ async function handleCurrencySave() {
               </div>
             </form>
           </template>
+
+          <BrandingManager v-else-if="activeTab === 'branding'" />
+
+          <DocumentTemplatesManager v-else-if="activeTab === 'document-templates'" />
 
           <FeaturesManager v-else-if="activeTab === 'features'" />
 

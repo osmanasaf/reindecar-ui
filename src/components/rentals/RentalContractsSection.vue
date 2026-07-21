@@ -40,17 +40,31 @@ function createSlot(documentType: ContractDocumentType): ContractSlotState {
 const slots = reactive<Record<ContractDocumentType, ContractSlotState>>({
   PRICE_OFFER: createSlot('PRICE_OFFER'),
   RENTAL_CONTRACT: createSlot('RENTAL_CONTRACT'),
+  HANDOVER: createSlot('HANDOVER'),
+  COMPLETION: createSlot('COMPLETION'),
 })
 
 const canCreateOffer = computed(() => isEnabled('PRICE_OFFER_DOCUMENTS'))
 const canCreateRentalContract = computed(() => isEnabled('RENTAL_CONTRACT_DOCUMENTS'))
 const canExportPdf = computed(() => isEnabled('CONTRACT_PDF_EXPORT'))
 
+const DOCUMENT_TYPE_GATES: Partial<Record<ContractDocumentType, () => boolean>> = {
+  PRICE_OFFER: () => canCreateOffer.value,
+  RENTAL_CONTRACT: () => canCreateRentalContract.value,
+}
+
 const visibleSlots = computed(() =>
-  (['PRICE_OFFER', 'RENTAL_CONTRACT'] as ContractDocumentType[]).filter((type) =>
-    type === 'PRICE_OFFER' ? canCreateOffer.value : canCreateRentalContract.value,
+  (['PRICE_OFFER', 'RENTAL_CONTRACT', 'HANDOVER', 'COMPLETION'] as ContractDocumentType[]).filter((type) =>
+    DOCUMENT_TYPE_GATES[type] ? DOCUMENT_TYPE_GATES[type]!() : true,
   ),
 )
+
+const EMPTY_STATE_CONFIG: Record<ContractDocumentType, { title: string; icon: 'receipt' | 'folder'; buttonLabel: string; variant: 'secondary' | 'accent' }> = {
+  PRICE_OFFER: { title: 'Henüz fiyat teklifi yok', icon: 'receipt', buttonLabel: 'Fiyat teklifi oluştur', variant: 'secondary' },
+  RENTAL_CONTRACT: { title: 'Henüz sözleşme yok', icon: 'folder', buttonLabel: 'Sözleşme oluştur', variant: 'accent' },
+  HANDOVER: { title: 'Henüz teslim tutanağı yok', icon: 'folder', buttonLabel: 'Teslim tutanağı oluştur', variant: 'secondary' },
+  COMPLETION: { title: 'Henüz tamamlama tutanağı yok', icon: 'folder', buttonLabel: 'Tamamlama tutanağı oluştur', variant: 'secondary' },
+}
 
 const showEditor = ref(false)
 const editorMode = ref<'create' | 'edit'>('create')
@@ -96,7 +110,7 @@ async function loadSlot(documentType: ContractDocumentType) {
 }
 
 async function loadAll() {
-  await Promise.all([loadSlot('PRICE_OFFER'), loadSlot('RENTAL_CONTRACT')])
+  await Promise.all([loadSlot('PRICE_OFFER'), loadSlot('RENTAL_CONTRACT'), loadSlot('HANDOVER'), loadSlot('COMPLETION')])
 }
 
 function openCreate(documentType: ContractDocumentType) {
@@ -197,7 +211,7 @@ watch(() => props.rentalId, loadAll)
     <div class="rcr-contracts">
       <div class="rcr-contracts__head">
         <div>
-          <h3 class="rcr-contracts__title">Sözleşme & fiyat teklifi</h3>
+          <h3 class="rcr-contracts__title">Sözleşme, teklif ve tutanaklar</h3>
           <p class="rcr-contracts__sub">Düzenlenebilir belge içeriği ve PDF çıktısı</p>
         </div>
       </div>
@@ -272,17 +286,17 @@ watch(() => props.rentalId, loadAll)
 
         <RcEmpty
           v-else
-          :title="type === 'PRICE_OFFER' ? 'Henüz fiyat teklifi yok' : 'Henüz sözleşme yok'"
+          :title="EMPTY_STATE_CONFIG[type].title"
           description="Kiralama için bu türde bir belge oluşturabilirsiniz."
         >
           <template #action>
             <RcButton
-              :variant="type === 'PRICE_OFFER' ? 'secondary' : 'accent'"
+              :variant="EMPTY_STATE_CONFIG[type].variant"
               size="sm"
               @click="openCreate(type)"
             >
-              <RcIcon :name="type === 'PRICE_OFFER' ? 'receipt' : 'folder'" :size="14" />
-              {{ type === 'PRICE_OFFER' ? 'Fiyat teklifi oluştur' : 'Sözleşme oluştur' }}
+              <RcIcon :name="EMPTY_STATE_CONFIG[type].icon" :size="14" />
+              {{ EMPTY_STATE_CONFIG[type].buttonLabel }}
             </RcButton>
           </template>
         </RcEmpty>

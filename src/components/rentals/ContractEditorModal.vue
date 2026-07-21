@@ -6,6 +6,8 @@ import { RcModal, RcButton } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
 import { CONTRACT_DOCUMENT_TYPE_LABELS } from '@/types/contract'
 import type { ContractDocumentType } from '@/types/contract'
+import { parseSections, serializeSections } from '@/utils/contractSections'
+import RichTextField from '@/components/shared/RichTextField.vue'
 
 const props = defineProps<{
   open: boolean
@@ -23,10 +25,26 @@ const emit = defineEmits<{
 const toast = useToast()
 const loading = ref(false)
 const saving = ref(false)
-const content = ref('')
 const showPlaceholders = ref(false)
 const placeholders = ref<Record<string, string>>({})
 const resolvedContractId = ref<number | null>(null)
+
+const RICH_TEXT_SECTIONS = new Set(['INTRO', 'BODY', 'TERMS', 'SIGNATURE'])
+const PLAIN_MULTILINE_SECTIONS = new Set(['HEADER', 'TITLE', 'RECIPIENT', 'META'])
+
+const SECTION_LABELS: Record<string, string> = {
+  HEADER: 'Üst bilgi',
+  TITLE: 'Başlık',
+  RECIPIENT: 'Alıcı bilgileri',
+  META: 'Belge bilgileri',
+  INTRO: 'Giriş',
+  BODY: 'Gövde metni',
+  TABLE: 'Tablo (ARAÇ|ADET|...)',
+  TERMS: 'Şartlar',
+  SIGNATURE: 'İmza bloğu',
+}
+
+const sections = ref<Array<{ name: string; content: string }>>([])
 
 const title = computed(() => {
   const label = CONTRACT_DOCUMENT_TYPE_LABELS[props.documentType]
@@ -41,13 +59,28 @@ function placeholderToken(key: string): string {
   return `{{${key}}}`
 }
 
+function sectionKind(name: string): 'rich' | 'plain' | 'raw' {
+  if (RICH_TEXT_SECTIONS.has(name)) return 'rich'
+  if (PLAIN_MULTILINE_SECTIONS.has(name)) return 'plain'
+  return 'raw'
+}
+
+function sectionLabel(name: string): string {
+  return SECTION_LABELS[name] ?? name
+}
+
+function loadContentIntoSections(content: string) {
+  const parsed = parseSections(content)
+  sections.value = Array.from(parsed.entries()).map(([name, body]) => ({ name, content: body }))
+}
+
 async function loadEditor() {
   loading.value = true
   resolvedContractId.value = props.contractId ?? null
   try {
     if (props.mode === 'edit' && props.contractId) {
       const data = await contractsApi.getContent(props.contractId)
-      content.value = data.content
+      loadContentIntoSections(data.content)
       placeholders.value = {}
       return
     }
@@ -57,10 +90,10 @@ async function loadEditor() {
       rentalId: props.rentalId,
       templateId: template.id,
     })
-    content.value = preview.renderedContent
+    loadContentIntoSections(preview.renderedContent)
     placeholders.value = preview.placeholders ?? {}
   } catch (err) {
-    toast.apiError(err, 'Sözleşme içeriği yüklenemedi')
+    toast.apiError(err, 'İçerik yüklenemedi')
     emit('close')
   } finally {
     loading.value = false
@@ -76,8 +109,14 @@ watch(
   { immediate: true },
 )
 
+function serializedContent(): string {
+  const map = new Map(sections.value.map((s) => [s.name, s.content]))
+  return serializeSections(map)
+}
+
 async function save() {
-  if (!content.value.trim()) {
+  const content = serializedContent()
+  if (!content.trim()) {
     toast.error('İçerik boş olamaz')
     return
   }
@@ -94,8 +133,8 @@ async function save() {
       resolvedContractId.value = contractId
     }
 
-    await contractsApi.updateContent(contractId, { content: content.value })
-    toast.success(props.mode === 'create' ? 'Sözleşme oluşturuldu' : 'Sözleşme güncellendi')
+    await contractsApi.updateContent(contractId, { content })
+    toast.success(props.mode === 'create' ? 'Belge oluşturuldu' : 'Belge güncellendi')
     emit('saved')
     emit('close')
   } catch (err) {
@@ -110,7 +149,7 @@ async function previewPdf() {
   try {
     const blob = await contractsApi.previewPdf({
       rentalId: props.rentalId,
-      contentOverride: content.value,
+      contentOverride: serializedContent(),
     })
     const url = URL.createObjectURL(blob)
     window.open(url, '_blank', 'noopener,noreferrer')
@@ -128,7 +167,7 @@ async function previewPdf() {
     <template #header>
       <div>
         <h2 class="rc-modal__title">{{ title }}</h2>
-        <div class="rc-modal__sub">Placeholder'lar doldurulduktan sonra serbest düzenleme yapabilirsiniz</div>
+        <div class="rc-modal__sub">Placeholder'lar doldurulduktan sonra bölüm bölüm düzenleyebilirsiniz</div>
       </div>
     </template>
 
@@ -152,12 +191,24 @@ async function previewPdf() {
         </div>
       </div>
 
-      <textarea
-        v-model="content"
-        class="rc-input rcr-contract-editor__textarea"
-        rows="18"
-        spellcheck="false"
-      />
+      <div class="rcr-contract-editor__sections">
+        <div v-for="section in sections" :key="section.name" class="rcr-contract-editor__section">
+          <label class="rcr-contract-editor__section-label">{{ sectionLabel(section.name) }}</label>
+
+          <RichTextField
+            v-if="sectionKind(section.name) === 'rich'"
+            v-model="section.content"
+            :min-height="section.name === 'BODY' ? 160 : 80"
+          />
+          <textarea
+            v-else
+            v-model="section.content"
+            class="rc-input rcr-contract-editor__textarea"
+            :rows="sectionKind(section.name) === 'plain' ? 3 : 6"
+            spellcheck="false"
+          />
+        </div>
+      </div>
     </template>
 
     <template #footer>
@@ -200,9 +251,26 @@ async function previewPdf() {
   color: var(--rc-blue-600);
 }
 
+.rcr-contract-editor__sections {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.rcr-contract-editor__section-label {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--rc-text-muted);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
 .rcr-contract-editor__textarea {
   width: 100%;
-  min-height: 360px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 13px;
   line-height: 1.5;

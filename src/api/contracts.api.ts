@@ -9,6 +9,7 @@ import type {
     SignContractPayload,
     ContractDocumentType,
     ContractTemplateSummary,
+    ContractTemplateDetail,
 } from '@/types/contract'
 
 class ContractsApiService extends BaseApi {
@@ -71,6 +72,38 @@ class ContractTemplatesApiService extends BaseApi {
 
     async findByDocumentType(documentType: ContractDocumentType): Promise<ContractTemplateSummary> {
         return this.get<ContractTemplateSummary>(`/by-document-type/${documentType}`)
+    }
+
+    async findAll(): Promise<ContractTemplateDetail[]> {
+        return this.get<ContractTemplateDetail[]>('')
+    }
+
+    async findById(id: number): Promise<ContractTemplateDetail> {
+        return this.get<ContractTemplateDetail>(`/${id}`)
+    }
+
+    async updateContent(id: number, content: string): Promise<ContractTemplateDetail> {
+        return this.put<ContractTemplateDetail>(`/${id}/content`, { content })
+    }
+
+    async activate(id: number): Promise<void> {
+        await this.post(`/${id}/activate`)
+    }
+
+    async deactivate(id: number): Promise<void> {
+        await this.post(`/${id}/deactivate`)
+    }
+
+    async previewPdf(id: number, rentalId: number): Promise<Blob> {
+        const { data } = await apiClient.get(`${this.basePath}/${id}/preview/pdf`, {
+            params: { rentalId },
+            responseType: 'blob',
+        })
+        return data
+    }
+
+    async bootstrapDefaults(): Promise<void> {
+        await this.post('/bootstrap-defaults')
     }
 }
 

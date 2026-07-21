@@ -1,4 +1,4 @@
-export type ContractDocumentType = 'PRICE_OFFER' | 'RENTAL_CONTRACT'
+export type ContractDocumentType = 'PRICE_OFFER' | 'RENTAL_CONTRACT' | 'HANDOVER' | 'COMPLETION'
 
 export type ContractStatus =
     | 'DRAFT'
@@ -13,6 +13,27 @@ export interface ContractTemplateSummary {
     code: string
     name: string
     documentType: ContractDocumentType
+}
+
+export interface ContractTermDetail {
+    id: number
+    title: string
+    content: string
+    required: boolean
+    sortOrder: number
+}
+
+export interface ContractTemplateDetail {
+    id: number
+    code: string
+    name: string
+    rentalType: string
+    documentType: ContractDocumentType
+    content: string
+    templateVersion: number
+    active: boolean
+    terms: ContractTermDetail[]
+    createdAt: string
 }
 
 export interface ContractDetail {
@@ -80,4 +101,6 @@ export const CONTRACT_STATUS_LABELS: Record<ContractStatus, string> = {
 export const CONTRACT_DOCUMENT_TYPE_LABELS: Record<ContractDocumentType, string> = {
     PRICE_OFFER: 'Fiyat teklifi',
     RENTAL_CONTRACT: 'Kiralama sözleşmesi',
+    HANDOVER: 'Teslim tutanağı',
+    COMPLETION: 'Tamamlama tutanağı',
 }
