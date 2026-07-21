@@ -16,6 +16,9 @@
   --rc-blue-800: #002F7A;
   --rc-blue-900: #001F52;
 
+  --rc-accent: var(--rc-blue-500);
+  --rc-accent-subtle: var(--rc-blue-50);
+
   /* — Neutrals (warm-cool true black/white) — */
   --rc-ink-1000: #0A0A0A;  /* primary text, dark surface */
   --rc-ink-900:  #1A1A1A;
@@ -177,6 +180,9 @@
 }
 
 [data-theme="dark"] {
+  --rc-accent: var(--rc-blue-400);
+  --rc-accent-subtle: rgba(0, 102, 255, 0.16);
+
   --rc-bg:           #0F0F0F;
   --rc-bg-subtle:    #141414;
   --rc-surface:      #1A1A1A;

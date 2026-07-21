@@ -8,6 +8,7 @@ import SearchableSelect from '@/components/common/SearchableSelect.vue'
 import type { Rental } from '@/types'
 import type { UetdsManifest } from '@/types/manifest'
 import { formatDateTime } from '@/utils/format'
+import { toInputDateTime } from '@/utils/datetime'
 
 const props = defineProps<{
   open: boolean
@@ -30,6 +31,7 @@ const rentals = ref<Rental[]>([])
 const selectedFile = ref<File | null>(null)
 const plateWarning = ref('')
 const selectedRentalId = ref<number | null>(null)
+const lockedRental = ref<Rental | null>(null)
 
 const { form, reset: resetFormFields, applyParsed, buildCreatePayload } = useManifestForm()
 
@@ -46,6 +48,16 @@ const selectedRental = computed(() =>
   rentals.value.find((rental) => rental.id === selectedRentalId.value),
 )
 
+const activeRental = computed(() => lockedRental.value ?? selectedRental.value ?? null)
+
+const tripMin = computed(() =>
+  activeRental.value ? toInputDateTime(activeRental.value.startDate) : undefined,
+)
+
+const tripMax = computed(() =>
+  activeRental.value?.endDate ? toInputDateTime(activeRental.value.endDate) : undefined,
+)
+
 const noServiceRentals = computed(
   () => !rentalLocked.value && !loadingRentals.value && rentals.value.length === 0,
 )
@@ -58,25 +70,62 @@ watch(
     if (rentalLocked.value) {
       selectedRentalId.value = props.rentalId as number
       form.value.vehiclePlate = props.vehiclePlate ?? ''
+      void loadLockedRental(props.rentalId as number)
     } else {
       void loadRentals()
     }
   },
 )
 
-watch(selectedRentalId, (rentalId) => {
-  const rental = rentals.value.find((item) => item.id === rentalId)
-  if (rental?.vehiclePlate && !form.value.vehiclePlate) {
+watch(activeRental, (rental) => {
+  if (rental?.vehiclePlate) {
     form.value.vehiclePlate = rental.vehiclePlate
   }
 })
+
+async function loadLockedRental(rentalId: number) {
+  try {
+    lockedRental.value = await rentalsApi.getById(rentalId)
+    if (lockedRental.value.vehiclePlate) {
+      form.value.vehiclePlate = lockedRental.value.vehiclePlate
+    }
+  } catch {
+    lockedRental.value = null
+  }
+}
 
 function resetForm() {
   mode.value = 'manual'
   selectedFile.value = null
   plateWarning.value = ''
   selectedRentalId.value = null
+  lockedRental.value = null
   resetFormFields()
+}
+
+function validateTripDates(): boolean {
+  const rental = activeRental.value
+  if (!form.value.tripStartAt) {
+    toast.error('Sefer başlangıç tarihi zorunludur')
+    return false
+  }
+  if (form.value.tripEndAt && form.value.tripEndAt < form.value.tripStartAt) {
+    toast.error('Sefer bitişi başlangıçtan önce olamaz')
+    return false
+  }
+  if (rental) {
+    const rentalStart = toInputDateTime(rental.startDate)
+    const rentalEnd = rental.endDate ? toInputDateTime(rental.endDate) : null
+    if (rentalStart && form.value.tripStartAt < rentalStart) {
+      toast.error('Sefer, kiralama başlangıcından önce başlayamaz')
+      return false
+    }
+    if (rentalEnd && (form.value.tripEndAt || form.value.tripStartAt) > rentalEnd) {
+      toast.error('Sefer, kiralama bitişinden sonra bitemez')
+      return false
+    }
+  }
+  return true
 }
 
 async function loadRentals() {
@@ -101,6 +150,9 @@ async function handlePreviewPdf() {
   try {
     const preview = await serviceManifestsApi.previewFromPdf(selectedRentalId.value, selectedFile.value)
     applyParsed(preview.parsed, preview.parsedVehiclePlate || '')
+    if (activeRental.value?.vehiclePlate) {
+      form.value.vehiclePlate = activeRental.value.vehiclePlate
+    }
     if (!preview.plateMatches) {
       plateWarning.value = `PDF plakası (${preview.parsedVehiclePlate}) kiralama plakası (${preview.rentalVehiclePlate}) ile uyuşmuyor`
     }
@@ -116,6 +168,9 @@ async function handlePreviewPdf() {
 async function handleSubmit() {
   if (!selectedRentalId.value) {
     toast.error('Kiralama seçin')
+    return
+  }
+  if (!(mode.value === 'pdf' && selectedFile.value) && !validateTripDates()) {
     return
   }
   submitting.value = true
@@ -153,9 +208,16 @@ function onFileChange(event: Event) {
       <div v-if="rentalLocked" class="rcr-manifest-create__locked">
         <span class="rcr-manifest-create__locked-icon"><RcIcon name="key" :size="15" /></span>
         <div>
-          <div class="rcr-manifest-create__locked-title">{{ rentalLabel || `Kiralama #${rentalId}` }}</div>
+          <div class="rcr-manifest-create__locked-title">
+            {{ lockedRental?.rentalNumber || rentalLabel || `Kiralama #${rentalId}` }}
+          </div>
           <div class="rcr-manifest-create__locked-meta">
-            {{ vehiclePlate || '—' }} · Manifest bu kiralamaya bağlanacak
+            {{ lockedRental?.vehiclePlate || vehiclePlate || '—' }}
+            <template v-if="lockedRental">
+              · {{ formatDateTime(lockedRental.startDate) }} —
+              {{ lockedRental.endDate ? formatDateTime(lockedRental.endDate) : 'süresiz' }}
+            </template>
+            · Manifest bu kiralamaya bağlanacak
           </div>
         </div>
       </div>
@@ -202,14 +264,20 @@ function onFileChange(event: Event) {
         <RcField label="UETDS sefer no *">
           <input v-model="form.uetdsTripNumber" class="rc-input" />
         </RcField>
-        <RcField label="Plaka *">
-          <input v-model="form.vehiclePlate" class="rc-input" />
+        <RcField label="Plaka" :hint="activeRental ? 'Kiralamadaki araçtan alınır' : undefined">
+          <input v-model="form.vehiclePlate" class="rc-input" :disabled="!!activeRental" />
         </RcField>
-        <RcField label="Sefer başlangıç *">
-          <input v-model="form.tripStartAt" type="datetime-local" class="rc-input" />
+        <RcField label="Sefer başlangıç *" :hint="tripMin ? 'Kiralama aralığı içinde olmalı' : undefined">
+          <input v-model="form.tripStartAt" type="datetime-local" class="rc-input" :min="tripMin" :max="tripMax" />
         </RcField>
         <RcField label="Sefer bitiş">
-          <input v-model="form.tripEndAt" type="datetime-local" class="rc-input" />
+          <input
+            v-model="form.tripEndAt"
+            type="datetime-local"
+            class="rc-input"
+            :min="form.tripStartAt || tripMin"
+            :max="tripMax"
+          />
         </RcField>
         <RcField label="Belge no">
           <input v-model="form.documentNumber" class="rc-input" />
