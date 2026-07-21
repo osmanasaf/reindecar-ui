@@ -13,6 +13,7 @@ import {
 import { RcPageHeader, RcButton, RcEmpty, RcSegTab, RcModal, RcBadge, RcTableSkeleton, RcField, RcInput } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
 import { formatDate } from '@/utils/format'
+import FeatureGate from '@/components/common/FeatureGate.vue'
 
 const toast = useToast()
 
@@ -189,10 +190,11 @@ onMounted(() => {
 </script>
 
 <template>
+  <FeatureGate feature="CUSTOMER_PRICING_AGREEMENTS">
   <div class="rc-page rca-cc">
     <RcPageHeader
-      title="Özel Fiyat Sözleşmeleri"
-      subtitle="Müşteriye özel aylık fiyat sözleşmeleri (leasing/kurumsal)"
+      title="Kurumsal Fiyat Anlaşmaları"
+      subtitle="Müşteriye özel aylık fiyat anlaşmaları (leasing/kurumsal)"
     >
       <template #actions>
         <RcButton variant="accent" @click="openCreateModal">
@@ -345,6 +347,7 @@ onMounted(() => {
       </template>
     </RcModal>
   </div>
+  </FeatureGate>
 </template>
 
 <style scoped>

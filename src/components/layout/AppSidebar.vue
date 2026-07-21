@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, reactive } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
 import { RcIcon, RcAntlerMark } from '@/components/icons'
 import { RcAvatar, RcKbd } from '@/components/rc'
@@ -40,7 +40,14 @@ function isNavItemVisible(item: NavItem): boolean {
   if (item.featureKey && !authStore.isSuperAdmin && !featuresStore.isEnabled(item.featureKey)) {
     return false
   }
+  if (item.children) {
+    return item.children.some(isNavItemVisible)
+  }
   return true
+}
+
+function visibleChildren(item: NavItem): NavItem[] {
+  return (item.children ?? []).filter(isNavItemVisible)
 }
 
 const visibleSections = computed(() =>
@@ -55,6 +62,17 @@ const visibleSections = computed(() =>
     }))
     .filter((section) => section.items.length > 0),
 )
+
+const expandedGroups = reactive<Record<string, boolean>>({})
+
+function isGroupOpen(item: NavItem): boolean {
+  if (visibleChildren(item).some(itemActive)) return true
+  return !!expandedGroups[item.name]
+}
+
+function toggleGroup(item: NavItem) {
+  expandedGroups[item.name] = !isGroupOpen(item)
+}
 
 const searchKbdLabel = computed(() =>
   typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.platform)
@@ -129,23 +147,61 @@ function formatCount(n: number | undefined): string | undefined {
         <div v-if="section.section && (!collapsed || mobileOpen)" class="rc-side__nav-section">
           {{ section.section }}
         </div>
-        <RouterLink
-          v-for="item in section.items"
-          :key="item.name"
-          :to="{ name: item.name }"
-          class="rc-side__item"
-          :class="{ 'rc-side__item--active': itemActive(item) }"
-          :title="collapsed && !mobileOpen ? item.label : undefined"
-        >
-          <RcIcon :name="item.icon" />
-          <span v-if="!collapsed || mobileOpen" class="rc-side__item-label">{{ item.label }}</span>
-          <span
-            v-if="(!collapsed || mobileOpen) && formatCount(countForNavItem(item.name))"
-            class="rc-side__item-count"
+        <template v-for="item in section.items" :key="item.name">
+          <template v-if="item.children">
+            <button
+              type="button"
+              class="rc-side__item rc-side__item--group"
+              :class="{ 'rc-side__item--active': visibleChildren(item).some(itemActive) }"
+              :title="collapsed && !mobileOpen ? item.label : undefined"
+              @click="toggleGroup(item)"
+            >
+              <RcIcon :name="item.icon" />
+              <span v-if="!collapsed || mobileOpen" class="rc-side__item-label">{{ item.label }}</span>
+              <RcIcon
+                v-if="!collapsed || mobileOpen"
+                name="chevronDown"
+                :size="14"
+                class="rc-side__group-chevron"
+                :class="{ 'rc-side__group-chevron--open': isGroupOpen(item) }"
+              />
+            </button>
+            <div v-if="isGroupOpen(item) && (!collapsed || mobileOpen)" class="rc-side__group-children">
+              <RouterLink
+                v-for="child in visibleChildren(item)"
+                :key="child.name"
+                :to="{ name: child.name }"
+                class="rc-side__item rc-side__item--child"
+                :class="{ 'rc-side__item--active': itemActive(child) }"
+              >
+                <RcIcon :name="child.icon" :size="14" />
+                <span class="rc-side__item-label">{{ child.label }}</span>
+                <span
+                  v-if="formatCount(countForNavItem(child.name))"
+                  class="rc-side__item-count"
+                >
+                  {{ formatCount(countForNavItem(child.name)) }}
+                </span>
+              </RouterLink>
+            </div>
+          </template>
+          <RouterLink
+            v-else
+            :to="{ name: item.name }"
+            class="rc-side__item"
+            :class="{ 'rc-side__item--active': itemActive(item) }"
+            :title="collapsed && !mobileOpen ? item.label : undefined"
           >
-            {{ formatCount(countForNavItem(item.name)) }}
-          </span>
-        </RouterLink>
+            <RcIcon :name="item.icon" />
+            <span v-if="!collapsed || mobileOpen" class="rc-side__item-label">{{ item.label }}</span>
+            <span
+              v-if="(!collapsed || mobileOpen) && formatCount(countForNavItem(item.name))"
+              class="rc-side__item-count"
+            >
+              {{ formatCount(countForNavItem(item.name)) }}
+            </span>
+          </RouterLink>
+        </template>
       </template>
     </nav>
 

@@ -8,6 +8,7 @@ export interface NavItem {
   adminOnly?: boolean
   superAdminOnly?: boolean
   featureKey?: FeatureKey
+  children?: NavItem[]
 }
 
 export interface NavSection {
@@ -39,8 +40,20 @@ export const navSections: NavSection[] = [
       { name: 'service-providers', label: 'Servis Sağlayıcılar', icon: 'wrench' },
       { name: 'penalties', label: 'Cezalar', icon: 'warning' },
       { name: 'km-packages', label: 'KM Paketleri', icon: 'bolt' },
-      { name: 'customer-contracts', label: 'Özel Fiyat Sözleşmeleri', icon: 'folder' },
-      { name: 'campaigns', label: 'Kampanyalar', icon: 'bolt' },
+      {
+        name: 'pricing-agreements',
+        label: 'Fiyat Anlaşmaları',
+        icon: 'cash',
+        children: [
+          { name: 'campaigns', label: 'Sezonluk Kampanyalar', icon: 'bolt' },
+          {
+            name: 'customer-contracts',
+            label: 'Kurumsal Fiyat Anlaşmaları',
+            icon: 'folder',
+            featureKey: 'CUSTOMER_PRICING_AGREEMENTS',
+          },
+        ],
+      },
       { name: 'rental-pricing', label: 'Araç/Müşteri Fiyat Kuralları', icon: 'cash' },
     ],
   },

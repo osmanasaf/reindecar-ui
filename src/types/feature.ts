@@ -28,6 +28,7 @@ export type FeatureKey =
     | 'PAYMENT_PROVISION'
     | 'KABIS_HGS_PENALTY_SYNC'
     | 'UETDS_API'
+    | 'CUSTOMER_PRICING_AGREEMENTS'
 
 export interface TenantFeature {
     key: FeatureKey

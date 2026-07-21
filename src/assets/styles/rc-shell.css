@@ -194,6 +194,36 @@
 
 .rc-side__item--active .rc-side__item-count { color: var(--rc-ink-300); }
 
+.rc-side__item--group {
+  width: 100%;
+  text-align: left;
+}
+
+.rc-side__group-chevron {
+  flex-shrink: 0;
+  color: var(--rc-ink-500);
+  transition: transform var(--rc-dur-fast);
+}
+
+.rc-side__group-chevron--open {
+  transform: rotate(180deg);
+}
+
+.rc-side__group-children {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 14px;
+  margin: 2px 0 4px;
+  border-left: 1px solid var(--rc-ink-900);
+}
+
+.rc-side__item--child {
+  height: 28px;
+  font-size: 12.5px;
+  font-weight: 450;
+}
+
 .rc-side__user {
   display: flex;
   align-items: center;
