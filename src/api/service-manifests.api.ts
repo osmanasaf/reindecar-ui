@@ -8,6 +8,7 @@ import type {
     UetdsManifest,
     UetdsManifestPreviewResponse,
     UetdsPassenger,
+    UetdsSubmission,
     UpdateUetdsManifestRequest,
 } from '@/types/manifest'
 
@@ -118,6 +119,18 @@ class ServiceManifestsApiService extends BaseApi {
 
     async downloadPassengerImportTemplateXlsx(): Promise<Blob> {
         return this.getBlob('/passengers/import-template.xlsx')
+    }
+
+    async submitToUetds(id: number): Promise<UetdsSubmission> {
+        return this.post(`/${id}/submit`)
+    }
+
+    async getSubmissionStatus(id: number): Promise<UetdsSubmission> {
+        return this.get(`/${id}/submission`)
+    }
+
+    async retrySubmission(submissionId: number): Promise<UetdsSubmission> {
+        return this.post(`/submissions/${submissionId}/retry`)
     }
 }
 

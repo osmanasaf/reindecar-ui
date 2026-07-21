@@ -11,7 +11,7 @@ import { RcIcon } from '@/components/icons'
 import { formatDateTime } from '@/utils/format'
 import { toApiDateTime, toInputDateTime } from '@/utils/datetime'
 import { downloadBlob } from '@/utils/download'
-import type { UetdsManifest, UetdsPassenger, CreateUetdsPassengerRequest, PassengerImportRowResult } from '@/types/manifest'
+import type { UetdsManifest, UetdsPassenger, UetdsSubmission, CreateUetdsPassengerRequest, PassengerImportRowResult } from '@/types/manifest'
 import type { FileRecord } from '@/api/files.api'
 
 const route = useRoute()
@@ -27,6 +27,8 @@ const saving = ref(false)
 const uploadingPdf = ref(false)
 const uploadingDoc = ref(false)
 const showDeleteConfirm = ref(false)
+const submission = ref<UetdsSubmission | null>(null)
+const submitting = ref(false)
 const passengerForm = ref<CreateUetdsPassengerRequest>({
   seatNumber: undefined,
   fullName: '',
@@ -83,12 +85,46 @@ async function loadManifest() {
     const data = await serviceManifestsApi.getById(manifestId.value)
     manifest.value = data
     syncForm(data)
-    await Promise.all([loadPassengers(), loadDocuments()])
+    await Promise.all([loadPassengers(), loadDocuments(), loadSubmission()])
   } catch (error: unknown) {
     toast.error(error instanceof Error ? error.message : 'Manifesto yüklenemedi')
     router.push({ name: 'service-manifests' })
   } finally {
     loading.value = false
+  }
+}
+
+async function loadSubmission() {
+  if (!isEnabled('UETDS_API')) return
+  try {
+    submission.value = await serviceManifestsApi.getSubmissionStatus(manifestId.value)
+  } catch {
+    submission.value = null
+  }
+}
+
+async function handleSubmitToUetds() {
+  submitting.value = true
+  try {
+    submission.value = await serviceManifestsApi.submitToUetds(manifestId.value)
+    toast.success('UETDS gönderim kuyruğuna eklendi')
+  } catch (error: unknown) {
+    toast.error(error instanceof Error ? error.message : 'UETDS gönderimi başlatılamadı')
+  } finally {
+    submitting.value = false
+  }
+}
+
+async function handleRetrySubmission() {
+  if (!submission.value) return
+  submitting.value = true
+  try {
+    submission.value = await serviceManifestsApi.retrySubmission(submission.value.id)
+    toast.success('Gönderim yeniden denendi')
+  } catch (error: unknown) {
+    toast.error(error instanceof Error ? error.message : 'Yeniden gönderim başarısız')
+  } finally {
+    submitting.value = false
   }
 }
 
@@ -278,6 +314,28 @@ async function handleDeleteManifest() {
   }
 }
 
+const submissionStatusLabel = computed(() => {
+  switch (submission.value?.status) {
+    case 'PENDING': return 'Gönderim kuyruğunda'
+    case 'SENT': return 'UETDS\'e gönderildi'
+    case 'FAILED': return 'Gönderim başarısız'
+    case 'ACKED': return 'UETDS onayladı'
+    default: return null
+  }
+})
+
+const submissionStatusVariant = computed(() => {
+  switch (submission.value?.status) {
+    case 'SENT':
+    case 'ACKED':
+      return 'success'
+    case 'FAILED':
+      return 'danger'
+    default:
+      return 'info'
+  }
+})
+
 onMounted(() => {
   void loadManifest()
 })
@@ -290,7 +348,20 @@ onMounted(() => {
         <RcIcon name="chevronLeft" :size="14" />
         Listeye dön
       </RcButton>
-      <div style="display: flex; gap: 8px">
+      <div style="display: flex; gap: 8px; align-items: center">
+        <FeatureGate feature="UETDS_API">
+          <RcBadge v-if="submissionStatusLabel" :variant="submissionStatusVariant">
+            {{ submissionStatusLabel }}
+          </RcBadge>
+          <RcButton
+            v-if="!submission || submission.status === 'FAILED'"
+            variant="secondary"
+            :disabled="submitting"
+            @click="submission ? handleRetrySubmission() : handleSubmitToUetds()"
+          >
+            {{ submission?.status === 'FAILED' ? 'Yeniden gönder' : "UETDS'e Gönder" }}
+          </RcButton>
+        </FeatureGate>
         <RcButton variant="secondary" @click="router.push({ name: 'rental-detail', params: { id: manifest?.rentalId } })">
           Kiralamaya git
         </RcButton>

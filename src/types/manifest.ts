@@ -26,6 +26,20 @@ export interface UetdsManifest {
     createdAt: string
 }
 
+export type UetdsSubmissionStatus = 'PENDING' | 'SENT' | 'FAILED' | 'ACKED'
+
+export interface UetdsSubmission {
+    id: number
+    manifestId: number
+    status: UetdsSubmissionStatus
+    uetdsReferenceNumber?: string
+    attemptCount: number
+    lastAttemptAt?: string
+    sentAt?: string
+    lastError?: string
+    createdAt: string
+}
+
 export interface UetdsPassenger {
     id: number
     manifestId: number
