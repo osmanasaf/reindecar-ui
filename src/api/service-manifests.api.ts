@@ -7,6 +7,7 @@ import type {
     PassengerImportPreviewResponse,
     UetdsManifest,
     UetdsManifestPreviewResponse,
+    UetdsManifestStats,
     UetdsPassenger,
     UpdateUetdsManifestRequest,
 } from '@/types/manifest'
@@ -14,8 +15,14 @@ import type {
 class ServiceManifestsApiService extends BaseApi {
     protected readonly basePath = '/service-manifests'
 
-    async list(params?: PaginationParams & { rentalId?: number }): Promise<PaginatedResponse<UetdsManifest>> {
+    async list(
+        params?: PaginationParams & { rentalId?: number; search?: string },
+    ): Promise<PaginatedResponse<UetdsManifest>> {
         return this.getList('', params)
+    }
+
+    async stats(): Promise<UetdsManifestStats> {
+        return this.get('/stats')
     }
 
     async getById(id: number): Promise<UetdsManifest> {
@@ -118,6 +125,10 @@ class ServiceManifestsApiService extends BaseApi {
 
     async deletePassenger(id: number, passengerId: number): Promise<void> {
         return this.deleteByPath(`/${id}/passengers/${passengerId}`)
+    }
+
+    async bulkDeletePassengers(id: number, passengerIds: number[]): Promise<void> {
+        return this.post(`/${id}/passengers/bulk-delete`, passengerIds)
     }
 
     async downloadPassengerImportTemplateXlsx(): Promise<Blob> {

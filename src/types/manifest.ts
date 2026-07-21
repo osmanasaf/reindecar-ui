@@ -24,6 +24,18 @@ export interface UetdsManifest {
     pdfFile?: FileRecord
     createdBy?: string
     createdAt: string
+    /** Son yüklenen PDF'in plakası kiralama aracı plakasıyla eşleşti mi (PDF yoksa null). */
+    pdfPlateMatches?: boolean | null
+    /** PDF'ten okunan plaka (uyuşmazlık gösteriminde kullanılır). */
+    parsedPlate?: string | null
+}
+
+export interface UetdsManifestStats {
+    total: number
+    upcoming: number
+    ongoing: number
+    done: number
+    totalPassengers: number
 }
 
 export interface UetdsPassenger {

@@ -13,6 +13,16 @@
   from { opacity: 0; }
   to   { opacity: 1; }
 }
+@keyframes rcPulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
+
+/* Live-status pulse — apply to a status dot that represents an in-progress
+   state (e.g. KABİS "Bekliyor", sefer "Devam ediyor"). */
+.rc-pulse {
+  animation: rcPulse 1.6s var(--rc-ease-in-out) infinite;
+}
 
 /* ── Entrance utilities (opt-in) ── */
 .rc-animate-in {
@@ -89,5 +99,8 @@
   .rc-kpi--link:hover,
   .rc-hover-raise:hover {
     transform: none !important;
+  }
+  .rc-pulse {
+    animation: none !important;
   }
 }

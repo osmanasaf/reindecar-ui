@@ -25,3 +25,17 @@ export interface KabisNotification {
     lastError?: string
     createdAt: string
 }
+
+export interface KabisNotificationStats {
+    total: number
+    pending: number
+    sent: number
+    acked: number
+    failed: number
+}
+
+export interface KabisBulkRetryResponse {
+    requested: number
+    retried: number
+    skipped: number
+}
