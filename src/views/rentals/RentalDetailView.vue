@@ -286,13 +286,23 @@ const totalPaid = computed(() => {
     .reduce((sum, p) => sum + p.amount, 0)
 })
 
-/** Alacak kayıtları üzerinden tahsil edilebilir toplam (ödenen + kalan) */
+/**
+ * Üst kartta "Genel toplam" olarak gösterilen tutar.
+ * Alacak kayıtları oluşmuşsa (ödenen + kalan) üzerinden hesaplanır.
+ * Taslak gibi henüz alacak üretilmemiş durumlarda özet sıfır döner; bu durumda
+ * hesaplanan genel toplam gösterilir; böylece üst kart ile alttaki "Ücret özeti"
+ * bölümü tutarlı olur (bkz. #4).
+ */
 const totalCollectible = computed(() => {
   if (
     paymentSummary.value?.totalPaid != null
     && paymentSummary.value?.totalRemaining != null
   ) {
-    return Number(paymentSummary.value.totalPaid) + Number(paymentSummary.value.totalRemaining)
+    const collectible = Number(paymentSummary.value.totalPaid) + Number(paymentSummary.value.totalRemaining)
+    if (collectible === 0 && grandTotal.value > 0) {
+      return grandTotal.value
+    }
+    return collectible
   }
   return grandTotal.value
 })
