@@ -36,12 +36,13 @@ import { resolveEffectiveIncludedKm } from '@/utils/km'
 import type { Rental, RentalType, Vehicle, Customer, Branch, RentalDriver, KmPackage, Payment, PenaltyResponse, DamageReport, TollRecord, DamageHistoryItem, RentalExtraItem } from '@/types'
 import DocumentsSection from '@/components/shared/DocumentsSection.vue'
 import RentalContractsSection from '@/components/rentals/RentalContractsSection.vue'
-import RentalManifestsSection from '@/components/rentals/RentalManifestsSection.vue'
+import RentalUetdsSection from '@/components/rentals/RentalUetdsSection.vue'
+import RentalKabisSection from '@/components/rentals/RentalKabisSection.vue'
 
-type TabKey = 'overview' | 'vehicle' | 'drivers' | 'km' | 'damages' | 'penalties' | 'payments' | 'docs' | 'operations' | 'timeline'
+type TabKey = 'overview' | 'vehicle' | 'drivers' | 'km' | 'damages' | 'penalties' | 'payments' | 'docs' | 'uetds' | 'kabis' | 'timeline'
 
 const VALID_TABS = new Set<TabKey>([
-  'overview', 'vehicle', 'drivers', 'km', 'damages', 'penalties', 'payments', 'docs', 'operations', 'timeline',
+  'overview', 'vehicle', 'drivers', 'km', 'damages', 'penalties', 'payments', 'docs', 'uetds', 'kabis', 'timeline',
 ])
 
 const route = useRoute()
@@ -124,8 +125,11 @@ const detailTabs = computed(() => [
   },
   { id: 'payments' as TabKey, label: 'Ödemeler', count: payments.value.length || undefined },
   { id: 'docs' as TabKey, label: 'Belgeler' },
-  ...(rental.value?.rentalType === 'SERVICE'
-    ? [{ id: 'operations' as TabKey, label: 'UETDS/KABİS' }]
+  ...(rental.value?.rentalType === 'SERVICE' && isEnabled('UETDS_MANIFESTS')
+    ? [{ id: 'uetds' as TabKey, label: 'UETDS' }]
+    : []),
+  ...(isEnabled('KABIS_NOTIFICATIONS')
+    ? [{ id: 'kabis' as TabKey, label: 'KABİS' }]
     : []),
   { id: 'timeline' as TabKey, label: 'Geçmiş' },
 ])
@@ -1113,13 +1117,18 @@ onActivated(() => {
           <DocumentsSection reference-type="RENTAL" :reference-id="rental.id" title="Kiralama belgeleri" />
         </div>
 
-        <!-- UETDS/KABİS -->
-        <div v-if="rental.rentalType === 'SERVICE'" v-show="activeTab === 'operations'" class="rc-card rcr-panel-card">
-          <RentalManifestsSection
+        <!-- UETDS (yalnızca servis kiralamalar) -->
+        <div v-if="rental.rentalType === 'SERVICE'" v-show="activeTab === 'uetds'" class="rc-card rcr-panel-card">
+          <RentalUetdsSection
             :rental-id="rental.id"
             :rental-number="rental.rentalNumber"
             :vehicle-plate="vehicle?.plateNumber || rental.vehiclePlate"
           />
+        </div>
+
+        <!-- KABİS (tüm kiralamalar) -->
+        <div v-show="activeTab === 'kabis'" class="rc-card rcr-panel-card">
+          <RentalKabisSection :rental-id="rental.id" />
         </div>
 
         <!-- Geçmiş -->
