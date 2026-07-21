@@ -1,5 +1,17 @@
-import { ref, computed, type Ref } from 'vue'
+import { ref, computed, nextTick, type Ref } from 'vue'
 import { isValidPhoneNumber } from '@/utils/phone'
+
+const ERROR_CONTAINER_SELECTOR = '.form-group.error, .rc-field--error, [data-field-error="true"]'
+const FOCUSABLE_SELECTOR =
+    'input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled])'
+
+function focusFirstError(): void {
+    if (typeof document === 'undefined') return
+    const container = document.querySelector<HTMLElement>(ERROR_CONTAINER_SELECTOR)
+    if (!container) return
+    container.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    container.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)?.focus({ preventScroll: true })
+}
 
 export interface ValidationRule {
     validate: (value: unknown) => boolean
@@ -61,7 +73,11 @@ export function useValidation(getFields?: ValidationFieldsGetter) {
             }
             errorsFromSubmit.value = next
         }
-        return Object.values(errors.value).every(errs => errs.length === 0)
+        const valid = Object.values(errors.value).every(errs => errs.length === 0)
+        if (!valid) {
+            void nextTick(focusFirstError)
+        }
+        return valid
     }
 
     function touch(name: string) {
@@ -83,6 +99,8 @@ export function useValidation(getFields?: ValidationFieldsGetter) {
 
     const isValid = computed(() => Object.values(errors.value).every(errs => errs.length === 0))
 
+    const errorCount = computed(() => Object.values(errors.value).filter(errs => errs.length > 0).length)
+
     return {
         errors,
         touched,
@@ -92,7 +110,8 @@ export function useValidation(getFields?: ValidationFieldsGetter) {
         reset,
         getError,
         hasError,
-        isValid
+        isValid,
+        errorCount
     }
 }
 

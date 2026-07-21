@@ -150,7 +150,7 @@ watch(selectedColorId, (colorId) => {
   form.value.color = c ? c.name : ''
 })
 
-const { validateForm, getError, hasError, touch } = useValidation(() => formRules.value)
+const { validateForm, getError, hasError, touch, errorCount } = useValidation(() => formRules.value)
 
 const formRules = computed(() => ({
   plateNumber: { value: form.value.plateNumber, rules: [rules.required(), rules.plate()] },
@@ -426,7 +426,8 @@ async function uploadPendingDocuments(vehicleId: number) {
 
 async function handleSubmit() {
   if (!validateForm(formRules.value)) {
-    toast.error('Lütfen formdaki hataları düzeltin')
+    const count = errorCount.value
+    toast.error(count > 0 ? `${count} alanda hata var, lütfen düzeltin` : 'Lütfen formdaki hataları düzeltin')
     return
   }
 
