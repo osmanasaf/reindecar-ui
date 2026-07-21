@@ -7,7 +7,7 @@ import KabisStatusBadge from '@/components/kabis/KabisStatusBadge.vue'
 import { RcPageHeader, RcButton, RcEmpty, RcTableSkeleton } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
 import { formatDateTime } from '@/utils/format'
-import type { KabisNotification, KabisNotificationStatus } from '@/types/kabis'
+import { kabisTypeLabel, type KabisNotification, type KabisNotificationStatus } from '@/types/kabis'
 
 const router = useRouter()
 const toast = useToast()
@@ -30,13 +30,6 @@ const statusOptions: Array<{ value: KabisNotificationStatus | ''; label: string 
   { value: 'ACKED', label: 'Onaylandı' },
   { value: 'FAILED', label: 'Başarısız' },
 ]
-
-const typeLabels: Record<string, string> = {
-  DELIVERY: 'Teslim',
-  RETURN: 'İade',
-  UPDATE: 'Güncelleme',
-  CANCEL: 'İptal',
-}
 
 async function loadNotifications() {
   loading.value = true
@@ -82,6 +75,18 @@ onMounted(() => {
       subtitle="EGM kiralık araç bildirim sistemi kayıtları"
     />
 
+    <div class="rc-alert rc-alert--info" style="margin-bottom: 16px">
+      <RcIcon name="info" :size="16" />
+      <div>
+        <div class="rc-alert__title">Bildirimler otomatik oluşturulur ve kuyruğa alınır</div>
+        <span>
+          Kiralama aktivasyonu, uzatma, iade ve iptal işlemlerinde KABİS kaydı otomatik açılır.
+          EGM entegrasyonu aktifleştirilene kadar dışarıya gönderim yapılmaz; kayıtlar bu süreçte
+          "Başarısız" durumda görünebilir.
+        </span>
+      </div>
+    </div>
+
     <div class="rca-stats rca-stats--payables">
       <div class="rca-stat">
         <div class="rca-stat__label">Toplam kayıt</div>
@@ -116,7 +121,7 @@ onMounted(() => {
       <template #icon><RcIcon name="shield" :size="32" /></template>
     </RcEmpty>
 
-    <div v-else class="rc-card" style="overflow: hidden">
+    <div v-else class="rc-card rc-animate-in" style="overflow: hidden">
       <table class="rc-table rcv-table--slim">
         <thead>
           <tr>
@@ -128,14 +133,14 @@ onMounted(() => {
             <th>Oluşturulma</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody class="rc-stagger">
           <tr
             v-for="item in notifications"
             :key="item.id"
             style="cursor: pointer"
             @click="openDetail(item.id)"
           >
-            <td>{{ typeLabels[item.notificationType] || item.notificationType }}</td>
+            <td>{{ kabisTypeLabel(item.notificationType) }}</td>
             <td class="rcr-row__mono">#{{ item.rentalId }}</td>
             <td><KabisStatusBadge :status="item.status" /></td>
             <td class="rc-num">{{ item.attemptCount }}</td>

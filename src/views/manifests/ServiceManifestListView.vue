@@ -43,6 +43,10 @@ function openDetail(id: number) {
   router.push({ name: 'service-manifest-detail', params: { id } })
 }
 
+function handleCreated(manifest: UetdsManifest) {
+  openDetail(manifest.id)
+}
+
 function handlePageChange(page: number) {
   currentPage.value = page
   void loadManifests()
@@ -78,7 +82,7 @@ onMounted(() => {
       <RcButton variant="primary" @click="showCreateModal = true">İlk manifestoyu oluştur</RcButton>
     </RcEmpty>
 
-    <div v-else class="rc-card" style="overflow: hidden">
+    <div v-else class="rc-card rc-animate-in" style="overflow: hidden">
       <table class="rc-table rcv-table--slim">
         <thead>
           <tr>
@@ -90,7 +94,7 @@ onMounted(() => {
             <th>Kaynak</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody class="rc-stagger">
           <tr
             v-for="manifest in manifests"
             :key="manifest.id"
@@ -128,7 +132,7 @@ onMounted(() => {
     <ManifestCreateModal
       :open="showCreateModal"
       @close="showCreateModal = false"
-      @created="loadManifests"
+      @created="handleCreated"
     />
   </div>
 </template>

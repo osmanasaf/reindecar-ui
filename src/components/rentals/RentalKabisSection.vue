@@ -6,7 +6,7 @@ import FeatureGate from '@/components/common/FeatureGate.vue'
 import KabisStatusBadge from '@/components/kabis/KabisStatusBadge.vue'
 import { RcButton, RcEmpty } from '@/components/rc'
 import { formatDateTime } from '@/utils/format'
-import type { KabisNotification } from '@/types/kabis'
+import { kabisTypeLabel, type KabisNotification } from '@/types/kabis'
 
 const props = defineProps<{
   rentalId: number
@@ -18,13 +18,6 @@ const { isEnabled } = useFeatures()
 const notifications = ref<KabisNotification[]>([])
 const loadingNotifications = ref(true)
 const retrying = ref<number | null>(null)
-
-const typeLabels: Record<string, string> = {
-  DELIVERY: 'Teslim',
-  RETURN: 'İade',
-  UPDATE: 'Güncelleme',
-  CANCEL: 'İptal',
-}
 
 async function loadNotifications() {
   if (!isEnabled('KABIS_NOTIFICATIONS')) {
@@ -64,7 +57,10 @@ watch(() => props.rentalId, loadNotifications)
       <div class="rcr-kabis__head">
         <div>
           <h3 class="rcr-kabis__title">KABİS bildirimleri</h3>
-          <p class="rcr-kabis__sub">EGM kiralık araç bildirim durumu</p>
+          <p class="rcr-kabis__sub">
+            Aktivasyon, uzatma, iade ve iptalde otomatik oluşturulur; EGM entegrasyonu
+            aktifleşene dek gönderim kuyruğunda bekler
+          </p>
         </div>
       </div>
 
@@ -77,7 +73,7 @@ watch(() => props.rentalId, loadNotifications)
       <div v-else class="rcr-kabis__list">
         <div v-for="item in notifications" :key="item.id" class="list-row">
           <div class="list-row-main">
-            <span class="list-row-title">{{ typeLabels[item.notificationType] || item.notificationType }}</span>
+            <span class="list-row-title">{{ kabisTypeLabel(item.notificationType) }}</span>
             <span class="list-row-meta">
               {{ formatDateTime(item.createdAt) }}
               <span v-if="item.lastError"> · {{ item.lastError }}</span>

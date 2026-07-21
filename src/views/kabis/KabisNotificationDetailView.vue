@@ -7,7 +7,7 @@ import KabisStatusBadge from '@/components/kabis/KabisStatusBadge.vue'
 import { RcButton, RcDetailSkeleton } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
 import { formatDateTime } from '@/utils/format'
-import type { KabisNotification } from '@/types/kabis'
+import { kabisTypeLabel, type KabisNotification } from '@/types/kabis'
 
 const route = useRoute()
 const router = useRouter()
@@ -18,13 +18,6 @@ const loading = ref(true)
 const retrying = ref(false)
 
 const notificationId = computed(() => Number(route.params.id))
-
-const typeLabels: Record<string, string> = {
-  DELIVERY: 'Teslim bildirimi',
-  RETURN: 'İade bildirimi',
-  UPDATE: 'Güncelleme bildirimi',
-  CANCEL: 'İptal bildirimi',
-}
 
 async function loadNotification() {
   loading.value = true
@@ -78,7 +71,7 @@ onMounted(() => {
     <div v-else-if="notification" class="rc-card">
       <div class="rc-card__head">
         <div>
-          <h1 class="rc-card__title">{{ typeLabels[notification.notificationType] || notification.notificationType }}</h1>
+          <h1 class="rc-card__title">{{ kabisTypeLabel(notification.notificationType) }} bildirimi</h1>
           <p class="rc-card__subtitle">Bildirim #{{ notification.id }}</p>
         </div>
         <KabisStatusBadge :status="notification.status" />
@@ -123,6 +116,19 @@ onMounted(() => {
             <div class="rc-alert__title">Son hata</div>
             <span>{{ notification.lastError }}</span>
           </div>
+        </div>
+
+        <div
+          v-if="notification.status === 'PENDING' || notification.status === 'FAILED'"
+          class="rc-alert rc-alert--info"
+          style="margin-top: 16px"
+        >
+          <RcIcon name="info" :size="16" />
+          <span>
+            Bildirimler kuyruğa alınır ve zamanlayıcı tarafından işlenir. EGM entegrasyonu
+            aktifleştirilene kadar dışarıya gönderim yapılmaz; bu süreçte kayıtlar "Başarısız"
+            durumda kalabilir.
+          </span>
         </div>
       </div>
     </div>

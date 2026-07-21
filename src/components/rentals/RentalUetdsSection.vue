@@ -78,9 +78,17 @@ watch(() => props.rentalId, loadManifests)
             <span class="list-row-title">{{ manifest.uetdsTripNumber }}</span>
             <span class="list-row-meta">
               {{ manifest.vehiclePlate }} · {{ formatDateTime(manifest.tripStartAt) }}
-              <span v-if="manifest.passengerCount != null"> · {{ manifest.passengerCount }} yolcu</span>
             </span>
           </div>
+          <RouterLink
+            v-if="isEnabled('UETDS_PASSENGERS')"
+            :to="{ name: 'service-manifest-detail', params: { id: manifest.id }, hash: '#yolcular' }"
+            class="rcr-uetds__passengers-link"
+            @click.stop
+          >
+            <RcIcon name="users" :size="13" />
+            {{ manifest.passengerCount ?? 0 }} yolcu
+          </RouterLink>
           <RcBadge :variant="manifest.source === 'UPLOAD' ? 'info' : 'default'">
             {{ manifest.source === 'UPLOAD' ? 'PDF' : 'Manuel' }}
           </RcBadge>
@@ -124,5 +132,24 @@ watch(() => props.rentalId, loadManifests)
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.rcr-uetds__passengers-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--rc-text-muted);
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--rc-surface-2);
+  flex-shrink: 0;
+  transition: background var(--rc-dur-fast), color var(--rc-dur-fast);
+}
+
+.rcr-uetds__passengers-link:hover {
+  background: var(--rc-blue-50);
+  color: var(--rc-blue-600);
 }
 </style>

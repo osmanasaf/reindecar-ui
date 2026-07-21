@@ -436,6 +436,29 @@
 }
 .rc-card__body { padding: 16px; }
 
+.rc-card__head-lead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.rc-card__icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--rc-blue-50);
+  color: var(--rc-blue-600);
+  flex-shrink: 0;
+}
+.rc-card__desc {
+  font-size: 12.5px;
+  color: var(--rc-text-muted);
+  margin-top: 2px;
+}
+
 /* ───────── Table ───────── */
 .rc-table {
   width: 100%;
