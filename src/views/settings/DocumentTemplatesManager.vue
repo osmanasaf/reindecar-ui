@@ -7,6 +7,7 @@ import { RcIcon } from '@/components/icons'
 import { CONTRACT_DOCUMENT_TYPE_LABELS } from '@/types/contract'
 import type { ContractDocumentType, ContractTemplateDetail } from '@/types/contract'
 import { parseSections, serializeSections } from '@/utils/contractSections'
+import { groupPlaceholders, placeholderToken } from '@/utils/placeholderLabels'
 import RichTextField from '@/components/shared/RichTextField.vue'
 
 const toast = useToast()
@@ -21,13 +22,14 @@ const activeTab = ref<ContractDocumentType>('RENTAL_CONTRACT')
 const templates = ref<ContractTemplateDetail[]>([])
 const supportedPlaceholders = ref<string[]>([])
 const showPlaceholders = ref(false)
-const previewRentalId = ref<number | null>(null)
 
 const tabs = DOCUMENT_TYPES.map((type) => ({ id: type, label: CONTRACT_DOCUMENT_TYPE_LABELS[type] }))
 
 const currentTemplate = computed(() =>
   templates.value.find((t) => t.documentType === activeTab.value) ?? null,
 )
+
+const placeholderGroups = computed(() => groupPlaceholders(supportedPlaceholders.value))
 
 const sections = ref<Array<{ name: string; content: string }>>([])
 
@@ -40,9 +42,20 @@ const SECTION_LABELS: Record<string, string> = {
   META: 'Belge bilgileri',
   INTRO: 'Giriş',
   BODY: 'Gövde metni',
-  TABLE: 'Tablo (ARAÇ|ADET|...)',
+  TABLE: 'Tablo',
   TERMS: 'Şartlar',
   SIGNATURE: 'İmza bloğu',
+}
+const SECTION_HINTS: Record<string, string> = {
+  HEADER: 'Belgenin en üstünde firma iletişim satırı',
+  TITLE: 'Belge başlığı (örn. ARAÇ KİRALAMA SÖZLEŞMESİ)',
+  RECIPIENT: 'Müşteri / alıcı bilgileri',
+  META: 'Belge no, tarih, plaka gibi özet satırı',
+  INTRO: 'Giriş paragrafı',
+  BODY: 'Belgenin ana metni',
+  TABLE: 'Boru (|) ile ayrılmış tablo satırları — düzeni bozmayın',
+  TERMS: 'Madde madde şartlar',
+  SIGNATURE: 'İmza satırları',
 }
 
 function sectionKind(name: string): 'rich' | 'plain' | 'raw' {
@@ -53,6 +66,10 @@ function sectionKind(name: string): 'rich' | 'plain' | 'raw' {
 
 function sectionLabel(name: string): string {
   return SECTION_LABELS[name] ?? name
+}
+
+function sectionHint(name: string): string {
+  return SECTION_HINTS[name] ?? ''
 }
 
 function loadSectionsFromTemplate() {
@@ -121,13 +138,10 @@ async function toggleActive() {
 }
 
 async function previewPdf() {
-  if (!currentTemplate.value || !previewRentalId.value) {
-    toast.error('Önizleme için bir kiralama ID girin')
-    return
-  }
+  if (!currentTemplate.value) return
   previewing.value = true
   try {
-    const blob = await contractTemplatesApi.previewPdf(currentTemplate.value.id, previewRentalId.value)
+    const blob = await contractTemplatesApi.previewSamplePdf(currentTemplate.value.id)
     const url = URL.createObjectURL(blob)
     window.open(url, '_blank', 'noopener,noreferrer')
     setTimeout(() => URL.revokeObjectURL(url), 60_000)
@@ -138,8 +152,14 @@ async function previewPdf() {
   }
 }
 
-function placeholderToken(key: string): string {
-  return `{{${key}}}`
+async function copyPlaceholder(key: string) {
+  const token = `{{${key}}}`
+  try {
+    await navigator.clipboard.writeText(token)
+    toast.success(`${token} kopyalandı`)
+  } catch {
+    toast.error('Kopyalanamadı')
+  }
 }
 
 onMounted(fetchTemplates)
@@ -157,32 +177,59 @@ onMounted(fetchTemplates)
     <div v-else-if="!currentTemplate" class="rcs-list__meta">Bu belge tipi için şablon bulunamadı.</div>
     <template v-else>
       <div class="rcs-doc-templates__head">
-        <div>
-          <div class="rcs-doc-templates__code">{{ currentTemplate.code }}</div>
+        <div class="rcs-doc-templates__head-info">
           <RcBadge :variant="currentTemplate.active ? 'success' : 'info'">
             {{ currentTemplate.active ? 'Aktif' : 'Pasif' }}
           </RcBadge>
+          <span class="rcs-doc-templates__code">{{ currentTemplate.code }}</span>
         </div>
         <div class="rcs-doc-templates__actions">
           <RcButton variant="ghost" size="sm" @click="showPlaceholders = !showPlaceholders">
             <RcIcon name="info" :size="14" />
-            Placeholder yardımı
+            Etiket yardımı
           </RcButton>
-          <RcButton variant="ghost" size="sm" :loading="togglingActive" @click="toggleActive">
+          <RcButton
+            variant="ghost"
+            size="sm"
+            :loading="togglingActive"
+            :title="currentTemplate.active ? 'Pasif şablon yeni belgelerde kullanılmaz' : 'Yeni belgeler bu şablonu kullanır'"
+            @click="toggleActive"
+          >
             {{ currentTemplate.active ? 'Pasifleştir' : 'Aktif et' }}
           </RcButton>
         </div>
       </div>
 
       <div v-if="showPlaceholders" class="rcr-contract-editor__placeholders">
-        <code v-for="key in supportedPlaceholders" :key="key" class="rcs-doc-templates__ph">
-          {{ placeholderToken(key) }}
-        </code>
+        <p class="rcs-doc-templates__ph-hint">
+          Bu etiketleri metne yazın; belge oluşturulurken gerçek değerlerle dolar. Tıklayınca kopyalanır.
+        </p>
+        <div v-for="grp in placeholderGroups" :key="grp.group" class="rcs-doc-templates__ph-group">
+          <div class="rcs-doc-templates__ph-group-title">{{ grp.group }}</div>
+          <div class="rcs-doc-templates__ph-list">
+            <button
+              v-for="item in grp.items"
+              :key="item.key"
+              type="button"
+              class="rcs-doc-templates__ph-chip"
+              :title="`${placeholderToken(item.key)} — kopyalamak için tıkla`"
+              @click="copyPlaceholder(item.key)"
+            >
+              <span class="rcs-doc-templates__ph-chip-label">{{ item.label }}</span>
+              <code>{{ placeholderToken(item.key) }}</code>
+            </button>
+          </div>
+        </div>
       </div>
 
       <div class="rcr-contract-editor__sections">
         <div v-for="section in sections" :key="section.name" class="rcr-contract-editor__section">
-          <label class="rcr-contract-editor__section-label">{{ sectionLabel(section.name) }}</label>
+          <label class="rcr-contract-editor__section-label">
+            {{ sectionLabel(section.name) }}
+            <span v-if="sectionHint(section.name)" class="rcr-contract-editor__section-hint">
+              — {{ sectionHint(section.name) }}
+            </span>
+          </label>
           <RichTextField
             v-if="sectionKind(section.name) === 'rich'"
             v-model="section.content"
@@ -199,19 +246,10 @@ onMounted(fetchTemplates)
       </div>
 
       <div class="rcs-doc-templates__footer">
-        <div class="rcs-doc-templates__preview">
-          <input
-            v-model.number="previewRentalId"
-            type="number"
-            class="rc-input"
-            placeholder="Kiralama ID"
-            style="width: 140px"
-          />
-          <RcButton variant="ghost" size="sm" :loading="previewing" @click="previewPdf">
-            <RcIcon name="download" :size="14" />
-            PDF önizle
-          </RcButton>
-        </div>
+        <RcButton variant="ghost" size="sm" :loading="previewing" @click="previewPdf">
+          <RcIcon name="eye" :size="14" />
+          PDF önizle (örnek verilerle)
+        </RcButton>
         <RcButton variant="primary" :loading="saving" @click="saveTemplate">
           Kaydet
         </RcButton>
@@ -231,13 +269,21 @@ onMounted(fetchTemplates)
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
   margin-bottom: 12px;
 }
 
+.rcs-doc-templates__head-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .rcs-doc-templates__code {
-  font-size: 13px;
-  font-weight: 600;
-  margin-bottom: 4px;
+  font-size: 11.5px;
+  color: var(--rc-text-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 .rcs-doc-templates__actions {
@@ -245,21 +291,61 @@ onMounted(fetchTemplates)
   gap: 8px;
 }
 
-.rcs-doc-templates__ph {
-  display: inline-block;
-  margin: 2px 6px 2px 0;
-  color: var(--rc-blue-600);
-}
-
 .rcr-contract-editor__placeholders {
-  max-height: 120px;
+  max-height: 240px;
   overflow: auto;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
   padding: 12px;
   border: 1px solid var(--rc-border);
   border-radius: var(--rc-radius-md);
   background: var(--rc-surface-muted);
-  font-size: 12.5px;
+}
+
+.rcs-doc-templates__ph-hint {
+  font-size: 12px;
+  color: var(--rc-text-muted);
+  margin: 0 0 10px;
+}
+
+.rcs-doc-templates__ph-group {
+  margin-bottom: 10px;
+}
+
+.rcs-doc-templates__ph-group-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--rc-text-muted);
+  margin-bottom: 4px;
+}
+
+.rcs-doc-templates__ph-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.rcs-doc-templates__ph-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border: 1px solid var(--rc-border);
+  border-radius: 999px;
+  background: var(--rc-surface);
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--rc-text);
+}
+
+.rcs-doc-templates__ph-chip:hover {
+  border-color: var(--rc-blue-600);
+}
+
+.rcs-doc-templates__ph-chip code {
+  color: var(--rc-blue-600);
+  font-size: 11px;
 }
 
 .rcr-contract-editor__sections {
@@ -272,10 +358,15 @@ onMounted(fetchTemplates)
   display: block;
   font-size: 12.5px;
   font-weight: 600;
-  color: var(--rc-text-muted);
+  color: var(--rc-text);
   margin-bottom: 6px;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
+}
+
+.rcr-contract-editor__section-hint {
+  font-weight: 400;
+  color: var(--rc-text-muted);
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 .rcr-contract-editor__textarea {
@@ -293,11 +384,5 @@ onMounted(fetchTemplates)
   margin-top: 20px;
   padding-top: 16px;
   border-top: 1px solid var(--rc-border);
-}
-
-.rcs-doc-templates__preview {
-  display: flex;
-  gap: 8px;
-  align-items: center;
 }
 </style>

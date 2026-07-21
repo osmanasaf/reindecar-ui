@@ -102,6 +102,10 @@ class ContractTemplatesApiService extends BaseApi {
         return data
     }
 
+    async previewSamplePdf(id: number): Promise<Blob> {
+        return this.getBlob(`/${id}/preview/sample/pdf`)
+    }
+
     async bootstrapDefaults(): Promise<void> {
         await this.post('/bootstrap-defaults')
     }
