@@ -883,26 +883,26 @@ onActivated(() => {
               </div>
             </div>
 
-            <div v-if="rental.startFuelLiters != null || rental.endFuelLiters != null" class="km-grid" style="margin-top: 16px">
+            <div v-if="rental.startFuelPercent != null || rental.endFuelPercent != null" class="km-grid" style="margin-top: 16px">
               <div class="km-item">
-                <span class="label">Çıkış depo</span>
+                <span class="label">Çıkış yakıt</span>
                 <span class="value">
-                  {{ rental.startFuelLiters != null ? `${rental.startFuelLiters.toLocaleString('tr-TR')} L` : '-' }}
+                  {{ rental.startFuelPercent != null ? `%${rental.startFuelPercent.toLocaleString('tr-TR')}` : '-' }}
                 </span>
               </div>
               <div class="km-item">
-                <span class="label">İade depo</span>
+                <span class="label">İade yakıt</span>
                 <span class="value">
-                  {{ rental.endFuelLiters != null ? `${rental.endFuelLiters.toLocaleString('tr-TR')} L` : '-' }}
+                  {{ rental.endFuelPercent != null ? `%${rental.endFuelPercent.toLocaleString('tr-TR')}` : '-' }}
                 </span>
               </div>
               <div
-                v-if="rental.startFuelLiters != null && rental.endFuelLiters != null && rental.startFuelLiters > rental.endFuelLiters"
+                v-if="rental.startFuelPercent != null && rental.endFuelPercent != null && rental.startFuelPercent > rental.endFuelPercent"
                 class="km-item total"
               >
-                <span class="label">Depo farkı</span>
+                <span class="label">Yakıt farkı</span>
                 <span class="value text-danger">
-                  {{ (rental.startFuelLiters - rental.endFuelLiters).toLocaleString('tr-TR') }} L
+                  %{{ (rental.startFuelPercent - rental.endFuelPercent).toLocaleString('tr-TR') }}
                 </span>
               </div>
             </div>

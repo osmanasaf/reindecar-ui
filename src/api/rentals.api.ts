@@ -84,11 +84,11 @@ class RentalsApiService extends BaseApi {
         id: number,
         endKm: number,
         actualReturnDate: string,
-        endFuelLiters?: number,
+        endFuelPercent?: number,
     ): Promise<ReturnPreviewResponse> {
         const params: Record<string, unknown> = { endKm, actualReturnDate }
-        if (endFuelLiters != null) {
-            params.endFuelLiters = endFuelLiters
+        if (endFuelPercent != null) {
+            params.endFuelPercent = endFuelPercent
         }
         return this.get(`/${id}/return-preview`, params)
     }

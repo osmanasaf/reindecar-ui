@@ -282,8 +282,8 @@ export interface Rental {
     totalDays: number
     startKm: number
     endKm: number
-    startFuelLiters?: number
-    endFuelLiters?: number
+    startFuelPercent?: number
+    endFuelPercent?: number
     totalKm: number
     kmPackageId?: number
     customIncludedKm?: number
@@ -767,7 +767,7 @@ export interface ReturnPreviewResponse {
     damageTotal: MoneyLike
     tollTotal?: MoneyLike
     grandTotal: MoneyLike
-    fuelDeficitLiters?: number
+    fuelDeficitPercent?: number
 }
 
 export interface RentalPaymentSummaryResponse {

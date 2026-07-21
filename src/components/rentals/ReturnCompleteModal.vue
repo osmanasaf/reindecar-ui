@@ -8,6 +8,7 @@ import { fmtTRY } from '@/utils/format'
 import type { Rental, Vehicle, VehicleReturnForm, ReturnPreviewResponse } from '@/types'
 import DatePicker from '@/components/base/DatePicker.vue'
 import DocumentsSection from '@/components/shared/DocumentsSection.vue'
+import FuelLevelSelect from '@/components/rentals/FuelLevelSelect.vue'
 import type { FileUploadType } from '@/api/files.api'
 
 const RETURN_UPLOAD_TYPES: FileUploadType[] = [
@@ -46,11 +47,10 @@ const applyFuelFee = ref(false)
 const earlyDiscountAmount = ref(0)
 const lateFeeAmount = ref(0)
 const fuelFeeAmount = ref(0)
-const fuelPricePerLiter = ref(0)
 
 const form = ref({
   endKm: 0,
-  endFuelLiters: null as number | null,
+  endFuelPercent: null as number | null,
   actualReturnDate: '',
   notes: '',
 })
@@ -102,12 +102,13 @@ const inputRules = computed(() => ({
       },
     ],
   },
-  endFuelLiters: {
-    value: form.value.endFuelLiters,
+  endFuelPercent: {
+    value: form.value.endFuelPercent,
     rules: [
       {
-        validate: (v: unknown) => v == null || v === '' || Number(v) >= 0,
-        message: 'İade depo litre değeri negatif olamaz',
+        validate: (v: unknown) =>
+          v == null || v === '' || (Number(v) >= 0 && Number(v) <= 100),
+        message: 'Yakıt seviyesi 0 ile 100 arasında olmalıdır',
       },
     ],
   },
@@ -125,24 +126,19 @@ function moneyAmount(amount: number | { amount: number; currency: string } | nul
   return typeof amount === 'number' ? amount : (amount.amount ?? 0)
 }
 
-const fuelDeficitLiters = computed(() => {
-  const deficit = preview.value?.fuelDeficitLiters ?? 0
+const fuelDeficitPercent = computed(() => {
+  const deficit = preview.value?.fuelDeficitPercent ?? 0
   return typeof deficit === 'number' ? deficit : Number(deficit) || 0
-})
-
-const suggestedFuelFee = computed(() => {
-  if (fuelDeficitLiters.value <= 0 || fuelPricePerLiter.value <= 0) return 0
-  return Math.round(fuelDeficitLiters.value * fuelPricePerLiter.value * 100) / 100
 })
 
 function initializePreviewAdjustments() {
   if (!preview.value) return
   applyEarlyDiscount.value = preview.value.earlyDays > 0
   applyLateFee.value = preview.value.lateDays > 0
-  applyFuelFee.value = fuelDeficitLiters.value > 0
+  applyFuelFee.value = fuelDeficitPercent.value > 0
   earlyDiscountAmount.value = moneyAmount(preview.value.earlyDiscount)
   lateFeeAmount.value = moneyAmount(preview.value.lateFee)
-  fuelFeeAmount.value = suggestedFuelFee.value
+  fuelFeeAmount.value = 0
 }
 
 const estimatedFinalTotal = computed(() => {
@@ -209,7 +205,7 @@ async function calculatePreview() {
       props.rentalId,
       form.value.endKm,
       form.value.actualReturnDate,
-      form.value.endFuelLiters ?? undefined,
+      form.value.endFuelPercent ?? undefined,
     )
     initializePreviewAdjustments()
     step.value = 'preview'
@@ -227,7 +223,7 @@ async function completeReturn() {
   try {
     const completeRequest: VehicleReturnForm = {
       endKm: form.value.endKm,
-      endFuelLiters: form.value.endFuelLiters ?? undefined,
+      endFuelPercent: form.value.endFuelPercent ?? undefined,
       actualReturnDate: form.value.actualReturnDate,
       notes: form.value.notes.trim() || undefined,
     }
@@ -246,7 +242,7 @@ async function completeReturn() {
       }
     }
 
-    if (preview.value && fuelDeficitLiters.value > 0) {
+    if (preview.value && fuelDeficitPercent.value > 0) {
       completeRequest.applyFuelFee = applyFuelFee.value
       if (applyFuelFee.value) {
         completeRequest.fuelFeeAmount = fuelFeeAmount.value
@@ -297,10 +293,9 @@ function handleClose() {
   earlyDiscountAmount.value = 0
   lateFeeAmount.value = 0
   fuelFeeAmount.value = 0
-  fuelPricePerLiter.value = 0
   rental.value = null
   vehicle.value = null
-  form.value = { endKm: 0, endFuelLiters: null, actualReturnDate: '', notes: '' }
+  form.value = { endKm: 0, endFuelPercent: null, actualReturnDate: '', notes: '' }
   emit('close')
 }
 
@@ -313,7 +308,6 @@ function handleBack() {
   earlyDiscountAmount.value = 0
   lateFeeAmount.value = 0
   fuelFeeAmount.value = 0
-  fuelPricePerLiter.value = 0
 }
 
 function formatMoney(amount: number | { amount: number; currency: string } | null | undefined): string {
@@ -337,11 +331,6 @@ const vehicleLabel = computed(() => {
     return `${rental.value.vehiclePlate} · ${rental.value.vehicleName}`
   }
   return '—'
-})
-
-watch([fuelPricePerLiter, fuelDeficitLiters, applyFuelFee], () => {
-  if (!applyFuelFee.value || fuelDeficitLiters.value <= 0) return
-  fuelFeeAmount.value = suggestedFuelFee.value
 })
 
 watch(
@@ -413,9 +402,9 @@ watch(
               <span class="rc-meta-row__label">Çıkış KM</span>
               <span class="rc-meta-row__value rc-num">{{ rental.startKm.toLocaleString('tr-TR') }} km</span>
             </div>
-            <div v-if="fuelTrackingEnabled && rental.startFuelLiters != null" class="rc-meta-row">
-              <span class="rc-meta-row__label">Çıkış depo</span>
-              <span class="rc-meta-row__value rc-num">{{ rental.startFuelLiters.toLocaleString('tr-TR') }} L</span>
+            <div v-if="fuelTrackingEnabled && rental.startFuelPercent != null" class="rc-meta-row">
+              <span class="rc-meta-row__label">Çıkış yakıt</span>
+              <span class="rc-meta-row__value rc-num">%{{ rental.startFuelPercent.toLocaleString('tr-TR') }}</span>
             </div>
           </div>
         </div>
@@ -468,19 +457,11 @@ watch(
               </span>
               <span v-if="hasError('actualReturnDate')" class="rc-field__error">{{ getError('actualReturnDate') }}</span>
             </div>
-            <div v-if="fuelTrackingEnabled" class="rc-field" :class="{ 'rc-field--error': hasError('endFuelLiters') }">
-              <label class="rc-field__label">İade depo (litre)</label>
-              <input
-                v-model.number="form.endFuelLiters"
-                class="rc-input"
-                type="number"
-                min="0"
-                step="0.1"
-                placeholder="Örn. 30"
-                @blur="touch('endFuelLiters')"
-              />
-              <span class="rc-field__hint">İade anındaki yakıt miktarı (litre)</span>
-              <span v-if="hasError('endFuelLiters')" class="rc-field__error">{{ getError('endFuelLiters') }}</span>
+            <div v-if="fuelTrackingEnabled" class="rc-field rcr-modal-form-grid__full" :class="{ 'rc-field--error': hasError('endFuelPercent') }">
+              <label class="rc-field__label">İade yakıt seviyesi</label>
+              <FuelLevelSelect v-model="form.endFuelPercent" input-id="return-fuel-percent" />
+              <span class="rc-field__hint">İade anındaki depo seviyesi — hazır oranı seçin ya da yüzdeyi elle girin</span>
+              <span v-if="hasError('endFuelPercent')" class="rc-field__error">{{ getError('endFuelPercent') }}</span>
             </div>
             <div class="rc-field rcr-modal-form-grid__full">
               <label class="rc-field__label">İade notu (opsiyonel)</label>
@@ -532,47 +513,36 @@ watch(
             <span class="rcr-return-preview-box__label">Erken iade</span>
             <span class="rcr-return-preview-box__value">{{ preview.earlyDays }} gün</span>
           </div>
-          <div v-if="fuelTrackingEnabled && fuelDeficitLiters > 0" class="rcr-return-preview-box rcr-return-preview-box--warn">
-            <span class="rcr-return-preview-box__label">Depo farkı</span>
-            <span class="rcr-return-preview-box__value rc-num">{{ fuelDeficitLiters.toLocaleString('tr-TR') }} L</span>
+          <div v-if="fuelTrackingEnabled && fuelDeficitPercent > 0" class="rcr-return-preview-box rcr-return-preview-box--warn">
+            <span class="rcr-return-preview-box__label">Yakıt farkı</span>
+            <span class="rcr-return-preview-box__value rc-num">%{{ fuelDeficitPercent.toLocaleString('tr-TR') }}</span>
           </div>
         </div>
 
         <div
-          v-if="fuelTrackingEnabled && fuelDeficitLiters > 0"
+          v-if="fuelTrackingEnabled && fuelDeficitPercent > 0"
           class="rc-card rcr-return-adjustments"
           style="margin-top: 14px"
         >
-          <div class="rc-card__head"><div class="rc-card__title">Yakıt / depo düzenlemeleri</div></div>
+          <div class="rc-card__head"><div class="rc-card__title">Yakıt düzenlemeleri</div></div>
           <div class="rcr-return-adjustments__body">
             <div class="rcr-return-adjustment">
               <label class="rcr-return-adjustment__toggle">
                 <input v-model="applyFuelFee" type="checkbox" />
-                <span>Benzin ücretini uygula ({{ fuelDeficitLiters.toLocaleString('tr-TR') }} L eksik)</span>
+                <span>Benzin ücretini uygula (%{{ fuelDeficitPercent.toLocaleString('tr-TR') }} eksik)</span>
               </label>
               <div v-if="applyFuelFee" class="rcr-return-adjustment__amount">
-                <label class="rc-field__label">Litre fiyatı (₺)</label>
-                <input
-                  v-model.number="fuelPricePerLiter"
-                  class="rc-input"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="Örn. 42.50"
-                />
-                <label class="rc-field__label">Ücret tutarı</label>
+                <label class="rc-field__label">Ücret tutarı (₺)</label>
                 <input
                   v-model.number="fuelFeeAmount"
                   class="rc-input"
                   type="number"
                   min="0"
                   step="0.01"
+                  placeholder="Örn. 500"
                 />
                 <span class="rc-field__hint">
-                  Önerilen: {{ fmtTRY(suggestedFuelFee) }}
-                  <template v-if="fuelPricePerLiter > 0">
-                    ({{ fuelDeficitLiters.toLocaleString('tr-TR') }} L × {{ fmtTRY(fuelPricePerLiter) }})
-                  </template>
+                  Eksik yakıt %{{ fuelDeficitPercent.toLocaleString('tr-TR') }} — bedeli elle belirleyin
                 </span>
               </div>
             </div>

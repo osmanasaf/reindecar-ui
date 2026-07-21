@@ -291,13 +291,13 @@ export interface UpdateKmPackageForm {
 
 export interface VehicleDeliveryForm {
     startKm: number
-    startFuelLiters?: number
+    startFuelPercent?: number
 }
 
 export interface VehicleReturnForm {
     actualReturnDate: string
     endKm: number
-    endFuelLiters?: number
+    endFuelPercent?: number
     notes?: string
     applyEarlyDiscount?: boolean
     earlyDiscountAmount?: number

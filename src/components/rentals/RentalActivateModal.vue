@@ -7,6 +7,7 @@ import { useToast, useValidation, rules, useFeatures } from '@/composables'
 import { fmtTRY, formatDate } from '@/utils/format'
 import type { Rental, Vehicle } from '@/types'
 import DocumentsSection from '@/components/shared/DocumentsSection.vue'
+import FuelLevelSelect from '@/components/rentals/FuelLevelSelect.vue'
 import type { FileUploadType } from '@/api/files.api'
 
 const HANDOVER_UPLOAD_TYPES: FileUploadType[] = [
@@ -36,7 +37,7 @@ const downloadingPdf = ref(false)
 const step = ref<'form' | 'completed'>('form')
 const activatedRental = ref<Rental | null>(null)
 const startKm = ref(0)
-const startFuelLiters = ref<number | null>(null)
+const startFuelPercent = ref<number | null>(null)
 
 const kmMin = computed(() => props.vehicle?.currentKm ?? 0)
 
@@ -44,7 +45,7 @@ const displayRental = computed(() => activatedRental.value ?? props.rental)
 
 function syncStartKmFromVehicle() {
   startKm.value = kmMin.value
-  startFuelLiters.value = null
+  startFuelPercent.value = null
 }
 
 watch(
@@ -83,12 +84,13 @@ const kmRules = computed(() => ({
       ),
     ],
   },
-  startFuelLiters: {
-    value: startFuelLiters.value,
+  startFuelPercent: {
+    value: startFuelPercent.value,
     rules: [
       {
-        validate: (v: unknown) => v == null || v === '' || Number(v) >= 0,
-        message: 'Depo litre değeri negatif olamaz',
+        validate: (v: unknown) =>
+          v == null || v === '' || (Number(v) >= 0 && Number(v) <= 100),
+        message: 'Yakıt seviyesi 0 ile 100 arasında olmalıdır',
       },
     ],
   },
@@ -102,7 +104,7 @@ async function confirm() {
   try {
     const updated = await rentalsApi.activate(props.rental.id, {
       startKm: startKm.value,
-      startFuelLiters: startFuelLiters.value ?? undefined,
+      startFuelPercent: startFuelPercent.value ?? undefined,
     })
     activatedRental.value = updated
     step.value = 'completed'
@@ -235,19 +237,11 @@ async function downloadHandoverPdf() {
         </span>
         <span v-if="hasError('startKm')" class="rc-field__error">{{ getError('startKm') }}</span>
       </div>
-      <div v-if="fuelTrackingEnabled" class="rc-field" :class="{ 'rc-field--error': hasError('startFuelLiters') }">
-        <label class="rc-field__label">Depo (litre)</label>
-        <input
-          v-model.number="startFuelLiters"
-          class="rc-input rc-num"
-          type="number"
-          min="0"
-          step="0.1"
-          placeholder="Örn. 45"
-          @blur="touch('startFuelLiters')"
-        />
-        <span class="rc-field__hint">Teslimattaki yakıt miktarı (litre)</span>
-        <span v-if="hasError('startFuelLiters')" class="rc-field__error">{{ getError('startFuelLiters') }}</span>
+      <div v-if="fuelTrackingEnabled" class="rc-field rcr-modal-form-grid__full" :class="{ 'rc-field--error': hasError('startFuelPercent') }">
+        <label class="rc-field__label">Yakıt seviyesi</label>
+        <FuelLevelSelect v-model="startFuelPercent" input-id="activate-fuel-percent" />
+        <span class="rc-field__hint">Teslimattaki depo seviyesi — hazır oranı seçin ya da yüzdeyi elle girin</span>
+        <span v-if="hasError('startFuelPercent')" class="rc-field__error">{{ getError('startFuelPercent') }}</span>
       </div>
     </div>
 
