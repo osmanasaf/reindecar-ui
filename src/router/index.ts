@@ -287,4 +287,23 @@ if (import.meta.env.DEV) {
 
 router.beforeEach(authGuard)
 
+// Yeni bir sürüm deploy edildiğinde eski JS chunk hash'leri sunucudan kalkar;
+// açık sekmedeki tembel (lazy) route'lar "Failed to fetch dynamically imported
+// module" hatasıyla boş kalır. Böyle bir durumda sekmeyi hedef route'a tam
+// sayfa yükleyerek yeni build'i getiririz. 10 sn'lik cooldown sonsuz döngüyü önler.
+router.onError((error, to) => {
+    const message = String((error as Error)?.message ?? '')
+    const isChunkLoadError =
+        /dynamically imported module/i.test(message) ||
+        /Importing a module script failed/i.test(message) ||
+        /error loading dynamically/i.test(message)
+    if (!isChunkLoadError) return
+
+    const key = 'rc-chunk-reload-at'
+    const last = Number(sessionStorage.getItem(key) ?? 0)
+    if (Date.now() - last < 10_000) return
+    sessionStorage.setItem(key, String(Date.now()))
+    window.location.assign(to?.fullPath ?? window.location.href)
+})
+
 export default router
