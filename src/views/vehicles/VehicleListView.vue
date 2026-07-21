@@ -43,7 +43,7 @@ const categories = ref<VehicleCategory[]>([])
 const branches = ref<Branch[]>([])
 const viewMode = useLocalStorage<VehicleListViewMode>(
   UI_STORAGE_KEYS.vehicleListView,
-  'table',
+  'gantt',
   {
     serializer: {
       read: (raw) => normalizeVehicleViewMode(JSON.parse(raw)),
