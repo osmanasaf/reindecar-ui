@@ -364,12 +364,16 @@ const extraItemsTotalDisplay = computed(() =>
   safeRentalExtraItems.value.reduce((sum, item) => sum + getExtraItemTotal(item), 0)
 )
 
-const remainingAmount = computed(() => {
+const rawRemaining = computed(() => {
   if (paymentSummary.value?.totalRemaining != null) {
-    return Math.max(0, Number(paymentSummary.value.totalRemaining))
+    return Number(paymentSummary.value.totalRemaining)
   }
   return 0
 })
+
+const remainingAmount = computed(() => Math.max(0, rawRemaining.value))
+
+const refundAmount = computed(() => Math.max(0, -rawRemaining.value))
 
 async function refreshPaymentSummary() {
   if (!rental.value) return
@@ -712,10 +716,15 @@ onActivated(() => {
         </div>
         <div class="rcv-stat">
           <div class="rcv-stat__label">Bakiye</div>
-          <div class="rcv-stat__value rc-num" :class="{ 'rcv-stat__value--warn': remainingAmount > 0 }">
-            {{ fmtTRY(remainingAmount) }}
+          <div
+            class="rcv-stat__value rc-num"
+            :class="{ 'rcv-stat__value--warn': remainingAmount > 0 || refundAmount > 0 }"
+          >
+            {{ fmtTRY(refundAmount > 0 ? refundAmount : remainingAmount) }}
           </div>
-          <div class="rcv-stat__sub">{{ remainingAmount > 0 ? 'tahsil bekliyor' : 'borç yok' }}</div>
+          <div class="rcv-stat__sub">
+            {{ refundAmount > 0 ? 'müşteriye iade edilecek' : (remainingAmount > 0 ? 'tahsil bekliyor' : 'borç yok') }}
+          </div>
         </div>
         <div v-if="rental.status === 'ACTIVE' || rental.status === 'OVERDUE'" class="rcv-stat">
           <div class="rcv-stat__label">Kalan süre</div>
@@ -1083,7 +1092,8 @@ onActivated(() => {
           <h3 class="rcr-panel-card__title">Ödeme geçmişi</h3>
           <div class="rcr-payment-summary">
             <div><span>Ödenen</span><strong class="rc-num">{{ formatCurrency(totalPaid) }}</strong></div>
-            <div><span>Kalan</span><strong class="rc-num" :class="{ 'text-danger': remainingAmount > 0 }">{{ formatCurrency(remainingAmount) }}</strong></div>
+            <div v-if="refundAmount > 0"><span>İade edilecek</span><strong class="rc-num text-danger">{{ formatCurrency(refundAmount) }}</strong></div>
+            <div v-else><span>Kalan</span><strong class="rc-num" :class="{ 'text-danger': remainingAmount > 0 }">{{ formatCurrency(remainingAmount) }}</strong></div>
             <div><span>Durum</span><strong>{{ paymentStatus }}</strong></div>
           </div>
           <RcEmpty v-if="payments.length === 0" title="Ödeme kaydı yok" description="Henüz tahsilat yapılmamış" />
