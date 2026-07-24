@@ -94,12 +94,14 @@ const secondary = computed((): ActionDef[] => {
     return [
       { label: 'Ödeme al', icon: 'cash', kind: 'payment' },
       { label: 'Hasar ekle', icon: 'wrench', kind: 'damage' },
+      { label: 'Teslim tutanağı', icon: 'download', kind: 'pdf' },
     ]
   }
   if (s === RentalStatus.PENDING_PAYMENT) {
     return [
       { label: 'Ödeme al', icon: 'cash', kind: 'payment' },
       { label: 'Hasar ekle', icon: 'wrench', kind: 'damage' },
+      { label: 'Teslim tutanağı', icon: 'download', kind: 'pdf' },
     ]
   }
   if (s === RentalStatus.CLOSED) {

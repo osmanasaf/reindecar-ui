@@ -647,16 +647,6 @@ onActivated(() => {
         </div>
         <div class="rcr-detail__head-actions">
           <RcButton
-            v-if="['RETURN_PENDING', 'PENDING_PAYMENT', 'CLOSED'].includes(rental.status)"
-            variant="ghost"
-            size="sm"
-            :disabled="generatingPdf"
-            @click="generatePdf"
-          >
-            <RcIcon name="receipt" :size="14" />
-            Teslim tutanağı
-          </RcButton>
-          <RcButton
             v-if="!canUseContractOffers && ['DRAFT', 'RESERVED'].includes(rental.status)"
             variant="ghost"
             size="sm"
