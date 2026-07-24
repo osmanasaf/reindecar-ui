@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { usersApi } from '@/api'
+import { usersApi, branchesApi } from '@/api'
 import type { UserResponse, UserRole, CreateUserRequest, UpdateUserRequest } from '@/api'
+import type { Branch } from '@/types'
 import { useToast } from '@/composables'
 import { SearchableSelect } from '@/components/common'
 import { RcPageHeader, RcButton, RcEmpty, RcModal, RcAvatar, RcBadge, RcStatusPill, RcTableSkeleton } from '@/components/rc'
@@ -16,12 +17,20 @@ const editingUser = ref<UserResponse | null>(null)
 
 const toast = useToast()
 
+const branches = ref<Branch[]>([])
+
 const activeCount = computed(() => users.value.filter(u => u.active).length)
 
 const roleOptions: { value: UserRole; label: string }[] = [
   { value: 'OPERATOR', label: 'Operatör' },
   { value: 'ADMIN', label: 'Yönetici' },
 ]
+
+const branchOptions = computed(() =>
+  branches.value.map(branch => ({ value: branch.id, label: branch.name })),
+)
+
+const requiresBranch = computed(() => formData.value.role === 'OPERATOR')
 
 const formData = ref({
   username: '',
@@ -54,6 +63,15 @@ async function fetchUsers() {
   }
 }
 
+async function fetchBranches() {
+  try {
+    branches.value = await branchesApi.getActive()
+  } catch (err) {
+    toast.apiError(err, 'Şubeler yüklenemedi')
+    branches.value = []
+  }
+}
+
 function openCreateForm() {
   editingUser.value = null
   formData.value = {
@@ -83,6 +101,10 @@ function openEditForm(user: UserResponse) {
 }
 
 async function handleSubmit() {
+  if (requiresBranch.value && formData.value.branchId == null) {
+    toast.error('Operatör kullanıcılar için şube seçimi zorunludur')
+    return
+  }
   saving.value = true
   try {
     if (editingUser.value) {
@@ -130,7 +152,10 @@ function initials(name: string): string {
   return name.split(' ').filter(Boolean).map(s => s[0]).slice(0, 2).join('').toUpperCase()
 }
 
-onMounted(fetchUsers)
+onMounted(() => {
+  fetchUsers()
+  fetchBranches()
+})
 </script>
 
 <template>
@@ -251,6 +276,15 @@ onMounted(fetchUsers)
             placeholder="Rol seçin"
             search-placeholder="Ara…"
             :disabled="!!editingUser"
+          />
+        </label>
+        <label v-if="requiresBranch" class="rc-field">
+          <span class="rc-field__label">Şube</span>
+          <SearchableSelect
+            v-model="formData.branchId"
+            :options="branchOptions"
+            placeholder="Şube seçin"
+            search-placeholder="Şube ara…"
           />
         </label>
         <label v-if="!editingUser" class="rc-field">
