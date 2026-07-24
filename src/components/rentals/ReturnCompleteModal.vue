@@ -144,13 +144,12 @@ function initializePreviewAdjustments() {
 const estimatedFinalTotal = computed(() => {
   if (!preview.value || !rental.value) return 0
 
-  const baseRental = (rental.value.totalPrice || 0) - (rental.value.discountAmount || 0)
+  const baseRental = rental.value.grandTotal || 0
   const kmPenalty = moneyAmount(preview.value.kmPenalty)
-  const penaltyTotal = moneyAmount(preview.value.penaltyTotal)
   const damageTotal = moneyAmount(preview.value.damageTotal)
   const tollTotal = moneyAmount(preview.value.tollTotal)
 
-  let total = baseRental + kmPenalty + penaltyTotal + damageTotal + tollTotal
+  let total = baseRental + kmPenalty + damageTotal + tollTotal
   if (applyLateFee.value) total += lateFeeAmount.value
   if (applyFuelFee.value) total += fuelFeeAmount.value
   if (applyEarlyDiscount.value) total -= earlyDiscountAmount.value
