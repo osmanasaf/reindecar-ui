@@ -2948,6 +2948,11 @@
   color: var(--rc-text-muted);
 }
 
+.rcr-create .rcr-pricing-calc .breakdown-item .label-hint {
+  margin-left: 4px;
+  opacity: 0.75;
+}
+
 .rcr-create .rcr-pricing-calc .breakdown-item .value {
   font-weight: 500;
   color: var(--rc-text);
