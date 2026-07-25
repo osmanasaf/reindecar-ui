@@ -409,8 +409,12 @@ onMounted(async () => {
             <div v-if="form.rentalId && !fieldsLocked" class="span-2">
               <label class="rc-veh-modal-form__checkbox">
                 <input v-model="form.customerResponsible" type="checkbox" />
-                <span>Aktif kiralamaya bağla · müşteri sorumlu (alacak oluştur)</span>
+                <span>Aktif kiralamaya bağla · müşteri sorumlu</span>
               </label>
+              <p class="rc-veh-modal-form__checkbox-hint">
+                Alacak kaydı bu adımda oluşmaz; hasar “Onarıldı” olarak işaretlenip gerçek onarım
+                bedeli girildiğinde oluşturulur.
+              </p>
             </div>
           </div>
         </div>
