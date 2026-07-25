@@ -163,8 +163,8 @@ const formRules = computed(() => ({
   transmission: { value: form.value.transmission, rules: [rules.required()] },
   engineCapacity: { value: form.value.engineCapacity, rules: [rules.required(), rules.positive()] },
   seatCount: { value: form.value.seatCount, rules: [rules.required(), rules.minValue(1), rules.maxValue(50)] },
-  categoryId: { value: form.value.categoryId, rules: [rules.required('Kategori seçiniz')] },
-  branchId: { value: form.value.branchId, rules: [rules.required('Şube seçiniz')] },
+  categoryId: { value: form.value.categoryId, rules: [rules.requiredId('Kategori seçiniz')] },
+  branchId: { value: form.value.branchId, rules: [rules.requiredId('Şube seçiniz')] },
   currentKm: {
     value: form.value.currentKm,
     rules: [rules.required(), rules.minValue(minimumEditableKm.value, `KM cannot be lower than ${minimumEditableKm.value}`)]
