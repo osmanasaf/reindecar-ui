@@ -75,8 +75,8 @@ const formRules = computed(() => ({
     rules: [rules.required(), rules.minValue(minimumEditableKm.value, `KM cannot be lower than ${minimumEditableKm.value}`)]
   },
   dailyPrice: { value: form.value.dailyPrice, rules: [rules.required(), rules.positive()] },
-  categoryId: { value: form.value.categoryId, rules: [rules.required()] },
-  branchId: { value: form.value.branchId, rules: [rules.required('Şube seçiniz')] }
+  categoryId: { value: form.value.categoryId, rules: [rules.requiredId('Kategori seçiniz')] },
+  branchId: { value: form.value.branchId, rules: [rules.requiredId('Şube seçiniz')] }
 }))
 const { validateForm, getError, hasError, touch, reset } = useValidation(() => formRules.value)
 

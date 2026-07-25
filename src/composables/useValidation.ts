@@ -132,6 +132,15 @@ export const rules = {
         message
     }),
 
+    requiredId: (message = 'Bu alan zorunludur'): ValidationRule => ({
+        validate: (value) => {
+            if (value === null || value === undefined || value === '') return false
+            const id = Number(value)
+            return Number.isFinite(id) && id > 0
+        },
+        message
+    }),
+
     minLength: (min: number, message?: string): ValidationRule => ({
         validate: (value) => typeof value === 'string' && value.length >= min,
         message: message || `En az ${min} karakter olmalıdır`
