@@ -60,6 +60,11 @@ const customer = ref<Customer | null>(null)
 const branch = ref<Branch | null>(null)
 const returnBranch = ref<Branch | null>(null)
 
+function formatBranchLocation(target: Branch | null): string {
+  if (!target) return ''
+  return [target.city, target.district].filter((part) => part?.trim()).join(' / ')
+}
+
 const kmPackage = ref<KmPackage | null>(null)
 const drivers = ref<RentalDriver[]>([])
 const loading = ref(true)
@@ -789,12 +794,12 @@ onActivated(() => {
               <div class="branch-item">
                 <span class="label">Teslim şubesi</span>
                 <span class="value">{{ branch?.name || '—' }}</span>
-                <span v-if="branch" class="sub-value">{{ branch.city }} / {{ branch.district }}</span>
+                <span v-if="branch" class="sub-value">{{ formatBranchLocation(branch) }}</span>
               </div>
               <div class="branch-item">
                 <span class="label">İade şubesi</span>
                 <span class="value">{{ returnBranch?.name || '—' }}</span>
-                <span v-if="returnBranch" class="sub-value">{{ returnBranch.city }} / {{ returnBranch.district }}</span>
+                <span v-if="returnBranch" class="sub-value">{{ formatBranchLocation(returnBranch) }}</span>
               </div>
             </div>
           </div>
