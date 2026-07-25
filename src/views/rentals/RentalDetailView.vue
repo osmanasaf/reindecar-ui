@@ -1242,6 +1242,7 @@ onActivated(() => {
         <DamageDetailModal
           :damage="damageForModal(selectedDamage)"
           :visible="selectedDamage !== null"
+          :vehicle-id="selectedDamage?.vehicleId"
           @close="selectedDamage = null"
         />
 

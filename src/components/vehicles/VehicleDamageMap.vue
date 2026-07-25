@@ -466,6 +466,7 @@ onMounted(() => {
     <DamageDetailModal
       :damage="damageForDetailModal"
       :visible="damageForDetailModal !== null"
+      :vehicle-id="vehicleId"
       @close="damageForDetailModal = null"
       @edit="handleDamageDetailEdit"
     />
