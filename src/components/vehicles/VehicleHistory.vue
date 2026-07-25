@@ -193,6 +193,7 @@ onMounted(() => {
     <DamageDetailModal
       :damage="selectedDamage"
       :visible="selectedDamage !== null"
+      :vehicle-id="vehicleId"
       @close="closeModals"
     />
 
