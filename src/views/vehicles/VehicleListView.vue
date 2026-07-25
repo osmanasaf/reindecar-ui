@@ -487,11 +487,11 @@ const ganttDays = computed(() => {
   })
 })
 
-function dayIndexForDate(d: Date, windowStart: Date): number | null {
-  const ms = d.setHours(0, 0, 0, 0) - windowStart.setHours(0, 0, 0, 0)
-  const idx = Math.floor(ms / 86400000)
-  if (idx < 0 || idx >= GANTT_DAYS) return null
-  return idx
+function dayOffsetFromWindowStart(d: Date, windowStart: Date): number {
+  const day = new Date(d).setHours(0, 0, 0, 0)
+  const start = new Date(windowStart).setHours(0, 0, 0, 0)
+  if (Number.isNaN(day) || Number.isNaN(start)) return Number.NaN
+  return Math.floor((day - start) / 86400000)
 }
 
 function ganttBookings(v: Vehicle) {
@@ -501,13 +501,13 @@ function ganttBookings(v: Vehicle) {
 
   if (history?.rentals.length) {
     for (const r of history.rentals) {
-      const rs = new Date(r.startDate)
-      const re = new Date(r.actualReturnDate || r.endDate)
-      const startIdx = dayIndexForDate(new Date(rs), new Date(windowStart))
-      const endIdx = dayIndexForDate(new Date(re), new Date(windowStart))
-      if (startIdx === null && endIdx === null) continue
-      const start = startIdx ?? 0
-      const end = Math.min(GANTT_DAYS, (endIdx ?? GANTT_DAYS - 1) + 1)
+      const startOffset = dayOffsetFromWindowStart(new Date(r.startDate), windowStart)
+      const endOffset = dayOffsetFromWindowStart(new Date(r.actualReturnDate || r.endDate), windowStart)
+      if (Number.isNaN(startOffset) || Number.isNaN(endOffset)) continue
+      if (endOffset < startOffset) continue
+      if (endOffset < 0 || startOffset >= GANTT_DAYS) continue
+      const start = Math.max(0, startOffset)
+      const end = Math.min(GANTT_DAYS, endOffset + 1)
       if (end <= start) continue
       const st = String(r.status).toUpperCase()
       let type = 'rented'
