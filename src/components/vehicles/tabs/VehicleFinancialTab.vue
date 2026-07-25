@@ -3,7 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { vehiclesApi } from '@/api'
 import { useToast } from '@/composables'
 import { fmtTRY } from '@/utils/format'
-import type { VehicleHistory } from '@/types'
+import { RentalStatus, type VehicleHistory } from '@/types'
 import VehiclePaymentDetails from '@/components/installments/VehiclePaymentDetails.vue'
 
 const props = defineProps<{ vehicleId: number }>()
@@ -14,11 +14,19 @@ const loading = ref(false)
 
 const MONTH_LABELS = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara']
 
+const UNREALIZED_RENTAL_STATUSES: string[] = [RentalStatus.DRAFT, RentalStatus.CANCELLED]
+
+const revenueRentals = computed(() =>
+  (history.value?.rentals ?? []).filter(
+    (r) => !UNREALIZED_RENTAL_STATUSES.includes(String(r.status).toUpperCase())
+  )
+)
+
 const monthlyData = computed(() => {
   const buckets = Array.from({ length: 12 }, () => ({ rev: 0, cost: 0 }))
   if (!history.value) return buckets
 
-  for (const r of history.value.rentals) {
+  for (const r of revenueRentals.value) {
     const d = new Date(r.startDate)
     if (Number.isNaN(d.getTime())) continue
     const bucket = buckets[d.getMonth()]
@@ -100,8 +108,8 @@ onMounted(loadHistory)
         </div>
         <div class="rcv-stat">
           <div class="rcv-stat__label">Kiralama sayısı</div>
-          <div class="rcv-stat__value">{{ history?.rentals.length ?? 0 }}</div>
-          <div class="rcv-stat__sub">bu yıl kayıtlı</div>
+          <div class="rcv-stat__value">{{ revenueRentals.length }}</div>
+          <div class="rcv-stat__sub">taslak/iptal hariç</div>
         </div>
       </div>
 
