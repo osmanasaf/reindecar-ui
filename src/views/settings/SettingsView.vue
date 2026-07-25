@@ -195,6 +195,8 @@ onMounted(async () => {
   const tab = route.query.tab
   if (tab === 'features' && authStore.isAdmin) {
     activeTab.value = 'features'
+  } else if (tab === 'document-templates') {
+    activeTab.value = 'document-templates'
   }
 
   const fullName = authStore.user?.fullName || ''

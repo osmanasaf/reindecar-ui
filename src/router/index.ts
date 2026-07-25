@@ -107,6 +107,18 @@ const router = createRouter({
             meta: { requiresAuth: true }
         },
         {
+            path: '/rentals/:rentalId/documents/:documentType',
+            name: 'document-editor',
+            component: () => import('@/views/documents/DocumentEditorView.vue'),
+            meta: { requiresAuth: true }
+        },
+        {
+            path: '/settings/templates/:templateId',
+            name: 'template-editor',
+            component: () => import('@/views/documents/DocumentEditorView.vue'),
+            meta: { requiresAuth: true }
+        },
+        {
             path: '/branches',
             name: 'branches',
             component: () => import('@/views/branches/BranchListView.vue'),

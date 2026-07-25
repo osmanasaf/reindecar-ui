@@ -62,9 +62,21 @@ class ContractsApiService extends BaseApi {
         return this.post<ContractDetail>(`/${id}/sign`, payload)
     }
 
+    async newVersion(id: number): Promise<ContractDetail> {
+        return this.post<ContractDetail>(`/${id}/new-version`)
+    }
+
     async cancel(id: number): Promise<void> {
         await this.post(`/${id}/cancel`)
     }
+}
+
+export interface CreateContractTemplatePayload {
+    code: string
+    name: string
+    rentalType: string
+    documentType: ContractDocumentType
+    content: string
 }
 
 class ContractTemplatesApiService extends BaseApi {
@@ -72,6 +84,10 @@ class ContractTemplatesApiService extends BaseApi {
 
     async findByDocumentType(documentType: ContractDocumentType): Promise<ContractTemplateSummary> {
         return this.get<ContractTemplateSummary>(`/by-document-type/${documentType}`)
+    }
+
+    async create(payload: CreateContractTemplatePayload): Promise<ContractTemplateDetail> {
+        return this.post<ContractTemplateDetail>('', payload)
     }
 
     async findAll(): Promise<ContractTemplateDetail[]> {
@@ -84,6 +100,10 @@ class ContractTemplatesApiService extends BaseApi {
 
     async updateContent(id: number, content: string): Promise<ContractTemplateDetail> {
         return this.put<ContractTemplateDetail>(`/${id}/content`, { content })
+    }
+
+    async rename(id: number, name: string): Promise<ContractTemplateDetail> {
+        return this.put<ContractTemplateDetail>(`/${id}/name`, { name })
     }
 
     async activate(id: number): Promise<void> {
@@ -111,5 +131,28 @@ class ContractTemplatesApiService extends BaseApi {
     }
 }
 
+export interface ContractClause {
+    id: number
+    text: string
+    sortOrder: number
+}
+
+class ContractClausesApiService extends BaseApi {
+    protected readonly basePath = '/contract-clauses'
+
+    async list(): Promise<ContractClause[]> {
+        return this.get<ContractClause[]>('')
+    }
+
+    async create(text: string): Promise<ContractClause> {
+        return this.post<ContractClause>('', { text })
+    }
+
+    async remove(id: number): Promise<void> {
+        await this.deleteByPath(`/${id}`)
+    }
+}
+
 export const contractsApi = new ContractsApiService()
 export const contractTemplatesApi = new ContractTemplatesApiService()
+export const contractClausesApi = new ContractClausesApiService()

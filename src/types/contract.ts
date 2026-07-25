@@ -30,7 +30,7 @@ export interface ContractTemplateDetail {
     rentalType: string
     documentType: ContractDocumentType
     content: string
-    templateVersion: number
+    version: number
     active: boolean
     terms: ContractTermDetail[]
     createdAt: string
@@ -48,8 +48,8 @@ export interface ContractDetail {
     signedAt: string | null
     signedBy: string | null
     signatureMethod: string | null
-    expired: boolean
-    signed: boolean
+    isExpired: boolean
+    isSigned: boolean
     createdAt: string
 }
 
