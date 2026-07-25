@@ -43,7 +43,18 @@ const canCalculate = computed(() => {
 })
 
 
+const unitPriceValue = computed(() => {
+  if (!priceData.value) return 0
+  return priceData.value.unitPrice || priceData.value.dailyPrice
+})
+
+const isDailyUnitPrice = computed(() => {
+  if (props.rentalType === 'DAILY') return true
+  return !!priceData.value && unitPriceValue.value === priceData.value.dailyPrice
+})
+
 const unitPriceLabel = computed(() => {
+  if (isDailyUnitPrice.value) return 'Günlük birim fiyat'
   switch (props.rentalType) {
     case 'LEASING':
     case 'MONTHLY':
@@ -51,15 +62,15 @@ const unitPriceLabel = computed(() => {
       return 'Aylık Fiyat'
     case 'WEEKLY':
       return 'Haftalık Fiyat'
-    case 'DAILY':
     default:
-      return 'Günlük Fiyat'
+      return 'Günlük birim fiyat'
   }
 })
 
-const unitPriceValue = computed(() => {
-  if (!priceData.value) return 0
-  return priceData.value.unitPrice || priceData.value.dailyPrice
+const unitPriceHint = computed(() => {
+  if (!isDailyUnitPrice.value || props.openEnded) return ''
+  const days = priceData.value?.totalDays ?? 0
+  return days > 0 ? `× ${days} gün` : ''
 })
 
 const kmPackageDisplayLabel = computed(() => {
@@ -237,7 +248,10 @@ watch([() => props.vehicleId, () => props.startDate, () => props.endDate, () => 
 
         <div class="breakdown-list">
           <div class="breakdown-item base">
-            <span class="label">{{ unitPriceLabel }}</span>
+            <span class="label">
+              {{ unitPriceLabel }}
+              <span v-if="unitPriceHint" class="label-hint">{{ unitPriceHint }}</span>
+            </span>
             <span class="value">{{ formatCurrency(unitPriceValue) }}</span>
           </div>
 
