@@ -222,7 +222,7 @@ async function loadUpcomingMaintenance() {
   try {
     if (!featuresLoaded.value) await loadFeatures()
     if (!isEnabled('MAINTENANCE_REMINDERS')) return
-    upcomingMaintenance.value = await maintenanceSchedulesApi.getUpcoming()
+    upcomingMaintenance.value = (await maintenanceSchedulesApi.getUpcoming()) ?? null
   } catch (error: unknown) {
     console.error('[Dashboard] Failed to load upcoming maintenance', error)
     upcomingMaintenance.value = null

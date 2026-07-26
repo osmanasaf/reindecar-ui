@@ -62,10 +62,10 @@ async function load() {
   loading.value = true
   loadError.value = false
   try {
-    items.value = await maintenanceSchedulesApi.getUpcoming({
+    items.value = (await maintenanceSchedulesApi.getUpcoming({
       days: selectedDays.value ?? undefined,
       types: typeFilter.value ? [typeFilter.value] : undefined,
-    })
+    })) ?? []
   } catch {
     loadError.value = true
   } finally {

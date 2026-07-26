@@ -68,7 +68,7 @@ function kmText(km: number): string {
 async function loadSchedules() {
   loading.value = true
   try {
-    schedules.value = await maintenanceSchedulesApi.getByVehicle(props.vehicleId)
+    schedules.value = (await maintenanceSchedulesApi.getByVehicle(props.vehicleId)) ?? []
   } catch (error: unknown) {
     toast.apiError(error, 'Bakım planları yüklenemedi')
   } finally {
