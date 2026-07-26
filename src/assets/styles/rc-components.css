@@ -755,19 +755,24 @@
 }
 
 /* ───────── Page & list transitions ───────── */
-.rc-page-enter-active {
-  transition: opacity var(--rc-dur-base) var(--rc-ease-out),
-              transform var(--rc-dur-base) var(--rc-ease-out);
+/* Sayfa girişi bilinçli olarak <Transition> yerine saf CSS animation:
+   Vue'nun class tabanlı transition'ı görünürlüğü JS callback'lerinde
+   (requestAnimationFrame) tutar; callback düşerse ya da geçiş yarıda
+   kesilirse `-enter-from` sınıfı kaldırılmaz, sayfa kalıcı olarak
+   opacity:0 kalır ve `mode="out-in"` yeni sayfayı hiç mount etmez.
+   CSS animation'da böyle bir JS durumu yoktur. */
+.rc-app__scroll > * {
+  animation: rc-page-in var(--rc-dur-base) var(--rc-ease-out);
 }
-.rc-page-enter-from {
-  opacity: 0;
-  transform: translateY(6px);
-}
-.rc-page-leave-active {
-  transition: opacity var(--rc-dur-fast) var(--rc-ease-out);
-}
-.rc-page-leave-to {
-  opacity: 0;
+@keyframes rc-page-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .rc-list-enter-active {
@@ -875,8 +880,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .rc-page-enter-active,
-  .rc-page-leave-active,
+  .rc-app__scroll > * {
+    animation: none !important;
+  }
   .rc-list-enter-active,
   .rc-list-leave-active,
   .rc-list-move,
