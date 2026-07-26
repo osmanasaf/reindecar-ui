@@ -6,6 +6,7 @@ import type { VehicleMaintenanceMap, MaintenanceRecord } from '@/types'
 import { RcButton } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
 import MaintenanceDetailModal from './MaintenanceDetailModal.vue'
+import VehicleScheduleSummary from '@/components/maintenance/VehicleScheduleSummary.vue'
 
 const props = defineProps<{
   vehicleId: number
@@ -45,33 +46,18 @@ const currentPct = computed(() =>
 )
 
 const timelineTicks = computed(() => {
-  const ticks = sortedByKm.value.map(m => ({
-    id: m.id,
-    km: m.currentKm,
-    label: formatKmShort(m.currentKm),
-    date: formatDate(m.maintenanceDate),
-    done: m.currentKm <= props.currentKm,
-    upcoming: false
-  }))
-
-  const nextInterval = Math.ceil(props.currentKm / 10000) * 10000
-  if (nextInterval <= maxScaleKm.value && !ticks.some(t => t.km === nextInterval)) {
-    const kmLeft = nextInterval - props.currentKm
-    ticks.push({
-      id: -1,
-      km: nextInterval,
-      label: formatKmShort(nextInterval),
-      date: kmLeft <= 15000 ? `≈ ${Math.ceil(kmLeft / 1000)}k km` : 'Yakında',
-      done: false,
-      upcoming: true
-    })
-  }
-
-  return ticks.sort((a, b) => a.km - b.km)
+  return sortedByKm.value
+    .map(m => ({
+      id: m.id,
+      km: m.currentKm,
+      label: formatKmShort(m.currentKm),
+      date: formatDate(m.maintenanceDate),
+      done: m.currentKm <= props.currentKm
+    }))
+    .sort((a, b) => a.km - b.km)
 })
 
-const doneCount = computed(() => timelineTicks.value.filter(t => t.done && t.id > 0).length)
-const upcomingCount = computed(() => timelineTicks.value.filter(t => t.upcoming).length)
+const doneCount = computed(() => timelineTicks.value.filter(t => t.done).length)
 
 const yearMaintenanceCost = computed(() => {
   const yearAgo = new Date()
@@ -79,11 +65,6 @@ const yearMaintenanceCost = computed(() => {
   return sortedMaintenances.value
     .filter(m => new Date(m.maintenanceDate) >= yearAgo)
     .reduce((sum, m) => sum + (m.costAmount || 0), 0)
-})
-
-const kmToNextService = computed(() => {
-  const next = timelineTicks.value.find(t => t.upcoming)
-  return next ? Math.max(0, next.km - props.currentKm) : 0
 })
 
 watch(sortedMaintenances, (list) => {
@@ -164,9 +145,6 @@ function tickPct(km: number): number {
             <div class="rcv-mt__title">Bakım Yolculuğu</div>
             <div class="rcv-mt__sub">
               Şu an <b>{{ formatKm(currentKm) }}</b>'desin
-              <template v-if="kmToNextService > 0">
-                · sonraki bakıma <b>{{ formatKm(kmToNextService) }}</b> kaldı
-              </template>
             </div>
           </div>
           <RcButton variant="ghost" size="sm" @click="emit('add-maintenance')">
@@ -181,10 +159,7 @@ function tickPct(km: number): number {
           <template v-for="tick in timelineTicks" :key="`${tick.km}-${tick.id}`">
             <div
               class="rcv-mt__tick"
-              :class="{
-                'rcv-mt__tick--done': tick.done,
-                'rcv-mt__tick--upcoming': tick.upcoming
-              }"
+              :class="{ 'rcv-mt__tick--done': tick.done }"
               :style="{ left: `${tickPct(tick.km)}%` }"
             />
             <div class="rcv-mt__tick-label" :style="{ left: `${tickPct(tick.km)}%` }">
@@ -207,16 +182,14 @@ function tickPct(km: number): number {
             <span class="rcv-mt__legend-dot rcv-mt__legend-dot--current" />
             Şu an
           </div>
-          <div v-if="upcomingCount" class="rcv-mt__legend-item">
-            <span class="rcv-mt__legend-dot rcv-mt__legend-dot--upcoming" />
-            Yaklaşan ({{ upcomingCount }})
-          </div>
           <span class="rcv-mt__legend-cost">
             Bu yıl bakım maliyeti:
             <b>{{ formatCurrency(yearMaintenanceCost, 'TRY') }}</b>
           </span>
         </div>
       </div>
+
+      <VehicleScheduleSummary :vehicle-id="vehicleId" :current-km="currentKm" />
 
       <div class="rc-card">
         <div class="rc-card__head">

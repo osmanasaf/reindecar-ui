@@ -6,6 +6,8 @@ export { customersApi } from './customers.api'
 export { driversApi } from './drivers.api'
 export { damagesApi } from './damages.api'
 export { maintenancesApi } from './maintenances.api'
+export { maintenanceSchedulesApi } from './maintenance-schedules.api'
+export type { UpcomingMaintenanceParams } from './maintenance-schedules.api'
 export { rentalsApi, kmPackagesApi, leasingKmApi } from './rentals.api'
 export { branchesApi } from './branches.api'
 export {

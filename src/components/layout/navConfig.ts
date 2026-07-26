@@ -30,6 +30,7 @@ export const navSections: NavSection[] = [
     items: [
       { name: 'service-manifests', label: 'UETDS Manifestoları', icon: 'globe', featureKey: 'UETDS_MANIFESTS' },
       { name: 'kabis-notifications', label: 'KABİS Bildirimleri', icon: 'shield', featureKey: 'KABIS_NOTIFICATIONS' },
+      { name: 'maintenance', label: 'Bakım Takibi', icon: 'wrench', featureKey: 'MAINTENANCE_REMINDERS' },
     ],
   },
   {
@@ -164,6 +165,10 @@ export function isNavItemActive(routeName: string | undefined, path: string, ite
     return routeName === 'kabis-notifications'
       || routeName === 'kabis-notification-detail'
       || path.startsWith('/kabis/notifications')
+  }
+
+  if (itemName === 'maintenance') {
+    return routeName === 'maintenance' || path.startsWith('/maintenance')
   }
 
   if (itemName === 'settings') {

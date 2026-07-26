@@ -32,6 +32,7 @@ function resolveRoute(n: NotificationResponse): string | null {
   if (type === 'VEHICLE') return `/vehicles/${n.referenceId}`
   if (type === 'RENTAL') return `/rentals/${n.referenceId}`
   if (type === 'CUSTOMER') return `/customers/${n.referenceId}`
+  if (type === 'MAINTENANCE_SCHEDULE') return '/maintenance'
   return null
 }
 

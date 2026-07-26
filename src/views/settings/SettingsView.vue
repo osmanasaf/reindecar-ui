@@ -5,7 +5,7 @@ import { useAuthStore } from '@/stores'
 import { useAppSettingsStore } from '@/stores/appSettings.store'
 import { useFeaturesStore } from '@/stores/features.store'
 import { useToast } from '@/composables'
-import { usersApi } from '@/api'
+import { usersApi, tenantSettingsApi } from '@/api'
 import { RcPageHeader, RcButton, RcField, RcTabs, RcSkeletonText } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
 import type { IconName } from '@/components/icons/iconPaths'
@@ -78,6 +78,11 @@ const currencyOptions = [
 const selectedCurrency = ref('TRY')
 const savingCurrency = ref(false)
 
+const REMINDER_DAYS_MIN = 1
+const REMINDER_DAYS_MAX = 90
+const maintenanceReminderDays = ref<number | null>(null)
+const savingReminderDays = ref(false)
+
 const currencyPreviewRows = computed(() => {
   const fmt = (value: number) => {
     try {
@@ -106,7 +111,7 @@ const accountItems: NavItemMeta[] = [
 ]
 
 const systemItems: NavItemMeta[] = [
-  { id: 'general', label: 'Genel', desc: 'Para birimi ve bölgesel ayarlar', icon: 'sliders', keywords: 'genel para birimi currency bölge dil try usd euro' },
+  { id: 'general', label: 'Genel', desc: 'Para birimi ve bölgesel ayarlar', icon: 'sliders', keywords: 'genel para birimi currency bölge dil try usd euro bakım hatırlatma' },
   { id: 'branding', label: 'Firma / Marka', desc: 'Logo, renk ve firma bilgileri', icon: 'building', keywords: 'firma marka logo renk kurumsal branding' },
   { id: 'document-templates', label: 'Belge Şablonları', desc: 'Sözleşme ve fatura şablonları', icon: 'edit', keywords: 'belge şablon sözleşme fatura döküman template' },
   { id: 'features', label: 'Modüller', desc: 'Aktif modülleri yönet', icon: 'sparkle', keywords: 'modül özellik feature aktif' },
@@ -213,10 +218,20 @@ onMounted(async () => {
   if (authStore.isAdmin) {
     await appSettingsStore.loadSettings()
     selectedCurrency.value = appSettingsStore.defaultCurrency
+    await fetchMaintenanceReminderDays()
     await featuresStore.loadFeatures()
     animateModuleCount()
   }
 })
+
+async function fetchMaintenanceReminderDays() {
+  try {
+    const settings = await tenantSettingsApi.getSettings()
+    maintenanceReminderDays.value = settings.maintenanceReminderDays
+  } catch {
+    maintenanceReminderDays.value = null
+  }
+}
 
 onBeforeUnmount(() => {
   if (loadTimer) clearTimeout(loadTimer)
@@ -298,6 +313,27 @@ async function handleNotificationSave() {
     toast.error(err.message || 'Ayarlar kaydedilirken hata oluştu')
   } finally {
     loading.value = false
+  }
+}
+
+async function handleReminderDaysSave() {
+  const days = maintenanceReminderDays.value
+  if (typeof days !== 'number' || days < REMINDER_DAYS_MIN || days > REMINDER_DAYS_MAX) {
+    toast.error(`Hatırlatma penceresi ${REMINDER_DAYS_MIN}-${REMINDER_DAYS_MAX} gün arasında olmalıdır`)
+    return
+  }
+  savingReminderDays.value = true
+  try {
+    const updated = await tenantSettingsApi.updateSettings({
+      defaultCurrency: appSettingsStore.defaultCurrency,
+      maintenanceReminderDays: days,
+    })
+    maintenanceReminderDays.value = updated.maintenanceReminderDays
+    toast.success('Bakım hatırlatma ayarı kaydedildi')
+  } catch (error: unknown) {
+    toast.apiError(error, 'Bakım hatırlatma ayarı kaydedilemedi')
+  } finally {
+    savingReminderDays.value = false
   }
 }
 
@@ -499,6 +535,27 @@ async function handleCurrencySave() {
 
               <div class="rcs-foot">
                 <RcButton type="submit" variant="primary" :loading="savingCurrency">Kaydet</RcButton>
+              </div>
+            </form>
+
+            <form @submit.prevent="handleReminderDaysSave">
+              <div class="rcs-form-grid">
+                <RcField
+                  label="Bakım hatırlatma penceresi (gün)"
+                  hint="Bakım bildirimleri bu kadar gün önceden oluşturulur"
+                >
+                  <input
+                    v-model.number="maintenanceReminderDays"
+                    type="number"
+                    class="rc-input"
+                    :min="REMINDER_DAYS_MIN"
+                    :max="REMINDER_DAYS_MAX"
+                    required
+                  />
+                </RcField>
+              </div>
+              <div class="rcs-foot">
+                <RcButton type="submit" variant="primary" :loading="savingReminderDays">Kaydet</RcButton>
               </div>
             </form>
           </template>

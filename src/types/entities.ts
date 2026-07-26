@@ -796,6 +796,76 @@ export interface RentalDetailResponse {
     tolls: TollRecord[]
 }
 
+export type MaintenanceScheduleType = 'KM_BASED' | 'TIME_BASED' | 'HYBRID'
+
+export type MaintenanceScheduleStatus = 'SCHEDULED' | 'DUE' | 'COMPLETED' | 'OVERDUE' | 'CANCELLED'
+
+export const MAINTENANCE_SCHEDULE_TYPE_LABELS: Record<MaintenanceScheduleType, string> = {
+    KM_BASED: 'Km Bazlı',
+    TIME_BASED: 'Süre Bazlı',
+    HYBRID: 'Hibrit',
+}
+
+export const MAINTENANCE_SCHEDULE_STATUS_LABELS: Record<MaintenanceScheduleStatus, string> = {
+    SCHEDULED: 'Planlı',
+    DUE: 'Zamanı Geldi',
+    COMPLETED: 'Tamamlandı',
+    OVERDUE: 'Gecikti',
+    CANCELLED: 'İptal Edildi',
+}
+
+export type MaintenanceScheduleBadgeVariant = 'info' | 'warning' | 'danger' | 'success' | 'default'
+
+export const MAINTENANCE_SCHEDULE_STATUS_VARIANTS: Record<MaintenanceScheduleStatus, MaintenanceScheduleBadgeVariant> = {
+    SCHEDULED: 'info',
+    DUE: 'warning',
+    OVERDUE: 'danger',
+    COMPLETED: 'success',
+    CANCELLED: 'default',
+}
+
+export interface MaintenanceSchedule {
+    id: number
+    rentalId: number | null
+    vehicleId: number
+    maintenanceType: MaintenanceType
+    scheduleType: MaintenanceScheduleType
+    nextMaintenanceKm: number | null
+    nextMaintenanceDate: string | null
+    lastMaintenanceKm: number | null
+    lastMaintenanceDate: string | null
+    maintenanceIntervalKm: number | null
+    maintenanceIntervalDays: number | null
+    reminderSent: boolean
+    status: MaintenanceScheduleStatus
+    notes: string | null
+    createdAt: string
+}
+
+export interface CompletableSchedule {
+    scheduleId: number
+    vehicleCurrentKm: number
+    plateNumber?: string
+    brand?: string
+    model?: string
+}
+
+export interface UpcomingMaintenance {
+    scheduleId: number
+    vehicleId: number
+    plateNumber: string
+    brand: string
+    model: string
+    maintenanceType: MaintenanceType
+    scheduleType: MaintenanceScheduleType
+    status: MaintenanceScheduleStatus
+    nextMaintenanceDate: string | null
+    nextMaintenanceKm: number | null
+    vehicleCurrentKm: number
+    daysRemaining: number | null
+    kmRemaining: number | null
+}
+
 export interface TollRecord {
     id: number
     tollNumber: string

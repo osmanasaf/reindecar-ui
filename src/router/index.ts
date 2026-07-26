@@ -270,6 +270,12 @@ const router = createRouter({
             meta: { requiresAuth: true, featureKey: 'KABIS_NOTIFICATIONS' }
         },
         {
+            path: '/maintenance',
+            name: 'maintenance',
+            component: () => import('@/views/maintenance/MaintenanceScheduleView.vue'),
+            meta: { requiresAuth: true, featureKey: 'MAINTENANCE_REMINDERS' }
+        },
+        {
             path: '/admin/tenants',
             name: 'admin-tenants',
             component: () => import('@/views/admin/AdminTenantListView.vue'),

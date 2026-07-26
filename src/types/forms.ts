@@ -1,4 +1,5 @@
 import type { RentalType, PaymentMethod, KmRecordSource, DiscountType, CalculationType, CustomerType, DamageType, DamageLocation, DamageSeverity, MaintenanceType, FuelType, Transmission } from './enums'
+import type { MaintenanceScheduleType } from './entities'
 
 
 export interface LoginForm {
@@ -156,6 +157,9 @@ export interface CreateRentalForm {
 
 export interface UpdateVehicleDetailsForm {
     hasUtts?: boolean
+    nextServiceDate?: string | null
+    nextServiceKm?: number | null
+    nextTireChangeDate?: string | null
 }
 
 export interface RecordVehicleLocationForm {
@@ -272,6 +276,23 @@ export interface CreateMaintenanceRecordForm {
     affectedZones?: number[]
     partsReplaced?: string[]
     paintColor?: string
+}
+
+export interface CreateMaintenanceScheduleForm {
+    scheduleType: MaintenanceScheduleType
+    maintenanceType?: MaintenanceType
+    intervalKm?: number
+    intervalDays?: number
+    currentKm?: number
+    notes?: string
+}
+
+export interface UpdateMaintenanceScheduleForm {
+    intervalKm?: number
+    intervalDays?: number
+    nextMaintenanceKm?: number
+    nextMaintenanceDate?: string
+    notes?: string
 }
 
 export interface CreateKmPackageForm {

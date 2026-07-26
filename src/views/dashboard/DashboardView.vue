@@ -17,12 +17,12 @@ import {
   RcListSkeleton,
   RcError,
 } from '@/components/rc'
-import { useDashboardStats, useToast, usePermissions } from '@/composables'
+import { useDashboardStats, useToast, usePermissions, useFeatures } from '@/composables'
 import { useAuthStore } from '@/stores'
-import { receivablesApi, payablesApi } from '@/api'
+import { receivablesApi, payablesApi, maintenanceSchedulesApi } from '@/api'
 import { fmtTRY, formatDate } from '@/utils/format'
 import type { UpcomingReturn } from '@/api'
-import type { Rental, ReceivableResponse, PayableResponse } from '@/types'
+import type { Rental, ReceivableResponse, PayableResponse, UpcomingMaintenance } from '@/types'
 import type { IconName } from '@/components/icons/iconPaths'
 
 const REVENUE_PERIOD_OPTIONS = [
@@ -43,6 +43,7 @@ const router = useRouter()
 const toast = useToast()
 const authStore = useAuthStore()
 const { canViewRevenue } = usePermissions()
+const { isEnabled, loaded: featuresLoaded, loadFeatures } = useFeatures()
 const {
   stats,
   revenue,
@@ -62,6 +63,7 @@ const selectedRentalId = ref<number | null>(null)
 const receivableRows = ref<ReceivableResponse[]>([])
 const payableRows = ref<PayableResponse[]>([])
 const accountingRowsLoading = ref(false)
+const upcomingMaintenance = ref<UpcomingMaintenance[] | null>(null)
 
 interface KpiCard {
   id: string
@@ -197,8 +199,35 @@ const kpiCards = computed<KpiCard[]>(() => {
       spark: revValues.length >= 2 ? revValues.slice(-8) : undefined,
       sparkColor: a?.netPositive ? 'var(--rc-success-500)' : 'var(--rc-danger-500)',
     },
+    ...(maintenanceKpi.value ? [maintenanceKpi.value] : []),
   ]
 })
+
+const maintenanceKpi = computed<KpiCard | null>(() => {
+  if (!isEnabled('MAINTENANCE_REMINDERS')) return null
+  const list = upcomingMaintenance.value
+  if (list === null) return null
+  return {
+    id: 'maintenance',
+    label: 'Bakımı Yaklaşan',
+    value: String(list.length),
+    sub: 'araç',
+    icon: 'wrench',
+    alert: list.some((item) => item.status === 'OVERDUE' || (item.daysRemaining != null && item.daysRemaining < 0)),
+    route: '/maintenance',
+  }
+})
+
+async function loadUpcomingMaintenance() {
+  try {
+    if (!featuresLoaded.value) await loadFeatures()
+    if (!isEnabled('MAINTENANCE_REMINDERS')) return
+    upcomingMaintenance.value = await maintenanceSchedulesApi.getUpcoming()
+  } catch (error: unknown) {
+    console.error('[Dashboard] Failed to load upcoming maintenance', error)
+    upcomingMaintenance.value = null
+  }
+}
 
 // Redesign (data.jsx / page-dashboard.jsx): tüm kategoriler her zaman gösterilir; 0 sayılı satırlar da legend'da kalır.
 const fleetItems = computed(() => {
@@ -289,6 +318,7 @@ function go(route?: string): void {
 watch(revenuePeriod, (months) => fetchRevenue(months))
 
 onMounted(async () => {
+  void loadUpcomingMaintenance()
   await fetchAll(revenuePeriod.value)
   fetchAccountingRows()
 })

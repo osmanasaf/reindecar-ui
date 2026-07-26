@@ -7,6 +7,7 @@ export interface TenantSettings {
     taxNumber: string
     logoUrl: string | null
     defaultCurrency: string
+    maintenanceReminderDays: number
 }
 
 class TenantSettingsApiService extends BaseApi {
