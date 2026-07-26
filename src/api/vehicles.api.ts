@@ -167,6 +167,10 @@ class VehiclesApiService extends BaseApi {
     }
 }
 
+export interface UpdateVehicleCategoryPayload extends Partial<VehicleCategory> {
+    clearRequiredLicenseClass?: boolean
+}
+
 class VehicleCategoriesApiService extends BaseApi {
     protected readonly basePath = '/vehicle-categories'
 
@@ -186,7 +190,7 @@ class VehicleCategoriesApiService extends BaseApi {
         return this.post('', category)
     }
 
-    async update(id: number, category: Partial<VehicleCategory>): Promise<VehicleCategory> {
+    async update(id: number, category: UpdateVehicleCategoryPayload): Promise<VehicleCategory> {
         return this.put(`/${id}`, category)
     }
 
