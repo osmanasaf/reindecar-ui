@@ -92,9 +92,7 @@ onBeforeUnmount(() => {
           label="Yükleniyor…"
         />
         <RouterView v-else v-slot="{ Component }">
-          <Transition name="rc-page" mode="out-in">
-            <component :is="Component" :key="route.path" />
-          </Transition>
+          <component :is="Component" :key="route.path" />
         </RouterView>
       </main>
     </div>
