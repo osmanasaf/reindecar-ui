@@ -23,13 +23,6 @@ const DAY_PRESETS = [7, 30, 90]
 const CUSTOM_DAYS_MIN = 1
 const CUSTOM_DAYS_MAX = 365
 
-/**
- * Kalan çubuklarının doluluk oranı için referans aralık.
- * `UpcomingMaintenance` planın gerçek bakım aralığını taşımadığı için
- * oran bu tipik aralıklara göre yaklaşık hesaplanır.
- */
-const APPROX_INTERVAL_DAYS = 180
-const APPROX_INTERVAL_KM = 10_000
 const BAR_MIN_PCT = 4
 const BAR_MAX_PCT = 100
 
@@ -75,7 +68,8 @@ const BAR_LABEL_COLOR: Record<BarTone, string> = {
 
 type RemainingBar = {
   key: 'days' | 'km'
-  pct: number
+  /** Planın bakım aralığı bilinmiyorsa null — çubuk çizilmez, yalnız etiket gösterilir. */
+  pct: number | null
   fill: string
   labelColor: string
   label: string
@@ -157,7 +151,9 @@ const rows = computed<MaintenanceRow[]>(() =>
   })),
 )
 
-function barPercent(remaining: number, interval: number): number {
+/** Aralığın ne kadarının tükendiği; aralık bilinmiyorsa oran hesaplanamaz. */
+function barPercent(remaining: number, interval: number | null): number | null {
+  if (interval == null || interval <= 0) return null
   const consumed = ((interval - remaining) / interval) * 100
   return Math.min(BAR_MAX_PCT, Math.max(BAR_MIN_PCT, Math.round(consumed)))
 }
@@ -174,7 +170,7 @@ function daysBar(item: UpcomingMaintenance): RemainingBar | null {
   const tone = daysTone(item)
   return {
     key: 'days',
-    pct: barPercent(days, APPROX_INTERVAL_DAYS),
+    pct: barPercent(days, item.maintenanceIntervalDays),
     fill: BAR_FILL[tone],
     labelColor: BAR_LABEL_COLOR[tone],
     label: days < 0 ? `${-days} gün gecikti` : `${days} gün kaldı`,
@@ -187,7 +183,7 @@ function kmBar(item: UpcomingMaintenance): RemainingBar | null {
   const tone: BarTone = km < 0 ? 'late' : 'ahead'
   return {
     key: 'km',
-    pct: barPercent(km, APPROX_INTERVAL_KM),
+    pct: barPercent(km, item.maintenanceIntervalKm),
     fill: BAR_FILL[tone],
     labelColor: BAR_LABEL_COLOR[tone],
     label: km < 0 ? `${fmtNum(-km)} km aşıldı` : `${fmtNum(km)} km kaldı`,
@@ -405,10 +401,16 @@ onMounted(() => {
           </span>
           <span class="msv-remaining">
             <span v-for="bar in row.bars" :key="bar.key" class="msv-bar">
-              <span class="msv-bar__track" aria-hidden="true">
+              <span v-if="bar.pct != null" class="msv-bar__track" aria-hidden="true">
                 <span class="msv-bar__fill" :style="{ width: `${bar.pct}%`, background: bar.fill }" />
               </span>
-              <span class="msv-bar__label" :style="{ color: bar.labelColor }">{{ bar.label }}</span>
+              <span
+                class="msv-bar__label"
+                :class="{ 'msv-bar__label--solo': bar.pct == null }"
+                :style="{ color: bar.labelColor }"
+              >
+                {{ bar.label }}
+              </span>
             </span>
             <span v-if="row.bars.length === 0" class="msv-muted">—</span>
           </span>
@@ -724,6 +726,11 @@ onMounted(() => {
   font-weight: 500;
   text-align: right;
   white-space: nowrap;
+}
+/* Bakım aralığı bilinmeyen planda çubuk yok; etiket hücreyi kaplar. */
+.msv-bar__label--solo {
+  flex: 1;
+  text-align: left;
 }
 
 .msv-actions {
