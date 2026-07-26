@@ -102,6 +102,10 @@ function openEdit(category: VehicleCategory) {
   showModal.value = true
 }
 
+function selectRequiredLicenseClass(value: number | null) {
+  form.value.requiredLicenseClassId = value ?? undefined
+}
+
 async function save() {
   if (!form.value.name.trim()) {
     toast.error('Kategori adı zorunludur')
@@ -119,6 +123,7 @@ async function save() {
         description: form.value.description.trim() || undefined,
         defaultDailyPrice: form.value.defaultDailyPrice || undefined,
         requiredLicenseClassId: form.value.requiredLicenseClassId,
+        clearRequiredLicenseClass: form.value.requiredLicenseClassId == null,
         sortOrder: form.value.sortOrder || undefined,
       })
       toast.success('Kategori güncellendi')
@@ -266,7 +271,7 @@ onMounted(() => {
             placeholder="Sınıf seçin (opsiyonel)"
             search-placeholder="Ara..."
             clearable
-            @update:model-value="form.requiredLicenseClassId = ($event as number | undefined) ?? undefined"
+            @update:model-value="selectRequiredLicenseClass"
           />
         </RcField>
         <div class="rcs-modal-grid">
