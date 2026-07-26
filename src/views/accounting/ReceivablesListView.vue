@@ -448,7 +448,7 @@ const showList = computed(() => {
     </div>
 
     <PaymentModal
-      :show="showPaymentModal"
+      :open="showPaymentModal"
       :remaining-amount="selectedReceivableAmount"
       :receivable-number="selectedReceivableNumber"
       title="Tahsilat kaydet"

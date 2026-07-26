@@ -9,8 +9,7 @@ import { RcModal, RcButton, RcField, RcInput } from '@/components/rc'
 import { useAccountingStore } from '@/stores'
 
 interface Props {
-  show?: boolean
-  open?: boolean
+  open: boolean
   sourceId?: number
   sourceType?: string
   defaultDescription?: string
@@ -24,7 +23,6 @@ const emit = defineEmits<{
   submit: [data: CreatePayableRequest]
 }>()
 
-const isOpen = computed(() => props.open ?? props.show ?? false)
 
 const toast = useToast()
 const accountingStore = useAccountingStore()
@@ -86,7 +84,7 @@ onMounted(async () => {
   }
 })
 
-watch(isOpen, (open) => {
+watch(() => props.open, (open) => {
   if (!open) reset()
 })
 
@@ -99,7 +97,7 @@ function handleClose() {
 </script>
 
 <template>
-  <RcModal :open="isOpen" title="Yeni Verecek" wide @close="handleClose">
+  <RcModal :open="open" title="Yeni Verecek" wide @close="handleClose">
     <form style="display: flex; flex-direction: column; gap: 14px" @submit.prevent="onSubmit">
       <RcField label="Verecek türü" required>
         <SearchableSelect
