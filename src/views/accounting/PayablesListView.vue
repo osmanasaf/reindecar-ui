@@ -343,7 +343,7 @@ const showList = computed(() => {
     />
 
     <PaymentModal
-      :show="showPaymentModal"
+      :open="showPaymentModal"
       :remaining-amount="selectedPayableAmount"
       :receivable-number="selectedPayableNumber"
       title="Ödeme kaydet"

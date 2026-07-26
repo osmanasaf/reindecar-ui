@@ -240,7 +240,7 @@ function paymentMethodLabel(method: string): string {
 
     <PaymentModal
       v-if="receivable"
-      :show="showPaymentModal"
+      :open="showPaymentModal"
       :remaining-amount="receivable.remainingAmount"
       :receivable-number="receivable.receivableNumber"
       title="Tahsilat kaydet"

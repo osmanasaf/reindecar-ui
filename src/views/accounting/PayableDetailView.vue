@@ -235,7 +235,7 @@ async function doCancel() {
 
     <PaymentModal
       v-if="payable"
-      :show="showPaymentModal"
+      :open="showPaymentModal"
       :remaining-amount="payable.remainingAmount"
       :receivable-number="payable.payableNumber"
       title="Ödeme kaydet"

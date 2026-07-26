@@ -8,8 +8,7 @@ import { RcModal, RcButton, RcField, RcInput } from '@/components/rc'
 import { formatCurrency } from '@/utils/format'
 
 interface Props {
-  show?: boolean
-  open?: boolean
+  open: boolean
   remainingAmount: number
   receivableNumber?: string
   referenceNumber?: string
@@ -27,7 +26,6 @@ const emit = defineEmits<{
 
 const toast = useToast()
 
-const isOpen = computed(() => props.open ?? props.show ?? false)
 const docNumber = computed(() => props.receivableNumber || props.referenceNumber)
 
 const paymentMethods: { value: PaymentMethod; label: string }[] = [
@@ -90,7 +88,7 @@ const { values, errors, touched, setFieldValue, validateField, validateAll, rese
 
 const isSubmitting = ref(false)
 
-watch(isOpen, (open) => {
+watch(() => props.open, (open) => {
   if (!open) reset()
 })
 
@@ -140,7 +138,7 @@ function handleClose() {
 </script>
 
 <template>
-  <RcModal :open="isOpen" :title="title" wide @close="handleClose">
+  <RcModal :open="open" :title="title" wide @close="handleClose">
     <form style="display: flex; flex-direction: column; gap: 14px" @submit.prevent="onSubmit">
       <div v-if="docNumber" class="rca-pay-alert rca-pay-alert--info">
         <strong>Belge No:</strong> {{ docNumber }}
