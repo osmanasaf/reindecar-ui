@@ -63,6 +63,7 @@ export interface VehicleCategory {
     name: string
     description?: string
     defaultDailyPrice?: number
+    requiredLicenseClassId?: number
     sortOrder: number
     active: boolean
 }
@@ -536,6 +537,8 @@ export interface Driver {
     licenseClass?: string
     licenseClassId?: number
     licenseClassName?: string
+    birthDate?: string
+    licenseIssueDate?: string
     phone?: string
     customerId?: number
     primary?: boolean

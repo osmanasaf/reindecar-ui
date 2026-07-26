@@ -19,7 +19,9 @@ class DriversApiService extends BaseApi {
     async create(form: CreateDriverForm): Promise<Driver> {
         return this.post('', {
             ...form,
-            phone: normalizePhoneDigits(form.phone)
+            phone: normalizePhoneDigits(form.phone),
+            birthDate: form.birthDate || undefined,
+            licenseIssueDate: form.licenseIssueDate || undefined
         })
     }
 
@@ -28,6 +30,8 @@ class DriversApiService extends BaseApi {
         if (typeof payload.phone === 'string') {
             payload.phone = normalizePhoneDigits(payload.phone)
         }
+        payload.birthDate = payload.birthDate || undefined
+        payload.licenseIssueDate = payload.licenseIssueDate || undefined
         return this.put(`/${id}`, payload)
     }
 

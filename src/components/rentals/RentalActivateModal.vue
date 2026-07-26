@@ -5,6 +5,7 @@ import { RcIcon } from '@/components/icons'
 import { rentalsApi } from '@/api'
 import { useToast, useValidation, rules, useFeatures } from '@/composables'
 import { fmtTRY, formatDate } from '@/utils/format'
+import { describeRentalOperationError, type RentalOperationError } from '@/utils/rentalErrors'
 import type { Rental, Vehicle } from '@/types'
 import DocumentsSection from '@/components/shared/DocumentsSection.vue'
 import FuelLevelSelect from '@/components/rentals/FuelLevelSelect.vue'
@@ -36,6 +37,7 @@ const submitting = ref(false)
 const downloadingPdf = ref(false)
 const step = ref<'form' | 'completed'>('form')
 const activatedRental = ref<Rental | null>(null)
+const submitError = ref<RentalOperationError | null>(null)
 const startKm = ref(0)
 const startFuelPercent = ref<number | null>(null)
 
@@ -54,6 +56,7 @@ watch(
     if (!isOpen) return
     step.value = 'form'
     activatedRental.value = null
+    submitError.value = null
     syncStartKmFromVehicle()
   },
 )
@@ -101,6 +104,7 @@ const { validateForm, getError, hasError, touch, reset } = useValidation(() => k
 async function confirm() {
   if (!props.rental || !validateForm(kmRules.value)) return
   submitting.value = true
+  submitError.value = null
   try {
     const updated = await rentalsApi.activate(props.rental.id, {
       startKm: startKm.value,
@@ -111,7 +115,7 @@ async function confirm() {
     toast.success('Araç teslim edildi — kiralama aktif')
     emit('activated', updated)
   } catch (err) {
-    toast.apiError(err, 'Teslimat başarısız')
+    submitError.value = describeRentalOperationError(err, 'Teslimat başarısız')
   } finally {
     submitting.value = false
   }
@@ -121,6 +125,7 @@ function handleClose() {
   reset()
   step.value = 'form'
   activatedRental.value = null
+  submitError.value = null
   emit('close')
 }
 
@@ -262,6 +267,14 @@ async function downloadHandoverPdf() {
         Önce taslak tutanağı indirip imzalatın; ardından imzalı kopyayı, teslim fotoğrafı veya sözleşmeyi yükleyin.
         Belgeler anında kaydedilir ve teslimatı tamamlamadan da eklenebilir.
       </p>
+    </div>
+
+    <div v-if="submitError" class="rc-alert rc-alert--danger rcr-modal-alert-spaced--top">
+      <RcIcon name="warning" :size="16" />
+      <div>
+        <div class="rc-alert__title">{{ submitError.message }}</div>
+        <span v-if="submitError.hint">{{ submitError.hint }}</span>
+      </div>
     </div>
 
     <div class="rc-alert rc-alert--info rcr-modal-alert-spaced--top">

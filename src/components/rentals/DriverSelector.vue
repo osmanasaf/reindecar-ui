@@ -34,9 +34,13 @@ const newDriver = ref<CreateDriverForm>({
   licenseNumber: '',
   licenseExpiryDate: '',
   licenseClassId: undefined,
+  birthDate: '',
+  licenseIssueDate: '',
   phone: '',
   customerId: props.customerId
 })
+
+const licenseClassError = ref('')
 
 async function fetchLicenseClasses() {
   loadingLicenseClasses.value = true
@@ -121,6 +125,12 @@ async function createDriver() {
     toast.error('Önce müşteri seçmelisiniz')
     return
   }
+  if (!newDriver.value.licenseClassId) {
+    licenseClassError.value = 'Ehliyet sınıfı zorunludur'
+    toast.error('Ehliyet sınıfı zorunludur')
+    return
+  }
+  licenseClassError.value = ''
   try {
     const created = await customersApi.createDriver(props.customerId, newDriver.value)
     toast.success('Sürücü başarıyla oluşturuldu')
@@ -143,9 +153,12 @@ function resetForm() {
     licenseNumber: '',
     licenseExpiryDate: '',
     licenseClassId: undefined,
+    birthDate: '',
+    licenseIssueDate: '',
     phone: '',
     customerId: props.customerId
   }
+  licenseClassError.value = ''
 }
 
 function toggleNewDriverForm() {
@@ -223,22 +236,36 @@ watch(() => props.customerId, (newCustomerId) => {
           <input id="licenseNumber" v-model="newDriver.licenseNumber" type="text" required />
         </div>
         <div class="form-group">
-          <label>Ehliyet Sınıfı</label>
+          <label>Ehliyet Sınıfı *</label>
           <SearchableSelect
             :model-value="newDriver.licenseClassId ?? null"
             :options="licenseClassOptions"
             placeholder="Sınıf seçin"
             search-placeholder="Ara..."
-            clearable
             :loading="loadingLicenseClasses"
-            @update:model-value="newDriver.licenseClassId = ($event as number | undefined) ?? undefined"
+            @update:model-value="newDriver.licenseClassId = ($event as number | undefined) ?? undefined; licenseClassError = ''"
           />
+          <span v-if="licenseClassError" class="rc-field__error">{{ licenseClassError }}</span>
         </div>
-        <div class="form-group full-width">
+        <div class="form-group">
           <DatePicker
             v-model="newDriver.licenseExpiryDate"
             label="Ehliyet Geçerlilik Tarihi *"
             placeholder="Ehliyet geçerlilik tarihi"
+          />
+        </div>
+        <div class="form-group">
+          <DatePicker
+            v-model="newDriver.birthDate"
+            label="Doğum Tarihi"
+            placeholder="Doğum tarihi"
+          />
+        </div>
+        <div class="form-group">
+          <DatePicker
+            v-model="newDriver.licenseIssueDate"
+            label="Ehliyet Veriliş Tarihi"
+            placeholder="Ehliyet veriliş tarihi"
           />
         </div>
       </div>

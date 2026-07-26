@@ -5,6 +5,7 @@ import { useValidation, rules, useToast, useFeatures } from '@/composables'
 import { RcModal, RcButton } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
 import { fmtTRY } from '@/utils/format'
+import { describeRentalOperationError, type RentalOperationError } from '@/utils/rentalErrors'
 import type { Rental, Vehicle, VehicleReturnForm, ReturnPreviewResponse } from '@/types'
 import DatePicker from '@/components/base/DatePicker.vue'
 import DocumentsSection from '@/components/shared/DocumentsSection.vue'
@@ -41,6 +42,7 @@ const rental = ref<Rental | null>(null)
 const vehicle = ref<Vehicle | null>(null)
 const step = ref<'input' | 'preview' | 'completed'>('input')
 const preview = ref<ReturnPreviewResponse | null>(null)
+const submitError = ref<RentalOperationError | null>(null)
 const applyEarlyDiscount = ref(false)
 const applyLateFee = ref(false)
 const applyFuelFee = ref(false)
@@ -219,6 +221,7 @@ async function completeReturn() {
   if (!props.rentalId) return
 
   saving.value = true
+  submitError.value = null
   try {
     const completeRequest: VehicleReturnForm = {
       endKm: form.value.endKm,
@@ -254,7 +257,7 @@ async function completeReturn() {
     emit('completed', updatedRental)
     step.value = 'completed'
   } catch (err) {
-    toast.apiError(err, 'Kiralama sonlandırılamadı')
+    submitError.value = describeRentalOperationError(err, 'Kiralama sonlandırılamadı')
   } finally {
     saving.value = false
   }
@@ -286,6 +289,7 @@ function handleClose() {
   reset()
   step.value = 'input'
   preview.value = null
+  submitError.value = null
   applyEarlyDiscount.value = false
   applyLateFee.value = false
   applyFuelFee.value = false
@@ -301,6 +305,7 @@ function handleClose() {
 function handleBack() {
   step.value = 'input'
   preview.value = null
+  submitError.value = null
   applyEarlyDiscount.value = false
   applyLateFee.value = false
   applyFuelFee.value = false
@@ -339,6 +344,7 @@ watch(
       reset()
       step.value = 'input'
       preview.value = null
+      submitError.value = null
       fetchRental()
     }
   },
@@ -645,6 +651,14 @@ watch(
               <span>Tahmini nihai tutar</span>
               <span class="rc-num">{{ fmtTRY(estimatedFinalTotal) }}</span>
             </div>
+          </div>
+        </div>
+
+        <div v-if="submitError" class="rc-alert rc-alert--danger" style="margin-top: 14px">
+          <RcIcon name="warning" :size="16" />
+          <div>
+            <div class="rc-alert__title">{{ submitError.message }}</div>
+            <span v-if="submitError.hint">{{ submitError.hint }}</span>
           </div>
         </div>
       </template>

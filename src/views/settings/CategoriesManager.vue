@@ -1,23 +1,52 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { vehicleCategoriesApi } from '@/api'
+import { ref, computed, onMounted } from 'vue'
+import { vehicleCategoriesApi, referenceDataApi } from '@/api'
 import { useToast } from '@/composables'
 import { AccountingConfirmModal } from '@/components/accounting'
+import { SearchableSelect } from '@/components/common'
 import { RcButton, RcField, RcModal, RcEmpty, RcTableSkeleton } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
-import type { VehicleCategory } from '@/types'
+import type { VehicleCategory, LicenseClass } from '@/types'
 
 const toast = useToast()
 const categories = ref<VehicleCategory[]>([])
 const loading = ref(true)
 const showInactive = ref(false)
 
+const licenseClasses = ref<LicenseClass[]>([])
+
+const licenseClassOptions = computed(() =>
+  licenseClasses.value
+    .filter((lc) => lc.active !== false)
+    .map((lc) => ({ value: lc.id, label: lc.description ? `${lc.code} — ${lc.description}` : lc.code })),
+)
+
+function licenseClassCode(id: number | undefined): string | null {
+  if (id == null) return null
+  return licenseClasses.value.find((lc) => lc.id === id)?.code ?? null
+}
+
 const showModal = ref(false)
 const editingCategory = ref<VehicleCategory | null>(null)
-const form = ref({ code: '', name: '', description: '', defaultDailyPrice: 0, sortOrder: 0 })
+const form = ref({
+  code: '',
+  name: '',
+  description: '',
+  defaultDailyPrice: 0,
+  requiredLicenseClassId: undefined as number | undefined,
+  sortOrder: 0,
+})
 const saving = ref(false)
 
 const deactivateTarget = ref<VehicleCategory | null>(null)
+
+async function fetchLicenseClasses() {
+  try {
+    licenseClasses.value = await referenceDataApi.getLicenseClassesAll()
+  } catch {
+    licenseClasses.value = []
+  }
+}
 
 async function fetchCategories() {
   loading.value = true
@@ -54,6 +83,7 @@ function openAdd() {
     name: '',
     description: '',
     defaultDailyPrice: 0,
+    requiredLicenseClassId: undefined,
     sortOrder: categories.value.length + 1,
   }
   showModal.value = true
@@ -66,6 +96,7 @@ function openEdit(category: VehicleCategory) {
     name: category.name,
     description: category.description ?? '',
     defaultDailyPrice: category.defaultDailyPrice ?? 0,
+    requiredLicenseClassId: category.requiredLicenseClassId,
     sortOrder: category.sortOrder,
   }
   showModal.value = true
@@ -87,6 +118,7 @@ async function save() {
         name: form.value.name.trim(),
         description: form.value.description.trim() || undefined,
         defaultDailyPrice: form.value.defaultDailyPrice || undefined,
+        requiredLicenseClassId: form.value.requiredLicenseClassId,
         sortOrder: form.value.sortOrder || undefined,
       })
       toast.success('Kategori güncellendi')
@@ -96,6 +128,7 @@ async function save() {
         name: form.value.name.trim(),
         description: form.value.description.trim() || undefined,
         defaultDailyPrice: form.value.defaultDailyPrice || 0,
+        requiredLicenseClassId: form.value.requiredLicenseClassId,
         sortOrder: form.value.sortOrder || 0,
       })
       toast.success('Kategori eklendi')
@@ -126,7 +159,10 @@ async function doDeactivate() {
   }
 }
 
-onMounted(fetchCategories)
+onMounted(() => {
+  fetchLicenseClasses()
+  fetchCategories()
+})
 </script>
 
 <template>
@@ -176,6 +212,13 @@ onMounted(fetchCategories)
           <span class="rcs-list__name">{{ category.name }}</span>
           <span v-if="category.description" class="rcs-list__meta">{{ category.description }}</span>
         </div>
+        <span
+          v-if="licenseClassCode(category.requiredLicenseClassId)"
+          class="rcs-badge-code"
+          :title="`Gerekli ehliyet sınıfı: ${licenseClassCode(category.requiredLicenseClassId)}`"
+        >
+          Ehliyet: {{ licenseClassCode(category.requiredLicenseClassId) }}
+        </span>
         <span v-if="category.defaultDailyPrice" class="rcs-price">
           {{ category.defaultDailyPrice.toLocaleString('tr-TR') }} ₺/gün
         </span>
@@ -212,6 +255,19 @@ onMounted(fetchCategories)
         </RcField>
         <RcField label="Açıklama">
           <input v-model="form.description" type="text" class="rc-input" placeholder="Kısa açıklama" maxlength="500" />
+        </RcField>
+        <RcField
+          label="Gerekli ehliyet sınıfı"
+          hint="Boş bırakılırsa bu kategorideki araçlar için ehliyet sınıfı şartı aranmaz"
+        >
+          <SearchableSelect
+            :model-value="form.requiredLicenseClassId ?? null"
+            :options="licenseClassOptions"
+            placeholder="Sınıf seçin (opsiyonel)"
+            search-placeholder="Ara..."
+            clearable
+            @update:model-value="form.requiredLicenseClassId = ($event as number | undefined) ?? undefined"
+          />
         </RcField>
         <div class="rcs-modal-grid">
           <RcField label="Varsayılan günlük fiyat (₺)">

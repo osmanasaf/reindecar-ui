@@ -20,6 +20,7 @@ const emit = defineEmits<{
 }>()
 
 const form = ref<UpdateDriverForm>({})
+const licenseClassError = ref('')
 
 const displayName = computed(() => {
   if (!props.driver) return ''
@@ -30,6 +31,7 @@ watch(
   () => [props.open, props.driver] as const,
   ([isOpen, driver]) => {
     if (!isOpen || !driver) return
+    licenseClassError.value = ''
     form.value = {
       firstName: driver.firstName,
       lastName: driver.lastName,
@@ -38,6 +40,8 @@ watch(
       licenseNumber: driver.licenseNumber,
       licenseClassId: driver.licenseClassId,
       licenseExpiryDate: driver.licenseExpiryDate,
+      birthDate: driver.birthDate,
+      licenseIssueDate: driver.licenseIssueDate,
       active: driver.active,
     }
   },
@@ -50,6 +54,11 @@ function handlePhoneInput(event: Event) {
 }
 
 function submit() {
+  if (!form.value.licenseClassId) {
+    licenseClassError.value = 'Ehliyet sınıfı zorunludur'
+    return
+  }
+  licenseClassError.value = ''
   emit('save', { ...form.value })
 }
 </script>
@@ -88,18 +97,23 @@ function submit() {
       <RcField label="Ehliyet no">
         <input v-model="form.licenseNumber" class="rc-input" type="text" />
       </RcField>
-      <RcField label="Ehliyet sınıfı">
+      <RcField label="Ehliyet sınıfı *" :error="licenseClassError">
         <SearchableSelect
           :model-value="form.licenseClassId ?? null"
           :options="licenseClassOptions"
           placeholder="Sınıf seçin"
           search-placeholder="Ara..."
-          clearable
-          @update:model-value="form.licenseClassId = ($event as number | undefined) ?? undefined"
+          @update:model-value="form.licenseClassId = ($event as number | undefined) ?? undefined; licenseClassError = ''"
         />
       </RcField>
-      <RcField label="Ehliyet geçerlilik" class="span-2">
+      <RcField label="Ehliyet geçerlilik">
         <DatePicker v-model="form.licenseExpiryDate" placeholder="Geçerlilik tarihi" />
+      </RcField>
+      <RcField label="Doğum tarihi" hint="Minimum yaş kuralı için kullanılır">
+        <DatePicker v-model="form.birthDate" placeholder="Doğum tarihi" />
+      </RcField>
+      <RcField label="Ehliyet veriliş tarihi" hint="Minimum ehliyet yılı kuralı için kullanılır">
+        <DatePicker v-model="form.licenseIssueDate" placeholder="Ehliyet veriliş tarihi" />
       </RcField>
       <label class="rc-cust-edit__checkbox span-2">
         <input v-model="form.active" type="checkbox" />

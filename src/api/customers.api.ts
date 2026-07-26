@@ -117,7 +117,9 @@ class CustomersApiService extends BaseApi {
     async createDriver(customerId: number, driver: CreateDriverForm): Promise<Driver> {
         return this.post(`/${customerId}/drivers`, {
             ...driver,
-            phone: normalizePhoneDigits(driver.phone)
+            phone: normalizePhoneDigits(driver.phone),
+            birthDate: driver.birthDate || undefined,
+            licenseIssueDate: driver.licenseIssueDate || undefined
         })
     }
 

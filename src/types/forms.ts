@@ -203,6 +203,8 @@ export interface CreateDriverForm {
     licenseNumber: string
     licenseClassId?: number
     licenseExpiryDate: string
+    birthDate?: string
+    licenseIssueDate?: string
     primary?: boolean
 }
 
@@ -214,6 +216,8 @@ export interface UpdateDriverForm {
     licenseNumber?: string
     licenseClassId?: number
     licenseExpiryDate?: string
+    birthDate?: string
+    licenseIssueDate?: string
     active?: boolean
 }
 

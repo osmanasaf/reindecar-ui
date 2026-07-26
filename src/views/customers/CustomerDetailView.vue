@@ -58,8 +58,12 @@ const newDriver = ref<CreateDriverForm>({
   licenseNumber: '',
   licenseExpiryDate: '',
   licenseClassId: undefined,
+  birthDate: '',
+  licenseIssueDate: '',
   phone: ''
 })
+
+const newDriverLicenseClassError = ref('')
 
 const licenseClassOptions = ref<{ value: number; label: string }[]>([])
 
@@ -210,6 +214,12 @@ async function fetchDrivers() {
 }
 
 async function createDriver() {
+  if (!newDriver.value.licenseClassId) {
+    newDriverLicenseClassError.value = 'Ehliyet sınıfı zorunludur'
+    toast.error('Ehliyet sınıfı zorunludur')
+    return
+  }
+  newDriverLicenseClassError.value = ''
   savingDriver.value = true
   try {
     const created = await customersApi.createDriver(customerId.value, newDriver.value)
@@ -232,8 +242,11 @@ function resetDriverForm() {
     licenseNumber: '',
     licenseExpiryDate: '',
     licenseClassId: undefined,
+    birthDate: '',
+    licenseIssueDate: '',
     phone: ''
   }
+  newDriverLicenseClassError.value = ''
 }
 
 function getDriverDisplayName(driver: Driver): string {
@@ -891,20 +904,31 @@ onMounted(() => {
                   placeholder="Ehliyet numarası"
                 />
               </RcField>
-              <RcField label="Ehliyet sınıfı">
+              <RcField label="Ehliyet sınıfı *" :error="newDriverLicenseClassError">
                 <SearchableSelect
                   :model-value="newDriver.licenseClassId ?? null"
                   :options="licenseClassOptions"
                   placeholder="Sınıf seçin"
                   search-placeholder="Ara..."
-                  clearable
-                  @update:model-value="newDriver.licenseClassId = ($event as number | undefined) ?? undefined"
+                  @update:model-value="newDriver.licenseClassId = ($event as number | undefined) ?? undefined; newDriverLicenseClassError = ''"
                 />
               </RcField>
-              <RcField label="Ehliyet geçerlilik *" class="span-2">
+              <RcField label="Ehliyet geçerlilik *">
                 <DatePicker
                   v-model="newDriver.licenseExpiryDate"
                   placeholder="Ehliyet geçerlilik tarihi"
+                />
+              </RcField>
+              <RcField label="Doğum tarihi" hint="Minimum yaş kuralı için kullanılır">
+                <DatePicker
+                  v-model="newDriver.birthDate"
+                  placeholder="Doğum tarihi"
+                />
+              </RcField>
+              <RcField label="Ehliyet veriliş tarihi" hint="Minimum ehliyet yılı kuralı için kullanılır">
+                <DatePicker
+                  v-model="newDriver.licenseIssueDate"
+                  placeholder="Ehliyet veriliş tarihi"
                 />
               </RcField>
             </div>
