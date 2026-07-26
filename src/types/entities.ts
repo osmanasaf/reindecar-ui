@@ -864,6 +864,8 @@ export interface UpcomingMaintenance {
     vehicleCurrentKm: number
     daysRemaining: number | null
     kmRemaining: number | null
+    maintenanceIntervalDays: number | null
+    maintenanceIntervalKm: number | null
 }
 
 export interface TollRecord {
