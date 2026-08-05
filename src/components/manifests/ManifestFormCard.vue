@@ -46,17 +46,17 @@ async function handleSave() {
       </div>
     </div>
     <div class="rc-card__body">
-      <form class="rcs-form-grid" @submit.prevent="handleSave">
-        <RcField label="UETDS sefer no">
+      <form class="rc-form-grid" @submit.prevent="handleSave">
+        <RcField label="UETDS sefer no" required>
           <input v-model="form.uetdsTripNumber" class="rc-input" required />
         </RcField>
         <RcField label="Belge no">
           <input v-model="form.documentNumber" class="rc-input" />
         </RcField>
-        <RcField label="Başlangıç">
+        <RcField label="Sefer başlangıç" required>
           <input v-model="form.tripStartAt" type="datetime-local" class="rc-input" />
         </RcField>
-        <RcField label="Bitiş">
+        <RcField label="Sefer bitiş">
           <input v-model="form.tripEndAt" type="datetime-local" class="rc-input" />
         </RcField>
         <RcField label="Şoför">
@@ -65,25 +65,32 @@ async function handleSave() {
         <RcField label="SRC">
           <input v-model="form.driverSrc" class="rc-input" />
         </RcField>
-        <RcField label="Taşıyıcı" style="grid-column: 1 / -1">
+        <RcField label="Taşıyıcı firma" class="rc-form-grid__full">
           <input v-model="form.carrierCompanyName" class="rc-input" />
         </RcField>
-        <RcField label="Grup">
+        <RcField label="Grup adı">
           <input v-model="form.groupName" class="rc-input" />
         </RcField>
-        <RcField label="Ücret">
+        <RcField label="Grup ücreti">
           <input v-model.number="form.groupFeeAmount" type="number" min="0" step="0.01" class="rc-input rc-num" />
         </RcField>
-        <RcField label="Güzergah" style="grid-column: 1 / -1">
+        <RcField label="Güzergah" class="rc-form-grid__full">
           <input v-model="form.groupRoute" class="rc-input" />
         </RcField>
-        <RcField label="Açıklama" style="grid-column: 1 / -1">
-          <textarea v-model="form.groupDescription" class="rc-input" rows="3" />
+        <RcField label="Açıklama" class="rc-form-grid__full">
+          <textarea v-model="form.groupDescription" class="rc-textarea" rows="3" />
         </RcField>
-        <div style="grid-column: 1 / -1; display: flex; justify-content: flex-end">
+        <div class="rc-form-grid__full mfc-actions">
           <RcButton type="submit" variant="primary" :loading="saving">Kaydet</RcButton>
         </div>
       </form>
     </div>
   </div>
 </template>
+
+<style scoped>
+.mfc-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+</style>

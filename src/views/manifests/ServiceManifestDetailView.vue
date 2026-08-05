@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, computed, nextTick } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { serviceManifestsApi } from '@/api'
 import { useToast, useFeatures } from '@/composables'
 import { AccountingConfirmModal } from '@/components/accounting'
 import ManifestFormCard from '@/components/manifests/ManifestFormCard.vue'
 import ManifestPassengersCard from '@/components/manifests/ManifestPassengersCard.vue'
 import ManifestDocumentsCard from '@/components/manifests/ManifestDocumentsCard.vue'
-import { RcButton, RcDetailSkeleton } from '@/components/rc'
+import { RcButton, RcDetailSkeleton, RcDropzone } from '@/components/rc'
 import { RcIcon, type IconName } from '@/components/icons'
 import { formatDateTime } from '@/utils/format'
 import { resolveTripStatus } from '@/utils/tripStatus'
@@ -27,7 +27,6 @@ const pendingFile = ref<File | null>(null)
 const preview = ref<UetdsManifestPreviewResponse | null>(null)
 const previewing = ref(false)
 const attaching = ref(false)
-const fileInput = ref<HTMLInputElement | null>(null)
 
 const manifestId = computed(() => Number(route.params.id))
 const tripStatus = computed(() =>
@@ -120,14 +119,8 @@ async function loadManifest() {
 }
 
 // ── PDF akışı ──
-function pickFile() {
-  fileInput.value?.click()
-}
-
-async function onFileSelected(event: Event) {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  input.value = ''
+async function onFilesSelected(files: File[]) {
+  const file = files[0]
   if (!file || !manifest.value) return
   pendingFile.value = file
   preview.value = null
@@ -189,16 +182,7 @@ onBeforeUnmount(() => {
         <RcIcon name="chevronLeft" :size="14" />
         Listeye dön
       </RcButton>
-      <div style="display: flex; gap: 8px">
-        <RcButton
-          variant="secondary"
-          @click="router.push({ name: 'rental-detail', params: { id: manifest?.rentalId } })"
-        >
-          <RcIcon name="key" :size="14" />
-          Kiralamaya git
-        </RcButton>
-        <RcButton variant="danger" @click="showDeleteConfirm = true">Sil</RcButton>
-      </div>
+      <RcButton variant="danger" :disabled="!manifest" @click="showDeleteConfirm = true">Sil</RcButton>
     </div>
 
     <RcDetailSkeleton v-if="loading" />
@@ -208,7 +192,7 @@ onBeforeUnmount(() => {
       <aside class="md-rail">
         <div class="md-summary">
           <div class="md-summary__trip rc-mono">{{ manifest.uetdsTripNumber }}</div>
-          <div class="md-summary__meta">{{ manifest.vehiclePlate }} · {{ manifest.rentalNumber }}</div>
+          <div class="md-summary__meta">{{ manifest.vehiclePlate }}</div>
           <div class="md-summary__badges">
             <span
               v-if="tripStatus"
@@ -220,6 +204,20 @@ onBeforeUnmount(() => {
             </span>
           </div>
         </div>
+
+        <!-- Manifestonun bağlı olduğu kiralamaya dönüş: doğrudan UETDS sekmesine götürür -->
+        <RouterLink
+          class="md-parent"
+          :to="{ name: 'rental-detail', params: { id: manifest.rentalId }, query: { tab: 'uetds' } }"
+        >
+          <span class="md-parent__icon"><RcIcon name="key" :size="15" /></span>
+          <span class="md-parent__text">
+            <span class="md-parent__label">Bağlı kiralama</span>
+            <span class="md-parent__value rc-mono">{{ manifest.rentalNumber }}</span>
+          </span>
+          <RcIcon name="chevronRight" :size="15" class="md-parent__chevron" />
+        </RouterLink>
+
         <nav class="md-nav">
           <button
             v-for="item in railItems"
@@ -249,96 +247,97 @@ onBeforeUnmount(() => {
               </div>
             </div>
           </div>
-          <div class="rc-card__body">
-            <input
-              ref="fileInput"
-              type="file"
-              accept="application/pdf"
-              style="display: none"
-              @change="onFileSelected"
-            />
-
-            <div v-if="previewing" class="md-verify md-verify--muted">
-              <RcIcon name="clock" :size="18" />
-              <div><div class="md-verify__title">PDF okunuyor…</div></div>
-            </div>
-
-            <template v-else-if="preview">
-              <div v-if="preview.plateMatches" class="md-verify md-verify--ok">
-                <RcIcon name="checkCircle" :size="18" :stroke-width="1.8" />
-                <div class="md-verify__text">
-                  <div class="md-verify__title">Plaka doğrulandı</div>
-                  <div class="md-verify__desc">
+          <div class="rc-card__body md-pdf">
+            <!-- Yeni seçilen belgenin plaka doğrulaması -->
+            <template v-if="preview">
+              <div v-if="preview.plateMatches" class="rc-callout rc-callout--ok">
+                <span class="rc-callout__icon"><RcIcon name="checkCircle" :size="18" :stroke-width="1.8" /></span>
+                <div class="rc-callout__text">
+                  <div class="rc-callout__title">Plaka doğrulandı</div>
+                  <div class="rc-callout__desc">
                     Belgedeki plaka ({{ preview.parsedVehiclePlate || manifest.vehiclePlate }}) kiralama aracıyla eşleşiyor.
                   </div>
-                  <div class="md-verify__actions">
-                    <button type="button" class="md-btn md-btn--solid" :disabled="attaching" @click="attachPending">
+                  <div class="rc-callout__actions">
+                    <RcButton variant="accent" size="sm" :loading="attaching" @click="attachPending">
                       Belgeyi ekle
-                    </button>
-                    <button type="button" class="md-btn md-btn--ghost" :disabled="attaching" @click="cancelPending">
+                    </RcButton>
+                    <RcButton variant="ghost" size="sm" :disabled="attaching" @click="cancelPending">
                       Vazgeç
-                    </button>
+                    </RcButton>
                   </div>
                 </div>
               </div>
-              <div v-else class="md-verify md-verify--warn">
-                <RcIcon name="warning" :size="18" :stroke-width="1.8" />
-                <div class="md-verify__text">
-                  <div class="md-verify__title">Plaka uyuşmazlığı</div>
-                  <div class="md-verify__desc">
-                    Belgede <b>{{ preview.parsedVehiclePlate || '—' }}</b>, kiralamada
-                    <b>{{ preview.rentalVehiclePlate || manifest.vehiclePlate }}</b> görünüyor. Devam etmeden önce doğrulayın.
+              <div v-else class="rc-callout rc-callout--warn">
+                <span class="rc-callout__icon"><RcIcon name="warning" :size="18" :stroke-width="1.8" /></span>
+                <div class="rc-callout__text">
+                  <div class="rc-callout__title">Plaka uyuşmazlığı</div>
+                  <div class="rc-callout__desc">
+                    Belgede <strong>{{ preview.parsedVehiclePlate || '—' }}</strong>, kiralamada
+                    <strong>{{ preview.rentalVehiclePlate || manifest.vehiclePlate }}</strong> görünüyor.
+                    Devam etmeden önce doğrulayın.
                   </div>
-                  <div class="md-verify__actions">
-                    <button type="button" class="md-btn md-btn--warn" :disabled="attaching" @click="attachPending">
+                  <div class="rc-callout__actions">
+                    <RcButton variant="accent" size="sm" :loading="attaching" @click="attachPending">
                       Yine de kabul et
-                    </button>
-                    <button type="button" class="md-btn md-btn--ghost" :disabled="attaching" @click="pickFile">
-                      Belgeyi değiştir
-                    </button>
+                    </RcButton>
+                    <RcButton variant="ghost" size="sm" :disabled="attaching" @click="cancelPending">
+                      Vazgeç
+                    </RcButton>
                   </div>
                 </div>
               </div>
             </template>
 
+            <!-- Yüklü belgenin durumu -->
             <template v-else-if="manifest.pdfFile">
-              <div v-if="manifest.pdfPlateMatches === false" class="md-verify md-verify--warn" style="margin-bottom: 12px">
-                <RcIcon name="warning" :size="18" :stroke-width="1.8" />
-                <div class="md-verify__text">
-                  <div class="md-verify__title">Plaka uyuşmazlığı kabul edildi</div>
-                  <div class="md-verify__desc">
-                    Yüklü belgede <b>{{ manifest.parsedPlate || '—' }}</b>, kiralamada
-                    <b>{{ manifest.vehiclePlate }}</b> görünüyor.
+              <div v-if="manifest.pdfPlateMatches === false" class="rc-callout rc-callout--warn">
+                <span class="rc-callout__icon"><RcIcon name="warning" :size="18" :stroke-width="1.8" /></span>
+                <div class="rc-callout__text">
+                  <div class="rc-callout__title">Plaka uyuşmazlığı kabul edildi</div>
+                  <div class="rc-callout__desc">
+                    Yüklü belgede <strong>{{ manifest.parsedPlate || '—' }}</strong>, kiralamada
+                    <strong>{{ manifest.vehiclePlate }}</strong> görünüyor.
                   </div>
                 </div>
               </div>
-              <div v-else-if="manifest.pdfPlateMatches === true" class="md-verify md-verify--ok" style="margin-bottom: 12px">
-                <RcIcon name="checkCircle" :size="18" :stroke-width="1.8" />
-                <div class="md-verify__text">
-                  <div class="md-verify__title">Plaka doğrulandı</div>
-                  <div class="md-verify__desc">Belge plakası kiralama aracıyla eşleşiyor.</div>
+              <div v-else-if="manifest.pdfPlateMatches === true" class="rc-callout rc-callout--ok">
+                <span class="rc-callout__icon"><RcIcon name="checkCircle" :size="18" :stroke-width="1.8" /></span>
+                <div class="rc-callout__text">
+                  <div class="rc-callout__title">Plaka doğrulandı</div>
+                  <div class="rc-callout__desc">Belge plakası kiralama aracıyla eşleşiyor.</div>
                 </div>
               </div>
-              <div class="md-file">
-                <span class="md-file__badge rc-mono">PDF</span>
-                <div class="md-file__text">
-                  <div class="md-file__name">{{ manifest.pdfFile.fileName }}</div>
-                  <div class="md-file__meta">{{ formatDateTime(manifest.createdAt) }}</div>
+              <div class="rc-filerow">
+                <span class="rc-filerow__badge rc-mono">PDF</span>
+                <div class="rc-filerow__text">
+                  <div class="rc-filerow__name">{{ manifest.pdfFile.fileName }}</div>
+                  <div class="rc-filerow__meta">{{ formatDateTime(manifest.createdAt) }}</div>
                 </div>
-                <button type="button" class="md-btn md-btn--ghost" @click="pickFile">Değiştir</button>
               </div>
             </template>
 
-            <div v-else class="md-verify md-verify--muted">
-              <RcIcon name="filePdf" :size="18" />
-              <div class="md-verify__text">
-                <div class="md-verify__title">Belge eklenmedi</div>
-                <div class="md-verify__desc">Manuel giriş — PDF ekleyerek plaka doğrulamasını kolaylaştırın.</div>
-                <div class="md-verify__actions">
-                  <button type="button" class="md-btn md-btn--solid" @click="pickFile">PDF yükle</button>
+            <!-- Belge yok: neden önemli olduğunu anlat -->
+            <div v-else class="rc-callout rc-callout--muted">
+              <span class="rc-callout__icon"><RcIcon name="filePdf" :size="18" /></span>
+              <div class="rc-callout__text">
+                <div class="rc-callout__title">Belge eklenmedi</div>
+                <div class="rc-callout__desc">
+                  Manuel giriş — PDF ekleyerek plaka doğrulamasını kolaylaştırın.
                 </div>
               </div>
             </div>
+
+            <RcDropzone
+              v-if="!preview"
+              accept="application/pdf"
+              icon="filePdf"
+              :compact="!!manifest.pdfFile"
+              :busy="previewing"
+              busy-label="PDF okunuyor…"
+              :title="manifest.pdfFile ? 'Belgeyi değiştir' : 'PDF\'yi buraya sürükle veya seç'"
+              :hint="manifest.pdfFile ? 'Yeni PDF yükleyince plaka yeniden doğrulanır' : 'Yalnızca PDF · plaka otomatik doğrulanır'"
+              @select="onFilesSelected"
+            />
           </div>
         </section>
 
@@ -410,6 +409,44 @@ onBeforeUnmount(() => {
 .md-src--pdf { background: var(--rc-info-50); color: var(--rc-info-700); }
 .md-src--manual { background: var(--rc-surface-2); color: var(--rc-text-muted); }
 
+/* Bağlı kiralama kısayolu */
+.md-parent {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--rc-border-subtle);
+  border-radius: var(--rc-r-10);
+  background: var(--rc-surface);
+  color: inherit;
+  text-decoration: none;
+  transition: background var(--rc-dur-fast), border-color var(--rc-dur-fast);
+}
+.md-parent:hover { background: var(--rc-surface-hover); border-color: var(--rc-border); }
+.md-parent:focus-visible { outline: none; border-color: var(--rc-accent); box-shadow: var(--rc-focus-ring); }
+.md-parent__icon {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--rc-r-8);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--rc-accent-subtle);
+  color: var(--rc-accent);
+  flex-shrink: 0;
+}
+.md-parent__text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.md-parent__label { font-size: 11px; color: var(--rc-text-muted); }
+.md-parent__value {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--rc-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.md-parent__chevron { color: var(--rc-text-faint); flex-shrink: 0; }
+
 .md-nav { display: flex; flex-direction: column; gap: 2px; }
 .md-nav__item {
   display: flex;
@@ -433,66 +470,13 @@ onBeforeUnmount(() => {
 /* Sections */
 .md-sections { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 
-/* PDF & doğrulama */
-.md-verify {
+/* PDF & doğrulama — bildirim, dosya satırı ve bırakma alanı
+   rc-primitives.css'teki ortak sınıflardan gelir. */
+.md-pdf {
   display: flex;
-  align-items: flex-start;
-  gap: 11px;
-  padding: 13px 15px;
-  border-radius: var(--rc-r-10);
-  border: 1px solid transparent;
-}
-.md-verify--ok { background: var(--rc-success-50); border-color: color-mix(in srgb, var(--rc-success-500) 22%, transparent); color: var(--rc-success-700); }
-.md-verify--warn { background: var(--rc-warning-50); border-color: color-mix(in srgb, var(--rc-warning-500) 26%, transparent); color: var(--rc-warning-700); }
-.md-verify--muted { background: var(--rc-surface-2); border-color: var(--rc-border-subtle); color: var(--rc-text-muted); }
-.md-verify__text { flex: 1; min-width: 0; }
-.md-verify__title { font-size: 13px; font-weight: 600; }
-.md-verify__desc { font-size: 12.5px; color: var(--rc-text-soft); margin-top: 2px; }
-.md-verify__actions { display: flex; gap: 8px; margin-top: 10px; }
-
-.md-file {
-  display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 12px;
-  padding: 12px 14px;
-  border: 1px solid var(--rc-border-subtle);
-  border-radius: var(--rc-r-10);
-  background: var(--rc-surface-2);
 }
-.md-file__badge {
-  width: 34px;
-  height: 40px;
-  border-radius: var(--rc-r-4);
-  background: var(--rc-danger-50);
-  color: var(--rc-danger-700);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 9px;
-  font-weight: 600;
-  flex-shrink: 0;
-}
-.md-file__text { flex: 1; min-width: 0; }
-.md-file__name { font-size: 13px; font-weight: 500; }
-.md-file__meta { font-size: 12px; color: var(--rc-text-muted); }
-
-.md-btn {
-  height: 28px;
-  padding: 0 12px;
-  border-radius: var(--rc-r-6);
-  font-size: 12px;
-  font-weight: 600;
-}
-.md-btn:disabled { opacity: 0.55; cursor: not-allowed; }
-.md-btn--solid { background: var(--rc-text); color: var(--rc-text-inverse); }
-.md-btn--warn { background: var(--rc-warning-700); color: #fff; }
-.md-btn--ghost {
-  background: var(--rc-surface);
-  border: 1px solid var(--rc-border);
-  color: var(--rc-text-soft);
-  font-weight: 500;
-}
-.md-btn--ghost:hover { background: var(--rc-surface-hover); }
 
 @media (max-width: 900px) {
   .md-layout { grid-template-columns: 1fr; }

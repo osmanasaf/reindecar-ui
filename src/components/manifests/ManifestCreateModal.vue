@@ -2,11 +2,11 @@
 import { ref, watch, computed } from 'vue'
 import { rentalsApi, serviceManifestsApi } from '@/api'
 import { useToast, useManifestForm } from '@/composables'
-import { RcModal, RcButton, RcField, RcSegTab } from '@/components/rc'
+import { RcModal, RcButton, RcField, RcSegTab, RcDropzone } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
 import SearchableSelect from '@/components/common/SearchableSelect.vue'
 import type { Rental } from '@/types'
-import type { UetdsManifest } from '@/types/manifest'
+import type { UetdsManifest, UetdsManifestPreviewResponse } from '@/types/manifest'
 import { formatDateTime } from '@/utils/format'
 import { toInputDateTime } from '@/utils/datetime'
 
@@ -29,7 +29,7 @@ const submitting = ref(false)
 const previewing = ref(false)
 const rentals = ref<Rental[]>([])
 const selectedFile = ref<File | null>(null)
-const plateWarning = ref('')
+const pdfPreview = ref<UetdsManifestPreviewResponse | null>(null)
 const selectedRentalId = ref<number | null>(null)
 const lockedRental = ref<Rental | null>(null)
 
@@ -61,6 +61,12 @@ const tripMax = computed(() =>
 const noServiceRentals = computed(
   () => !rentalLocked.value && !loadingRentals.value && rentals.value.length === 0,
 )
+
+const canSubmit = computed(() =>
+  mode.value === 'pdf' ? selectedFile.value !== null : true,
+)
+
+const submitLabel = computed(() => (mode.value === 'pdf' ? 'PDF ile oluştur' : 'Kaydet'))
 
 watch(
   () => props.open,
@@ -97,7 +103,7 @@ async function loadLockedRental(rentalId: number) {
 function resetForm() {
   mode.value = 'manual'
   selectedFile.value = null
-  plateWarning.value = ''
+  pdfPreview.value = null
   selectedRentalId.value = null
   lockedRental.value = null
   resetFormFields()
@@ -140,29 +146,40 @@ async function loadRentals() {
   }
 }
 
-async function handlePreviewPdf() {
-  if (!selectedRentalId.value || !selectedFile.value) {
-    toast.error('Kiralama ve PDF dosyası seçin')
+async function handleFilesSelected(files: File[]) {
+  const file = files[0]
+  if (!file) return
+  if (!selectedRentalId.value) {
+    toast.error('Önce kiralama seçin')
     return
   }
+  selectedFile.value = file
+  pdfPreview.value = null
   previewing.value = true
-  plateWarning.value = ''
   try {
-    const preview = await serviceManifestsApi.previewFromPdf(selectedRentalId.value, selectedFile.value)
-    applyParsed(preview.parsed, preview.parsedVehiclePlate || '')
-    if (activeRental.value?.vehiclePlate) {
-      form.value.vehiclePlate = activeRental.value.vehiclePlate
-    }
-    if (!preview.plateMatches) {
-      plateWarning.value = `PDF plakası (${preview.parsedVehiclePlate}) kiralama plakası (${preview.rentalVehiclePlate}) ile uyuşmuyor`
-    }
-    mode.value = 'manual'
-    toast.success('PDF alanları forma aktarıldı')
+    pdfPreview.value = await serviceManifestsApi.previewFromPdf(selectedRentalId.value, file)
   } catch (err) {
     toast.apiError(err, 'PDF önizleme başarısız')
+    selectedFile.value = null
   } finally {
     previewing.value = false
   }
+}
+
+function applyPreviewToForm() {
+  const preview = pdfPreview.value
+  if (!preview) return
+  applyParsed(preview.parsed, preview.parsedVehiclePlate || '')
+  if (activeRental.value?.vehiclePlate) {
+    form.value.vehiclePlate = activeRental.value.vehiclePlate
+  }
+  mode.value = 'manual'
+  toast.success('PDF alanları forma aktarıldı — belge eklenmeyecek')
+}
+
+function clearPdf() {
+  selectedFile.value = null
+  pdfPreview.value = null
 }
 
 async function handleSubmit() {
@@ -170,7 +187,11 @@ async function handleSubmit() {
     toast.error('Kiralama seçin')
     return
   }
-  if (!(mode.value === 'pdf' && selectedFile.value) && !validateTripDates()) {
+  if (mode.value === 'pdf' && !selectedFile.value) {
+    toast.error('PDF dosyası seçin')
+    return
+  }
+  if (mode.value === 'manual' && !validateTripDates()) {
     return
   }
   submitting.value = true
@@ -190,17 +211,12 @@ async function handleSubmit() {
     submitting.value = false
   }
 }
-
-function onFileChange(event: Event) {
-  const input = event.target as HTMLInputElement
-  selectedFile.value = input.files?.[0] ?? null
-}
 </script>
 
 <template>
   <RcModal :open="open" title="Yeni UETDS Manifestosu" wide @close="emit('close')">
     <div class="rcr-manifest-create">
-      <div class="rcr-manifest-create__modes">
+      <div class="rc-segtabs rc-segtabs--flush rcr-manifest-create__modes">
         <RcSegTab id="manual" :active="mode" @select="mode = 'manual'">Manuel giriş</RcSegTab>
         <RcSegTab id="pdf" :active="mode" @select="mode = 'pdf'">PDF'den aktar</RcSegTab>
       </div>
@@ -223,7 +239,11 @@ function onFileChange(event: Event) {
       </div>
 
       <template v-else>
-        <RcField label="Servis kiralaması *" hint="Yalnızca aktif servis (SERVICE) tipi kiralamalar seçilebilir">
+        <RcField
+          label="Servis kiralaması"
+          required
+          hint="Yalnızca aktif servis (SERVICE) tipi kiralamalar seçilebilir"
+        >
           <SearchableSelect
             v-model="selectedRentalId"
             :options="rentalOptions"
@@ -234,7 +254,7 @@ function onFileChange(event: Event) {
           />
         </RcField>
 
-        <div v-if="noServiceRentals" class="rc-alert rc-alert--info" style="margin-bottom: 16px">
+        <div v-if="noServiceRentals" class="rc-alert rc-alert--info rcr-manifest-create__alert">
           <RcIcon name="info" :size="16" />
           <span>
             Uygun kiralama bulunamadı. UETDS manifestosu yalnızca <strong>aktif</strong> durumdaki
@@ -243,31 +263,67 @@ function onFileChange(event: Event) {
         </div>
       </template>
 
-      <template v-if="mode === 'pdf'">
-        <RcField label="UETDS PDF *" hint="PDF yüklendikten sonra alanları önizleyip kaydedebilirsiniz">
-          <input type="file" accept="application/pdf" class="rc-input" @change="onFileChange" />
-        </RcField>
-        <div style="display: flex; gap: 8px; margin-bottom: 16px">
-          <RcButton variant="secondary" :loading="previewing" @click="handlePreviewPdf">
-            <RcIcon name="eye" :size="14" />
-            PDF'den Oku
-          </RcButton>
+      <!-- PDF'den aktar -->
+      <div v-if="mode === 'pdf'" class="rcr-manifest-create__pdf">
+        <div v-if="pdfPreview" class="rc-filerow">
+          <span class="rc-filerow__badge rc-mono">PDF</span>
+          <div class="rc-filerow__text">
+            <div class="rc-filerow__name">{{ selectedFile?.name }}</div>
+            <div class="rc-filerow__meta">
+              Sefer no: {{ pdfPreview.parsed.uetdsTripNumber || '—' }} · Plaka:
+              {{ pdfPreview.parsedVehiclePlate || '—' }}
+            </div>
+          </div>
+          <RcButton variant="ghost" size="sm" @click="clearPdf">Kaldır</RcButton>
         </div>
-      </template>
 
-      <div v-if="plateWarning" class="rc-alert rc-alert--danger" style="margin-bottom: 16px">
-        <RcIcon name="warning" :size="16" />
-        <span>{{ plateWarning }}</span>
+        <RcDropzone
+          v-else
+          accept="application/pdf"
+          icon="filePdf"
+          :busy="previewing"
+          busy-label="PDF okunuyor…"
+          title="PDF'yi buraya sürükle veya seç"
+          hint="Yalnızca PDF · alanlar otomatik okunur, plaka doğrulanır"
+          @select="handleFilesSelected"
+        />
+
+        <div v-if="pdfPreview" class="rc-callout" :class="pdfPreview.plateMatches ? 'rc-callout--ok' : 'rc-callout--warn'">
+          <span class="rc-callout__icon">
+            <RcIcon :name="pdfPreview.plateMatches ? 'checkCircle' : 'warning'" :size="18" :stroke-width="1.8" />
+          </span>
+          <div class="rc-callout__text">
+            <div class="rc-callout__title">
+              {{ pdfPreview.plateMatches ? 'Plaka doğrulandı' : 'Plaka uyuşmazlığı' }}
+            </div>
+            <div class="rc-callout__desc">
+              <template v-if="pdfPreview.plateMatches">
+                Belgedeki plaka kiralama aracıyla eşleşiyor. Kaydettiğinizde belge manifestoya eklenir.
+              </template>
+              <template v-else>
+                Belgede <strong>{{ pdfPreview.parsedVehiclePlate || '—' }}</strong>, kiralamada
+                <strong>{{ pdfPreview.rentalVehiclePlate || '—' }}</strong> görünüyor. Devam etmeden önce doğrulayın.
+              </template>
+            </div>
+            <div class="rc-callout__actions">
+              <RcButton variant="ghost" size="sm" @click="applyPreviewToForm">
+                <RcIcon name="edit" :size="14" />
+                Alanları forma aktar
+              </RcButton>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div class="rcs-form-grid">
-        <RcField label="UETDS sefer no *">
+      <!-- Manuel giriş -->
+      <div v-else class="rc-modal-form">
+        <RcField label="UETDS sefer no" required>
           <input v-model="form.uetdsTripNumber" class="rc-input" />
         </RcField>
         <RcField label="Plaka" :hint="activeRental ? 'Kiralamadaki araçtan alınır' : undefined">
           <input v-model="form.vehiclePlate" class="rc-input" :disabled="!!activeRental" />
         </RcField>
-        <RcField label="Sefer başlangıç *" :hint="tripMin ? 'Kiralama aralığı içinde olmalı' : undefined">
+        <RcField label="Sefer başlangıç" required :hint="tripMin ? 'Kiralama aralığı içinde olmalı' : undefined">
           <input v-model="form.tripStartAt" type="datetime-local" class="rc-input" :min="tripMin" :max="tripMax" />
         </RcField>
         <RcField label="Sefer bitiş">
@@ -291,7 +347,7 @@ function onFileChange(event: Event) {
         <RcField label="SRC">
           <input v-model="form.driverSrc" class="rc-input" />
         </RcField>
-        <RcField label="Taşıyıcı firma" style="grid-column: 1 / -1">
+        <RcField label="Taşıyıcı firma" class="rc-modal-form__full">
           <input v-model="form.carrierCompanyName" class="rc-input" />
         </RcField>
         <RcField label="Grup adı">
@@ -300,11 +356,11 @@ function onFileChange(event: Event) {
         <RcField label="Grup ücreti">
           <input v-model.number="form.groupFeeAmount" type="number" min="0" step="0.01" class="rc-input rc-num" />
         </RcField>
-        <RcField label="Güzergah" style="grid-column: 1 / -1">
+        <RcField label="Güzergah" class="rc-modal-form__full">
           <input v-model="form.groupRoute" class="rc-input" />
         </RcField>
-        <RcField label="Açıklama" style="grid-column: 1 / -1">
-          <textarea v-model="form.groupDescription" class="rc-input" rows="3" />
+        <RcField label="Açıklama" class="rc-modal-form__full">
+          <textarea v-model="form.groupDescription" class="rc-textarea" rows="3" />
         </RcField>
       </div>
 
@@ -315,9 +371,9 @@ function onFileChange(event: Event) {
     </div>
 
     <template #footer>
-      <RcButton variant="secondary" @click="emit('close')">İptal</RcButton>
-      <RcButton variant="primary" :loading="submitting" @click="handleSubmit">
-        Kaydet
+      <RcButton variant="ghost" @click="emit('close')">Vazgeç</RcButton>
+      <RcButton variant="accent" :loading="submitting" :disabled="!canSubmit" @click="handleSubmit">
+        {{ submitLabel }}
       </RcButton>
     </template>
   </RcModal>
@@ -325,11 +381,17 @@ function onFileChange(event: Event) {
 
 <style scoped>
 .rcr-manifest-create__modes {
-  display: inline-flex;
-  gap: 0;
-  border-bottom: 1px solid var(--rc-border);
   margin-bottom: 16px;
-  width: 100%;
+}
+
+.rcr-manifest-create__alert {
+  margin-bottom: 16px;
+}
+
+.rcr-manifest-create__pdf {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .rcr-manifest-create__locked {

@@ -4,7 +4,7 @@ import { serviceManifestsApi } from '@/api'
 import { FILE_UPLOAD_TYPE_LABELS, type FileRecord, type FileUploadType } from '@/api/files.api'
 import { useToast, useFeatures } from '@/composables'
 import FeatureGate from '@/components/common/FeatureGate.vue'
-import { RcField } from '@/components/rc'
+import { RcField, RcDropzone } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
 
 const props = defineProps<{
@@ -37,8 +37,8 @@ async function loadDocuments() {
   }
 }
 
-async function handleUpload(event: Event) {
-  const file = (event.target as HTMLInputElement).files?.[0]
+async function handleUpload(files: File[]) {
+  const file = files[0]
   if (!file) return
   uploading.value = true
   try {
@@ -49,7 +49,6 @@ async function handleUpload(event: Event) {
     toast.apiError(err, 'Belge yüklenemedi')
   } finally {
     uploading.value = false
-    ;(event.target as HTMLInputElement).value = ''
   }
 }
 
@@ -91,17 +90,23 @@ watch(() => props.manifestId, loadDocuments)
         </div>
 
         <!-- Yükleme kontrolü -->
-        <div class="rcs-form-grid md-doc-upload">
-          <RcField label="Belge tipi">
+        <div class="md-doc-upload">
+          <RcField label="Belge tipi" class="md-doc-upload__type">
             <select v-model="uploadType" class="rc-input">
               <option v-for="type in documentTypes" :key="type" :value="type">
                 {{ FILE_UPLOAD_TYPE_LABELS[type] }}
               </option>
             </select>
           </RcField>
-          <RcField label="Dosya">
-            <input type="file" class="rc-input" :disabled="uploading" @change="handleUpload" />
-          </RcField>
+          <RcDropzone
+            compact
+            accept="application/pdf,image/*"
+            :busy="uploading"
+            busy-label="Belge yükleniyor…"
+            :title="`${FILE_UPLOAD_TYPE_LABELS[uploadType]} yükle`"
+            hint="Dosyayı buraya sürükle veya seç"
+            @select="handleUpload"
+          />
         </div>
       </div>
     </div>
@@ -140,5 +145,11 @@ watch(() => props.manifestId, loadDocuments)
 .md-doc__meta { font-size: 11.5px; color: var(--rc-text-muted); }
 .md-doc__meta--ok { color: var(--rc-success-700); }
 
-.md-doc-upload { margin-top: 16px; }
+.md-doc-upload {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+.md-doc-upload__type { max-width: 320px; }
 </style>
