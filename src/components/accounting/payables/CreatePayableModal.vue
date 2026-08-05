@@ -23,7 +23,6 @@ const emit = defineEmits<{
   submit: [data: CreatePayableRequest]
 }>()
 
-
 const toast = useToast()
 const accountingStore = useAccountingStore()
 
@@ -98,7 +97,7 @@ function handleClose() {
 
 <template>
   <RcModal :open="open" title="Yeni Verecek" wide @close="handleClose">
-    <form style="display: flex; flex-direction: column; gap: 14px" @submit.prevent="onSubmit">
+    <form class="rc-modal-form rc-modal-form--single" @submit.prevent="onSubmit">
       <RcField label="Verecek türü" required>
         <SearchableSelect
           v-model="values.type"
@@ -125,7 +124,7 @@ function handleClose() {
       <RcField label="Açıklama" required>
         <textarea
           v-model="values.description"
-          class="rc-input"
+          class="rc-textarea"
           rows="3"
           maxlength="500"
           placeholder="Verecek açıklaması"
@@ -167,9 +166,9 @@ function handleClose() {
     </form>
 
     <template #footer>
-      <RcButton variant="secondary" @click="handleClose">İptal</RcButton>
-      <RcButton variant="accent" :disabled="isSubmitting" @click="onSubmit">
-        {{ isSubmitting ? 'Oluşturuluyor...' : 'Verecek oluştur' }}
+      <RcButton variant="ghost" @click="handleClose">Vazgeç</RcButton>
+      <RcButton variant="accent" :loading="isSubmitting" @click="onSubmit">
+        Verecek oluştur
       </RcButton>
     </template>
   </RcModal>

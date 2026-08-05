@@ -68,7 +68,7 @@ function submit() {
     <template #header>
       <div>
         <h2 class="rc-modal__title">
-          <RcIcon name="edit" :size="18" style="color: var(--rc-blue-500); vertical-align: -3px; margin-right: 8px" />
+          <RcIcon name="edit" :size="18" class="rc-modal__title-icon" />
           Sürücü düzenle
         </h2>
         <div v-if="driver" class="rc-modal__sub">{{ displayName }}</div>
@@ -124,8 +124,8 @@ function submit() {
     <template #footer>
       <span class="rc-spacer" />
       <RcButton variant="ghost" @click="emit('close')">Vazgeç</RcButton>
-      <RcButton variant="accent" :disabled="saving" @click="submit">
-        {{ saving ? 'Kaydediliyor…' : 'Kaydet' }}
+      <RcButton variant="accent" :loading="saving" @click="submit">
+        Kaydet
       </RcButton>
     </template>
   </RcModal>

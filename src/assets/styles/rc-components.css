@@ -151,7 +151,9 @@
   color: var(--rc-text);
   transition: border-color var(--rc-dur-fast), box-shadow var(--rc-dur-fast);
 }
-.rc-textarea { height: auto; padding: 8px 10px; line-height: 1.45; }
+.rc-textarea { height: auto; padding: 8px 10px; line-height: 1.45; resize: vertical; }
+.rc-textarea--md   { min-height: 72px; }
+.rc-textarea--tall { min-height: 96px; }
 .rc-input:hover, .rc-select:hover { border-color: var(--rc-border-strong); }
 .rc-input:focus, .rc-select:focus, .rc-textarea:focus {
   outline: none;
@@ -181,6 +183,15 @@
   font-size: var(--rc-fs-13);
 }
 .rc-input-group .rc-icon { color: var(--rc-text-faint); flex: 0 0 16px; }
+/* Sonek/önek etiketi (%, ₺, TRY gibi birimler) */
+.rc-input-group__affix {
+  flex: 0 0 auto;
+  color: var(--rc-text-muted);
+  font-size: var(--rc-fs-13);
+  font-weight: var(--rc-fw-medium);
+  pointer-events: none;
+  user-select: none;
+}
 
 .rc-input--lg { height: 40px; font-size: var(--rc-fs-14); }
 

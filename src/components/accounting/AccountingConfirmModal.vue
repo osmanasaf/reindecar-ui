@@ -29,14 +29,12 @@ async function onConfirm() {
 
 <template>
   <RcModal :open="open" :title="title" @close="emit('close')">
-    <p style="margin: 0; font-size: 14px; color: var(--rc-text-muted); line-height: 1.5">
-      {{ message }}
-    </p>
+    <p class="rc-modal-prose">{{ message }}</p>
     <template #footer>
-      <RcButton variant="secondary" @click="emit('close')">Vazgeç</RcButton>
+      <RcButton variant="ghost" @click="emit('close')">Vazgeç</RcButton>
       <RcButton
-        :variant="variant === 'warning' ? 'secondary' : 'primary'"
-        :disabled="submitting"
+        :variant="variant === 'danger' ? 'danger' : 'accent'"
+        :loading="submitting"
         @click="onConfirm"
       >
         {{ confirmLabel || 'Onayla' }}

@@ -142,11 +142,162 @@
   border-top: 1px solid var(--rc-border-subtle);
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 8px;
   background: var(--rc-surface-2);
   border-radius: 0 0 var(--rc-r-12) var(--rc-r-12);
 }
+/* Sağa hizalama varsayılan. Solda kalması gereken bir eylem varsa
+   (ör. "Sil") araya .rc-spacer koy — flex:1 ile boşluğu o yutar. */
 .rc-modal__foot .rc-spacer { flex: 1; }
+
+/* ── Modal içi ortak yapı taşları ──
+   Modül bağımsız: rentals, accounting, vehicles hepsi bunları kullanır. */
+
+.rc-modal__title-icon {
+  color: var(--rc-accent);
+  vertical-align: -3px;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+.rc-modal__title-icon--danger  { color: var(--rc-danger-500); }
+.rc-modal__title-icon--warning { color: var(--rc-warning-500); }
+.rc-modal__title-icon--success { color: var(--rc-success-500); }
+
+/* Onay/bilgi modallerinin gövde metni */
+.rc-modal-prose {
+  margin: 0;
+  font-size: var(--rc-fs-14);
+  line-height: var(--rc-lh-base);
+  color: var(--rc-text-muted);
+}
+.rc-modal-prose strong { color: var(--rc-text); font-weight: var(--rc-fw-semibold); }
+
+/* İki kolonlu form ızgarası — `rc-form-grid` kart/panel içinde,
+   `rc-modal-form` modal gövdesinde aynı ızgaranın adıdır. */
+.rc-modal-form,
+.rc-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.rc-modal-form--single,
+.rc-form-grid--single { grid-template-columns: 1fr; }
+.rc-modal-form__full,
+.rc-form-grid__full { grid-column: 1 / -1; }
+
+@media (max-width: 640px) {
+  .rc-modal-form,
+  .rc-form-grid { grid-template-columns: 1fr; }
+}
+
+/* Öne çıkan tutar/bakiye şeridi — "Ödeme al" gibi finansal modallarda
+   ana rakamı taşır. --success ve --neutral varyantları da var. */
+.rc-modal-callout {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  background: var(--rc-warning-50);
+  border: 1px solid var(--rc-warning-200);
+  border-radius: var(--rc-r-8);
+}
+.rc-modal-callout--success {
+  background: var(--rc-success-50);
+  border-color: var(--rc-success-200);
+}
+.rc-modal-callout--neutral {
+  justify-content: center;
+  background: var(--rc-surface-2);
+  border-color: var(--rc-border-subtle);
+  color: var(--rc-text-muted);
+  font-size: 13px;
+}
+.rc-modal-callout__main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.rc-modal-callout__label {
+  font-size: 11px;
+  font-weight: var(--rc-fw-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--rc-tracking-caps);
+  color: var(--rc-text-muted);
+}
+.rc-modal-callout__value {
+  font-size: 22px;
+  font-weight: var(--rc-fw-bold);
+  color: var(--rc-warning-800);
+  line-height: var(--rc-lh-tight);
+}
+.rc-modal-callout--success .rc-modal-callout__value { color: var(--rc-success-800); }
+
+/* Rakamın kendisi tıklanabilirse (tutarı forma yazmak için) */
+button.rc-modal-callout__value {
+  display: inline-block;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 22px;
+  font-weight: var(--rc-fw-bold);
+  text-align: left;
+  cursor: pointer;
+}
+button.rc-modal-callout__value:hover:not(:disabled) {
+  color: var(--rc-accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+button.rc-modal-callout__value:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+/* Girdi + yardımcı buton yan yana (ör. "Kalanı yaz") */
+.rc-modal-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.rc-modal-input-row .rc-input,
+.rc-modal-input-row .rc-field {
+  flex: 1;
+  min-width: 0;
+}
+.rc-modal-input-row .rc-btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* Onay kutusu satırı */
+.rc-modal-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--rc-fs-13);
+  cursor: pointer;
+}
+
+/* Net/özet satırı */
+.rc-modal-summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--rc-surface-2);
+  border-radius: var(--rc-r-6);
+  font-size: var(--rc-fs-13);
+}
+.rc-modal-summary__value {
+  font-weight: var(--rc-fw-semibold);
+  color: var(--rc-text);
+}
 
 .rc-segtabs {
   display: flex;
@@ -155,6 +306,13 @@
   padding: 0 20px;
   background: var(--rc-surface);
   border-radius: var(--rc-r-10) var(--rc-r-10) 0 0;
+}
+/* Modal gövdesi gibi kendi yatay boşluğu olan kaplarda sekmeleri
+   alttaki alanlarla hizalamak için yan boşluğu kaldırır. */
+.rc-segtabs--flush {
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
 }
 .rc-segtab {
   display: inline-flex;
@@ -214,3 +372,134 @@
   height: 40px;
   color: var(--rc-text-faint);
 }
+
+/* ── Dosya bırakma alanı (RcDropzone) ────────────────────────
+   Tıkla-veya-sürükle dosya seçimi. Modal ve kart gövdesinde
+   aynı görünür; kompakt hâli için `--sm`. */
+.rc-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 40px;
+  border: 2px dashed var(--rc-border-strong);
+  border-radius: var(--rc-r-12);
+  background: var(--rc-surface-2);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color var(--rc-dur-base), background var(--rc-dur-base);
+}
+.rc-dropzone:hover { border-color: var(--rc-accent); }
+.rc-dropzone:focus-visible {
+  outline: none;
+  border-color: var(--rc-accent);
+  box-shadow: var(--rc-focus-ring);
+}
+.rc-dropzone--over { border-color: var(--rc-accent); background: var(--rc-accent-subtle); }
+.rc-dropzone--busy { opacity: 0.7; pointer-events: none; }
+.rc-dropzone--disabled { opacity: 0.55; cursor: not-allowed; pointer-events: none; }
+.rc-dropzone--sm {
+  flex-direction: row;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  text-align: left;
+}
+.rc-dropzone__icon {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--rc-r-12);
+  background: var(--rc-surface);
+  color: var(--rc-accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--rc-shadow-sm);
+  flex-shrink: 0;
+}
+.rc-dropzone--sm .rc-dropzone__icon {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--rc-r-8);
+}
+.rc-dropzone__title { font-size: 13.5px; font-weight: 600; color: var(--rc-text); }
+.rc-dropzone__hint { font-size: 12.5px; color: var(--rc-text-muted); margin-top: 2px; }
+
+/* ── Durum bildirimi (başlık + açıklama + eylem) ──────────────
+   Tek satırlık uyarılar için `.rc-alert` yeterli; başlıklı ve
+   eylem düğmeli bildirimler bu bloğu kullanır. */
+.rc-callout {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 13px 15px;
+  border: 1px solid transparent;
+  border-radius: var(--rc-r-10);
+}
+.rc-callout--ok {
+  background: var(--rc-success-50);
+  border-color: color-mix(in srgb, var(--rc-success-500) 22%, transparent);
+  color: var(--rc-success-700);
+}
+.rc-callout--warn {
+  background: var(--rc-warning-50);
+  border-color: color-mix(in srgb, var(--rc-warning-500) 26%, transparent);
+  color: var(--rc-warning-700);
+}
+.rc-callout--danger {
+  background: var(--rc-danger-50);
+  border-color: color-mix(in srgb, var(--rc-danger-500) 24%, transparent);
+  color: var(--rc-danger-700);
+}
+.rc-callout--info {
+  background: var(--rc-info-50);
+  border-color: color-mix(in srgb, var(--rc-info-500) 24%, transparent);
+  color: var(--rc-info-700);
+}
+.rc-callout--muted {
+  background: var(--rc-surface-2);
+  border-color: var(--rc-border-subtle);
+  color: var(--rc-text-muted);
+}
+.rc-callout__icon { display: inline-flex; flex-shrink: 0; margin-top: 1px; }
+.rc-callout__text { flex: 1; min-width: 0; }
+.rc-callout__title { font-size: 13px; font-weight: 600; }
+.rc-callout__desc { font-size: 12.5px; color: var(--rc-text-soft); margin-top: 2px; }
+.rc-callout__desc strong { color: var(--rc-text); font-weight: 600; }
+.rc-callout__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+
+/* ── Yüklü dosya satırı ──────────────────────────────────────── */
+.rc-filerow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--rc-border-subtle);
+  border-radius: var(--rc-r-10);
+  background: var(--rc-surface-2);
+}
+.rc-filerow__badge {
+  width: 34px;
+  height: 40px;
+  border-radius: var(--rc-r-4);
+  background: var(--rc-danger-50);
+  color: var(--rc-danger-700);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.rc-filerow__text { flex: 1; min-width: 0; }
+.rc-filerow__name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--rc-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rc-filerow__meta { font-size: 12px; color: var(--rc-text-muted); }

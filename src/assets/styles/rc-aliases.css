@@ -1,0 +1,51 @@
+/* ===========================================================
+   TOKEN ALIASLARI
+   Kod tabanında v2 (--rc-*) şemasının yanında ikinci bir
+   isimlendirme şeması birikmiş: radius-md / green-600 / orange-500
+   gibi adlar hiçbir yerde tanımlı değildi, dolayısıyla onları
+   kullanan kurallar sessizce geçersizdi (köşeler kare kalıyor,
+   renk hiç uygulanmıyordu).
+
+   Buradaki aliaslar o adları kanonik token'lara bağlar. Yeni kodda
+   kanonik adları kullan; bu dosya yalnızca geçiş katmanıdır.
+
+   Aliaslar kanonik token'lara işaret ettiği için dark tema
+   otomatik olarak doğru çalışır — ayrı bir dark bloğu gerekmez.
+   =========================================================== */
+:root {
+  /* — Radius: --rc-radius-* → --rc-r-* — */
+  --rc-radius-sm: var(--rc-r-6);
+  --rc-radius-md: var(--rc-r-8);
+  --rc-radius-lg: var(--rc-r-12);
+  --rc-radius:    var(--rc-r-8);
+
+  /* — Renk ailesi adları: green/red/orange → success/danger/warning — */
+  --rc-green-500: var(--rc-success-500);
+  --rc-green-600: var(--rc-success-600);
+
+  --rc-red-500: var(--rc-danger-500);
+  --rc-red-600: var(--rc-danger-600);
+
+  --rc-orange-50:  var(--rc-warning-50);
+  --rc-orange-200: var(--rc-warning-200);
+  --rc-orange-400: var(--rc-warning-400);
+  --rc-orange-500: var(--rc-warning-500);
+  --rc-orange-600: var(--rc-warning-600);
+  --rc-orange-800: var(--rc-warning-800);
+
+  /* — Yüzeyler — */
+  --rc-surface-1:      var(--rc-surface);
+  --rc-surface-muted:  var(--rc-surface-2);
+  --rc-bg-muted:       var(--rc-bg-subtle);
+
+  /* — Tipografi — */
+  --rc-font:          var(--rc-font-sans);
+  --rc-text-xs:       var(--rc-fs-11);
+  --rc-text-sm:       var(--rc-fs-13);
+  --rc-weight-medium: var(--rc-fw-medium);
+
+  /* — Spacing / motion — */
+  --rc-space-4:        var(--rc-s-4);
+  --rc-dur-normal:     var(--rc-dur-base);
+  --rc-transition-fast: var(--rc-dur-fast) var(--rc-ease-out);
+}

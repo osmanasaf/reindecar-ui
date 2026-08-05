@@ -72,7 +72,7 @@ async function handleSubmit() {
 
     <template #footer>
       <RcButton variant="ghost" @click="emit('close')">Vazgeç</RcButton>
-      <RcButton type="submit" variant="primary" form="maintenance-schedule-complete-form" :loading="submitting">
+      <RcButton type="submit" variant="accent" form="maintenance-schedule-complete-form" :loading="submitting">
         Tamamla
       </RcButton>
     </template>

@@ -108,7 +108,7 @@ watch(
     <template #header>
       <div>
         <h2 class="rc-modal__title">
-          <RcIcon name="user" :size="20" style="color: var(--rc-blue-500); vertical-align: -3px; margin-right: 8px" />
+          <RcIcon name="user" :size="20" class="rc-modal__title-icon" />
           Sürücü ekle
         </h2>
         <div v-if="rental" class="rc-modal__sub">{{ rental.rentalNumber }}</div>
@@ -181,9 +181,9 @@ watch(
     <template #footer>
       <span class="rc-spacer" />
       <RcButton variant="ghost" @click="handleClose">Vazgeç</RcButton>
-      <RcButton variant="accent" :disabled="!canSubmit || submitting" @click="submit">
+      <RcButton variant="accent" :loading="submitting" :disabled="!canSubmit" @click="submit">
         <RcIcon name="plus" :size="14" />
-        {{ submitting ? 'Ekleniyor…' : 'Sürücü ekle' }}
+        Sürücü ekle
       </RcButton>
     </template>
   </RcModal>

@@ -40,6 +40,11 @@ const breadcrumbLabels: Record<string, string> = {
   'km-packages': 'KM Paketleri',
   penalties: 'Cezalar',
   'penalty-detail': 'Ceza Detayı',
+  'service-manifests': 'UETDS Manifestoları',
+  'service-manifest-detail': 'Manifesto Detayı',
+  'kabis-notifications': 'KABİS Bildirimleri',
+  'kabis-notification-detail': 'Bildirim Detayı',
+  maintenance: 'Bakım Takibi',
 }
 
 const breadcrumbs = computed<BreadcrumbItem[]>(() => {
@@ -67,6 +72,8 @@ const breadcrumbs = computed<BreadcrumbItem[]>(() => {
     'installment-detail': { label: 'Alacak / Verecek', to: '/installments/dashboard' },
     'installments-dashboard': { label: 'Alacak / Verecek', to: '/accounting/receivables' },
     'penalty-detail': { label: 'Cezalar', to: '/penalties' },
+    'service-manifest-detail': { label: 'UETDS Manifestoları', to: '/service-manifests' },
+    'kabis-notification-detail': { label: 'KABİS Bildirimleri', to: '/kabis/notifications' },
   }
 
   const parent = sectionMap[routeName]

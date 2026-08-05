@@ -2,7 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { serviceManifestsApi } from '@/api'
 import { useToast } from '@/composables'
-import { RcModal, RcButton } from '@/components/rc'
+import { RcModal, RcButton, RcDropzone } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
 import { downloadBlob } from '@/utils/download'
 import type { CreateUetdsPassengerRequest, PassengerImportRowResult } from '@/types/manifest'
@@ -19,10 +19,8 @@ const emit = defineEmits<{
 
 const toast = useToast()
 const importing = ref(false)
-const dragOver = ref(false)
 const importRows = ref<PassengerImportRowResult[]>([])
 const importSelection = ref<Set<number>>(new Set())
-const fileInput = ref<HTMLInputElement | null>(null)
 
 const hasPreview = computed(() => importRows.value.length > 0)
 const selectedCount = computed(() => importSelection.value.size)
@@ -35,7 +33,6 @@ watch(
     if (isOpen) {
       importRows.value = []
       importSelection.value = new Set()
-      dragOver.value = false
     }
   },
 )
@@ -53,10 +50,6 @@ async function downloadExcelTemplate() {
   } catch (err) {
     toast.apiError(err, 'Şablon indirilemedi')
   }
-}
-
-function openPicker() {
-  fileInput.value?.click()
 }
 
 async function processFile(file: File) {
@@ -77,16 +70,8 @@ async function processFile(file: File) {
   }
 }
 
-async function onFileInput(event: Event) {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  input.value = ''
-  if (file) await processFile(file)
-}
-
-async function onDrop(event: DragEvent) {
-  dragOver.value = false
-  const file = event.dataTransfer?.files?.[0]
+async function handleFilesSelected(files: File[]) {
+  const file = files[0]
   if (file) await processFile(file)
 }
 
@@ -128,14 +113,6 @@ async function confirmImport() {
     subtitle="Yüklenen liste mevcut yolcuların yerine geçer"
     @close="emit('close')"
   >
-    <input
-      ref="fileInput"
-      type="file"
-      accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-      style="display: none"
-      @change="onFileInput"
-    />
-
     <div class="pi-templates">
       <RcButton variant="ghost" size="sm" @click="downloadCsvTemplate">
         <RcIcon name="download" :size="14" />
@@ -195,24 +172,14 @@ async function confirmImport() {
     </template>
 
     <!-- Boş durum: dropzone -->
-    <div
+    <RcDropzone
       v-else
-      class="pi-dropzone"
-      :class="{ 'pi-dropzone--over': dragOver, 'pi-dropzone--busy': importing }"
-      role="button"
-      tabindex="0"
-      @click="openPicker"
-      @keydown.enter="openPicker"
-      @dragover.prevent="dragOver = true"
-      @dragleave.prevent="dragOver = false"
-      @drop.prevent="onDrop"
-    >
-      <span class="pi-dropzone__icon"><RcIcon name="upload" :size="20" /></span>
-      <div class="pi-dropzone__text">
-        <div class="pi-dropzone__title">{{ importing ? 'Dosya işleniyor…' : 'Dosyayı buraya sürükle veya seç' }}</div>
-        <div class="pi-dropzone__hint">CSV veya Excel (.xlsx)</div>
-      </div>
-    </div>
+      accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      :busy="importing"
+      title="Dosyayı buraya sürükle veya seç"
+      hint="CSV veya Excel (.xlsx)"
+      @select="handleFilesSelected"
+    />
 
     <template #footer>
       <span class="pi-footnote">
@@ -221,9 +188,9 @@ async function confirmImport() {
           : 'Yüklenen liste mevcut yolcuların yerine geçer' }}
       </span>
       <div class="pi-footer-actions">
-        <RcButton variant="secondary" @click="emit('close')">Vazgeç</RcButton>
+        <RcButton variant="ghost" @click="emit('close')">Vazgeç</RcButton>
         <RcButton
-          variant="primary"
+          variant="accent"
           :disabled="importing || selectedCount === 0"
           :loading="importing"
           @click="confirmImport"
@@ -292,35 +259,6 @@ async function confirmImport() {
 .pi-status { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pi-status--ok { color: var(--rc-success-700); }
 .pi-status--err { color: var(--rc-danger-700); }
-
-.pi-dropzone {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 40px;
-  border: 2px dashed var(--rc-border-strong);
-  border-radius: var(--rc-r-12);
-  background: var(--rc-surface-2);
-  text-align: center;
-  transition: border-color var(--rc-dur-base), background var(--rc-dur-base);
-}
-.pi-dropzone--over { border-color: var(--rc-accent); background: var(--rc-accent-subtle); }
-.pi-dropzone--busy { opacity: 0.7; pointer-events: none; }
-.pi-dropzone__icon {
-  width: 44px;
-  height: 44px;
-  border-radius: var(--rc-r-12);
-  background: var(--rc-surface);
-  color: var(--rc-accent);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: var(--rc-shadow-sm);
-}
-.pi-dropzone__title { font-size: 13.5px; font-weight: 600; color: var(--rc-text); }
-.pi-dropzone__hint { font-size: 12.5px; color: var(--rc-text-muted); margin-top: 2px; }
 
 .pi-footnote { font-size: 12.5px; color: var(--rc-text-muted); flex: 1; }
 .pi-footer-actions { display: flex; gap: 8px; }

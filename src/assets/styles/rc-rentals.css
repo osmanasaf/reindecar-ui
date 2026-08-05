@@ -135,7 +135,7 @@
 
 .rc-rental-quick__alert {
   padding: 10px 20px;
-  border-bottom: 1px solid var(--rc-danger-100, #f4bcba);
+  border-bottom: 1px solid var(--rc-danger-100);
 }
 
 .rc-rental-quick__rail-wrap {
@@ -848,7 +848,7 @@
 }
 
 .rcr-detail .list-row-clickable:hover {
-  background: var(--rc-surface-3, #eef2f7);
+  background: var(--rc-surface-3);
 }
 
 .rcr-detail .driver-item {
@@ -903,97 +903,9 @@
   border-bottom: none;
 }
 
-.rcr-payment-modal-balance {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 16px;
-  padding: 14px 16px;
-  background: var(--rc-warning-50, #fffbeb);
-  border: 1px solid var(--rc-warning-200, #fde68a);
-  border-radius: var(--rc-r-8);
-}
-
-.rcr-payment-modal-balance--paid {
-  justify-content: center;
-  background: var(--rc-surface-2);
-  border-color: var(--rc-border-subtle);
-  color: var(--rc-text-muted);
-  font-size: 13px;
-}
-
-.rcr-payment-modal-balance__main {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-
-.rcr-payment-modal-balance__label {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--rc-text-muted);
-}
-
-.rcr-payment-modal-balance__value {
-  display: inline-block;
-  padding: 0;
-  border: none;
-  background: none;
-  font: inherit;
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--rc-warning-800, #92400e);
-  line-height: 1.2;
-  text-align: left;
-  cursor: pointer;
-}
-
-.rcr-payment-modal-balance__value:hover:not(:disabled) {
-  color: var(--rc-blue-600, #2563eb);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
-.rcr-payment-modal-balance__value:disabled {
-  cursor: default;
-  opacity: 1;
-}
-
-.rcr-payment-modal-amount-row {
-  display: flex;
-  gap: 8px;
-  align-items: stretch;
-}
-
-.rcr-payment-modal-amount-row .rc-input {
-  flex: 1;
-  min-width: 0;
-}
-
-.rcr-payment-modal-amount-row .rc-btn {
-  flex-shrink: 0;
-  white-space: nowrap;
-}
-
-.rcr-modal-form-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-}
-
-.rcr-modal-form-grid__full {
-  grid-column: 1 / -1;
-}
-
-.rcr-modal__title-icon {
-  color: var(--rc-blue-500);
-  vertical-align: -3px;
-  margin-right: 8px;
-}
+/* Ödeme şeridi, form ızgarası ve başlık ikonu rc-primitives.css'e taşındı
+   (.rc-modal-callout / .rc-modal-form / .rc-modal__title-icon) — accounting
+   ve vehicles modalleri de aynı görsel dili paylaşsın diye. */
 
 .rcr-modal-rail {
   margin-bottom: 16px;
@@ -1037,11 +949,6 @@
   margin-bottom: 16px;
 }
 
-@media (max-width: 640px) {
-  .rcr-modal-form-grid {
-    grid-template-columns: 1fr;
-  }
-}
 
 /* ── Return complete modal ── */
 .rcr-return-modal__loading {
@@ -1505,7 +1412,7 @@
   align-items: center;
   padding: 12px 14px;
   background: var(--rc-success-50);
-  border: 1px solid var(--rc-success-100, #b6e5c8);
+  border: 1px solid var(--rc-success-100);
   border-radius: var(--rc-r-8);
   font-size: 13px;
 }
@@ -3133,7 +3040,7 @@
 }
 
 .rcr-create .rcr-extra-items .item-card:hover {
-  background: var(--rc-surface-3, #eef2f7);
+  background: var(--rc-surface-3);
 }
 
 .rcr-create .rcr-extra-items .item-icon {

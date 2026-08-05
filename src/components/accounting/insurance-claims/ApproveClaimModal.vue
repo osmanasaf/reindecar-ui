@@ -80,9 +80,9 @@ function handleClose() {
       <span v-if="error" class="rc-field__error">{{ error }}</span>
     </form>
     <template #footer>
-      <RcButton variant="secondary" @click="handleClose">İptal</RcButton>
-      <RcButton variant="accent" type="submit" form="approve-claim-form" :disabled="isSubmitting">
-        {{ isSubmitting ? 'Onaylanıyor…' : 'Onayla' }}
+      <RcButton variant="ghost" @click="handleClose">Vazgeç</RcButton>
+      <RcButton variant="accent" type="submit" form="approve-claim-form" :loading="isSubmitting">
+        Onayla
       </RcButton>
     </template>
   </RcModal>

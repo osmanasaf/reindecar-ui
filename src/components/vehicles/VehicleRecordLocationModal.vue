@@ -94,7 +94,7 @@ async function save() {
     <template #header>
       <div>
         <h2 class="rc-modal__title">
-          <RcIcon name="pin" :size="20" style="vertical-align: -3px; margin-right: 8px" />
+          <RcIcon name="pin" :size="20" class="rc-modal__title-icon" />
           Günlük konum kaydı
         </h2>
         <div class="rc-modal__sub">Aracın belirli bir günde bulunduğu şubeyi kaydedin</div>
@@ -122,7 +122,7 @@ async function save() {
       <RcField label="Not (opsiyonel)" class="rcv-form-grid__full">
         <textarea
           v-model="notes"
-          class="rc-input"
+          class="rc-textarea"
           rows="3"
           placeholder="Otopark, adres veya açıklama"
         />

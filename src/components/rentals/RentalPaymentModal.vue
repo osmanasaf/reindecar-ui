@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
-import { RcModal, RcButton } from '@/components/rc'
+import { RcModal, RcButton, RcField } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
 import { paymentApi } from '@/api'
 import { useToast, useValidation, rules } from '@/composables'
@@ -84,7 +84,7 @@ const netAmount = computed(() =>
     : amount.value,
 )
 
-const { validateForm, getError, hasError, touch, reset } = useValidation(() => formRules.value)
+const { validateForm, getError, touch, reset } = useValidation(() => formRules.value)
 
 const roundedRemaining = computed(() =>
   Math.round(props.remainingAmount * 100) / 100,
@@ -137,7 +137,7 @@ function handleClose() {
     <template #header>
       <div>
         <h2 class="rc-modal__title">
-          <RcIcon name="cash" :size="20" style="color: var(--rc-blue-500); vertical-align: -3px; margin-right: 8px" />
+          <RcIcon name="cash" :size="20" class="rc-modal__title-icon" />
           Ödeme al
         </h2>
         <div v-if="rental" class="rc-modal__sub">
@@ -146,94 +146,71 @@ function handleClose() {
       </div>
     </template>
 
-    <div
-      v-if="roundedRemaining > 0"
-      class="rcr-payment-modal-balance"
-      role="status"
-    >
-      <div class="rcr-payment-modal-balance__main">
-        <span class="rcr-payment-modal-balance__label">Tahsil edilecek kalan</span>
+    <div v-if="roundedRemaining > 0" class="rc-modal-callout" role="status">
+      <div class="rc-modal-callout__main">
+        <span class="rc-modal-callout__label">Tahsil edilecek kalan</span>
         <button
           type="button"
-          class="rcr-payment-modal-balance__value rc-num"
-          :disabled="roundedRemaining <= 0 || isFullRemaining"
-          title="Kalan tutarı yaz"
+          class="rc-modal-callout__value rc-num"
+          :disabled="isFullRemaining"
+          title="Kalan tutarı forma yaz"
           @click="setRemainingAmount"
         >
           {{ fmtTRY(roundedRemaining) }}
         </button>
       </div>
-      <RcButton
-        variant="ghost"
-        size="sm"
-        type="button"
-        :disabled="isFullRemaining"
-        @click="setRemainingAmount"
-      >
+      <RcButton variant="ghost" size="sm" :disabled="isFullRemaining" @click="setRemainingAmount">
         {{ isFullRemaining ? 'Kalanın tamamı seçili' : 'Kalanın tamamını al' }}
       </RcButton>
     </div>
 
-    <div v-else class="rcr-payment-modal-balance rcr-payment-modal-balance--paid">
+    <div v-else class="rc-modal-callout rc-modal-callout--neutral">
       <span>Tahsil edilecek bakiye kalmadı.</span>
     </div>
 
-    <div class="rcr-modal-form-grid">
-      <div class="rc-field rcr-modal-form-grid__full" :class="{ 'rc-field--error': hasError('amount') }">
-        <label class="rc-field__label">Tutar (₺)</label>
-        <div class="rcr-payment-modal-amount-row">
-          <input
-            v-model.number="amount"
-            class="rc-input"
-            type="number"
-            min="0"
-            :max="roundedRemaining"
-            step="0.01"
-            placeholder="0,00"
-            @blur="touch('amount')"
-          />
-          <RcButton
-            variant="ghost"
-            size="sm"
-            type="button"
-            title="Kalan tutarı yaz"
-            :disabled="roundedRemaining <= 0 || isFullRemaining"
-            @click="setRemainingAmount"
-          >
-            <RcIcon name="cash" :size="14" />
-            Kalanı yaz
-          </RcButton>
-        </div>
-        <span class="rc-field__hint">
-          En fazla {{ fmtTRY(roundedRemaining) }} tahsil edilebilir
-        </span>
-        <span v-if="hasError('amount')" class="rc-field__error">{{ getError('amount') }}</span>
-      </div>
-      <div class="rc-field">
-        <label class="rc-field__label">Ödeme yöntemi</label>
+    <div class="rc-modal-form">
+      <RcField
+        class="rc-modal-form__full"
+        label="Tutar (₺)"
+        required
+        :error="getError('amount')"
+        :hint="`En fazla ${fmtTRY(roundedRemaining)} tahsil edilebilir`"
+      >
+        <input
+          v-model.number="amount"
+          class="rc-input"
+          type="number"
+          min="0"
+          :max="roundedRemaining"
+          step="0.01"
+          placeholder="0,00"
+          @blur="touch('amount')"
+        />
+      </RcField>
+
+      <RcField label="Ödeme yöntemi" required>
         <select v-model="method" class="rc-select">
           <option v-for="m in paymentMethods" :key="m.value" :value="m.value">{{ m.label }}</option>
         </select>
-      </div>
-      <div class="rc-field">
-        <label class="rc-field__label">İşlem referansı (opsiyonel)</label>
-        <input v-model="transactionRef" class="rc-input" type="text" placeholder="POS slip no, dekont…" />
-      </div>
-      <div class="rc-field rcr-modal-form-grid__full">
-        <label class="rc-field__label">Not (opsiyonel)</label>
-        <textarea v-model="notes" class="rc-textarea" rows="2" placeholder="Tahsilat notu" />
-      </div>
+      </RcField>
 
-      <div class="rc-field rcr-modal-form-grid__full">
-        <label class="rc-field__checkbox">
+      <RcField label="İşlem referansı" hint="Opsiyonel">
+        <input v-model="transactionRef" class="rc-input" type="text" placeholder="POS slip no, dekont…" />
+      </RcField>
+
+      <RcField class="rc-modal-form__full" label="Not" hint="Opsiyonel">
+        <textarea v-model="notes" class="rc-textarea" rows="2" placeholder="Tahsilat notu" />
+      </RcField>
+
+      <div class="rc-modal-form__full">
+        <label class="rc-modal-check">
           <input v-model="applyDiscount" type="checkbox" />
           İndirim uygula
         </label>
       </div>
 
       <template v-if="applyDiscount">
-        <div class="rc-field" :class="{ 'rc-field--error': hasError('discountAmount') }">
-          <label class="rc-field__label">İndirim tutarı (₺)</label>
+        <RcField label="İndirim tutarı (₺)" required :error="getError('discountAmount')">
           <input
             v-model.number="discountAmount"
             class="rc-input"
@@ -244,35 +221,30 @@ function handleClose() {
             placeholder="0,00"
             @blur="touch('discountAmount')"
           />
-          <span v-if="hasError('discountAmount')" class="rc-field__error">{{ getError('discountAmount') }}</span>
-        </div>
-        <div class="rc-field">
-          <label class="rc-field__label">İndirim sebebi (opsiyonel)</label>
+        </RcField>
+
+        <RcField label="İndirim sebebi" hint="Opsiyonel">
           <input v-model="discountReason" class="rc-input" type="text" placeholder="Vade iskontosu, kampanya…" />
-        </div>
-        <div class="rc-field rcr-modal-form-grid__full">
-          <span class="rc-field__hint">Net tahsil edilecek tutar: <strong>{{ fmtTRY(netAmount) }}</strong></span>
+        </RcField>
+
+        <div class="rc-modal-form__full rc-modal-summary">
+          <span>Net tahsil edilecek tutar</span>
+          <span class="rc-modal-summary__value rc-num">{{ fmtTRY(netAmount) }}</span>
         </div>
       </template>
     </div>
 
     <template #footer>
-      <span class="rc-spacer" />
       <RcButton variant="ghost" @click="handleClose">Vazgeç</RcButton>
-      <RcButton variant="accent" :disabled="submitting || roundedRemaining <= 0" @click="confirm">
+      <RcButton
+        variant="accent"
+        :loading="submitting"
+        :disabled="roundedRemaining <= 0"
+        @click="confirm"
+      >
         <RcIcon name="check" :size="14" />
-        {{ submitting ? 'Kaydediliyor…' : 'Ödemeyi kaydet' }}
+        Ödemeyi kaydet
       </RcButton>
     </template>
   </RcModal>
 </template>
-
-<style scoped>
-.rc-field__checkbox {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  cursor: pointer;
-}
-</style>

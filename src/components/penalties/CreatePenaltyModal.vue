@@ -397,9 +397,9 @@ watch(() => props.show, async (newVal) => {
         </div>
       </form>
     <template #footer>
-      <RcButton variant="secondary" @click="handleClose">İptal</RcButton>
-      <RcButton variant="primary" type="submit" form="create-penalty-form" :disabled="isSubmitting || !selectedRentalId">
-        {{ isSubmitting ? 'Kaydediliyor…' : 'Kaydet' }}
+      <RcButton variant="ghost" @click="handleClose">Vazgeç</RcButton>
+      <RcButton variant="accent" type="submit" form="create-penalty-form" :loading="isSubmitting" :disabled="!selectedRentalId">
+        Kaydet
       </RcButton>
     </template>
   </RcModal>

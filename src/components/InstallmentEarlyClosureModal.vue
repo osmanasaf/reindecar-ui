@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import type { VehicleInstallmentResponse } from '@/types'
 import { RcModal, RcButton, RcField } from '@/components/rc'
+import { RcIcon } from '@/components/icons'
 
 interface Props {
   open: boolean
@@ -116,7 +117,7 @@ function handleSubmit() {
     <div class="rci-closure__section">
       <h4 class="rci-closure__section-title">İndirim (opsiyonel)</h4>
       <p class="rci-closure__hint">Erken ödeme indirimi uygulamak isterseniz oran veya tutar girebilirsiniz.</p>
-      <div class="rcs-modal-grid">
+      <div class="rc-modal-form">
         <RcField label="İndirim oranı (%)" hint="0–100 arası">
           <input
             v-model.number="discountPercentage"
@@ -157,24 +158,24 @@ function handleSubmit() {
       </div>
     </div>
 
-    <RcField label="Notlar (opsiyonel)">
+    <RcField label="Not" hint="Opsiyonel">
       <textarea
         v-model="notes"
-        class="rc-input"
+        class="rc-textarea"
         rows="3"
         placeholder="Erken kapama ile ilgili notlarınız…"
-        style="resize: vertical; min-height: 72px"
       />
     </RcField>
 
-    <div class="rca-pay-alert rca-pay-alert--warn" style="margin-top: 16px">
+    <div class="rca-pay-alert rca-pay-alert--warn rcr-modal-alert-spaced--top">
       <strong>Dikkat:</strong> Erken kapama işlemi geri alınamaz. Tüm kalan taksitler ödendi olarak işaretlenecektir.
     </div>
 
     <template #footer>
-      <RcButton variant="secondary" @click="emit('close')">İptal</RcButton>
-      <RcButton variant="primary" :disabled="processing" @click="handleSubmit">
-        {{ processing ? 'İşleniyor…' : `${formatCurrency(finalAmount)} öde ve kapat` }}
+      <RcButton variant="ghost" @click="emit('close')">Vazgeç</RcButton>
+      <RcButton variant="accent" :loading="processing" @click="handleSubmit">
+        <RcIcon name="check" :size="14" />
+        {{ formatCurrency(finalAmount) }} öde ve kapat
       </RcButton>
     </template>
   </RcModal>

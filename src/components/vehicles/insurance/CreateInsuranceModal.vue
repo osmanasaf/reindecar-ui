@@ -262,9 +262,9 @@ watch(() => props.show, (newVal) => {
         Tamamla
       </RcButton>
       <template v-else>
-        <RcButton variant="ghost" @click="handleClose">İptal</RcButton>
-        <RcButton variant="accent" type="submit" form="create-insurance-form" :disabled="isSubmitting">
-          {{ isSubmitting ? 'Kaydediliyor...' : 'Kaydet' }}
+        <RcButton variant="ghost" @click="handleClose">Vazgeç</RcButton>
+        <RcButton variant="accent" type="submit" form="create-insurance-form" :loading="isSubmitting">
+          Kaydet
         </RcButton>
       </template>
     </template>

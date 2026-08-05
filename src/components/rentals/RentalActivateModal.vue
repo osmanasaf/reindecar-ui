@@ -161,7 +161,7 @@ async function downloadHandoverPdf() {
     <template #header>
       <div>
         <h2 class="rc-modal__title">
-          <RcIcon name="key" :size="20" class="rcr-modal__title-icon" />
+          <RcIcon name="key" :size="20" class="rc-modal__title-icon" />
           Aracı teslim et · Kiralamayı aktive et
         </h2>
         <div v-if="rental" class="rc-modal__sub">
@@ -225,7 +225,7 @@ async function downloadHandoverPdf() {
       </div>
     </div>
 
-    <div class="rcr-modal-form-grid">
+    <div class="rc-modal-form">
       <div class="rc-field" :class="{ 'rc-field--error': hasError('startKm') }">
         <label class="rc-field__label">Başlangıç KM</label>
         <input
@@ -242,7 +242,7 @@ async function downloadHandoverPdf() {
         </span>
         <span v-if="hasError('startKm')" class="rc-field__error">{{ getError('startKm') }}</span>
       </div>
-      <div v-if="fuelTrackingEnabled" class="rc-field rcr-modal-form-grid__full" :class="{ 'rc-field--error': hasError('startFuelPercent') }">
+      <div v-if="fuelTrackingEnabled" class="rc-field rc-modal-form__full" :class="{ 'rc-field--error': hasError('startFuelPercent') }">
         <label class="rc-field__label">Yakıt seviyesi</label>
         <FuelLevelSelect v-model="startFuelPercent" input-id="activate-fuel-percent" />
         <span class="rc-field__hint">Teslimattaki depo seviyesi — hazır oranı seçin ya da yüzdeyi elle girin</span>
@@ -315,14 +315,14 @@ async function downloadHandoverPdf() {
       <template v-if="step === 'form'">
       <span class="rc-spacer" />
       <RcButton variant="ghost" @click="handleClose">Vazgeç</RcButton>
-      <RcButton variant="accent" :disabled="submitting" @click="confirm">
+      <RcButton variant="accent" :loading="submitting" @click="confirm">
         <RcIcon name="check" :size="14" />
-        {{ submitting ? 'Kaydediliyor…' : 'Teslimatı tamamla' }}
+        Teslimatı tamamla
       </RcButton>
       </template>
       <template v-else>
       <span class="rc-spacer" />
-      <RcButton variant="primary" @click="handleClose">Tamam</RcButton>
+      <RcButton variant="accent" @click="handleClose">Tamam</RcButton>
       </template>
     </template>
   </RcModal>
