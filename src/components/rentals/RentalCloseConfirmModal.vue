@@ -39,7 +39,7 @@ async function confirm() {
     <template #header>
       <div>
         <h2 class="rc-modal__title">
-          <RcIcon name="check" :size="20" style="color: var(--rc-blue-500); vertical-align: -3px; margin-right: 8px" />
+          <RcIcon name="check" :size="20" class="rc-modal__title-icon" />
           Kiralamayı kapat
         </h2>
         <div v-if="rental" class="rc-modal__sub">{{ rental.rentalNumber }}</div>
@@ -76,9 +76,9 @@ async function confirm() {
     <template #footer>
       <span class="rc-spacer" />
       <RcButton variant="ghost" @click="emit('close')">Vazgeç</RcButton>
-      <RcButton variant="accent" :disabled="submitting" @click="confirm">
+      <RcButton variant="accent" :loading="submitting" @click="confirm">
         <RcIcon name="check" :size="14" />
-        {{ submitting ? 'Kapatılıyor…' : 'Kiralamayı kapat' }}
+        Kiralamayı kapat
       </RcButton>
     </template>
   </RcModal>

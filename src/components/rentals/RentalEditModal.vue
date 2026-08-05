@@ -190,7 +190,7 @@ async function save() {
     <template #header>
       <div>
         <h2 class="rc-modal__title">
-          <RcIcon name="edit" :size="20" class="rcr-modal__title-icon" />
+          <RcIcon name="edit" :size="20" class="rc-modal__title-icon" />
           Kiralamayı düzenle
         </h2>
         <div v-if="rental" class="rc-modal__sub">
@@ -210,7 +210,7 @@ async function save() {
     <div v-if="rental" class="rcr-edit-modal">
       <section class="rcr-edit-modal__section">
         <h3 class="rcr-edit-modal__heading">Tarih &amp; şube</h3>
-        <div class="rcr-modal-form-grid">
+        <div class="rc-modal-form">
           <div class="rc-field">
             <label class="rc-field__label">Başlangıç</label>
             <DatePicker v-model="startDate" />
@@ -220,7 +220,7 @@ async function save() {
             <DatePicker v-model="endDate" :min="startDate" :disabled="openEnded" />
           </div>
           <FeatureGate feature="OPEN_ENDED_RENTAL">
-            <div v-if="openEndedEditable" class="rc-field rcr-modal-form-grid__full">
+            <div v-if="openEndedEditable" class="rc-field rc-modal-form__full">
               <label class="rcr-edit-modal__check">
                 <input v-model="openEnded" type="checkbox" @change="openEnded && (endDate = '')" />
                 <span>Açık uçlu kiralama (bitiş belirsiz)</span>
@@ -248,7 +248,7 @@ async function save() {
 
       <section class="rcr-edit-modal__section">
         <h3 class="rcr-edit-modal__heading">KM paketi</h3>
-        <div class="rcr-modal-form-grid">
+        <div class="rc-modal-form">
           <div class="rc-field">
             <label class="rc-field__label">Paket</label>
             <SearchableSelect
@@ -272,14 +272,14 @@ async function save() {
 
       <section class="rcr-edit-modal__section">
         <h3 class="rcr-edit-modal__heading">İndirim &amp; not</h3>
-        <div class="rcr-modal-form-grid">
+        <div class="rc-modal-form">
           <div class="rc-field">
             <label class="rc-field__label">İndirim tutarı (₺)</label>
             <input v-model.number="discountAmount" class="rc-input rc-num" type="number" min="0" step="0.01" />
           </div>
-          <div class="rc-field rcr-modal-form-grid__full">
+          <div class="rc-field rc-modal-form__full">
             <label class="rc-field__label">Notlar</label>
-            <textarea v-model="notes" class="rc-input" rows="3" placeholder="Kiralama notları" />
+            <textarea v-model="notes" class="rc-textarea" rows="3" placeholder="Kiralama notları" />
           </div>
         </div>
       </section>
@@ -293,9 +293,9 @@ async function save() {
     <template #footer>
       <span class="rc-spacer" />
       <RcButton variant="ghost" @click="emit('close')">Vazgeç</RcButton>
-      <RcButton variant="accent" :disabled="submitting" @click="save">
+      <RcButton variant="accent" :loading="submitting" @click="save">
         <RcIcon name="check" :size="14" />
-        {{ submitting ? 'Kaydediliyor…' : 'Kaydet' }}
+        Kaydet
       </RcButton>
     </template>
   </RcModal>

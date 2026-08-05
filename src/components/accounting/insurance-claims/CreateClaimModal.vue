@@ -199,11 +199,10 @@ watch(() => props.show, (newVal) => {
         <RcField label="Açıklama">
           <textarea
             v-model="values.description"
-            class="rc-input"
+            class="rc-textarea rc-textarea--tall"
             placeholder="Hasar detayları ve olay bilgileri"
             rows="4"
             maxlength="1000"
-            style="resize: vertical; min-height: 96px"
             @blur="validateField('description')"
           />
           <span v-if="touched.description && errors.description" class="rc-field__error">{{ errors.description }}</span>
@@ -212,11 +211,10 @@ watch(() => props.show, (newVal) => {
         <RcField label="Notlar">
           <textarea
             v-model="values.notes"
-            class="rc-input"
+            class="rc-textarea rc-textarea--md"
             placeholder="Ek notlar"
             rows="3"
             maxlength="500"
-            style="resize: vertical; min-height: 72px"
             @blur="validateField('notes')"
           />
           <span v-if="touched.notes && errors.notes" class="rc-field__error">{{ errors.notes }}</span>
@@ -224,9 +222,9 @@ watch(() => props.show, (newVal) => {
       </template>
     </form>
     <template #footer>
-      <RcButton variant="secondary" @click="handleClose">İptal</RcButton>
-      <RcButton variant="primary" type="submit" form="create-claim-form" :disabled="isSubmitting || insurances.length === 0">
-        {{ isSubmitting ? 'Oluşturuluyor…' : 'Başvuru oluştur' }}
+      <RcButton variant="ghost" @click="handleClose">Vazgeç</RcButton>
+      <RcButton variant="accent" type="submit" form="create-claim-form" :loading="isSubmitting" :disabled="insurances.length === 0">
+        Başvuru oluştur
       </RcButton>
     </template>
   </RcModal>

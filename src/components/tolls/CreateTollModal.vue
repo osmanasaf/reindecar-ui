@@ -4,10 +4,13 @@ import { tollsApi } from '@/api'
 import { useToast } from '@/composables'
 import { SearchableSelect } from '@/components/common'
 import DatePicker from '@/components/base/DatePicker.vue'
+import { RcModal, RcButton, RcField } from '@/components/rc'
+import { RcIcon } from '@/components/icons'
 import { TollType } from '@/types'
 import type { CreateTollRecordRequest } from '@/api'
 
 const props = defineProps<{
+  open: boolean
   rentalId: number
   vehicleId: number
   customerId: number
@@ -69,249 +72,80 @@ async function handleSubmit() {
 </script>
 
 <template>
-  <div class="modal-overlay" @click.self="emit('close')">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2>HGS/OGS Geçiş Kaydı</h2>
-        <button class="close-btn" @click="emit('close')">&times;</button>
+  <RcModal :open="open" wide @close="emit('close')">
+    <template #header>
+      <div>
+        <h2 class="rc-modal__title">
+          <RcIcon name="route" :size="20" class="rc-modal__title-icon" />
+          HGS/OGS geçiş kaydı
+        </h2>
+        <div class="rc-modal__sub">Geçiş, müşteriye alacak olarak yansıtılır</div>
       </div>
+    </template>
 
-      <form @submit.prevent="handleSubmit" class="toll-form">
-        <div class="form-grid">
-          <div class="form-group">
-            <label>Geçiş Tipi *</label>
-            <SearchableSelect
-              v-model="form.tollType"
-              :options="tollTypes"
-              placeholder="Geçiş tipi seçin"
-              search-placeholder="Ara..."
-            />
-          </div>
+    <form id="create-toll-form" class="rc-modal-form" @submit.prevent="handleSubmit">
+      <RcField label="Geçiş tipi" required>
+        <SearchableSelect
+          v-model="form.tollType"
+          :options="tollTypes"
+          placeholder="Geçiş tipi seçin"
+          search-placeholder="Ara…"
+        />
+      </RcField>
 
-          <div class="form-group">
-            <DatePicker
-              v-model="form.passageDate"
-              label="Geçiş Tarihi *"
-              placeholder="Tarih seçin"
-            />
-          </div>
+      <DatePicker
+        v-model="form.passageDate"
+        label="Geçiş tarihi *"
+        placeholder="Tarih seçin"
+      />
 
-          <div class="form-group">
-            <label for="passageLocation">Geçiş Noktası</label>
-            <input
-              id="passageLocation"
-              type="text"
-              v-model="form.passageLocation"
-              placeholder="Örn: FSM Köprüsü, Osmangazi Köprüsü"
-            />
-          </div>
+      <RcField label="Geçiş noktası" hint="Opsiyonel">
+        <input
+          v-model="form.passageLocation"
+          class="rc-input"
+          type="text"
+          placeholder="Örn: FSM Köprüsü, Osmangazi Köprüsü"
+        />
+      </RcField>
 
-          <div class="form-group">
-            <label for="tollAmount">Geçiş Ücreti (TRY) *</label>
-            <input
-              id="tollAmount"
-              type="number"
-              v-model.number="form.tollAmount"
-              placeholder="0.00"
-              step="0.01"
-              min="0"
-              required
-            />
-          </div>
+      <RcField label="Geçiş ücreti (₺)" required>
+        <input
+          v-model.number="form.tollAmount"
+          class="rc-input"
+          type="number"
+          placeholder="0,00"
+          step="0.01"
+          min="0"
+          required
+        />
+      </RcField>
 
-          <div class="form-group">
-            <label for="hgsTagNumber">HGS Etiket No</label>
-            <input
-              id="hgsTagNumber"
-              type="text"
-              v-model="form.hgsTagNumber"
-              placeholder="HGS-123456789"
-            />
-          </div>
+      <RcField label="HGS etiket no" hint="Opsiyonel">
+        <input
+          v-model="form.hgsTagNumber"
+          class="rc-input"
+          type="text"
+          placeholder="HGS-123456789"
+        />
+      </RcField>
 
-          <div class="form-group full-width">
-            <label for="description">Açıklama</label>
-            <textarea
-              id="description"
-              v-model="form.description"
-              rows="3"
-              placeholder="Ek bilgi..."
-            ></textarea>
-          </div>
-        </div>
+      <RcField class="rc-modal-form__full" label="Açıklama" hint="Opsiyonel">
+        <textarea
+          v-model="form.description"
+          class="rc-textarea"
+          rows="3"
+          placeholder="Ek bilgi…"
+        />
+      </RcField>
+    </form>
 
-        <div class="info-box">
-          Geçiş kaydı oluşturulduğunda otomatik olarak müşteriye alacak olarak yansıtılır.
-        </div>
-
-        <div class="form-actions">
-          <button type="button" class="btn btn-outline" @click="emit('close')">
-            İptal
-          </button>
-          <button type="submit" class="btn btn-primary" :disabled="submitting">
-            {{ submitting ? 'Kaydediliyor...' : 'Kaydet' }}
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
+    <template #footer>
+      <RcButton variant="ghost" @click="emit('close')">Vazgeç</RcButton>
+      <RcButton variant="accent" type="submit" form="create-toll-form" :loading="submitting">
+        <RcIcon name="check" :size="14" />
+        Kaydet
+      </RcButton>
+    </template>
+  </RcModal>
 </template>
 
-<style scoped>
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal-content {
-  background: var(--color-surface);
-  border-radius: 12px;
-  width: 90%;
-  max-width: 600px;
-  max-height: 90vh;
-  overflow-y: auto;
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px 24px;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.modal-header h2 {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 600;
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  font-size: 28px;
-  cursor: pointer;
-  color: var(--color-text-secondary);
-  padding: 0;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-}
-
-.close-btn:hover {
-  background: var(--color-bg-secondary);
-}
-
-.toll-form {
-  padding: 24px;
-}
-
-.form-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.form-group.full-width {
-  grid-column: 1 / -1;
-}
-
-.form-group label {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--color-text-secondary);
-}
-
-.form-group input,
-.form-group select,
-.form-group textarea {
-  padding: 10px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  font-size: 14px;
-  background: var(--color-bg-secondary);
-}
-
-.form-group input:focus,
-.form-group select:focus,
-.form-group textarea:focus {
-  outline: none;
-  border-color: var(--color-primary);
-  background: var(--color-surface);
-}
-
-.info-box {
-  margin-top: 16px;
-  padding: 12px 16px;
-  background: var(--color-info-bg, #e8f4fd);
-  border-radius: 8px;
-  font-size: 13px;
-  color: var(--color-info-text, #1565c0);
-  border-left: 3px solid var(--color-info, #2196f3);
-}
-
-.form-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  margin-top: 24px;
-  padding-top: 20px;
-  border-top: 1px solid var(--color-border);
-}
-
-.btn {
-  padding: 10px 24px;
-  border-radius: 8px;
-  font-weight: 500;
-  cursor: pointer;
-  border: none;
-  transition: all 0.2s;
-}
-
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn-primary {
-  background: var(--color-primary);
-  color: white;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: var(--color-primary-hover);
-}
-
-.btn-outline {
-  background: transparent;
-  border: 1px solid var(--color-border);
-  color: var(--color-text);
-}
-
-.btn-outline:hover {
-  background: var(--color-bg-secondary);
-}
-
-@media (max-width: 640px) {
-  .form-grid {
-    grid-template-columns: 1fr;
-  }
-}
-</style>

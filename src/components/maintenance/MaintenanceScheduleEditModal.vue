@@ -115,7 +115,7 @@ async function handleSubmit() {
       </div>
 
       <RcField label="Notlar">
-        <textarea v-model="form.notes" class="rc-input" rows="3" placeholder="Ek bilgi…"></textarea>
+        <textarea v-model="form.notes" class="rc-textarea" rows="3" placeholder="Ek bilgi…"></textarea>
       </RcField>
     </form>
 
@@ -123,7 +123,7 @@ async function handleSubmit() {
       <RcButton variant="ghost" @click="emit('close')">Vazgeç</RcButton>
       <RcButton
         type="submit"
-        variant="primary"
+        variant="accent"
         form="maintenance-schedule-edit-form"
         :loading="submitting"
         :disabled="loadingDetail"

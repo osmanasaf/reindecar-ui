@@ -2,7 +2,8 @@
 import { ref, computed, watch } from 'vue'
 import { installmentsApi } from '@/api'
 import { useToast } from '@/composables'
-import { RcButton, RcModal } from '@/components/rc'
+import { RcButton, RcModal, RcField } from '@/components/rc'
+import { RcIcon } from '@/components/icons'
 import type { VehicleInstallmentResponse } from '@/types'
 
 const props = defineProps<{
@@ -104,108 +105,93 @@ async function handleSubmit() {
 </script>
 
 <template>
-  <RcModal :open="visible" title="Taksit Erken Kapatma" @close="emit('close')">
-    <div class="rc-veh-modal-form">
-      <div class="rc-veh-installment-close__info">
-        <div class="rc-veh-installment-close__info-row">
-          <span style="font-size: 13px; color: var(--rc-text-muted)">Kalan Bakiye</span>
-          <strong>{{ formatCurrency(outstandingBalance) }}</strong>
-        </div>
-        <p class="rc-veh-installment-close__info-note">
-          Kalan {{ props.installment.remainingInstallments }} taksit toplu olarak ödenecek ve plan
-          kapatılacaktır.
-        </p>
-      </div>
-
-      <div class="form-grid">
-        <div class="form-group">
-          <label>İndirim Oranı (%)</label>
-          <div class="input-with-suffix">
-            <input
-              v-model.number="discountPercentage"
-              type="number"
-              min="0"
-              max="100"
-              step="0.1"
-              placeholder="0"
-              @input="onDiscountRateChange"
-            />
-            <span class="suffix">%</span>
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label>Erken Kapatma Tutarı</label>
-          <div class="input-with-suffix">
-            <input
-              v-model.number="paymentAmount"
-              type="number"
-              min="0"
-              :max="outstandingBalance"
-              step="0.01"
-              placeholder="0"
-              @input="onPaymentAmountChange"
-            />
-            <span class="suffix">{{ props.installment.totalCurrency || 'TRY' }}</span>
-          </div>
+  <RcModal :open="visible" wide @close="emit('close')">
+    <template #header>
+      <div>
+        <h2 class="rc-modal__title">
+          <RcIcon name="cash" :size="20" class="rc-modal__title-icon" />
+          Taksit erken kapatma
+        </h2>
+        <div class="rc-modal__sub">
+          Kalan {{ props.installment.remainingInstallments }} taksit toplu ödenip plan kapatılacak
         </div>
       </div>
+    </template>
 
-      <div class="rc-veh-installment-close__calc">
+    <div class="rc-modal-callout" role="status">
+      <div class="rc-modal-callout__main">
+        <span class="rc-modal-callout__label">Kalan bakiye</span>
+        <span class="rc-modal-callout__value rc-num">{{ formatCurrency(outstandingBalance) }}</span>
+      </div>
+    </div>
+
+    <div class="rc-modal-form">
+      <RcField label="İndirim oranı" hint="Tutarı otomatik hesaplar">
+        <div class="rc-input-group">
+          <input
+            v-model.number="discountPercentage"
+            type="number"
+            min="0"
+            max="100"
+            step="0.1"
+            placeholder="0"
+            @input="onDiscountRateChange"
+          />
+          <span class="rc-input-group__affix">%</span>
+        </div>
+      </RcField>
+
+      <RcField label="Erken kapatma tutarı" hint="Oranı otomatik hesaplar">
+        <div class="rc-input-group">
+          <input
+            v-model.number="paymentAmount"
+            type="number"
+            min="0"
+            :max="outstandingBalance"
+            step="0.01"
+            placeholder="0"
+            @input="onPaymentAmountChange"
+          />
+          <span class="rc-input-group__affix">
+            {{ props.installment.totalCurrency || 'TRY' }}
+          </span>
+        </div>
+      </RcField>
+
+      <div class="rc-modal-form__full rc-veh-installment-close__calc">
         <div class="rc-veh-installment-close__calc-row">
-          <span>Kalan Tutar</span>
-          <span>{{ formatCurrency(outstandingBalance) }}</span>
+          <span>Kalan tutar</span>
+          <span class="rc-num">{{ formatCurrency(outstandingBalance) }}</span>
         </div>
         <div
           v-if="discountAmount > 0"
           class="rc-veh-installment-close__calc-row rc-veh-installment-close__calc-row--discount"
         >
-          <span>İndirim Tutarı</span>
-          <span>−{{ formatCurrency(discountAmount) }}</span>
+          <span>İndirim tutarı</span>
+          <span class="rc-num">−{{ formatCurrency(discountAmount) }}</span>
         </div>
         <div class="rc-veh-installment-close__calc-row rc-veh-installment-close__calc-row--total">
-          <span>Ödenecek Tutar</span>
-          <span>{{ formatCurrency(Number(paymentAmount) || 0) }}</span>
+          <span>Ödenecek tutar</span>
+          <span class="rc-num">{{ formatCurrency(Number(paymentAmount) || 0) }}</span>
         </div>
       </div>
 
-      <div class="form-group">
-        <label>Notlar</label>
+      <RcField class="rc-modal-form__full" label="Not" hint="Opsiyonel">
         <textarea
           v-model="notes"
-          placeholder="Erken kapama ile ilgili notlar..."
+          class="rc-textarea"
+          placeholder="Erken kapama ile ilgili notlar…"
           rows="3"
         />
-      </div>
+      </RcField>
     </div>
 
     <template #footer>
-      <RcButton variant="secondary" @click="emit('close')">İptal</RcButton>
-      <RcButton variant="accent" :disabled="loading" @click="handleSubmit">
-        {{ loading ? 'İşleniyor…' : 'Ödemeyi Onayla ve Kapat' }}
+      <RcButton variant="ghost" @click="emit('close')">Vazgeç</RcButton>
+      <RcButton variant="accent" :loading="loading" @click="handleSubmit">
+        <RcIcon name="check" :size="14" />
+        Ödemeyi onayla ve kapat
       </RcButton>
     </template>
   </RcModal>
 </template>
-
-<style scoped>
-.input-with-suffix {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.input-with-suffix input {
-  width: 100%;
-  padding-right: 40px;
-}
-
-.suffix {
-  position: absolute;
-  right: 12px;
-  color: var(--rc-text-muted);
-  font-size: 13px;
-  font-weight: 500;
-  pointer-events: none;
-}
-</style>

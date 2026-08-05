@@ -66,11 +66,10 @@ function handleClose() {
       <RcField label="Red sebebi">
         <textarea
           v-model="reason"
-          class="rc-input"
+          class="rc-textarea rc-textarea--tall"
           rows="4"
           maxlength="500"
           placeholder="Red sebebini açıklayın…"
-          style="resize: vertical; min-height: 96px"
           @input="validateReason"
         />
       </RcField>
@@ -80,9 +79,9 @@ function handleClose() {
       </div>
     </form>
     <template #footer>
-      <RcButton variant="secondary" @click="handleClose">İptal</RcButton>
-      <RcButton variant="danger" type="submit" form="reject-claim-form" :disabled="isSubmitting">
-        {{ isSubmitting ? 'Reddediliyor…' : 'Reddet' }}
+      <RcButton variant="ghost" @click="handleClose">Vazgeç</RcButton>
+      <RcButton variant="danger" type="submit" form="reject-claim-form" :loading="isSubmitting">
+        Reddet
       </RcButton>
     </template>
   </RcModal>

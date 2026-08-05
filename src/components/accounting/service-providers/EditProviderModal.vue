@@ -348,9 +348,9 @@ watch(() => props.provider, (newVal) => {
         </div>
       </form>
     <template #footer>
-      <RcButton variant="secondary" @click="handleClose">İptal</RcButton>
-      <RcButton variant="primary" type="submit" form="edit-provider-form" :disabled="isSubmitting">
-        {{ isSubmitting ? 'Kaydediliyor…' : 'Kaydet' }}
+      <RcButton variant="ghost" @click="handleClose">Vazgeç</RcButton>
+      <RcButton variant="accent" type="submit" form="edit-provider-form" :loading="isSubmitting">
+        Kaydet
       </RcButton>
     </template>
   </RcModal>

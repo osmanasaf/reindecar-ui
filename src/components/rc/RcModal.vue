@@ -62,7 +62,17 @@ watch(() => props.open, async (isOpen) => {
   }
 })
 
-onMounted(() => window.addEventListener('keydown', onKeydown))
+onMounted(async () => {
+  window.addEventListener('keydown', onKeydown)
+  // v-if ile zaten açık olarak mount edilen modallarda watch tetiklenmez;
+  // kilidi ve odağı burada uygula. (Kapalıyken dokunmuyoruz — başka bir
+  // modalın kilidini temizlememek için.)
+  if (props.open) {
+    document.body.style.overflow = 'hidden'
+    await nextTick()
+    focusFirst()
+  }
+})
 onUnmounted(() => {
   window.removeEventListener('keydown', onKeydown)
   document.body.style.overflow = ''

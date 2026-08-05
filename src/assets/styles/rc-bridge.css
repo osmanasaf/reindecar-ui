@@ -16,6 +16,8 @@
 
   --color-info: var(--rc-info-500);
   --color-info-light: var(--rc-info-50);
+  --color-info-bg: var(--rc-info-50);
+  --color-info-text: var(--rc-info-700);
 
   --color-bg: var(--rc-bg);
   --color-bg-secondary: var(--rc-bg-subtle);

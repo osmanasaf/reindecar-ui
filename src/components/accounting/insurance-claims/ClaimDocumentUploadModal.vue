@@ -91,9 +91,9 @@ const handleClose = () => {
       />
     </RcField>
     <template #footer>
-      <RcButton variant="secondary" @click="handleClose">İptal</RcButton>
-      <RcButton variant="primary" :disabled="!canUpload || isUploading" @click="handleUpload">
-        {{ isUploading ? 'Yükleniyor…' : 'Yükle' }}
+      <RcButton variant="ghost" @click="handleClose">Vazgeç</RcButton>
+      <RcButton variant="accent" :loading="isUploading" :disabled="!canUpload" @click="handleUpload">
+        Yükle
       </RcButton>
     </template>
   </RcModal>

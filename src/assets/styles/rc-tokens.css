@@ -35,22 +35,44 @@
   --rc-ink-25:   #FAFAFA;
   --rc-white:    #FFFFFF;
 
-  /* — Semantic — */
+  /* — Semantic (full 50→800 ramps; -50/-100 are tints, -600+ are text-safe) — */
   --rc-success-50:  #E6F7EE;
+  --rc-success-100: #C2EBD5;
+  --rc-success-200: #93DBB5;
+  --rc-success-300: #5FC993;
+  --rc-success-400: #2FB675;
   --rc-success-500: #0EA85C;
+  --rc-success-600: #0B8A4B;
   --rc-success-700: #066B39;
+  --rc-success-800: #04502B;
 
   --rc-warning-50:  #FFF4E0;
+  --rc-warning-100: #FFE7BC;
+  --rc-warning-200: #FFD489;
+  --rc-warning-300: #FFBE4F;
+  --rc-warning-400: #F5A81F;
   --rc-warning-500: #E89500;
+  --rc-warning-600: #C27C00;
   --rc-warning-700: #9C6300;
+  --rc-warning-800: #7A4D00;
 
   --rc-danger-50:  #FFE9E9;
+  --rc-danger-100: #FFCFCE;
+  --rc-danger-200: #FFA9A6;
+  --rc-danger-300: #FA7D78;
+  --rc-danger-400: #F0554E;
   --rc-danger-500: #E5342E;
+  --rc-danger-600: #C22622;
   --rc-danger-700: #9A1B17;
+  --rc-danger-800: #741210;
 
   --rc-info-50:  #E6F1FB;
+  --rc-info-100: #C7E0F6;
+  --rc-info-200: #96C6ED;
   --rc-info-500: #1A7FCC;
+  --rc-info-600: #1268A8;
   --rc-info-700: #0E5588;
+  --rc-info-800: #0A4068;
 
   --rc-purple-50: #EFEBFD;
   --rc-purple-500: #6B47DC;
@@ -60,6 +82,7 @@
   --rc-bg-subtle:    #F4F4F2;   /* warm off-white */
   --rc-surface:      #FFFFFF;
   --rc-surface-2:    #F7F7F7;
+  --rc-surface-3:    #EFF1F4;   /* inset panels, read-only rails */
   --rc-surface-hover:#F0F0F0;
   --rc-overlay:      rgba(10,10,10,0.55);
 
@@ -187,6 +210,7 @@
   --rc-bg-subtle:    #141414;
   --rc-surface:      #1A1A1A;
   --rc-surface-2:    #222222;
+  --rc-surface-3:    #282828;
   --rc-surface-hover:#2A2A2A;
   --rc-overlay:      rgba(0, 0, 0, 0.65);
 
@@ -217,15 +241,37 @@
   --rc-chart-bar: var(--rc-ink-700);
   --rc-chart-bar-active: var(--rc-blue-400);
 
-  /* Semantic tints: -700 metinleri koyu yüzeyde okunabilir */
+  /* Semantic ramps invert on dark: the -50…-200 tint end becomes a translucent
+     wash over the dark surface, and the -600…-800 text end — which is
+     dark-on-light by design — has to resolve light or the text disappears. */
   --rc-success-50:  rgba(14, 168, 92, 0.14);
+  --rc-success-100: rgba(14, 168, 92, 0.24);
+  --rc-success-200: rgba(14, 168, 92, 0.38);
+  --rc-success-600: #34d399;
   --rc-success-700: #4ade80;
+  --rc-success-800: #86efac;
+
   --rc-warning-50:  rgba(232, 149, 0, 0.14);
+  --rc-warning-100: rgba(232, 149, 0, 0.24);
+  --rc-warning-200: rgba(232, 149, 0, 0.38);
+  --rc-warning-600: #f59e0b;
   --rc-warning-700: #fbbf24;
+  --rc-warning-800: #fcd34d;
+
   --rc-danger-50:   rgba(229, 52, 46, 0.14);
+  --rc-danger-100:  rgba(229, 52, 46, 0.24);
+  --rc-danger-200:  rgba(229, 52, 46, 0.38);
+  --rc-danger-600:  #f05555;
   --rc-danger-700:  #f87171;
+  --rc-danger-800:  #fca5a5;
+
   --rc-info-50:     rgba(26, 127, 204, 0.14);
+  --rc-info-100:    rgba(26, 127, 204, 0.24);
+  --rc-info-200:    rgba(26, 127, 204, 0.38);
+  --rc-info-600:    #3b93e8;
   --rc-info-700:    #60a5fa;
+  --rc-info-800:    #93c5fd;
+
   --rc-purple-50:   rgba(107, 71, 220, 0.14);
 }
 

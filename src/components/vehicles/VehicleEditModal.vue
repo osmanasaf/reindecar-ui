@@ -531,7 +531,7 @@ watch(() => props.visible, (isVisible) => {
         </form>
 
     <template v-if="!loading" #footer>
-      <RcButton variant="secondary" type="button" @click="handleClose">İptal</RcButton>
+      <RcButton variant="ghost" type="button" @click="handleClose">Vazgeç</RcButton>
       <RcButton variant="accent" type="button" :loading="saving" @click="handleSubmit">
         Kaydet
       </RcButton>

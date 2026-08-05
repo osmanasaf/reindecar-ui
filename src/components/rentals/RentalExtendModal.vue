@@ -93,7 +93,7 @@ async function confirm() {
     <template #header>
       <div>
         <h2 class="rc-modal__title">
-          <RcIcon name="plus" :size="20" style="color: var(--rc-blue-500); vertical-align: -3px; margin-right: 8px" />
+          <RcIcon name="plus" :size="20" class="rc-modal__title-icon" />
           Kiralama süresini uzat
         </h2>
         <div v-if="rental" class="rc-modal__sub">{{ rental.rentalNumber }} · {{ rental.customerName }}</div>
@@ -118,7 +118,7 @@ async function confirm() {
       </div>
     </div>
 
-    <div class="rcr-modal-form-grid" style="margin-top: 14px">
+    <div class="rc-modal-form" style="margin-top: 14px">
       <div class="rc-field">
         <DatePicker
           v-model="newEndDate"
@@ -131,7 +131,7 @@ async function confirm() {
         <label class="rc-field__label">Ek gün</label>
         <input v-model.number="extraDays" class="rc-input rc-num" type="number" min="1" step="1" />
       </div>
-      <div class="rc-field rcr-modal-form-grid__full">
+      <div class="rc-field rc-modal-form__full">
         <label class="rc-field__label">Neden (opsiyonel)</label>
         <input v-model="reason" class="rc-input" type="text" placeholder="Müşteri 3 gün daha talep etti…" />
       </div>
@@ -148,9 +148,9 @@ async function confirm() {
     <template #footer>
       <span class="rc-spacer" />
       <RcButton variant="ghost" @click="emit('close')">Vazgeç</RcButton>
-      <RcButton variant="accent" :disabled="!canSubmit || submitting" @click="confirm">
+      <RcButton variant="accent" :loading="submitting" :disabled="!canSubmit" @click="confirm">
         <RcIcon name="check" :size="14" />
-        {{ submitting ? 'Uzatılıyor…' : `Uzat · ${fmtTRY(extraCharge)}` }}
+        {{ `Uzat · ${fmtTRY(extraCharge)}` }}
       </RcButton>
     </template>
   </RcModal>

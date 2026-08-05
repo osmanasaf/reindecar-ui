@@ -142,7 +142,7 @@ watch(() => props.visible, (isVisible) => {
     <template #header>
       <div>
         <h2 class="rc-modal__title">
-          <RcIcon name="plus" :size="18" style="color: var(--rc-blue-500); vertical-align: -3px; margin-right: 8px" />
+          <RcIcon name="plus" :size="18" class="rc-modal__title-icon" />
           Hızlı müşteri ekle
         </h2>
         <div class="rc-modal__sub">Kiralama için minimum bilgilerle bireysel müşteri</div>
@@ -244,9 +244,9 @@ watch(() => props.visible, (isVisible) => {
 
     <template #footer>
       <span class="rc-spacer" />
-      <RcButton variant="ghost" @click="handleClose">İptal</RcButton>
-      <RcButton variant="accent" :disabled="saving" @click="handleSubmit">
-        {{ saving ? 'Kaydediliyor…' : 'Müşteri oluştur' }}
+      <RcButton variant="ghost" @click="handleClose">Vazgeç</RcButton>
+      <RcButton variant="accent" :loading="saving" @click="handleSubmit">
+        Müşteri oluştur
       </RcButton>
     </template>
   </RcModal>

@@ -507,7 +507,7 @@ watch(
           <RcIcon
             :name="isCreateMode ? 'plus' : 'edit'"
             :size="18"
-            style="color: var(--rc-blue-500); vertical-align: -3px; margin-right: 8px"
+            class="rc-modal__title-icon"
           />
           {{ isCreateMode ? 'Yeni müşteri' : 'Müşteriyi düzenle' }}
         </h2>
@@ -761,7 +761,7 @@ watch(
     </form>
 
     <template #footer>
-      <RcButton variant="ghost" @click="emit('close')">İptal</RcButton>
+      <RcButton variant="ghost" @click="emit('close')">Vazgeç</RcButton>
       <span class="rc-spacer" />
       <RcButton variant="accent" :disabled="loading" :loading="saving" @click="handleSubmit">
         <RcIcon name="check" :size="14" />

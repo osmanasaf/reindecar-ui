@@ -91,7 +91,7 @@ function handleSubmit() {
 
 <template>
   <RcModal :open="open" title="Yeni Alacak" wide @close="handleClose">
-    <div style="display: flex; flex-direction: column; gap: 14px">
+    <div class="rc-modal-form rc-modal-form--single">
       <RcField label="Tip" required>
         <SearchableSelect
           v-model="form.type"
@@ -127,7 +127,7 @@ function handleSubmit() {
     </div>
 
     <template #footer>
-      <RcButton variant="secondary" @click="handleClose">İptal</RcButton>
+      <RcButton variant="ghost" @click="handleClose">Vazgeç</RcButton>
       <RcButton variant="accent" :disabled="submitting" @click="handleSubmit">
         Oluştur
       </RcButton>

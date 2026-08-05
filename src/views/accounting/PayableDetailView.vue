@@ -239,6 +239,7 @@ async function doCancel() {
       :remaining-amount="payable.remainingAmount"
       :receivable-number="payable.payableNumber"
       title="Ödeme kaydet"
+      direction="pay"
       @close="showPaymentModal = false"
       @submit="submitPayment"
     />

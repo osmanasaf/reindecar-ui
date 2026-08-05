@@ -1257,7 +1257,8 @@ onActivated(() => {
         />
 
         <CreateTollModal
-          v-if="showCreateTollModal && rental"
+          v-if="rental"
+          :open="showCreateTollModal"
           :rental-id="rental.id"
           :vehicle-id="rental.vehicleId"
           :customer-id="rental.customerId"

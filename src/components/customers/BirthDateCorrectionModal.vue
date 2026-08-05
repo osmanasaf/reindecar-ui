@@ -75,7 +75,7 @@ async function save() {
     <template #header>
       <div>
         <h2 class="rc-modal__title">
-          <RcIcon name="calendar" :size="20" style="vertical-align: -3px; margin-right: 8px" />
+          <RcIcon name="calendar" :size="20" class="rc-modal__title-icon" />
           Doğum tarihini düzelt
         </h2>
         <div v-if="customer" class="rc-modal__sub">{{ displayName }}</div>

@@ -5,6 +5,7 @@ import App from './App.vue'
 
 import './assets/styles/variables.css'
 import './assets/styles/rc-tokens.css'
+import './assets/styles/rc-aliases.css'
 import './assets/styles/rc-components.css'
 import './assets/styles/rc-primitives.css'
 import './assets/styles/rc-shell.css'

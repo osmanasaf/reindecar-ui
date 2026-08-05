@@ -360,7 +360,7 @@ watch(
           <RcIcon
             name="arrowRight"
             :size="20"
-            style="color: var(--rc-blue-500); vertical-align: -3px; margin-right: 8px"
+            class="rc-modal__title-icon"
           />
           {{ modalTitle }}
         </h2>
@@ -423,7 +423,7 @@ watch(
         </div>
 
         <form class="rcr-return-modal__form" @submit.prevent="calculatePreview">
-          <div class="rcr-modal-form-grid">
+          <div class="rc-modal-form">
             <div class="rc-field" :class="{ 'rc-field--error': hasError('endKm') }">
               <label class="rc-field__label">İade KM</label>
               <input
@@ -462,13 +462,13 @@ watch(
               </span>
               <span v-if="hasError('actualReturnDate')" class="rc-field__error">{{ getError('actualReturnDate') }}</span>
             </div>
-            <div v-if="fuelTrackingEnabled" class="rc-field rcr-modal-form-grid__full" :class="{ 'rc-field--error': hasError('endFuelPercent') }">
+            <div v-if="fuelTrackingEnabled" class="rc-field rc-modal-form__full" :class="{ 'rc-field--error': hasError('endFuelPercent') }">
               <label class="rc-field__label">İade yakıt seviyesi</label>
               <FuelLevelSelect v-model="form.endFuelPercent" input-id="return-fuel-percent" />
               <span class="rc-field__hint">İade anındaki depo seviyesi — hazır oranı seçin ya da yüzdeyi elle girin</span>
               <span v-if="hasError('endFuelPercent')" class="rc-field__error">{{ getError('endFuelPercent') }}</span>
             </div>
-            <div class="rc-field rcr-modal-form-grid__full">
+            <div class="rc-field rc-modal-form__full">
               <label class="rc-field__label">İade notu (opsiyonel)</label>
               <textarea
                 v-model="form.notes"
@@ -700,22 +700,22 @@ watch(
         <template v-if="step === 'input'">
           <span class="rc-spacer" />
           <RcButton variant="ghost" @click="handleClose">Vazgeç</RcButton>
-          <RcButton variant="secondary" :disabled="calculating" @click="calculatePreview">
-            {{ calculating ? 'Hesaplanıyor…' : 'Önizle' }}
+          <RcButton variant="accent" :loading="calculating" @click="calculatePreview">
+            Önizle
             <RcIcon name="chevronRight" :size="14" />
           </RcButton>
         </template>
         <template v-else-if="step === 'preview'">
           <RcButton variant="ghost" :disabled="saving" @click="handleBack">← Geri</RcButton>
           <span class="rc-spacer" />
-          <RcButton variant="accent" :disabled="saving" @click="completeReturn">
+          <RcButton variant="accent" :loading="saving" @click="completeReturn">
             <RcIcon name="check" :size="14" />
-            {{ saving ? 'Tamamlanıyor…' : 'İadeyi tamamla' }}
+            İadeyi tamamla
           </RcButton>
         </template>
         <template v-else>
           <span class="rc-spacer" />
-          <RcButton variant="primary" @click="handleClose">Tamam</RcButton>
+          <RcButton variant="accent" @click="handleClose">Tamam</RcButton>
         </template>
       </template>
     </template>
