@@ -464,7 +464,12 @@ watch(
             </div>
             <div v-if="fuelTrackingEnabled" class="rc-field rc-modal-form__full" :class="{ 'rc-field--error': hasError('endFuelPercent') }">
               <label class="rc-field__label">İade yakıt seviyesi</label>
-              <FuelLevelSelect v-model="form.endFuelPercent" input-id="return-fuel-percent" />
+              <FuelLevelSelect
+                v-model="form.endFuelPercent"
+                input-id="return-fuel-percent"
+                :reference-percent="fuelTrackingEnabled ? rental.startFuelPercent ?? null : null"
+                reference-label="Çıkış"
+              />
               <span class="rc-field__hint">İade anındaki depo seviyesi — hazır oranı seçin ya da yüzdeyi elle girin</span>
               <span v-if="hasError('endFuelPercent')" class="rc-field__error">{{ getError('endFuelPercent') }}</span>
             </div>
@@ -496,9 +501,26 @@ watch(
 
       <!-- Step: preview -->
       <template v-else-if="step === 'preview' && preview">
+        <div class="rc-status-rail rcr-return-modal__rail">
+          <span class="rc-status-step rc-status-step--done">
+            <span class="rc-status-step__dot"><RcIcon name="check" :size="10" /></span>
+            Aktif
+          </span>
+          <RcIcon name="chevronRight" :size="14" class="rc-status-step__chev" />
+          <span class="rc-status-step rc-status-step--done">
+            <span class="rc-status-step__dot"><RcIcon name="check" :size="10" /></span>
+            İade kontrolü
+          </span>
+          <RcIcon name="chevronRight" :size="14" class="rc-status-step__chev" />
+          <span class="rc-status-step rc-status-step--current">
+            <span class="rc-status-step__dot">3</span>
+            Önizleme
+          </span>
+        </div>
+
         <div class="rc-alert rc-alert--info" style="margin-bottom: 14px">
           <RcIcon name="info" :size="16" />
-          <span>Aşağıdaki tutarlar <strong>previewReturn</strong> sonucudur. Onayladığınızda iade tamamlanır.</span>
+          <span>Aşağıdaki tutarlar iade bilgilerinize göre hesaplanan <strong>önizlemedir</strong> — onayladığınızda iade tamamlanır.</span>
         </div>
 
         <div class="rcr-return-preview-grid">
@@ -531,6 +553,18 @@ watch(
         >
           <div class="rc-card__head"><div class="rc-card__title">Yakıt düzenlemeleri</div></div>
           <div class="rcr-return-adjustments__body">
+            <div v-if="rental?.startFuelPercent != null" class="rcr-return-fuel-compare">
+              <span class="rcr-return-fuel-compare__item">
+                Çıkış <strong class="rc-num">%{{ rental.startFuelPercent.toLocaleString('tr-TR') }}</strong>
+              </span>
+              <RcIcon name="arrowRight" :size="13" class="rcr-return-fuel-compare__arrow" />
+              <span class="rcr-return-fuel-compare__item">
+                İade <strong class="rc-num">%{{ (form.endFuelPercent ?? 0).toLocaleString('tr-TR') }}</strong>
+              </span>
+              <span class="rcr-return-fuel-compare__deficit rc-num">
+                %{{ fuelDeficitPercent.toLocaleString('tr-TR') }} eksik
+              </span>
+            </div>
             <div class="rcr-return-adjustment">
               <label class="rcr-return-adjustment__toggle">
                 <input v-model="applyFuelFee" type="checkbox" />
@@ -546,8 +580,11 @@ watch(
                   step="0.01"
                   placeholder="Örn. 500"
                 />
-                <span class="rc-field__hint">
+                <span v-if="fuelFeeAmount > 0" class="rc-field__hint">
                   Eksik yakıt %{{ fuelDeficitPercent.toLocaleString('tr-TR') }} — bedeli elle belirleyin
+                </span>
+                <span v-else class="rc-field__hint rcr-return-fuel-zero-hint">
+                  Tutar girilmedi — bu haliyle benzin ücreti yansıtılmaz
                 </span>
               </div>
             </div>

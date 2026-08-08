@@ -245,7 +245,10 @@ async function downloadHandoverPdf() {
       <div v-if="fuelTrackingEnabled" class="rc-field rc-modal-form__full" :class="{ 'rc-field--error': hasError('startFuelPercent') }">
         <label class="rc-field__label">Yakıt seviyesi</label>
         <FuelLevelSelect v-model="startFuelPercent" input-id="activate-fuel-percent" />
-        <span class="rc-field__hint">Teslimattaki depo seviyesi — hazır oranı seçin ya da yüzdeyi elle girin</span>
+        <span class="rc-field__hint">
+          Teslimattaki depo seviyesi — hazır oranı seçin ya da yüzdeyi elle girin.
+          {{ startFuelPercent == null ? 'Girilmezse iadede yakıt farkı hesaplanamaz.' : '' }}
+        </span>
         <span v-if="hasError('startFuelPercent')" class="rc-field__error">{{ getError('startFuelPercent') }}</span>
       </div>
     </div>

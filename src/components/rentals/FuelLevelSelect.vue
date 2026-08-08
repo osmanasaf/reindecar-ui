@@ -6,8 +6,10 @@ const props = withDefaults(
     modelValue: number | null
     disabled?: boolean
     inputId?: string
+    referencePercent?: number | null
+    referenceLabel?: string
   }>(),
-  { disabled: false, inputId: undefined },
+  { disabled: false, inputId: undefined, referencePercent: null, referenceLabel: 'Çıkış' },
 )
 
 const emit = defineEmits<{ 'update:modelValue': [value: number | null] }>()
@@ -47,6 +49,32 @@ const fillColor = computed(() => {
 })
 
 const readout = computed(() => (percent.value == null ? '—' : `%${formatNumber(percent.value)}`))
+
+const reference = computed(() =>
+  props.referencePercent == null ? null : clamp(props.referencePercent),
+)
+
+interface FuelDelta {
+  type: 'deficit' | 'even' | 'surplus'
+  amount: number
+}
+
+const delta = computed<FuelDelta | null>(() => {
+  if (reference.value == null || percent.value == null) return null
+  const diff = percent.value - reference.value
+  if (diff < 0) return { type: 'deficit', amount: Math.abs(diff) }
+  if (diff > 0) return { type: 'surplus', amount: diff }
+  return { type: 'even', amount: 0 }
+})
+
+const deltaText = computed(() => {
+  if (!delta.value) return ''
+  if (delta.value.type === 'deficit')
+    return `${props.referenceLabel} seviyesine göre %${formatNumber(delta.value.amount)} eksik`
+  if (delta.value.type === 'surplus')
+    return `${props.referenceLabel} seviyesine göre %${formatNumber(delta.value.amount)} fazla`
+  return `${props.referenceLabel} seviyesiyle aynı`
+})
 
 function clamp(value: number): number {
   if (Number.isNaN(value)) return MIN_PERCENT
@@ -135,12 +163,21 @@ function onNumberInput(event: Event): void {
         <div class="rc-fuel__fill" :style="{ width: fillWidth, background: fillColor }" />
         <span v-for="tick in 3" :key="tick" class="rc-fuel__tick" :style="{ left: `${tick * 25}%` }" />
         <span
+          v-if="reference != null"
+          class="rc-fuel__ref"
+          :style="{ left: `${reference}%` }"
+          :title="`${referenceLabel}: %${formatNumber(reference)}`"
+          aria-hidden="true"
+        />
+        <span
+          v-if="percent != null"
           class="rc-fuel__thumb"
           :style="{ left: fillWidth, borderColor: fillColor }"
           aria-hidden="true"
         />
       </div>
       <span class="rc-fuel__endcap">F</span>
+      <span class="rc-fuel__readout rc-num">{{ readout }}</span>
     </div>
 
     <div class="rc-fuel__controls">
@@ -175,7 +212,11 @@ function onNumberInput(event: Event): void {
         />
         <span class="rc-fuel__custom-suffix">%</span>
       </div>
-      <span class="rc-fuel__readout rc-num">{{ readout }}</span>
+    </div>
+
+    <div v-if="delta" class="rc-fuel__delta" :class="`rc-fuel__delta--${delta.type}`" role="status">
+      <span class="rc-fuel__delta-dot" aria-hidden="true" />
+      {{ deltaText }}
     </div>
   </div>
 </template>
@@ -184,8 +225,11 @@ function onNumberInput(event: Event): void {
 .rc-fuel {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  max-width: 420px;
+  gap: 12px;
+  padding: 14px;
+  background: var(--rc-surface-2);
+  border: 1px solid var(--rc-border-subtle);
+  border-radius: var(--rc-r-8);
 }
 
 .rc-fuel__gauge {
@@ -206,8 +250,8 @@ function onNumberInput(event: Event): void {
 .rc-fuel__track {
   position: relative;
   flex: 1;
-  height: 8px;
-  background: var(--rc-surface-2);
+  height: 12px;
+  background: var(--rc-surface);
   border: 1px solid var(--rc-border-subtle);
   border-radius: 999px;
   cursor: pointer;
@@ -239,12 +283,24 @@ function onNumberInput(event: Event): void {
   background: var(--rc-border);
 }
 
+.rc-fuel__ref {
+  position: absolute;
+  top: -5px;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid var(--rc-text-muted);
+  pointer-events: none;
+}
+
 .rc-fuel__thumb {
   position: absolute;
   top: 50%;
   transform: translate(-50%, -50%);
-  width: 14px;
-  height: 14px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   background: var(--rc-surface);
   border: 2px solid var(--rc-border-strong);
@@ -264,7 +320,8 @@ function onNumberInput(event: Event): void {
   display: inline-flex;
   gap: 2px;
   padding: 3px;
-  background: var(--rc-surface-2);
+  background: var(--rc-surface);
+  border: 1px solid var(--rc-border-subtle);
   border-radius: var(--rc-r-8);
 }
 
@@ -286,7 +343,7 @@ function onNumberInput(event: Event): void {
 }
 
 .rc-fuel__step--active {
-  background: var(--rc-surface);
+  background: var(--rc-surface-2);
   color: var(--rc-text);
   font-weight: 600;
   box-shadow: var(--rc-shadow-sm);
@@ -305,6 +362,7 @@ function onNumberInput(event: Event): void {
 .rc-fuel__custom {
   position: relative;
   width: 72px;
+  margin-left: auto;
 }
 
 .rc-fuel__custom-field {
@@ -336,11 +394,40 @@ function onNumberInput(event: Event): void {
 }
 
 .rc-fuel__readout {
-  margin-left: auto;
-  font-size: 12.5px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 700;
   color: var(--rc-text);
-  min-width: 40px;
+  min-width: 48px;
   text-align: right;
+  flex-shrink: 0;
+}
+
+.rc-fuel__delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.rc-fuel__delta-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.rc-fuel__delta--deficit {
+  color: var(--rc-danger-700);
+  background: var(--rc-danger-50);
+}
+
+.rc-fuel__delta--surplus,
+.rc-fuel__delta--even {
+  color: var(--rc-success-700);
+  background: var(--rc-success-50);
 }
 </style>
