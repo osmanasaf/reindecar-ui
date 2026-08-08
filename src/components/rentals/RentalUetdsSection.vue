@@ -105,7 +105,7 @@ watch(() => props.rentalId, loadManifests)
           <span class="ru-src" :class="manifest.source === 'UPLOAD' ? 'ru-src--pdf' : 'ru-src--manual'">
             {{ manifest.source === 'UPLOAD' ? 'PDF' : 'Manuel' }}
           </span>
-          <RcIcon name="chevronRight" :size="16" class="ru-row__chevron" />
+          <RcIcon name="chevronRight" :size="16" class="ru-row__chevron rc-chevron-nudge" />
         </button>
       </div>
 

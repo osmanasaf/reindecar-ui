@@ -215,7 +215,7 @@ onBeforeUnmount(() => {
             <span class="md-parent__label">Bağlı kiralama</span>
             <span class="md-parent__value rc-mono">{{ manifest.rentalNumber }}</span>
           </span>
-          <RcIcon name="chevronRight" :size="15" class="md-parent__chevron" />
+          <RcIcon name="chevronRight" :size="15" class="md-parent__chevron rc-chevron-nudge" />
         </RouterLink>
 
         <nav class="md-nav">

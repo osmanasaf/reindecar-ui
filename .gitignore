@@ -31,3 +31,6 @@ dist-ssr
 # Tasarım prototipi — yalnızca lokal referans
 /redesign/
 build-errors.txt
+
+# Claude Code yerel araç durumu (launch config, worktree kopyaları)
+.claude/

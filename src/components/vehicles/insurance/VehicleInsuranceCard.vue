@@ -33,7 +33,7 @@ const statusInfo = computed(() => {
 
 <template>
   <div
-    class="rc-card rcv-insurance-card"
+    class="rc-card rcv-insurance-card rc-hover-raise"
     :class="`rcv-insurance-card--${statusInfo.accent}`"
   >
     <div class="rc-card__body">

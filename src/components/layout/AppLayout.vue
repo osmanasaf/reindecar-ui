@@ -64,10 +64,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div
-    class="rc-app"
-    :class="{ 'rc-app--collapsed': sidebarCollapsed && !isMobile }"
-  >
+  <div class="rc-app">
     <AppSidebar
       :collapsed="sidebarCollapsed"
       :mobile-open="isMobile && sidebarOpen"

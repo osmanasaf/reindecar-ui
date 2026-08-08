@@ -2,6 +2,9 @@
 import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RcIcon } from '@/components/icons'
 
+/** rc-primitives.css'teki rcModalOut/rcOverlayOut süresiyle aynı olmalı. */
+const CLOSE_ANIM_MS = 180
+
 const props = withDefaults(defineProps<{
   open: boolean
   title?: string
@@ -17,6 +20,14 @@ const emit = defineEmits<{ close: [] }>()
 
 const modalRef = ref<HTMLElement | null>(null)
 const titleId = `rc-modal-title-${Math.random().toString(36).slice(2, 9)}`
+
+// Kapanış animasyonu bilinçli olarak <Transition> ile değil, görünürlüğü
+// setTimeout ile düşürerek yapılıyor: Vue'nun class tabanlı geçişi elemanı
+// requestAnimationFrame callback'inde kaldırır; kare üretilmeyen bir sekmede
+// modal ekranda asılı kalır. setTimeout kare üretiminden bağımsız çalışır.
+const visible = ref(props.open)
+const closing = ref(false)
+let closeTimer: ReturnType<typeof setTimeout> | undefined
 
 const FOCUSABLE =
   'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
@@ -54,12 +65,28 @@ function onKeydown(e: KeyboardEvent) {
   trapFocus(e)
 }
 
+function closeDelay(): number {
+  return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : CLOSE_ANIM_MS
+}
+
 watch(() => props.open, async (isOpen) => {
+  clearTimeout(closeTimer)
   document.body.style.overflow = isOpen ? 'hidden' : ''
+
   if (isOpen) {
+    closing.value = false
+    visible.value = true
     await nextTick()
     focusFirst()
+    return
   }
+
+  if (!visible.value) return
+  closing.value = true
+  closeTimer = setTimeout(() => {
+    closing.value = false
+    visible.value = false
+  }, closeDelay())
 })
 
 onMounted(async () => {
@@ -74,6 +101,7 @@ onMounted(async () => {
   }
 })
 onUnmounted(() => {
+  clearTimeout(closeTimer)
   window.removeEventListener('keydown', onKeydown)
   document.body.style.overflow = ''
 })
@@ -81,7 +109,12 @@ onUnmounted(() => {
 
 <template>
   <Teleport to="body">
-    <div v-if="open" class="rc-overlay" @click.self="emit('close')">
+    <div
+      v-if="visible"
+      class="rc-overlay"
+      :class="{ 'rc-modal-closing': closing }"
+      @click.self="emit('close')"
+    >
       <div
         ref="modalRef"
         class="rc-modal"

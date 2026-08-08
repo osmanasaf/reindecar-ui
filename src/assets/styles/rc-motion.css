@@ -88,6 +88,19 @@
   transform: translateY(0);
 }
 
+/* ── Satır sonu chevron'u ──
+   Satırın üzerine gelindiğinde ileri kayar ve vurgulanır. `:hover` hover
+   zincirindeki tüm ataları eşlediği için `:hover > .rc-chevron-nudge`
+   "chevron'un satırı hover'da" anlamına gelir. */
+.rc-chevron-nudge {
+  transition: transform var(--rc-dur-fast) var(--rc-ease-out),
+              color var(--rc-dur-fast) var(--rc-ease-out);
+}
+:hover > .rc-chevron-nudge {
+  transform: translateX(3px);
+  color: var(--rc-blue-500);
+}
+
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
   .rc-animate-in,
@@ -98,6 +111,12 @@
   }
   .rc-kpi--link:hover,
   .rc-hover-raise:hover {
+    transform: none !important;
+  }
+  .rc-chevron-nudge {
+    transition: none !important;
+  }
+  :hover > .rc-chevron-nudge {
     transform: none !important;
   }
   .rc-pulse {

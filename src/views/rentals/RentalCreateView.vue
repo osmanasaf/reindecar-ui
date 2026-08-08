@@ -198,6 +198,13 @@ function validateDates(): boolean {
   return true
 }
 
+/* Adım kartı yön duyarlı girsin: ileri giderken sağdan, geri dönerken soldan. */
+const stepDirection = ref<'fwd' | 'back'>('fwd')
+
+watch(currentStep, (next, previous) => {
+  stepDirection.value = next < previous ? 'back' : 'fwd'
+})
+
 function nextStep() {
   if (currentStep.value === 7 && isService.value) {
     void handleSubmit()
@@ -565,7 +572,7 @@ function onWizardKeydown(e: KeyboardEvent) {
     />
 
     <div class="rc-detail rcr-create__layout">
-      <div class="rc-detail__main rcr-create__main">
+      <div class="rc-detail__main rcr-create__main" :class="`rcr-create__main--${stepDirection}`">
         <!-- Step 1 -->
         <div v-if="currentStep === 1" class="rc-card">
           <div class="rc-card__head">

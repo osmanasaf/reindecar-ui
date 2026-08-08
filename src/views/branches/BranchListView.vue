@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, computed } from 'vue'
 import { branchesApi, vehiclesApi } from '@/api'
-import { useToast, useReferenceData } from '@/composables'
+import { useToast, useReferenceData, useFirstLoadStagger } from '@/composables'
 import { validators, validate, formatPhoneInput } from '@/utils/validation'
 import { SearchableSelect } from '@/components/common'
 import BranchesTable from '@/components/branches/BranchesTable.vue'
@@ -16,6 +16,7 @@ interface BranchWithCount extends Branch {
 
 const branches = ref<BranchWithCount[]>([])
 const loading = ref(true)
+const rowsStagger = useFirstLoadStagger(loading)
 const showForm = ref(false)
 const editingBranch = ref<Branch | null>(null)
 
@@ -378,6 +379,7 @@ onMounted(fetchBranches)
       <BranchesTable
         v-else
         :branches="filteredBranches"
+        :rows-class="rowsStagger"
         @edit="openEditForm"
         @toggle="toggleStatus"
       />

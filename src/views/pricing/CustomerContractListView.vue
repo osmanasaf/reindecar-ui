@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { customerContractsApi, customersApi, vehicleCategoriesApi } from '@/api'
-import { useToast } from '@/composables'
+import { useToast, useFirstLoadStagger } from '@/composables'
 import type { VehicleCategory, Customer } from '@/types'
 import {
   CUSTOMER_CONTRACT_STATUS_LABELS,
@@ -20,6 +20,7 @@ const toast = useToast()
 const contracts = ref<CustomerContractResponse[]>([])
 const categories = ref<VehicleCategory[]>([])
 const loading = ref(true)
+const rowsStagger = useFirstLoadStagger(loading)
 const activeTab = ref<CustomerContractStatus | 'ALL'>('ALL')
 
 const showModal = ref(false)
@@ -230,7 +231,7 @@ onMounted(() => {
       </template>
     </RcEmpty>
 
-    <div v-else class="rca-cc-grid">
+    <div v-else class="rca-cc-grid" :class="rowsStagger">
       <article v-for="contract in filteredContracts" :key="contract.id" class="rca-cc-card">
         <div class="rca-cc-card__head">
           <div>

@@ -30,7 +30,7 @@ const typeText = computed(() => translateReceivableType(props.receivable.type))
 </script>
 
 <template>
-  <div class="receivable-card" @click="emit('click', receivable.id)">
+  <div class="receivable-card rc-hover-raise" @click="emit('click', receivable.id)">
     <div class="card-header">
       <div class="card-header-left">
         <h3 class="card-title">{{ receivable.receivableNumber }}</h3>
@@ -101,12 +101,11 @@ const typeText = computed(() => translateReceivableType(props.receivable.type))
   border-radius: 0.5rem;
   padding: 1.5rem;
   cursor: pointer;
-  transition: all 0.2s;
 }
 
+/* Yükselme ve gölge ortak .rc-hover-raise'den gelir. */
 .receivable-card:hover {
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  border-color: var(--color-primary, #2563eb);
+  border-color: var(--rc-blue-500);
 }
 
 .card-header {

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { rentalPricingApi, vehiclesApi, customersApi, vehicleCategoriesApi } from '@/api'
-import { useToast } from '@/composables'
+import { useToast, useFirstLoadStagger } from '@/composables'
 import { RentalType } from '@/types'
 import type { Vehicle, Customer, VehicleCategory } from '@/types'
 import {
@@ -19,6 +19,7 @@ const toast = useToast()
 const pricings = ref<RentalPricingResponse[]>([])
 const categories = ref<VehicleCategory[]>([])
 const loading = ref(true)
+const rowsStagger = useFirstLoadStagger(loading)
 const activeTab = ref<PricingLevel | 'ALL'>('ALL')
 const showModal = ref(false)
 const saving = ref(false)
@@ -256,7 +257,7 @@ onMounted(() => {
       </template>
     </RcEmpty>
 
-    <div v-else class="rca-cc-grid">
+    <div v-else class="rca-cc-grid" :class="rowsStagger">
       <article v-for="pricing in filteredPricings" :key="pricing.id" class="rca-cc-card">
         <div class="rca-cc-card__head">
           <div>

@@ -1098,6 +1098,41 @@
   color: var(--rc-success-700);
 }
 
+.rcr-return-fuel-compare {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--rc-surface-2);
+  border-radius: var(--rc-r-8);
+  font-size: 12.5px;
+  color: var(--rc-text-muted);
+}
+
+.rcr-return-fuel-compare__item strong {
+  color: var(--rc-text);
+  font-weight: 600;
+}
+
+.rcr-return-fuel-compare__arrow {
+  color: var(--rc-text-faint);
+  flex-shrink: 0;
+}
+
+.rcr-return-fuel-compare__deficit {
+  margin-left: auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--rc-danger-50);
+  color: var(--rc-danger-700);
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.rcr-return-fuel-zero-hint {
+  color: var(--rc-warning-700);
+}
+
 .rcr-return-modal__done {
   text-align: center;
   padding: 24px 12px;
@@ -1338,9 +1373,35 @@
   color: white;
 }
 
-.rc-step__chev {
-  color: var(--rc-text-faint);
-  flex-shrink: 0;
+/* Tamamlanan adımın onay ikonu: sınıf yerine eleman yeni oluştuğu için
+   animasyon adım geçildiğinde bir kez oynar. rcPop rc-components.css'te. */
+.rc-step__check {
+  animation: rcPop 260ms var(--rc-ease-out);
+}
+
+/* Adımlar arası bağlayıcı: geçilen adımda dolan ilerleme çizgisi. */
+.rc-step__link {
+  position: relative;
+  flex: 1 1 28px;
+  min-width: 16px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--rc-ink-150);
+  overflow: hidden;
+}
+
+.rc-step__link-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 0;
+  background: var(--rc-success-500);
+  transition: width var(--rc-dur-slow) var(--rc-ease-out);
+}
+
+.rc-step__link--filled .rc-step__link-fill {
+  width: 100%;
 }
 
 .rcr-create__head {
@@ -1379,6 +1440,28 @@
 
 .rcr-create__main {
   gap: 14px;
+}
+
+/* Adım kartı yöne duyarlı girer. Bilinçli olarak <Transition> değil saf CSS
+   keyframe: adımlar zaten ayrı v-if dalları olduğu için her geçişte yeni
+   eleman oluşur ve animasyon kendiliğinden oynar. Görünürlük hiçbir JS
+   callback'ine bağlı kalmaz (bkz. rc-components.css sayfa geçişi notu). */
+.rcr-create__main > * {
+  animation: rcStepInFwd var(--rc-dur-base) var(--rc-ease-out);
+}
+
+.rcr-create__main--back > * {
+  animation-name: rcStepInBack;
+}
+
+@keyframes rcStepInFwd {
+  from { opacity: 0; transform: translateX(18px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes rcStepInBack {
+  from { opacity: 0; transform: translateX(-18px); }
+  to   { opacity: 1; transform: none; }
 }
 
 .rcr-create__side {
@@ -3427,5 +3510,18 @@
   .rc-step {
     padding: 6px 8px;
     font-size: 11px;
+  }
+}
+
+/* ───────── Reduced motion ───────── */
+@media (prefers-reduced-motion: reduce) {
+  .rcr-create__main > * {
+    animation: none !important;
+  }
+  .rc-step__check {
+    animation: none !important;
+  }
+  .rc-step__link-fill {
+    transition: none !important;
   }
 }

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { kmPackagesApi } from '@/api/km-packages.api'
-import { useToast } from '@/composables'
+import { useToast, useFirstLoadStagger } from '@/composables'
 import { RentalType } from '@/types'
 import type { KmPackage, CreateKmPackageForm, UpdateKmPackageForm } from '@/types'
 import { RcPageHeader, RcButton, RcEmpty, RcSegTab, RcModal, RcBadge, RcTableSkeleton } from '@/components/rc'
@@ -11,6 +11,7 @@ const toast = useToast()
 
 const packages = ref<KmPackage[]>([])
 const loading = ref(true)
+const rowsStagger = useFirstLoadStagger(loading)
 const activeTab = ref<RentalType | 'ALL'>('ALL')
 const showModal = ref(false)
 const editingPackage = ref<KmPackage | null>(null)
@@ -209,7 +210,7 @@ onMounted(fetchPackages)
       </template>
     </RcEmpty>
 
-    <div v-else class="rca-km-grid">
+    <div v-else class="rca-km-grid" :class="rowsStagger">
       <article
         v-for="pkg in filteredPackages"
         :key="pkg.id"
