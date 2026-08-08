@@ -187,6 +187,10 @@ const adjustments = computed<ReturnAdjustmentInput>(() => ({
    ReturnPreviewResponse.finalTotal — tamamlamanın alacak kurallarını aynalar). */
 const baseRentalAmount = computed(() => moneyAmount(preview.value?.baseRentalAmount))
 const finalTotal = computed(() => moneyAmount(preview.value?.finalTotal))
+/* Sürüm kayması koruması: tutarı hesaplayan sunucu alanı yoksa ₺0 göstermek
+   yanıltıcı olur — tutar yerine "—" çıkar. */
+const hasServerTotal = computed(() => preview.value?.finalTotal != null)
+const finalTotalLabel = computed(() => (hasServerTotal.value ? fmtTRY(finalTotal.value) : '—'))
 const kmPenalty = computed(() => moneyAmount(preview.value?.kmPenalty))
 const openItemsTotal = computed(() => {
   if (!preview.value) return 0
@@ -768,7 +772,7 @@ onUnmounted(() => clearTimeout(previewTimer))
 
             <div class="rcr-live__total">
               <span>Tahmini nihai tutar</span>
-              <span class="rc-num">{{ fmtTRY(finalTotal) }}</span>
+              <span class="rc-num">{{ finalTotalLabel }}</span>
             </div>
 
             <p class="rcr-live__note">
@@ -803,7 +807,7 @@ onUnmounted(() => clearTimeout(previewTimer))
           <RcButton variant="ghost" :disabled="saving" @click="handleClose">Vazgeç</RcButton>
           <RcButton variant="accent" :loading="saving" @click="completeReturn">
             <RcIcon name="check" :size="14" />
-            İadeyi tamamla<template v-if="preview"> · {{ fmtTRY(finalTotal) }}</template>
+            İadeyi tamamla<template v-if="hasServerTotal"> · {{ finalTotalLabel }}</template>
           </RcButton>
         </template>
       </template>
