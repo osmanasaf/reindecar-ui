@@ -31,8 +31,8 @@ const location = computed(() => {
 </script>
 
 <template>
-  <div 
-    class="provider-card" 
+  <div
+    class="provider-card rc-hover-raise"
     :class="{ 'inactive': !provider.active }"
     @click="emit('click', provider.id)"
   >
@@ -103,12 +103,11 @@ const location = computed(() => {
   border-radius: 0.5rem;
   padding: 1.5rem;
   cursor: pointer;
-  transition: all 0.2s;
 }
 
+/* Yükselme ve gölge ortak .rc-hover-raise'den gelir. */
 .provider-card:hover {
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  border-color: var(--color-primary, #2563eb);
+  border-color: var(--rc-blue-500);
 }
 
 .provider-card.inactive {

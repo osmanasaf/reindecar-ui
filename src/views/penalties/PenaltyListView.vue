@@ -2,7 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { penaltiesApi } from '@/api'
-import { useToast, useEnumTranslations } from '@/composables'
+import { useToast, useEnumTranslations, useFirstLoadStagger } from '@/composables'
 import PenaltyStatusBadge from '@/components/penalties/PenaltyStatusBadge.vue'
 import { RcPageHeader, RcButton, RcEmpty, RcBadge, RcTableSkeleton } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
@@ -15,6 +15,7 @@ const { translateViolationType } = useEnumTranslations()
 
 const penalties = ref<PenaltyResponse[]>([])
 const loading = ref(true)
+const rowsStagger = useFirstLoadStagger(loading)
 const totalCount = ref(0)
 const currentPage = ref(0)
 const pageSize = ref(20)
@@ -126,7 +127,7 @@ onMounted(() => {
             <th>Durum</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody :class="rowsStagger">
           <tr
             v-for="penalty in paginatedPenalties"
             :key="penalty.id"

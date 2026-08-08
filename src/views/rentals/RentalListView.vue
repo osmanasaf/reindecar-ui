@@ -3,7 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { rentalsApi, dashboardApi, vehiclesApi, customersApi } from '@/api'
 import type { RentalStats } from '@/api/dashboard.api'
-import { usePagination, useToast, usePageSearchHotkey } from '@/composables'
+import { usePagination, useToast, usePageSearchHotkey, useFirstLoadStagger } from '@/composables'
 import RentalQuickModal from '@/components/rentals/RentalQuickModal.vue'
 import { RcIcon } from '@/components/icons'
 import {
@@ -27,6 +27,7 @@ const rentals = ref<Rental[]>([])
 const vehicleMap = ref<Map<number, Vehicle>>(new Map())
 const customerMap = ref<Map<number, Customer>>(new Map())
 const loading = ref(true)
+const rowsStagger = useFirstLoadStagger(loading)
 const error = ref<string | null>(null)
 const searchQuery = ref('')
 const statusView = ref<StatusView>('all')
@@ -302,7 +303,7 @@ watch(searchQuery, () => {
 </script>
 
 <template>
-  <div class="rc-page">
+  <div class="rc-page rc-page--staggered">
     <RcPageHeader title="Kiralamalar" :subtitle="pageSubtitle">
       <template #actions>
         <RouterLink to="/rentals/create" class="rc-btn rc-btn--accent">
@@ -456,7 +457,7 @@ watch(searchQuery, () => {
             <th class="rc-right">Tutar</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody :class="rowsStagger">
           <tr
             v-for="rental in rentals"
             :key="rental.id"

@@ -8,20 +8,28 @@ export interface FleetDonutItem {
   color: string
 }
 
-const props = defineProps<{
+const RADIUS = 56
+const CIRCUMFERENCE = 2 * Math.PI * RADIUS
+
+const props = withDefaults(defineProps<{
   items: FleetDonutItem[]
-}>()
+  /** İlk yüklemede halkanın süpürülerek çizilmesi. Yenileme/filtrede kapalı. */
+  intro?: boolean
+}>(), {
+  intro: false,
+})
 
 const total = computed(() => props.items.reduce((sum, item) => sum + item.count, 0))
 
+/** Maskenin sayfada birden fazla donut olduğunda çakışmaması için. */
+const sweepMaskId = `rc-donut-sweep-${Math.random().toString(36).slice(2, 9)}`
+
 const segments = computed(() => {
-  const r = 56
-  const circumference = 2 * Math.PI * r
   let offset = 0
   const t = total.value || 1
   return props.items.map((item) => {
-    const len = (item.count / t) * circumference
-    const segment = { ...item, len, offset, circumference }
+    const len = (item.count / t) * CIRCUMFERENCE
+    const segment = { ...item, len, offset, circumference: CIRCUMFERENCE }
     offset += len
     return segment
   })
@@ -31,20 +39,42 @@ const segments = computed(() => {
 <template>
   <div class="rc-fleet-donut" role="img" :aria-label="`Filo durumu, toplam ${total} araç`">
     <svg width="140" height="140" viewBox="0 0 140 140" aria-hidden="true">
+      <!-- Giriş süpürmesi: maske halkası saat 12'den başlayıp dilimleri açar.
+           Maskenin varsayılan hâli tam açık; animasyon hiç oynamazsa da grafik
+           görünür kalır. -->
+      <defs v-if="intro">
+        <mask :id="sweepMaskId">
+          <circle
+            class="rc-fleet-donut__sweep"
+            cx="70"
+            cy="70"
+            r="56"
+            fill="none"
+            stroke="#fff"
+            stroke-width="14"
+            :stroke-dasharray="CIRCUMFERENCE"
+            stroke-dashoffset="0"
+            transform="rotate(-90 70 70)"
+            :style="{ '--rc-donut-c': CIRCUMFERENCE }"
+          />
+        </mask>
+      </defs>
       <circle cx="70" cy="70" r="56" fill="none" stroke="var(--rc-donut-track)" stroke-width="14" />
-      <circle
-        v-for="seg in segments"
-        :key="seg.key"
-        cx="70"
-        cy="70"
-        r="56"
-        fill="none"
-        :stroke="seg.color"
-        stroke-width="14"
-        :stroke-dasharray="`${seg.len} ${seg.circumference}`"
-        :stroke-dashoffset="-seg.offset"
-        transform="rotate(-90 70 70)"
-      />
+      <g :mask="intro ? `url(#${sweepMaskId})` : undefined">
+        <circle
+          v-for="seg in segments"
+          :key="seg.key"
+          cx="70"
+          cy="70"
+          r="56"
+          fill="none"
+          :stroke="seg.color"
+          stroke-width="14"
+          :stroke-dasharray="`${seg.len} ${seg.circumference}`"
+          :stroke-dashoffset="-seg.offset"
+          transform="rotate(-90 70 70)"
+        />
+      </g>
       <text
         x="70"
         y="68"
@@ -82,6 +112,21 @@ const segments = computed(() => {
   display: flex;
   align-items: center;
   gap: 24px;
+}
+
+.rc-fleet-donut__sweep {
+  animation: rcDonutSweep 900ms var(--rc-ease-out);
+}
+
+@keyframes rcDonutSweep {
+  from { stroke-dashoffset: var(--rc-donut-c); }
+  to   { stroke-dashoffset: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rc-fleet-donut__sweep {
+    animation: none !important;
+  }
 }
 
 .rc-fleet-donut__legend {

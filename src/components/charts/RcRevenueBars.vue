@@ -2,16 +2,25 @@
 import { computed } from 'vue'
 import { fmtTRY } from '@/utils/format'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   data: number[]
   labels: string[]
-}>()
+  /** İlk yüklemede çubukların büyüyerek girmesi. Yenileme/filtrede kapalı. */
+  intro?: boolean
+}>(), {
+  intro: false,
+})
 
 const max = computed(() => Math.max(...props.data, 1))
 </script>
 
 <template>
-  <div class="rc-revenue-bars" role="img" :aria-label="`${data.length} aylık ciro grafiği`">
+  <div
+    class="rc-revenue-bars"
+    :class="{ 'rc-revenue-bars--intro': intro }"
+    role="img"
+    :aria-label="`${data.length} aylık ciro grafiği`"
+  >
     <div
       v-for="(value, i) in data"
       :key="i"
@@ -52,11 +61,35 @@ const max = computed(() => Math.max(...props.data, 1))
   min-height: 4px;
   background: var(--rc-chart-bar);
   border-radius: 3px;
+  transform-origin: bottom center;
   transition: background 200ms;
 }
 
 .rc-revenue-bars__bar--last {
   background: var(--rc-chart-bar-active);
+}
+
+/* Giriş: çubuklar tabandan yukarı doğru büyür. */
+.rc-revenue-bars--intro .rc-revenue-bars__bar {
+  animation: rcGrowY 520ms var(--rc-ease-out) both;
+}
+.rc-revenue-bars--intro .rc-revenue-bars__col:nth-child(1) .rc-revenue-bars__bar { animation-delay: 0ms; }
+.rc-revenue-bars--intro .rc-revenue-bars__col:nth-child(2) .rc-revenue-bars__bar { animation-delay: 50ms; }
+.rc-revenue-bars--intro .rc-revenue-bars__col:nth-child(3) .rc-revenue-bars__bar { animation-delay: 100ms; }
+.rc-revenue-bars--intro .rc-revenue-bars__col:nth-child(4) .rc-revenue-bars__bar { animation-delay: 150ms; }
+.rc-revenue-bars--intro .rc-revenue-bars__col:nth-child(5) .rc-revenue-bars__bar { animation-delay: 200ms; }
+.rc-revenue-bars--intro .rc-revenue-bars__col:nth-child(6) .rc-revenue-bars__bar { animation-delay: 250ms; }
+.rc-revenue-bars--intro .rc-revenue-bars__col:nth-child(n + 7) .rc-revenue-bars__bar { animation-delay: 300ms; }
+
+@keyframes rcGrowY {
+  from { transform: scaleY(0.04); }
+  to   { transform: scaleY(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rc-revenue-bars--intro .rc-revenue-bars__bar {
+    animation: none !important;
+  }
 }
 
 .rc-revenue-bars__label {

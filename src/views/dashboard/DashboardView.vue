@@ -17,7 +17,14 @@ import {
   RcListSkeleton,
   RcError,
 } from '@/components/rc'
-import { useDashboardStats, useToast, usePermissions, useFeatures } from '@/composables'
+import {
+  useDashboardStats,
+  useToast,
+  usePermissions,
+  useFeatures,
+  useFirstLoadIntro,
+  useCountUp,
+} from '@/composables'
 import { useAuthStore } from '@/stores'
 import { receivablesApi, payablesApi, maintenanceSchedulesApi } from '@/api'
 import { fmtTRY, formatDate } from '@/utils/format'
@@ -69,12 +76,29 @@ interface KpiCard {
   id: string
   label: string
   value: string
+  /** Sayaç animasyonuna girecek ham sayı; yalnız tam sayı gösteren kartlarda. */
+  count?: number
   sub: string
   icon: IconName
   alert?: boolean
   route?: string
   spark?: number[]
   sparkColor?: string
+}
+
+/** Bar (520ms + 5×50ms gecikme) ve donut (900ms) girişlerini kapsayan pencere. */
+const CHART_INTRO_MS = 1200
+
+const chartsIntro = useFirstLoadIntro(loading, CHART_INTRO_MS)
+const { progress: kpiProgress, start: startKpiCountUp } = useCountUp()
+
+watch(loading, (isLoading) => {
+  if (!isLoading) startKpiCountUp()
+})
+
+function kpiValue(card: KpiCard): string {
+  if (card.count == null) return card.value
+  return String(Math.round(card.count * kpiProgress.value))
 }
 
 function safeNum(v: unknown, fallback = 0): number {
@@ -160,6 +184,7 @@ const kpiCards = computed<KpiCard[]>(() => {
       id: 'active',
       label: 'Aktif kiralama',
       value: String(safeNum(s.activeRentals)),
+      count: safeNum(s.activeRentals),
       sub: `${safeNum(s.totalRentals)} toplam`,
       icon: 'key',
       alert: s.overdueRentals > 0,
@@ -171,6 +196,7 @@ const kpiCards = computed<KpiCard[]>(() => {
       id: 'vehicles',
       label: 'Müsait araç',
       value: String(safeNum(s.availableVehicles)),
+      count: safeNum(s.availableVehicles),
       sub: `${safeNum(s.totalVehicles)} toplam filo`,
       icon: 'car',
       route: '/vehicles',
@@ -179,6 +205,7 @@ const kpiCards = computed<KpiCard[]>(() => {
       id: 'customers',
       label: 'Müşteriler',
       value: String(safeNum(s.totalCustomers)),
+      count: safeNum(s.totalCustomers),
       sub: 'kayıtlı müşteri',
       icon: 'users',
       route: '/customers',
@@ -187,6 +214,7 @@ const kpiCards = computed<KpiCard[]>(() => {
       id: 'returns',
       label: 'Bugün iade',
       value: String(safeNum(s.todayReturns)),
+      count: safeNum(s.todayReturns),
       sub: `${safeNum(s.tomorrowReturns)} yarın`,
       icon: 'calendar',
     },
@@ -211,6 +239,7 @@ const maintenanceKpi = computed<KpiCard | null>(() => {
     id: 'maintenance',
     label: 'Bakımı Yaklaşan',
     value: String(list.length),
+    count: list.length,
     sub: 'araç',
     icon: 'wrench',
     alert: list.some((item) => item.status === 'OVERDUE' || (item.daysRemaining != null && item.daysRemaining < 0)),
@@ -359,7 +388,7 @@ onMounted(async () => {
           <RcIcon :name="card.icon" :size="14" />
           {{ card.label }}
         </div>
-        <div class="rc-kpi__value">{{ card.value }}</div>
+        <div class="rc-kpi__value">{{ kpiValue(card) }}</div>
         <div class="rc-kpi__sub">
           <span>{{ card.sub }}</span>
           <span
@@ -407,7 +436,11 @@ onMounted(async () => {
               <RcBadge variant="success" dot>Toplam dönem</RcBadge>
               <span class="rc-dashboard-revenue-meta">{{ revenuePeriod }} aylık ciro</span>
             </div>
-            <RcRevenueBars :data="[...revenue.values]" :labels="[...revenue.labels]" />
+            <RcRevenueBars
+              :data="[...revenue.values]"
+              :labels="[...revenue.labels]"
+              :intro="chartsIntro"
+            />
           </template>
           <RcEmpty v-else title="Ciro verisi yok" description="Seçilen dönemde kayıt bulunamadı." />
         </div>
@@ -424,7 +457,7 @@ onMounted(async () => {
         <div class="rc-card__body">
           <RcSkeleton v-if="loading" height="220px" radius="lg" />
           <template v-else-if="hasFleetData">
-            <RcFleetDonut :items="fleetItems" />
+            <RcFleetDonut :items="fleetItems" :intro="chartsIntro" />
             <hr class="rc-hr">
             <div style="display: flex; gap: 8px; font-size: 12px; color: var(--rc-text-muted)">
               <RcIcon name="info" :size="14" style="margin-top: 2px; flex-shrink: 0" />

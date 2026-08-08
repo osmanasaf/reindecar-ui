@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { campaignsApi, vehicleCategoriesApi } from '@/api'
-import { useToast } from '@/composables'
+import { useToast, useFirstLoadStagger } from '@/composables'
 import { RentalType } from '@/types'
 import type { VehicleCategory } from '@/types'
 import type { CampaignResponse, CreateCampaignRequest } from '@/types/campaign'
@@ -14,6 +14,7 @@ const toast = useToast()
 const campaigns = ref<CampaignResponse[]>([])
 const categories = ref<VehicleCategory[]>([])
 const loading = ref(true)
+const rowsStagger = useFirstLoadStagger(loading)
 const activeTab = ref<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL')
 const showModal = ref(false)
 const saving = ref(false)
@@ -187,7 +188,7 @@ onMounted(() => {
       </template>
     </RcEmpty>
 
-    <div v-else class="rca-cc-grid">
+    <div v-else class="rca-cc-grid" :class="rowsStagger">
       <article v-for="campaign in filteredCampaigns" :key="campaign.id" class="rca-cc-card">
         <div class="rca-cc-card__head">
           <div>

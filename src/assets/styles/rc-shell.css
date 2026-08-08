@@ -3,19 +3,17 @@
    Page/modal primitives: rc-primitives.css
    =========================================================== */
 
+/* Kabuk flex: `grid-template-columns` güvenilir şekilde transition edilemez,
+   bu yüzden kolon genişliği doğrudan .rc-side üzerinde animate ediliyor. */
 .rc-app {
-  display: grid;
-  grid-template-columns: var(--rc-sidebar-w) 1fr;
+  display: flex;
   min-height: 100vh;
   background: var(--rc-bg-subtle);
 }
 
-.rc-app--collapsed {
-  grid-template-columns: var(--rc-sidebar-w-collapsed) 1fr;
-}
-
 .rc-app__main {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   min-width: 0;
   min-height: 100vh;
@@ -35,12 +33,19 @@
   background: var(--rc-ink-1000);
   color: var(--rc-ink-300);
   display: flex;
+  flex: 0 0 auto;
   flex-direction: column;
   position: sticky;
   top: 0;
+  width: var(--rc-sidebar-w);
   height: 100vh;
   border-right: 1px solid var(--rc-ink-900);
   overflow: hidden;
+  transition: width var(--rc-dur-base) var(--rc-ease-out);
+}
+
+.rc-side--collapsed {
+  width: var(--rc-sidebar-w-collapsed);
 }
 
 .rc-side__brand {
@@ -76,7 +81,6 @@
   border-radius: var(--rc-r-6);
   color: var(--rc-ink-300);
   flex-shrink: 0;
-  margin-left: auto;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.04);
   transition: background var(--rc-dur-fast), color var(--rc-dur-fast), border-color var(--rc-dur-fast);
@@ -184,8 +188,9 @@
   text-overflow: ellipsis;
 }
 
+/* Sağa hizalama .rc-side__item-label'ın flex-grow'undan gelir; `margin-left: auto`
+   kullanılmıyor çünkü `auto` daralma animasyonunda interpolasyon yapılamıyor. */
 .rc-side__item-count {
-  margin-left: auto;
   font-size: 11px;
   color: var(--rc-ink-500);
   font-variant-numeric: tabular-nums;
@@ -239,6 +244,8 @@
 }
 
 .rc-side__user:hover { background: rgba(255, 255, 255, 0.04); }
+/* Koyu sidebar'da blue-500 okunmuyor; vurgu rengi açık tonda. */
+.rc-side__user:hover > .rc-chevron-nudge { color: var(--rc-blue-300); }
 .rc-side__user .rc-avatar { background: var(--rc-blue-500); color: white; }
 
 .rc-side__user-info {
@@ -269,36 +276,68 @@
 
 /* Collapsed sidebar */
 .rc-side--collapsed .rc-side__search,
-.rc-side--collapsed .rc-side__nav-section,
-.rc-side--collapsed .rc-side__item-label,
-.rc-side--collapsed .rc-side__item-count,
-.rc-side--collapsed .rc-side__user-info,
-.rc-side--collapsed .rc-mark__wordmark,
-.rc-side--collapsed .rc-side__brand-link {
+.rc-side--collapsed .rc-side__nav-section {
   display: none;
+}
+
+/* Etiketler `display: none` ile kaybolmaz; sönerek sola kayar ve genişlikleri
+   sıfıra iner. Hepsinin flex-basis'i 0 (`flex: 1`) olduğu için genişlik
+   yalnızca flex-grow ile sürülür — `width: auto`dan 0'a interpolasyon
+   gerekmez. Sönme sidebar genişliğinden hızlı bitsin diye --rc-dur-fast. */
+.rc-side__brand-link,
+.rc-side__item-label,
+.rc-side__user-info {
+  transition: opacity var(--rc-dur-fast) var(--rc-ease-out),
+              transform var(--rc-dur-fast) var(--rc-ease-out),
+              flex-grow var(--rc-dur-base) var(--rc-ease-out);
+}
+.rc-side__item-count {
+  transition: opacity var(--rc-dur-fast) var(--rc-ease-out),
+              transform var(--rc-dur-fast) var(--rc-ease-out),
+              max-width var(--rc-dur-base) var(--rc-ease-out);
+  max-width: 48px;
+}
+
+.rc-side--collapsed .rc-side__brand-link,
+.rc-side--collapsed .rc-side__item-label,
+.rc-side--collapsed .rc-side__user-info {
+  flex-grow: 0;
+  opacity: 0;
+  transform: translateX(-8px);
+  overflow: hidden;
+  pointer-events: none;
+}
+.rc-side--collapsed .rc-side__item-count {
+  max-width: 0;
+  opacity: 0;
+  transform: translateX(-8px);
+  overflow: hidden;
+  pointer-events: none;
 }
 
 .rc-side--collapsed .rc-side__brand {
   justify-content: center;
   padding: 10px 8px;
-  flex-direction: column;
-  gap: 6px;
-  height: auto;
-  min-height: var(--rc-header-h);
+  gap: 0;
 }
 
-.rc-side--collapsed .rc-side__collapse-btn {
-  margin: 0 auto;
-  margin-left: auto;
+.rc-side__item,
+.rc-side__brand,
+.rc-side__user {
+  transition: background var(--rc-dur-fast), color var(--rc-dur-fast),
+              gap var(--rc-dur-base) var(--rc-ease-out),
+              padding var(--rc-dur-base) var(--rc-ease-out);
 }
 
 .rc-side--collapsed .rc-side__item {
   justify-content: center;
   padding: 0;
+  gap: 0;
 }
 
 .rc-side--collapsed .rc-side__user {
   justify-content: center;
+  gap: 0;
 }
 
 /* ────── Header ────── */
@@ -597,11 +636,7 @@
 }
 
 @media (max-width: 768px) {
-  .rc-app,
-  .rc-app--collapsed {
-    grid-template-columns: 1fr;
-  }
-
+  /* Sidebar akıştan çıkıyor; .rc-app__main tüm genişliği zaten alır. */
   .rc-side {
     position: fixed;
     left: 0;
@@ -1390,4 +1425,18 @@
 .rc-chip--on .rc-chip__count {
   background: var(--rc-blue-100);
   color: var(--rc-blue-700);
+}
+
+/* ───────── Reduced motion ───────── */
+@media (prefers-reduced-motion: reduce) {
+  .rc-side,
+  .rc-side__brand,
+  .rc-side__brand-link,
+  .rc-side__item,
+  .rc-side__item-label,
+  .rc-side__item-count,
+  .rc-side__user,
+  .rc-side__user-info {
+    transition: none !important;
+  }
 }

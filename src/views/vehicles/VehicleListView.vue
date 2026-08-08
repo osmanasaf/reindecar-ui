@@ -8,6 +8,7 @@ import {
   useLocalStorage,
   UI_STORAGE_KEYS,
   normalizeVehicleViewMode,
+  useFirstLoadStagger,
   type VehicleListViewMode,
 } from '@/composables'
 import { RcIcon } from '@/components/icons'
@@ -32,6 +33,7 @@ type SortKey = 'plate' | 'km' | 'daily' | 'year'
 const router = useRouter()
 const vehicles = ref<Vehicle[]>([])
 const loading = ref(true)
+const rowsStagger = useFirstLoadStagger(loading)
 const error = ref<string | null>(null)
 const searchQuery = ref('')
 const statusFilter = ref<FilterKey>('all')
@@ -576,7 +578,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="rc-page">
+  <div class="rc-page rc-page--staggered">
     <RcPageHeader
       title="Filo"
       subtitle="Bugün filonun nabzı — kim nerede, hangi araç müsait, hangi araç yolda"
@@ -940,7 +942,7 @@ onMounted(async () => {
             <th>Durum</th>
           </tr>
         </thead>
-        <TransitionGroup name="rc-list" tag="tbody">
+        <TransitionGroup name="rc-list" tag="tbody" :class="rowsStagger">
           <tr
             v-for="v in vehicles"
             :key="v.id"
@@ -1005,7 +1007,7 @@ onMounted(async () => {
     </div>
 
     <!-- Grid -->
-    <div v-else-if="viewMode === 'grid'" class="rcv-cards">
+    <div v-else-if="viewMode === 'grid'" class="rcv-cards" :class="rowsStagger">
       <div
         v-for="v in vehicles"
         :key="v.id"

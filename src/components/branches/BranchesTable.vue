@@ -6,9 +6,13 @@ interface BranchRow extends Branch {
   vehicleCount?: number
 }
 
-defineProps<{
+withDefaults(defineProps<{
   branches: readonly BranchRow[]
-}>()
+  /** İlk yüklemede satırlara kademeli giriş vermek için 'rc-stagger'. */
+  rowsClass?: string
+}>(), {
+  rowsClass: '',
+})
 
 const emit = defineEmits<{
   edit: [branch: BranchRow]
@@ -34,7 +38,7 @@ function location(branch: BranchRow): string {
           <th />
         </tr>
       </thead>
-      <tbody>
+      <tbody :class="rowsClass">
         <tr
           v-for="branch in branches"
           :key="branch.id"

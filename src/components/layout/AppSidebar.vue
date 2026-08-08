@@ -157,7 +157,7 @@ function formatCount(n: number | undefined): string | undefined {
               @click="toggleGroup(item)"
             >
               <RcIcon :name="item.icon" />
-              <span v-if="!collapsed || mobileOpen" class="rc-side__item-label">{{ item.label }}</span>
+              <span class="rc-side__item-label">{{ item.label }}</span>
               <RcIcon
                 v-if="!collapsed || mobileOpen"
                 name="chevronDown"
@@ -193,9 +193,9 @@ function formatCount(n: number | undefined): string | undefined {
             :title="collapsed && !mobileOpen ? item.label : undefined"
           >
             <RcIcon :name="item.icon" />
-            <span v-if="!collapsed || mobileOpen" class="rc-side__item-label">{{ item.label }}</span>
+            <span class="rc-side__item-label">{{ item.label }}</span>
             <span
-              v-if="(!collapsed || mobileOpen) && formatCount(countForNavItem(item.name))"
+              v-if="formatCount(countForNavItem(item.name))"
               class="rc-side__item-count"
             >
               {{ formatCount(countForNavItem(item.name)) }}
@@ -207,11 +207,11 @@ function formatCount(n: number | undefined): string | undefined {
 
     <RouterLink to="/settings" class="rc-side__user">
       <RcAvatar>{{ userMeta.initials }}</RcAvatar>
-      <div v-if="!collapsed || mobileOpen" class="rc-side__user-info">
+      <div class="rc-side__user-info">
         <b>{{ userMeta.name }}</b>
         <small>{{ userMeta.branch }} · {{ userMeta.role }}</small>
       </div>
-      <RcIcon v-if="!collapsed || mobileOpen" name="chevronRight" :size="14" />
+      <RcIcon v-if="!collapsed || mobileOpen" name="chevronRight" :size="14" class="rc-chevron-nudge" />
     </RouterLink>
   </aside>
 </template>

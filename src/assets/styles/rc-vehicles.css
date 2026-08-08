@@ -1751,14 +1751,10 @@
   gap: 12px;
 }
 
+/* Hover yükselmesi ortak .rc-hover-raise'den gelir (rc-motion.css). */
 .rcv-insurance-card {
   border-left-width: 3px;
   border-left-style: solid;
-  transition: box-shadow var(--rc-dur-fast), transform var(--rc-dur-fast);
-}
-
-.rcv-insurance-card:hover {
-  box-shadow: var(--rc-shadow-sm);
 }
 
 .rcv-insurance-card--ok { border-left-color: var(--rc-success-500); }

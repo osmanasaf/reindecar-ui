@@ -6,6 +6,7 @@ export interface StepperStep {
   label: string
 }
 
+
 const props = defineProps<{
   steps: StepperStep[]
   current: number
@@ -39,17 +40,19 @@ function onSelect(stepId: number) {
         @click="onSelect(step.id)"
       >
         <span class="rc-step__num">
-          <RcIcon v-if="step.id < current" name="check" :size="12" />
+          <RcIcon v-if="step.id < current" name="check" :size="12" class="rc-step__check" />
           <template v-else>{{ step.id }}</template>
         </span>
         {{ step.label }}
       </button>
-      <RcIcon
+      <span
         v-if="index < steps.length - 1"
-        name="chevronRight"
-        :size="14"
-        class="rc-step__chev"
-      />
+        class="rc-step__link"
+        :class="{ 'rc-step__link--filled': step.id < current }"
+        aria-hidden="true"
+      >
+        <span class="rc-step__link-fill" />
+      </span>
     </template>
   </div>
 </template>

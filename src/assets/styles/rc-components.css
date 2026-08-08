@@ -125,6 +125,8 @@
   display: flex; flex-direction: column; gap: 6px;
 }
 .rc-field__label {
+  display: flex;
+  align-items: center;
   font-size: var(--rc-fs-12);
   font-weight: 500;
   color: var(--rc-text-soft);
@@ -195,13 +197,42 @@
 
 .rc-input--lg { height: 40px; font-size: var(--rc-fs-14); }
 
+/* Hata sınıfı eklendiği anda animasyon kendiliğinden tetiklenir; hata sabit
+   kaldığı sürece tekrar oynamaz. */
 .rc-field--error .rc-input,
 .rc-field--error .rc-input-group {
   border-color: var(--rc-danger-500);
+  animation: rcShake 340ms var(--rc-ease-out);
+}
+@keyframes rcShake {
+  0%, 100% { transform: translateX(0); }
+  15% { transform: translateX(-4px); }
+  30% { transform: translateX(4px); }
+  45% { transform: translateX(-3px); }
+  60% { transform: translateX(3px); }
+  75% { transform: translateX(-2px); }
+  90% { transform: translateX(2px); }
 }
 .rc-field__error {
   font-size: var(--rc-fs-11);
   color: var(--rc-danger-700);
+  animation: rcErrIn 180ms var(--rc-ease-out);
+}
+@keyframes rcErrIn {
+  from { opacity: 0; transform: translateY(-3px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Hatadan geçerliye dönüşte kısa süreli onay işareti (RcField). */
+.rc-field__valid {
+  margin-left: 6px;
+  color: var(--rc-success-500);
+  animation: rcPop 260ms var(--rc-ease-out);
+}
+@keyframes rcPop {
+  from { transform: scale(0.4); opacity: 0; }
+  60%  { transform: scale(1.15); opacity: 1; }
+  to   { transform: scale(1); opacity: 1; }
 }
 
 /* ───────── Alert ───────── */
@@ -568,16 +599,19 @@
   z-index: var(--rc-z-toast, 100);
   display: flex;
   flex-direction: column;
-  gap: 8px;
   max-width: min(400px, calc(100vw - 32px));
   pointer-events: none;
 }
 
+/* Aralık `gap` yerine margin ile veriliyor: kapanan toast'ın yüksekliğiyle
+   birlikte kendi boşluğu da daralabilsin (gap daralmaz). */
 .rc-toast {
+  position: relative;
   display: flex;
   align-items: flex-start;
   gap: 10px;
   padding: 12px 14px;
+  margin-bottom: 8px;
   border-radius: var(--rc-radius-md);
   border: 1px solid var(--rc-border-subtle);
   background: var(--rc-surface);
@@ -585,6 +619,7 @@
   cursor: pointer;
   pointer-events: auto;
   min-width: 280px;
+  overflow: hidden;
 }
 
 .rc-toast__icon {
@@ -630,17 +665,60 @@
 .rc-toast--info { border-left: 3px solid var(--rc-blue-500); }
 .rc-toast--info .rc-toast__icon { color: var(--rc-blue-600); }
 
+/* Otomatik kapanma sayacı — süre ToastContainer'dan inline gelir. */
+.rc-toast__progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  transform-origin: left center;
+  animation: rcToastProgress linear forwards;
+  background: var(--rc-border-strong);
+}
+.rc-toast--success .rc-toast__progress { background: var(--rc-green-500); }
+.rc-toast--error   .rc-toast__progress { background: var(--rc-red-500); }
+.rc-toast--warning .rc-toast__progress { background: var(--rc-orange-500); }
+.rc-toast--info    .rc-toast__progress { background: var(--rc-blue-500); }
+@keyframes rcToastProgress {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0); }
+}
+
 .rc-toast-enter-active {
   animation: rcToastIn var(--rc-dur-base) var(--rc-ease-out);
 }
+/* Kapanışta yükseklik + boşluk daralması: kalan toast'lar zıplamak yerine
+   akıcı şekilde yukarı kayar. Gerçek yükseklik ToastContainer'daki leave
+   hook'unda inline max-height olarak ölçülür. */
 .rc-toast-leave-active {
   transition: opacity var(--rc-dur-fast) var(--rc-ease-out),
-              transform var(--rc-dur-fast) var(--rc-ease-out);
+              transform var(--rc-dur-fast) var(--rc-ease-out),
+              max-height 220ms var(--rc-ease-out),
+              margin-bottom 220ms var(--rc-ease-out),
+              padding-top 220ms var(--rc-ease-out),
+              padding-bottom 220ms var(--rc-ease-out),
+              border-top-width 220ms var(--rc-ease-out),
+              border-bottom-width 220ms var(--rc-ease-out);
+  pointer-events: none;
 }
-.rc-toast-enter-from,
+.rc-toast-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
 .rc-toast-leave-to {
   opacity: 0;
   transform: translateY(8px);
+  max-height: 0;
+  margin-bottom: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-top-width: 0;
+  border-bottom-width: 0;
+}
+/* Kalan toast'ların yukarı kayması */
+.rc-toast-move {
+  transition: transform var(--rc-dur-base) var(--rc-ease-out);
 }
 @keyframes rcToastIn {
   from { opacity: 0; transform: translateY(8px); }
@@ -786,6 +864,16 @@
   }
 }
 
+/* Opsiyonel: yoğun liste sayfalarında başlık → filtre barı → içerik sırayla
+   girsin. Sıra DOM sırasından okunur: 1. blok başlık, 2. blok filtre barı,
+   kalanlar ana içerik. */
+.rc-page--staggered > * {
+  animation: rc-page-in var(--rc-dur-base) var(--rc-ease-out) both;
+}
+.rc-page--staggered > *:nth-child(1) { animation-delay: 0ms; }
+.rc-page--staggered > *:nth-child(2) { animation-delay: 40ms; }
+.rc-page--staggered > *:nth-child(n + 3) { animation-delay: 80ms; }
+
 .rc-list-enter-active {
   transition: opacity var(--rc-dur-base) var(--rc-ease-out),
               transform var(--rc-dur-base) var(--rc-ease-out);
@@ -891,15 +979,26 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .rc-app__scroll > * {
+  .rc-app__scroll > *,
+  .rc-page--staggered > * {
     animation: none !important;
   }
   .rc-list-enter-active,
   .rc-list-leave-active,
   .rc-list-move,
   .rc-toast-enter-active,
-  .rc-toast-leave-active {
+  .rc-toast-leave-active,
+  .rc-toast-move {
     transition: none !important;
+    animation: none !important;
+  }
+  .rc-toast__progress {
+    display: none;
+  }
+  .rc-field--error .rc-input,
+  .rc-field--error .rc-input-group,
+  .rc-field__error,
+  .rc-field__valid {
     animation: none !important;
   }
   .rc-brand-loader--stroke-draw .rc-brand-loader__mark path,

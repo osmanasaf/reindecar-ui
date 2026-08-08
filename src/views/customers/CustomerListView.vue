@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { customersApi } from '@/api'
-import { usePagination, useToast } from '@/composables'
+import { usePagination, useToast, useFirstLoadStagger } from '@/composables'
 import CustomerQuickPreviewModal from '@/components/customers/CustomerQuickPreviewModal.vue'
 import CustomerEditModal from '@/components/customers/CustomerEditModal.vue'
 import { RcIcon } from '@/components/icons'
@@ -27,6 +27,7 @@ const router = useRouter()
 
 const customers = ref<Customer[]>([])
 const loading = ref(true)
+const rowsStagger = useFirstLoadStagger(loading)
 const error = ref<string | null>(null)
 const searchQuery = ref('')
 const typeFilter = ref<FilterKey>('all')
@@ -257,7 +258,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="rc-page">
+  <div class="rc-page rc-page--staggered">
     <RcPageHeader
       title="Müşteriler"
       subtitle="Müşteri tabanı, segment dağılımı ve durum özeti"
@@ -396,7 +397,7 @@ onMounted(async () => {
             <th>Durum</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody :class="rowsStagger">
           <tr
             v-for="customer in customers"
             :key="customer.id"
