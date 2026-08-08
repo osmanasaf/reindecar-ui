@@ -206,6 +206,11 @@
 .rc-modal__title-icon--success { color: var(--rc-success-500); }
 
 /* Onay/bilgi modallerinin gövde metni */
+/* Yedi bölgeli şablonun sabit aralıkları: ray başlığın hemen altında,
+   bilgi şeridi her zaman gövdenin en altında. */
+.rc-modal-rail { margin-bottom: 16px; }
+.rc-modal-note { margin-top: 16px; }
+
 .rc-modal-prose {
   margin: 0;
   font-size: var(--rc-fs-14);

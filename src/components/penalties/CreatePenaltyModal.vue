@@ -253,7 +253,15 @@ watch(() => props.show, async (newVal) => {
 </script>
 
 <template>
-  <RcModal :open="show" title="Yeni trafik cezası" xl @close="handleClose">
+  <RcModal
+    :open="show"
+    icon="warning"
+    intent="warning"
+    title="Yeni trafik cezası"
+    subtitle="Ceza, müşteriye alacak olarak yansıtılır"
+    xl
+    @close="handleClose"
+  >
       <form id="create-penalty-form" @submit.prevent="handleSubmit">
         <div class="rca-modal-form">
           <div class="form-group full-width">

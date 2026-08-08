@@ -16,6 +16,13 @@ const props = defineProps<{
 
 const emit = defineEmits<{ close: []; recorded: [payment: Payment] }>()
 
+const modalSubtitle = computed(() => {
+  if (!props.rental) return ''
+  return [props.rental.rentalNumber, props.rental.customerName, props.rental.vehiclePlate]
+    .filter(Boolean)
+    .join(' · ')
+})
+
 const toast = useToast()
 const submitting = ref(false)
 const amount = ref(0)
@@ -132,19 +139,11 @@ function handleClose() {
   <RcModal
     :open="open && !!rental"
     wide
+    icon="cash"
+    title="Ödeme al"
+    :subtitle="modalSubtitle"
     @close="handleClose"
   >
-    <template #header>
-      <div>
-        <h2 class="rc-modal__title">
-          <RcIcon name="cash" :size="20" class="rc-modal__title-icon" />
-          Ödeme al
-        </h2>
-        <div v-if="rental" class="rc-modal__sub">
-          {{ rental.rentalNumber }}
-        </div>
-      </div>
-    </template>
 
     <div v-if="roundedRemaining > 0" class="rc-modal-callout" role="status">
       <div class="rc-modal-callout__main">

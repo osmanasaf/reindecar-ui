@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
-import { RcModal, RcButton } from '@/components/rc'
+import { RcModal, RcButton, RcModalRail, type ModalRailStep } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
 import { rentalsApi } from '@/api'
 import { useToast, useValidation, rules, useFeatures } from '@/composables'
@@ -36,6 +36,22 @@ const fuelTrackingEnabled = computed(() => isEnabled('RENTAL_FUEL_TRACKING'))
 const submitting = ref(false)
 const downloadingPdf = ref(false)
 const step = ref<'form' | 'completed'>('form')
+
+const modalSubtitle = computed(() => {
+  if (!props.rental) return ''
+  return [props.rental.rentalNumber, props.customerName || props.rental.customerName, props.rental.vehiclePlate]
+    .filter(Boolean)
+    .join(' · ')
+})
+
+const railSteps = computed<ModalRailStep[]>(() => {
+  const done = step.value === 'completed'
+  return [
+    { label: 'Rezerve', state: 'done' },
+    { label: 'Teslimat', state: done ? 'done' : 'current' },
+    { label: 'Aktif', state: done ? 'current' : 'upcoming' },
+  ]
+})
 const activatedRental = ref<Rental | null>(null)
 const submitError = ref<RentalOperationError | null>(null)
 const startKm = ref(0)
@@ -156,42 +172,13 @@ async function downloadHandoverPdf() {
   <RcModal
     :open="open && !!displayRental"
     wide
+    icon="key"
+    :intent="step === 'completed' ? 'success' : 'operation'"
+    title="Aracı teslim et · Kiralamayı aktive et"
+    :subtitle="modalSubtitle"
     @close="handleClose"
   >
-    <template #header>
-      <div>
-        <h2 class="rc-modal__title">
-          <RcIcon name="key" :size="20" class="rc-modal__title-icon" />
-          Aracı teslim et · Kiralamayı aktive et
-        </h2>
-        <div v-if="rental" class="rc-modal__sub">
-          {{ rental.rentalNumber }} · {{ customerName || rental.customerName }} · {{ rental.vehiclePlate }}
-        </div>
-      </div>
-    </template>
-
-    <div class="rc-status-rail rcr-modal-rail">
-      <span class="rc-status-step" :class="{ 'rc-status-step--done': step === 'completed' }">
-        <span class="rc-status-step__dot">
-          <RcIcon v-if="step === 'completed'" name="check" :size="10" />
-          <template v-else>1</template>
-        </span>
-        Rezerve
-      </span>
-      <RcIcon name="chevronRight" :size="14" class="rc-status-step__chev" />
-      <span class="rc-status-step" :class="{ 'rc-status-step--done': step === 'completed', 'rc-status-step--current': step === 'form' }">
-        <span class="rc-status-step__dot">
-          <RcIcon v-if="step === 'completed'" name="check" :size="10" />
-          <template v-else>2</template>
-        </span>
-        Teslimat
-      </span>
-      <RcIcon name="chevronRight" :size="14" class="rc-status-step__chev" />
-      <span class="rc-status-step" :class="{ 'rc-status-step--current': step === 'completed' }">
-        <span class="rc-status-step__dot">3</span>
-        Aktif
-      </span>
-    </div>
+    <RcModalRail :steps="railSteps" class="rc-modal-rail" />
 
     <template v-if="step === 'form'">
     <div v-if="rental" class="rc-card rcr-modal-card rcr-modal-card--spaced">
@@ -272,7 +259,7 @@ async function downloadHandoverPdf() {
       </p>
     </div>
 
-    <div v-if="submitError" class="rc-alert rc-alert--danger rcr-modal-alert-spaced--top">
+    <div v-if="submitError" class="rc-alert rc-alert--danger rc-modal-note">
       <RcIcon name="warning" :size="16" />
       <div>
         <div class="rc-alert__title">{{ submitError.message }}</div>
@@ -280,7 +267,7 @@ async function downloadHandoverPdf() {
       </div>
     </div>
 
-    <div class="rc-alert rc-alert--info rcr-modal-alert-spaced--top">
+    <div class="rc-alert rc-alert--info rc-modal-note">
       <RcIcon name="info" :size="16" />
       <span>Teslimatta araç KM'si güncellenir ve kiralama <strong>ACTIVE</strong> durumuna geçer.</span>
     </div>

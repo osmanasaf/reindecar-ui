@@ -907,9 +907,7 @@
    (.rc-modal-callout / .rc-modal-form / .rc-modal__title-icon) — accounting
    ve vehicles modalleri de aynı görsel dili paylaşsın diye. */
 
-.rcr-modal-rail {
-  margin-bottom: 16px;
-}
+/* Modal rayının aralığı artık ortak .rc-modal-rail sınıfında (rc-primitives.css). */
 
 .rcr-modal-alert-spaced {
   margin-bottom: 14px;
@@ -1342,11 +1340,7 @@
 }
 
 /* ── Add driver modal ── */
-.rcr-add-driver__hint {
-  font-size: 13px;
-  color: var(--rc-text-muted);
-  margin: 0 0 14px;
-}
+/* Açıklama artık gövdenin altındaki ortak bilgi şeridinde. */
 
 .rcr-add-driver__list {
   display: flex;

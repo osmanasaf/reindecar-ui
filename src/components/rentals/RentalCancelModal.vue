@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
-import { RcModal, RcButton } from '@/components/rc'
+import { computed, ref, watch } from 'vue'
+import { RcModal, RcButton, RcModalRail, type ModalRailStep } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
 import { rentalsApi } from '@/api'
 import { useToast } from '@/composables'
@@ -25,6 +25,18 @@ const toast = useToast()
 const submitting = ref(false)
 const reason = ref('CUSTOMER_REQUEST')
 const notes = ref('')
+
+const modalSubtitle = computed(() => {
+  if (!props.rental) return ''
+  return [props.rental.rentalNumber, props.rental.customerName, props.rental.vehiclePlate]
+    .filter(Boolean)
+    .join(' · ')
+})
+
+const railSteps: ModalRailStep[] = [
+  { label: 'Rezerve', state: 'done' },
+  { label: 'İptal', state: 'current', danger: true },
+]
 
 watch(
   () => props.open,
@@ -59,29 +71,24 @@ async function confirm() {
   <RcModal
     :open="open && !!rental"
     wide
+    icon="close"
+    intent="destructive"
+    title="Kiralamayı iptal et"
+    :subtitle="modalSubtitle"
     @close="emit('close')"
   >
-    <template #header>
-      <div>
-        <h2 class="rc-modal__title">
-          <RcIcon
-            name="close"
-            :size="20"
-            class="rc-modal__title-icon rc-modal__title-icon--danger"
-          />
-          Kiralamayı iptal et
-        </h2>
-        <div v-if="rental" class="rc-modal__sub">{{ rental.rentalNumber }}</div>
-      </div>
-    </template>
+    <RcModalRail :steps="railSteps" class="rc-modal-rail" />
 
-    <div class="rc-alert rc-alert--danger">
-      <RcIcon name="warning" :size="16" />
-      <div>
-        <div class="rc-alert__title">Bu işlem geri alınamaz</div>
-        <span>
-          <strong>{{ rental?.rentalNumber }}</strong> iptal edilecek; rezerve araç müsait duruma döner ve açık alacaklar iptal edilir.
-        </span>
+    <div v-if="rental" class="rc-card">
+      <div class="rc-card__body rcr-modal-meta">
+        <div class="rc-meta-row">
+          <span class="rc-meta-row__label">Müşteri</span>
+          <span class="rc-meta-row__value">{{ rental.customerName || '—' }}</span>
+        </div>
+        <div class="rc-meta-row">
+          <span class="rc-meta-row__label">Araç</span>
+          <span class="rc-meta-row__value">{{ rental.vehiclePlate || '—' }}</span>
+        </div>
       </div>
     </div>
 
@@ -95,6 +102,16 @@ async function confirm() {
       <div class="rc-field rc-modal-form__full">
         <label class="rc-field__label">Açıklama (opsiyonel)</label>
         <textarea v-model="notes" class="rc-textarea" rows="3" placeholder="İptal detayı…" />
+      </div>
+    </div>
+
+    <div class="rc-alert rc-alert--danger rc-modal-note">
+      <RcIcon name="warning" :size="16" />
+      <div>
+        <div class="rc-alert__title">Bu işlem geri alınamaz</div>
+        <span>
+          <strong>{{ rental?.rentalNumber }}</strong> iptal edilecek; rezerve araç müsait duruma döner ve açık alacaklar iptal edilir.
+        </span>
       </div>
     </div>
 

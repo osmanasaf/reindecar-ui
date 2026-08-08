@@ -72,16 +72,14 @@ async function handleSubmit() {
 </script>
 
 <template>
-  <RcModal :open="open" wide @close="emit('close')">
-    <template #header>
-      <div>
-        <h2 class="rc-modal__title">
-          <RcIcon name="route" :size="20" class="rc-modal__title-icon" />
-          HGS/OGS geçiş kaydı
-        </h2>
-        <div class="rc-modal__sub">Geçiş, müşteriye alacak olarak yansıtılır</div>
-      </div>
-    </template>
+  <RcModal
+    :open="open"
+    wide
+    icon="route"
+    title="HGS/OGS geçiş kaydı"
+    subtitle="Geçiş, müşteriye alacak olarak yansıtılır"
+    @close="emit('close')"
+  >
 
     <form id="create-toll-form" class="rc-modal-form" @submit.prevent="handleSubmit">
       <RcField label="Geçiş tipi" required>

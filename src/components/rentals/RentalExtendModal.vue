@@ -60,6 +60,13 @@ const dailyRate = computed(() => {
 
 const extraCharge = computed(() => dailyRate.value * extraDays.value)
 
+const modalSubtitle = computed(() => {
+  if (!props.rental) return ''
+  return [props.rental.rentalNumber, props.rental.customerName, props.rental.vehiclePlate]
+    .filter(Boolean)
+    .join(' · ')
+})
+
 const minEndDate = computed(() => {
   if (!props.rental?.endDate) return undefined
   return addDaysYmd(props.rental.endDate, 1)
@@ -89,17 +96,14 @@ async function confirm() {
 </script>
 
 <template>
-  <RcModal :open="open && !!rental" wide @close="emit('close')">
-    <template #header>
-      <div>
-        <h2 class="rc-modal__title">
-          <RcIcon name="plus" :size="20" class="rc-modal__title-icon" />
-          Kiralama süresini uzat
-        </h2>
-        <div v-if="rental" class="rc-modal__sub">{{ rental.rentalNumber }} · {{ rental.customerName }}</div>
-      </div>
-    </template>
-
+  <RcModal
+    :open="open && !!rental"
+    wide
+    icon="plus"
+    title="Kiralama süresini uzat"
+    :subtitle="modalSubtitle"
+    @close="emit('close')"
+  >
     <div v-if="rental" class="rcr-extend-summary">
       <div>
         <div class="rcr-extend-summary__label">Mevcut bitiş</div>
@@ -137,7 +141,7 @@ async function confirm() {
       </div>
     </div>
 
-    <div class="rc-alert rc-alert--info" style="margin-top: 14px">
+    <div class="rc-alert rc-alert--info rc-modal-note">
       <RcIcon name="info" :size="16" />
       <span>
         Tahmini ek ücret: <strong class="rc-num">{{ fmtTRY(extraCharge) }}</strong>

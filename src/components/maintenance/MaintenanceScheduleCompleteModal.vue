@@ -56,6 +56,8 @@ async function handleSubmit() {
 <template>
   <RcModal
     :open="open"
+    icon="wrench"
+    intent="success"
     title="Bakımı Tamamla"
     :subtitle="subtitle"
     @close="emit('close')"
