@@ -1,17 +1,25 @@
 <script setup lang="ts">
 import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RcIcon } from '@/components/icons'
+import type { IconName } from '@/components/icons/iconPaths'
 
 /** rc-primitives.css'teki rcModalOut/rcOverlayOut süresiyle aynı olmalı. */
 const CLOSE_ANIM_MS = 180
+
+/** Başlık rozetinin rengini belirler; `rc-modal__badge--*` sınıflarıyla eşleşir. */
+export type ModalIntent = 'operation' | 'destructive' | 'success' | 'warning'
 
 const props = withDefaults(defineProps<{
   open: boolean
   title?: string
   subtitle?: string
+  /** Başlık rozeti ikonu; verilmezse rozet çizilmez. */
+  icon?: IconName
+  intent?: ModalIntent
   wide?: boolean
   xl?: boolean
 }>(), {
+  intent: 'operation',
   wide: false,
   xl: false,
 })
@@ -126,9 +134,19 @@ onUnmounted(() => {
       >
         <div v-if="title || $slots.header" class="rc-modal__head">
           <slot name="header">
-            <div>
-              <h2 :id="titleId" class="rc-modal__title">{{ title }}</h2>
-              <div v-if="subtitle" class="rc-modal__sub">{{ subtitle }}</div>
+            <div class="rc-modal__heading">
+              <span
+                v-if="icon"
+                class="rc-modal__badge"
+                :class="`rc-modal__badge--${intent}`"
+                aria-hidden="true"
+              >
+                <RcIcon :name="icon" :size="18" />
+              </span>
+              <div class="rc-modal__heading-text">
+                <h2 :id="titleId" class="rc-modal__title">{{ title }}</h2>
+                <div v-if="subtitle" class="rc-modal__sub">{{ subtitle }}</div>
+              </div>
             </div>
           </slot>
           <button type="button" class="rc-modal__close" aria-label="Kapat" @click="emit('close')">

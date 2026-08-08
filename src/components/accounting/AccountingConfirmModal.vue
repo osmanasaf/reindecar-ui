@@ -28,9 +28,16 @@ async function onConfirm() {
 </script>
 
 <template>
-  <RcModal :open="open" :title="title" @close="emit('close')">
+  <RcModal
+    :open="open"
+    :icon="variant === 'danger' ? 'warning' : 'info'"
+    :intent="variant === 'danger' ? 'destructive' : 'warning'"
+    :title="title"
+    @close="emit('close')"
+  >
     <p class="rc-modal-prose">{{ message }}</p>
     <template #footer>
+      <span class="rc-spacer" />
       <RcButton variant="ghost" @click="emit('close')">Vazgeç</RcButton>
       <RcButton
         :variant="variant === 'danger' ? 'danger' : 'accent'"

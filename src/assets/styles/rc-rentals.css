@@ -907,9 +907,7 @@
    (.rc-modal-callout / .rc-modal-form / .rc-modal__title-icon) — accounting
    ve vehicles modalleri de aynı görsel dili paylaşsın diye. */
 
-.rcr-modal-rail {
-  margin-bottom: 16px;
-}
+/* Modal rayının aralığı artık ortak .rc-modal-rail sınıfında (rc-primitives.css). */
 
 .rcr-modal-alert-spaced {
   margin-bottom: 14px;
@@ -1133,6 +1131,185 @@
   color: var(--rc-warning-700);
 }
 
+/* ── İade modalı: tek ekran + canlı hesap ── */
+.rcr-return-railrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.rcr-return-railrow__note {
+  font-size: 12.5px;
+  color: var(--rc-text-muted);
+}
+
+.rcr-return-railrow__note--late {
+  color: var(--rc-warning-700);
+  font-weight: var(--rc-fw-medium);
+}
+
+.rcr-return-layout {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 20px;
+  align-items: start;
+}
+
+.rcr-return-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.rcr-return-form { margin: 0; }
+
+.rcr-return-shortcuts {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--rc-border);
+}
+
+.rcr-return-shortcuts__label {
+  font-size: 12.5px;
+  color: var(--rc-text-muted);
+  margin-right: 4px;
+}
+
+.rcr-return-submit-error { margin-top: 16px; }
+
+/* Canlı hesap paneli */
+.rcr-live {
+  position: sticky;
+  top: 0;
+  background: var(--rc-surface-2);
+  border: 1px solid var(--rc-border);
+  border-radius: var(--rc-r-10);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: opacity var(--rc-dur-fast) var(--rc-ease-out);
+}
+
+.rcr-live--busy { opacity: 0.65; }
+
+.rcr-live__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.rcr-live__title {
+  font-size: 13px;
+  font-weight: var(--rc-fw-semibold);
+  color: var(--rc-text);
+}
+
+.rcr-live__pill {
+  font-size: 11px;
+  font-weight: var(--rc-fw-medium);
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--rc-info-50);
+  color: var(--rc-info-700);
+}
+
+.rcr-live__section {
+  font-size: 10.5px;
+  font-weight: var(--rc-fw-medium);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--rc-text-faint);
+  margin-top: 6px;
+}
+
+.rcr-live__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12.5px;
+  color: var(--rc-text);
+  min-height: 28px;
+}
+
+.rcr-live__row--credit { color: var(--rc-success-700); }
+
+.rcr-live__meta {
+  font-style: normal;
+  color: var(--rc-text-muted);
+  font-size: 11.5px;
+}
+
+.rcr-live__check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.rcr-live__amount {
+  width: 84px;
+  height: 28px;
+  flex-shrink: 0;
+  text-align: right;
+  font-size: 12.5px;
+  padding: 0 8px;
+}
+
+/* Kapalıyken tutar gizlenmez; girilen değer kaybolmasın diye yalnız soluklaşır. */
+.rcr-live__amount:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.rcr-live__warn {
+  margin: 0;
+  font-size: 11px;
+  color: var(--rc-warning-700);
+}
+
+.rcr-live__row--sub {
+  border-top: 1px solid var(--rc-border-subtle);
+  padding-top: 8px;
+  margin-top: 4px;
+  color: var(--rc-text-muted);
+}
+
+.rcr-live__total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-top: 2px solid var(--rc-border-strong);
+  padding-top: 10px;
+  margin-top: 2px;
+  font-size: 15px;
+  font-weight: var(--rc-fw-semibold);
+  color: var(--rc-text);
+}
+
+.rcr-live__note {
+  margin: 4px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--rc-text-muted);
+}
+
+@media (max-width: 900px) {
+  .rcr-return-layout { grid-template-columns: 1fr; }
+  .rcr-live { position: static; }
+}
+
 .rcr-return-modal__done {
   text-align: center;
   padding: 24px 12px;
@@ -1163,11 +1340,7 @@
 }
 
 /* ── Add driver modal ── */
-.rcr-add-driver__hint {
-  font-size: 13px;
-  color: var(--rc-text-muted);
-  margin: 0 0 14px;
-}
+/* Açıklama artık gövdenin altındaki ortak bilgi şeridinde. */
 
 .rcr-add-driver__list {
   display: flex;

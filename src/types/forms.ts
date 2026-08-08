@@ -319,6 +319,20 @@ export interface VehicleDeliveryForm {
     startFuelPercent?: number
 }
 
+/**
+ * İade önizlemesine gönderilen kullanıcı düzenlemeleri. Alan adları
+ * `VehicleReturnForm` ile birebir aynı olmalı — aynı değerler önce
+ * önizlemeye, sonra tamamlamaya gider.
+ */
+export interface ReturnAdjustmentInput {
+    applyLateFee?: boolean
+    lateFeeAmount?: number
+    applyFuelFee?: boolean
+    fuelFeeAmount?: number
+    applyEarlyDiscount?: boolean
+    earlyDiscountAmount?: number
+}
+
 export interface VehicleReturnForm {
     actualReturnDate: string
     endKm: number

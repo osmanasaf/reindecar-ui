@@ -138,16 +138,14 @@ watch(() => props.visible, (isVisible) => {
 </script>
 
 <template>
-  <RcModal :open="visible" wide @close="handleClose">
-    <template #header>
-      <div>
-        <h2 class="rc-modal__title">
-          <RcIcon name="plus" :size="18" class="rc-modal__title-icon" />
-          Hızlı müşteri ekle
-        </h2>
-        <div class="rc-modal__sub">Kiralama için minimum bilgilerle bireysel müşteri</div>
-      </div>
-    </template>
+  <RcModal
+    :open="visible"
+    wide
+    icon="user"
+    title="Hızlı müşteri ekle"
+    subtitle="Kiralama için minimum bilgilerle bireysel müşteri"
+    @close="handleClose"
+  >
 
     <form @submit.prevent="handleSubmit">
       <div v-if="rentalEndDate" class="rc-alert rc-alert--info" style="margin-bottom: 14px">

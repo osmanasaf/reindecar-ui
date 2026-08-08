@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { RcModal, RcButton } from '@/components/rc'
+import { computed, ref } from 'vue'
+import { RcModal, RcButton, RcModalRail, type ModalRailStep } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
 import { rentalsApi } from '@/api'
 import { useToast } from '@/composables'
@@ -20,6 +20,19 @@ const emit = defineEmits<{ close: []; reserved: [rental: Rental] }>()
 
 const toast = useToast()
 const submitting = ref(false)
+
+const modalSubtitle = computed(() => {
+  if (!props.rental) return ''
+  return [props.rental.rentalNumber, props.customerName || props.rental.customerName, props.rental.vehiclePlate]
+    .filter(Boolean)
+    .join(' · ')
+})
+
+const railSteps: ModalRailStep[] = [
+  { label: 'Taslak', state: 'current' },
+  { label: 'Rezerve' },
+  { label: 'Teslimat' },
+]
 
 async function confirm() {
   if (!props.rental) return
@@ -41,42 +54,12 @@ async function confirm() {
   <RcModal
     :open="open && !!rental"
     wide
+    icon="calendar"
+    title="Kiralamayı rezerve et"
+    :subtitle="modalSubtitle"
     @close="emit('close')"
   >
-    <template #header>
-      <div>
-        <h2 class="rc-modal__title">
-          <RcIcon name="calendar" :size="20" class="rc-modal__title-icon" />
-          Kiralamayı rezerve et
-        </h2>
-        <div v-if="rental" class="rc-modal__sub">
-          {{ rental.rentalNumber }} · {{ vehicleLabel || rental.vehiclePlate }}
-        </div>
-      </div>
-    </template>
-
-    <div class="rc-status-rail rcr-modal-rail">
-      <span class="rc-status-step rc-status-step--current">
-        <span class="rc-status-step__dot">1</span>
-        Taslak
-      </span>
-      <RcIcon name="chevronRight" :size="14" class="rc-status-step__chev" />
-      <span class="rc-status-step">
-        <span class="rc-status-step__dot">2</span>
-        Rezerve
-      </span>
-    </div>
-
-    <div class="rc-alert rc-alert--info rcr-modal-alert-spaced">
-      <RcIcon name="info" :size="16" />
-      <div>
-        <div class="rc-alert__title">Bu işlem ne yapar?</div>
-        <span>
-          Kiralama durumu <strong>DRAFT → RESERVED</strong> olarak güncellenir. Araç başka kiralamaya
-          verilemez ama henüz teslim edilmez.
-        </span>
-      </div>
-    </div>
+    <RcModalRail :steps="railSteps" class="rc-modal-rail" />
 
     <div v-if="rental" class="rc-card rcr-modal-card">
       <div class="rc-card__body rcr-modal-meta">
@@ -106,6 +89,17 @@ async function confirm() {
           <span class="rc-meta-row__label">Tutar</span>
           <span class="rc-meta-row__value rc-num">{{ fmtTRY(rental.grandTotal || rental.totalPrice) }}</span>
         </div>
+      </div>
+    </div>
+
+    <div class="rc-alert rc-alert--info rc-modal-note">
+      <RcIcon name="info" :size="16" />
+      <div>
+        <div class="rc-alert__title">Bu işlem ne yapar?</div>
+        <span>
+          Kiralama durumu <strong>Taslak → Rezerve</strong> olarak güncellenir. Araç başka kiralamaya
+          verilemez ama henüz teslim edilmez.
+        </span>
       </div>
     </div>
 

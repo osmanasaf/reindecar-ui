@@ -14,6 +14,13 @@ const props = defineProps<{
 
 const emit = defineEmits<{ close: []; added: [] }>()
 
+const modalSubtitle = computed(() => {
+  if (!props.rental) return ''
+  return [props.rental.rentalNumber, props.rental.customerName, props.rental.vehiclePlate]
+    .filter(Boolean)
+    .join(' · ')
+})
+
 const toast = useToast()
 const loading = ref(false)
 const submitting = ref(false)
@@ -104,20 +111,15 @@ watch(
 </script>
 
 <template>
-  <RcModal :open="open && !!rental" wide @close="handleClose">
-    <template #header>
-      <div>
-        <h2 class="rc-modal__title">
-          <RcIcon name="user" :size="20" class="rc-modal__title-icon" />
-          Sürücü ekle
-        </h2>
-        <div v-if="rental" class="rc-modal__sub">{{ rental.rentalNumber }}</div>
-      </div>
-    </template>
+  <RcModal
+    :open="open && !!rental"
+    wide
+    icon="users"
+    title="Sürücü ekle"
+    :subtitle="modalSubtitle"
+    @close="handleClose"
+  >
 
-    <p class="rcr-add-driver__hint">
-      Kiralamaya eklenecek sürücüyü seçin. İlk eklenen sürücü otomatik ana sürücü olur.
-    </p>
 
     <div v-if="loading" class="rcr-return-modal__loading">
       <div class="rcr-return-modal__spinner" />
@@ -177,6 +179,13 @@ watch(
         <span class="rc-field__hint">Sadece ID biliniyorsa kullanın.</span>
       </div>
     </template>
+
+    <div class="rc-alert rc-alert--info rc-modal-note">
+      <RcIcon name="info" :size="16" />
+      <span>
+        Kiralamaya eklenecek sürücüyü seçin. <strong>İlk eklenen sürücü</strong> otomatik ana sürücü olur.
+      </span>
+    </div>
 
     <template #footer>
       <span class="rc-spacer" />

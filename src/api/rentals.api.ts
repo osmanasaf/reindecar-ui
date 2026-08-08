@@ -17,7 +17,8 @@ import type {
     LeasingKmSummary,
     RecordKmForm,
     RentalType,
-    ReturnPreviewResponse
+    ReturnPreviewResponse,
+    ReturnAdjustmentInput
 } from '@/types'
 
 class RentalsApiService extends BaseApi {
@@ -80,15 +81,25 @@ class RentalsApiService extends BaseApi {
         return this.post(`/${id}/start-return`)
     }
 
+    /**
+     * Nihai tutarı sunucu hesaplar: düzenlemeler de gönderilir ve yanıttaki
+     * `finalTotal` doğrudan gösterilir (bkz. ReturnPreviewResponse).
+     */
     async previewReturn(
         id: number,
         endKm: number,
         actualReturnDate: string,
         endFuelPercent?: number,
+        adjustments?: ReturnAdjustmentInput,
     ): Promise<ReturnPreviewResponse> {
         const params: Record<string, unknown> = { endKm, actualReturnDate }
         if (endFuelPercent != null) {
             params.endFuelPercent = endFuelPercent
+        }
+        for (const [key, value] of Object.entries(adjustments ?? {})) {
+            if (value != null) {
+                params[key] = value
+            }
         }
         return this.get(`/${id}/return-preview`, params)
     }
