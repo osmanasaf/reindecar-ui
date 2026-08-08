@@ -119,6 +119,29 @@
   border-bottom: 1px solid var(--rc-border-subtle);
   gap: 16px;
 }
+/* Başlık bloğu: intent'e göre renklenen ikon rozeti + başlık/alt satır. */
+.rc-modal__heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.rc-modal__heading-text { min-width: 0; }
+
+.rc-modal__badge {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--rc-r-8);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.rc-modal__badge--operation   { background: var(--rc-blue-50);    color: var(--rc-blue-500); }
+.rc-modal__badge--destructive { background: var(--rc-danger-50);  color: var(--rc-danger-600); }
+.rc-modal__badge--success     { background: var(--rc-success-50); color: var(--rc-success-600); }
+.rc-modal__badge--warning     { background: var(--rc-warning-50); color: var(--rc-warning-600); }
+
 .rc-modal__title {
   font-family: var(--rc-font-display);
   font-size: 18px;

@@ -771,6 +771,15 @@ export interface ReturnPreviewResponse {
     tollTotal?: MoneyLike
     grandTotal: MoneyLike
     fuelDeficitPercent?: number
+    /** Kiralama bedelinin kendisi (ekstralar hariç, uygulanmış indirimler düşülmüş). */
+    baseRentalAmount: MoneyLike
+    /**
+     * Gönderilen düzenlemelerle iade tamamlanırsa müşterinin borcu.
+     * Tamamlamanın alacak kurallarını aynalar — UI bu tutarı yeniden hesaplamaz.
+     */
+    finalTotal: MoneyLike
+    /** Kiralama bedeli tavanına kırpıldıktan sonra gerçekten uygulanabilen indirim. */
+    appliedEarlyDiscount: MoneyLike
 }
 
 export interface RentalPaymentSummaryResponse {
