@@ -12,6 +12,11 @@ const props = defineProps<{
   manifestId: number
 }>()
 
+/** Sekme rozeti bu sayıdan besleniyor; liste her değiştiğinde üst bileşen haberdar edilir. */
+const emit = defineEmits<{
+  'count-change': [count: number]
+}>()
+
 const toast = useToast()
 const { isEnabled } = useFeatures()
 
@@ -92,6 +97,7 @@ async function loadPassengers() {
   try {
     passengers.value = await serviceManifestsApi.listPassengers(props.manifestId)
     pruneSelection()
+    emit('count-change', passengers.value.length)
   } catch (err) {
     toast.apiError(err, 'Yolcular yüklenemedi')
   }
