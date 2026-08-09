@@ -1,15 +1,18 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
-import { userInvitationsApi } from '@/api'
+import { computed, onMounted, ref } from 'vue'
+import { branchesApi, userInvitationsApi } from '@/api'
 import { useToast } from '@/composables'
 import { AccountingConfirmModal } from '@/components/accounting'
+import { SearchableSelect } from '@/components/common'
 import { RcPageHeader, RcButton, RcEmpty, RcStatusPill, RcTableSkeleton } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
 import type { UserInvitationResponse, UserInvitationRole } from '@/api'
+import type { Branch } from '@/types'
 
 const toast = useToast()
 
 const invitations = ref<UserInvitationResponse[]>([])
+const branches = ref<Branch[]>([])
 const loading = ref(true)
 const creating = ref(false)
 const cancellingId = ref<number | null>(null)
@@ -20,6 +23,7 @@ const cancelTarget = ref<UserInvitationResponse | null>(null)
 const form = ref({
   email: '',
   role: 'OPERATOR' as UserInvitationRole,
+  branchId: null as number | null,
 })
 
 const roleLabels: Record<UserInvitationRole, string> = {
@@ -27,7 +31,25 @@ const roleLabels: Record<UserInvitationRole, string> = {
   OPERATOR: 'Operatör',
 }
 
-onMounted(loadInvitations)
+const branchOptions = computed(() =>
+  branches.value.map(branch => ({ value: branch.id, label: branch.name })),
+)
+
+const requiresBranch = computed(() => form.value.role === 'OPERATOR')
+
+onMounted(() => {
+  loadInvitations()
+  loadBranches()
+})
+
+async function loadBranches() {
+  try {
+    branches.value = await branchesApi.getActive()
+  } catch (e) {
+    toast.apiError(e, 'Şubeler yüklenemedi')
+    branches.value = []
+  }
+}
 
 async function loadInvitations() {
   loading.value = true
@@ -45,6 +67,10 @@ async function createInvitation() {
     createError.value = 'Geçerli bir e-posta adresi girin.'
     return
   }
+  if (requiresBranch.value && form.value.branchId == null) {
+    createError.value = 'Operatör kullanıcılar için şube seçimi zorunludur.'
+    return
+  }
 
   creating.value = true
   createError.value = null
@@ -53,9 +79,11 @@ async function createInvitation() {
     const created = await userInvitationsApi.create({
       email: form.value.email.trim(),
       role: form.value.role,
+      branchId: requiresBranch.value ? form.value.branchId : null,
     })
     invitations.value = [created, ...invitations.value]
     form.value.email = ''
+    form.value.branchId = null
     lastInviteLink.value = buildInvitationLink(created)
     await copyText(lastInviteLink.value)
     toast.success('Davet oluşturuldu')
@@ -147,7 +175,11 @@ function formatDate(value: string | null) {
         </div>
       </div>
 
-      <form class="rca-invite-form" @submit.prevent="createInvitation">
+      <form
+        class="rca-invite-form"
+        :class="{ 'rca-invite-form--with-branch': requiresBranch }"
+        @submit.prevent="createInvitation"
+      >
         <label class="rc-field">
           <span class="rc-field__label">E-posta</span>
           <input
@@ -165,6 +197,15 @@ function formatDate(value: string | null) {
             <option value="OPERATOR">Operatör</option>
             <option value="ADMIN">Tenant admin</option>
           </select>
+        </label>
+        <label v-if="requiresBranch" class="rc-field">
+          <span class="rc-field__label">Şube</span>
+          <SearchableSelect
+            v-model="form.branchId"
+            :options="branchOptions"
+            placeholder="Şube seçin"
+            search-placeholder="Şube ara…"
+          />
         </label>
         <RcButton variant="accent" type="submit" :disabled="creating || !form.email">
           {{ creating ? 'Oluşturuluyor…' : 'Davet oluştur' }}
@@ -266,6 +307,10 @@ function formatDate(value: string | null) {
   align-items: end;
 }
 
+.rca-invite-form--with-branch {
+  grid-template-columns: minmax(220px, 1fr) 180px minmax(180px, 220px) auto;
+}
+
 .rca-invite-link {
   margin-top: 16px;
   padding-top: 16px;
@@ -284,7 +329,8 @@ function formatDate(value: string | null) {
 }
 
 @media (max-width: 760px) {
-  .rca-invite-form {
+  .rca-invite-form,
+  .rca-invite-form--with-branch {
     grid-template-columns: 1fr;
   }
 
