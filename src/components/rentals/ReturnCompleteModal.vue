@@ -67,6 +67,8 @@ const fuelFeeAmount = ref(0)
 // Kullanıcı tutarı elle değiştirdiyse sunucu önerisi üzerine yazmaz.
 const lateFeeTouched = ref(false)
 const earlyDiscountTouched = ref(false)
+// Yakıt farkı kullanıcı girdisine bağlı; kutuya elle dokunulduysa otomatik seçim devreye girmez.
+const fuelFeeTouched = ref(false)
 
 const showPenaltyModal = ref(false)
 const showTollModal = ref(false)
@@ -304,6 +306,19 @@ watch(preview, (value) => {
   schedulePreview()
 })
 
+/**
+ * Yakıt farkı, geç/erken iade gibi kiralamanın kendi tarihlerinden değil kullanıcının
+ * girdiği iade seviyesinden doğuyor; bu yüzden ilk önizlemede hep 0 oluyor. Fark her
+ * oluştuğunda kutuyu işaretle, kullanıcı kutuya elle dokunduysa karışma.
+ */
+watch(
+  () => preview.value?.fuelDeficitPercent,
+  (deficit) => {
+    if (!defaultsApplied || fuelFeeTouched.value) return
+    applyFuelFee.value = (Number(deficit) || 0) > 0
+  },
+)
+
 watch(
   () => [
     form.value.endKm,
@@ -427,6 +442,7 @@ function handleClose() {
   fuelFeeAmount.value = 0
   lateFeeTouched.value = false
   earlyDiscountTouched.value = false
+  fuelFeeTouched.value = false
   showPenaltyModal.value = false
   showTollModal.value = false
   showDamageForm.value = false
@@ -730,7 +746,7 @@ onUnmounted(() => clearTimeout(previewTimer))
 
             <div v-if="fuelTrackingEnabled && fuelDeficitPercent > 0" class="rcr-live__row">
               <label class="rcr-live__check">
-                <input v-model="applyFuelFee" type="checkbox" />
+                <input v-model="applyFuelFee" type="checkbox" @change="fuelFeeTouched = true" />
                 <span>
                   Yakıt farkı
                   <em class="rcr-live__meta">%{{ fuelDeficitPercent.toLocaleString('tr-TR') }} eksik</em>
