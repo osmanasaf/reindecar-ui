@@ -20,7 +20,6 @@ export interface ManifestFormState {
     groupRoute: string
     groupDescription: string
     groupFeeAmount: string | number
-    passengerCount: string | number
 }
 
 function emptyState(): ManifestFormState {
@@ -37,7 +36,6 @@ function emptyState(): ManifestFormState {
         groupRoute: '',
         groupDescription: '',
         groupFeeAmount: '',
-        passengerCount: '',
     }
 }
 
@@ -70,7 +68,6 @@ export function useManifestForm() {
             groupRoute: data.groupRoute || '',
             groupDescription: data.groupDescription || '',
             groupFeeAmount: data.groupFeeAmount ?? '',
-            passengerCount: data.passengerCount ?? '',
         }
     }
 
@@ -88,7 +85,6 @@ export function useManifestForm() {
             groupRoute: parsed.groupRoute || '',
             groupDescription: parsed.groupDescription || '',
             groupFeeAmount: parsed.groupFeeAmount ?? '',
-            passengerCount: parsed.passengerCount ?? '',
         }
     }
 
@@ -102,7 +98,6 @@ export function useManifestForm() {
             groupRoute: toOptionalText(form.value.groupRoute),
             groupDescription: toOptionalText(form.value.groupDescription),
             groupFeeAmount: toOptionalNumber(form.value.groupFeeAmount),
-            passengerCount: toOptionalNumber(form.value.passengerCount),
         }
     }
 

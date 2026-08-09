@@ -61,7 +61,6 @@ export interface CreateUetdsManifestRequest {
     groupRoute?: string
     groupDescription?: string
     groupFeeAmount?: number
-    passengerCount?: number
 }
 
 export interface UpdateUetdsManifestRequest {
@@ -76,7 +75,6 @@ export interface UpdateUetdsManifestRequest {
     groupRoute?: string
     groupDescription?: string
     groupFeeAmount?: number
-    passengerCount?: number
 }
 
 export interface CreateUetdsPassengerRequest {
@@ -99,7 +97,12 @@ export interface ParsedUetdsManifestData {
     groupRoute?: string
     groupDescription?: string
     groupFeeAmount?: number
-    passengerCount?: number
+    passengers?: ParsedUetdsPassenger[]
+}
+
+export interface ParsedUetdsPassenger {
+    seatNumber?: number | null
+    fullName: string
 }
 
 export interface UetdsManifestPreviewResponse {

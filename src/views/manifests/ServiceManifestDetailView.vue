@@ -39,13 +39,20 @@ const activeSection = ref<RailKey>('pdf')
 const sectionEls: Record<RailKey, HTMLElement | null> = { pdf: null, form: null, pax: null, doc: null }
 let scrollContainer: HTMLElement | null = null
 
+/**
+ * Sunucudan gelen sayı yolcu tablosundan türetiliyor; kullanıcı kartta yolcu ekleyip
+ * silerken rozeti tazelemek için kartın bildirdiği canlı sayıyı tercih ediyoruz.
+ */
+const livePassengerCount = ref<number | null>(null)
+const passengerCount = computed(() => livePassengerCount.value ?? manifest.value?.passengerCount ?? 0)
+
 const railItems = computed(() => {
   const items: Array<{ key: RailKey; label: string; icon: IconName; badge?: string }> = [
     { key: 'pdf', label: 'PDF & doğrulama', icon: 'filePdf' },
     { key: 'form', label: 'Sefer bilgileri', icon: 'globe' },
   ]
   if (isEnabled('UETDS_PASSENGERS')) {
-    items.push({ key: 'pax', label: 'Yolcular', icon: 'users', badge: String(manifest.value?.passengerCount ?? 0) })
+    items.push({ key: 'pax', label: 'Yolcular', icon: 'users', badge: String(passengerCount.value) })
   }
   if (isEnabled('UETDS_DOCUMENTS')) {
     items.push({ key: 'doc', label: 'Belgeler', icon: 'folder' })
@@ -348,7 +355,7 @@ onBeforeUnmount(() => {
 
         <!-- Yolcular -->
         <div :ref="(el) => setSectionEl('pax', el)">
-          <ManifestPassengersCard :manifest-id="manifestId" />
+          <ManifestPassengersCard :manifest-id="manifestId" @count-change="livePassengerCount = $event" />
         </div>
 
         <!-- Belgeler -->

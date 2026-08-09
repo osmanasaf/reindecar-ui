@@ -338,9 +338,6 @@ async function handleSubmit() {
         <RcField label="Belge no">
           <input v-model="form.documentNumber" class="rc-input" />
         </RcField>
-        <RcField label="Yolcu sayısı">
-          <input v-model.number="form.passengerCount" type="number" min="0" class="rc-input rc-num" />
-        </RcField>
         <RcField label="Şoför">
           <input v-model="form.driverName" class="rc-input" />
         </RcField>
