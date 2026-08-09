@@ -31,6 +31,8 @@ const roleLabels: Record<UserInvitationRole, string> = {
   OPERATOR: 'Operatör',
 }
 
+const CLIPBOARD_FAILED_MESSAGE = 'Link panoya kopyalanamadı, aşağıdaki alandan manuel kopyalayabilirsiniz.'
+
 const branchOptions = computed(() =>
   branches.value.map(branch => ({ value: branch.id, label: branch.name })),
 )
@@ -85,12 +87,16 @@ async function createInvitation() {
     form.value.email = ''
     form.value.branchId = null
     lastInviteLink.value = buildInvitationLink(created)
-    await copyText(lastInviteLink.value)
     toast.success('Davet oluşturuldu')
   } catch (e) {
     createError.value = (e as Error).message || 'Davet oluşturulamadı'
+    return
   } finally {
     creating.value = false
+  }
+
+  if (!(await tryCopyText(lastInviteLink.value))) {
+    toast.info(CLIPBOARD_FAILED_MESSAGE)
   }
 }
 
@@ -120,16 +126,28 @@ async function copyInvitationLink(invitation: UserInvitationResponse) {
     toast.error('Bu davetin token bilgisi yalnızca oluşturulduğu anda gösterilir.')
     return
   }
-  await copyText(buildInvitationLink(invitation))
-  toast.success('Davet linki kopyalandı')
+  await copyLink(buildInvitationLink(invitation))
+}
+
+async function copyLink(value: string) {
+  if (await tryCopyText(value)) {
+    toast.success('Davet linki kopyalandı')
+    return
+  }
+  toast.error(CLIPBOARD_FAILED_MESSAGE)
 }
 
 function buildInvitationLink(invitation: UserInvitationResponse) {
   return `${window.location.origin}/register-invited-user?token=${invitation.token}`
 }
 
-async function copyText(value: string) {
-  await navigator.clipboard.writeText(value)
+async function tryCopyText(value: string) {
+  try {
+    await navigator.clipboard.writeText(value)
+    return true
+  } catch {
+    return false
+  }
 }
 
 function isValidEmail(value: string) {
@@ -218,7 +236,7 @@ function formatDate(value: string | null) {
         <div class="rc-field__label">Son oluşturulan link</div>
         <div class="rca-invite-link__row">
           <input :value="lastInviteLink" readonly class="rc-input" />
-          <RcButton variant="secondary" size="sm" type="button" @click="copyText(lastInviteLink)">
+          <RcButton variant="secondary" size="sm" type="button" @click="copyLink(lastInviteLink)">
             Kopyala
           </RcButton>
         </div>
