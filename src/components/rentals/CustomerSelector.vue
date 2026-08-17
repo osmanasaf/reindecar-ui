@@ -54,6 +54,7 @@ async function searchCustomers(query: string) {
 }
 
 function handleSearchInput() {
+  showDropdown.value = true
   if (debounceTimer.value) {
     clearTimeout(debounceTimer.value)
   }
