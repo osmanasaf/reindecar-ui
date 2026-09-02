@@ -44,6 +44,7 @@ const overview = ref({
   overdue: 0,
   reserved: 0,
   returnPending: 0,
+  pendingPayment: 0,
   draft: 0,
   closed: 0,
   cancelled: 0,
@@ -68,6 +69,7 @@ const statusViews: { id: StatusView; label: string }[] = [
   { id: RentalStatus.DRAFT, label: 'Taslak' },
   { id: RentalStatus.OVERDUE, label: 'Gecikmiş' },
   { id: RentalStatus.RETURN_PENDING, label: 'İade bekliyor' },
+  { id: RentalStatus.PENDING_PAYMENT, label: 'Ödeme bekleniyor' },
   { id: RentalStatus.CLOSED, label: 'Tamamlanan' },
   { id: RentalStatus.CANCELLED, label: 'İptal' },
 ]
@@ -94,6 +96,7 @@ function viewCount(id: StatusView): number {
   if (id === RentalStatus.OVERDUE) return overview.value.overdue
   if (id === RentalStatus.RESERVED) return overview.value.reserved
   if (id === RentalStatus.RETURN_PENDING) return overview.value.returnPending
+  if (id === RentalStatus.PENDING_PAYMENT) return overview.value.pendingPayment
   if (id === RentalStatus.DRAFT) return overview.value.draft
   if (id === RentalStatus.CLOSED) return overview.value.closed
   if (id === RentalStatus.CANCELLED) return overview.value.cancelled
@@ -141,8 +144,9 @@ async function fetchOverview() {
       draft: 0,
       reserved: 0,
       active: 0,
-      returning: 0,
-      completed: 0,
+      return_pending: 0,
+      pending_payment: 0,
+      closed: 0,
       cancelled: 0,
       overdue: 0,
     }
@@ -151,9 +155,10 @@ async function fetchOverview() {
       active: stats.active ?? 0,
       overdue: stats.overdue ?? 0,
       reserved: stats.reserved ?? 0,
-      returnPending: stats.returning ?? 0,
+      returnPending: stats.return_pending ?? 0,
       draft: stats.draft ?? 0,
-      closed: stats.completed ?? 0,
+      pendingPayment: stats.pending_payment ?? 0,
+      closed: stats.closed ?? 0,
       cancelled: stats.cancelled ?? 0,
       todayReturns: upcoming.filter((r) => r.daysUntilReturn === 0).length,
     }
