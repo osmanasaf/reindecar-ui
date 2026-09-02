@@ -7,7 +7,7 @@ defineProps<{
 
 <template>
   <div class="rc-page__head">
-    <div>
+    <div class="rc-page__headline">
       <h1 class="rc-page__title">{{ title }}</h1>
       <div v-if="subtitle" class="rc-page__subtitle">{{ subtitle }}</div>
     </div>
