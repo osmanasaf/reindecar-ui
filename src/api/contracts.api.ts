@@ -42,6 +42,11 @@ class ContractsApiService extends BaseApi {
         return this.get<ContractDetail>(`/rental/${rentalId}`, { documentType }, { suppressErrorLog: true })
     }
 
+    /** Kiralamanin tum sozlesmeleri tek istekte; olmayan tip icin satir donmez, 404 uretilmez. */
+    async getAllByRentalId(rentalId: number): Promise<ContractDetail[]> {
+        return this.get<ContractDetail[]>(`/rental/${rentalId}/documents`)
+    }
+
     async create(payload: CreateContractPayload): Promise<ContractDetail> {
         return this.post('', payload)
     }
