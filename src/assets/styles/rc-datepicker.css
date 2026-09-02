@@ -213,7 +213,7 @@
 }
 
 .rc-date-range__apply:hover:not(:disabled) {
-  background: var(--rc-blue-600);
+  background: var(--rc-blue-fill-strong);
 }
 
 .rc-date-range__apply:disabled {

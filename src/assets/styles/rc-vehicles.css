@@ -2167,10 +2167,10 @@
   min-width: 0;
 }
 .rcv-heatmap__cell[data-lvl="0"] { background: var(--rc-ink-100); }
-.rcv-heatmap__cell[data-lvl="1"] { background: var(--rc-blue-100); }
+.rcv-heatmap__cell[data-lvl="1"] { background: var(--rc-blue-fill-soft); }
 .rcv-heatmap__cell[data-lvl="2"] { background: var(--rc-blue-300); }
-.rcv-heatmap__cell[data-lvl="3"] { background: var(--rc-blue-500); }
-.rcv-heatmap__cell[data-lvl="4"] { background: var(--rc-blue-700); }
+.rcv-heatmap__cell[data-lvl="3"] { background: var(--rc-blue-fill); }
+.rcv-heatmap__cell[data-lvl="4"] { background: var(--rc-blue-fill-deep); }
 .rcv-heatmap__cell[data-lvl="m"] { background: var(--rc-warning-500); }
 .rcv-heatmap__cell[data-lvl="d"] { background: var(--rc-danger-500); }
 .rcv-heatmap__legend {

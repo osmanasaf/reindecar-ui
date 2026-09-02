@@ -598,7 +598,7 @@
   width: 56px;
   height: 56px;
   border-radius: var(--rc-r-12, 12px);
-  background: var(--rc-blue-600);
+  background: var(--rc-blue-fill-strong);
   color: #fff;
   display: flex;
   align-items: center;
@@ -2291,7 +2291,7 @@
 }
 
 .rcr-create .rcr-vehicle-selector .select-btn:hover {
-  background: var(--rc-blue-600);
+  background: var(--rc-blue-fill-strong);
 }
 
 .rcr-create .rcr-vehicle-selector .vehicle-card.selected .select-btn {
@@ -2617,7 +2617,7 @@
 }
 
 .rcr-create .rcr-customer-selector .quick-create-btn:hover {
-  background: var(--rc-blue-600);
+  background: var(--rc-blue-fill-strong);
 }
 
 @media (max-width: 640px) {
@@ -2914,7 +2914,7 @@
 }
 
 .rcr-create .rcr-driver-selector .btn-primary:hover {
-  background: var(--rc-blue-600);
+  background: var(--rc-blue-fill-strong);
 }
 
 @media (max-width: 768px) {

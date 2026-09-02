@@ -90,7 +90,7 @@
   color: #fff;
   border-color: var(--rc-blue-500);
 }
-.rc-btn--accent:hover { background: var(--rc-blue-600); border-color: var(--rc-blue-600); }
+.rc-btn--accent:hover { background: var(--rc-blue-fill-strong); border-color: var(--rc-blue-fill-strong); }
 
 .rc-btn--secondary {
   background: var(--rc-surface);

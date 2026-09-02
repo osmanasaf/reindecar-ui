@@ -140,8 +140,6 @@ const activeTab = computed<'receivables' | 'payables' | 'installments'>(() => {
 
   border: none;
 
-  background: transparent;
-
   cursor: pointer;
 
   display: inline-flex;
