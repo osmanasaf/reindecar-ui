@@ -305,7 +305,9 @@ class DashboardApiService extends BaseApi {
     }
 
     private parseAccountingStats(raw?: Record<string, unknown> | AccountingStats): AccountingStats {
-        console.log('[Dashboard] Raw accounting from API:', JSON.stringify(raw))
+        if (import.meta.env.DEV) {
+            console.log('[Dashboard] Raw accounting from API:', JSON.stringify(raw))
+        }
         const toNum = (v: unknown): number => {
             if (v == null) return 0
             const n = Number(v)
@@ -331,7 +333,9 @@ class DashboardApiService extends BaseApi {
             netPosition: toNum(r?.netPosition),
             netPositive: toBool(r?.netPositive, true)
         }
-        console.log('[Dashboard] Parsed accounting:', JSON.stringify(result))
+        if (import.meta.env.DEV) {
+            console.log('[Dashboard] Parsed accounting:', JSON.stringify(result))
+        }
         return result
     }
 
