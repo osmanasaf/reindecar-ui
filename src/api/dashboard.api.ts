@@ -1,12 +1,18 @@
 import { BaseApi } from './client'
 import type { Rental } from '@/types'
 
+/**
+ * Anahtarlar backend'in urettigi kucuk harfli enum adlariyla birebir ayni
+ * (ReportingService.getDashboardStats). Onceden 'returning'/'completed' bekleniyordu;
+ * backend hicbir zaman o adlari gondermedigi icin sayaclar sessizce 0'a dusuyordu.
+ */
 export interface RentalStats {
     draft: number
     reserved: number
     active: number
-    returning: number
-    completed: number
+    return_pending: number
+    pending_payment: number
+    closed: number
     cancelled: number
     overdue: number
 }
