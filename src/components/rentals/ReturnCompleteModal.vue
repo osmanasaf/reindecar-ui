@@ -42,6 +42,7 @@ const props = defineProps<Props>()
 const emit = defineEmits<{
   close: []
   completed: [rental: Rental]
+  documentsChanged: []
 }>()
 
 const toast = useToast()
@@ -387,8 +388,8 @@ async function completeReturn() {
     const updatedRental = await rentalsApi.complete(props.rentalId, completeRequest)
     rental.value = updatedRental
     toast.success('Kiralama başarıyla sonlandırıldı')
-    emit('completed', updatedRental)
     completed.value = true
+    emit('completed', updatedRental)
   } catch (err) {
     submitError.value = describeRentalOperationError(err, 'Kiralama sonlandırılamadı')
   } finally {
@@ -517,6 +518,7 @@ onUnmounted(() => clearTimeout(previewTimer))
             :reference-id="rental.id"
             title="İade belgeleri"
             :upload-types="RETURN_UPLOAD_TYPES"
+            @uploaded="emit('documentsChanged')"
           />
         </div>
       </div>
@@ -673,6 +675,7 @@ onUnmounted(() => clearTimeout(previewTimer))
                 :reference-id="rental.id"
                 title="İade belgeleri"
                 :upload-types="RETURN_UPLOAD_TYPES"
+                @uploaded="emit('documentsChanged')"
               />
               <p class="rcr-modal-docs__hint">
                 İade fotoğrafı ve imzalı iade/tamamlama tutanağını burada yükleyebilirsiniz.
