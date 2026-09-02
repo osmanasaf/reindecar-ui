@@ -4,6 +4,17 @@ import { isTokenExpired } from '@/utils/jwt'
 import { generateTraceId, isErrorResponse, isAuthError } from '@/utils/error'
 import { useToast } from '@/composables/useToast'
 
+declare module 'axios' {
+    interface AxiosRequestConfig {
+        /**
+         * Beklenen hatalarda konsol logunu bastırır. Bazı 404'ler gerçek bir arıza
+         * değil, kontrol akışıdır (ör. bir kiralamada o tipte sözleşme henüz yok);
+         * hepsini console.error'a yazmak gerçek hataları gölgeliyor.
+         */
+        suppressErrorLog?: boolean
+    }
+}
+
 const API_URL = import.meta.env.VITE_API_URL || '/api/v1'
 
 const ACCESS_TOKEN_KEY = 'reindecar_access_token'
@@ -200,7 +211,9 @@ apiClient.interceptors.response.use(
         }
 
         if (isBackendError) {
-            console.error(`[${responseData.traceId}] Error ${responseData.code}: ${responseData.message}`)
+            if (!originalRequest?.suppressErrorLog) {
+                console.error(`[${responseData.traceId}] Error ${responseData.code}: ${responseData.message}`)
+            }
             throw responseData
         }
 
@@ -223,8 +236,15 @@ export abstract class BaseApi {
         return path.startsWith('/') ? `${this.basePath}${path}` : `${this.basePath}/${path}`
     }
 
-    protected async get<T>(path = '', params?: PaginationParams | Record<string, unknown>): Promise<T> {
-        const { data } = await apiClient.get<ApiResponse<T>>(this.buildUrl(path), { params })
+    protected async get<T>(
+        path = '',
+        params?: PaginationParams | Record<string, unknown>,
+        options?: { suppressErrorLog?: boolean },
+    ): Promise<T> {
+        const { data } = await apiClient.get<ApiResponse<T>>(this.buildUrl(path), {
+            params,
+            suppressErrorLog: options?.suppressErrorLog,
+        })
         return data.data
     }
 
