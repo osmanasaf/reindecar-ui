@@ -43,7 +43,7 @@ const formRules = computed(() => ({
   locationDate: { value: locationDate.value, rules: [rules.required('Tarih seçiniz')] },
 }))
 
-const { validateForm, getError, hasError, touch } = useValidation(() => formRules.value)
+const { validateForm, getError, hasError, touch, reset } = useValidation(() => formRules.value)
 
 async function loadBranches() {
   try {
@@ -57,6 +57,7 @@ watch(
   () => [props.open, props.defaultBranchId] as const,
   async ([isOpen, defaultBranch]) => {
     if (!isOpen) return
+    reset()
     locationDate.value = todayYmd()
     notes.value = ''
     branchId.value = defaultBranch ?? null

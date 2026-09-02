@@ -274,7 +274,7 @@ const formRules = computed(() => {
   return companyRules
 })
 
-const { validateForm, getError, hasError, touch } = useValidation(() => formRules.value)
+const { validateForm, getError, hasError, touch, reset } = useValidation(() => formRules.value)
 
 async function fetchLicenseClasses() {
   try {
@@ -492,6 +492,7 @@ watch(
   () => [props.open, props.customerId, props.initialType] as const,
   ([isOpen, id, initialType]) => {
     if (!isOpen) return
+    reset()
     if (id) loadCustomer()
     else initCreateForm(initialType ?? 'PERSONAL')
   },
