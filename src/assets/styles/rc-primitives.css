@@ -347,6 +347,7 @@ button.rc-modal-callout__value:disabled {
 
 .rc-segtabs {
   display: flex;
+  flex-wrap: wrap;
   border-bottom: 1px solid var(--rc-border);
   gap: 0;
   padding: 0 20px;
@@ -363,6 +364,8 @@ button.rc-modal-callout__value:disabled {
 .rc-segtab {
   display: inline-flex;
   align-items: center;
+  flex-shrink: 0;
+  white-space: nowrap;
   gap: 6px;
   padding: 12px 14px;
   border: none;
