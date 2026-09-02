@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Branch } from '@/types'
 import { RcButton, RcBadge } from '@/components/rc'
+import { toSearchQuery } from '@/utils/search'
 
 interface BranchRow extends Branch {
   vehicleCount?: number
@@ -19,9 +20,22 @@ const emit = defineEmits<{
   toggle: [branch: BranchRow]
 }>()
 
+/**
+ * Adres serbest metin; kullanıcı doğal olarak ilçe ve ili de yazıyor. İlçe/il
+ * yalnızca adreste zaten geçmiyorsa eklenir. Karşılaştırma diyakritik katlanarak
+ * yapılır: referans verideki 'Cankaya' ile adresteki 'Çankaya' eşleşsin.
+ */
 function location(branch: BranchRow): string {
-  const parts = [branch.address, branch.district, branch.city].filter(Boolean)
-  return parts.length ? parts.join(', ') : '—'
+  const address = branch.address?.trim() ?? ''
+  const addressSegments = new Set(
+    address.split(',').map((segment) => toSearchQuery(segment)).filter(Boolean),
+  )
+  const parts = [address]
+  for (const extra of [branch.district, branch.city]) {
+    if (extra && !addressSegments.has(toSearchQuery(extra))) parts.push(extra)
+  }
+  const filled = parts.filter(Boolean)
+  return filled.length ? filled.join(', ') : '—'
 }
 </script>
 
