@@ -34,8 +34,12 @@ class ContractsApiService extends BaseApi {
         return this.get<ContractDetail>(`/${id}`)
     }
 
+    /**
+     * Sözleşme yoksa backend 404 (E001) döner ve çağıran bunu sessizce ele alır —
+     * beklenen kontrol akışı olduğu için konsola hata olarak yazılmaz.
+     */
     async getByRentalId(rentalId: number, documentType: ContractDocumentType): Promise<ContractDetail> {
-        return this.get<ContractDetail>(`/rental/${rentalId}`, { documentType })
+        return this.get<ContractDetail>(`/rental/${rentalId}`, { documentType }, { suppressErrorLog: true })
     }
 
     async create(payload: CreateContractPayload): Promise<ContractDetail> {
