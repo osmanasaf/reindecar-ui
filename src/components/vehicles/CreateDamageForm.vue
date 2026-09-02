@@ -113,7 +113,13 @@ function selectZone(zoneId: number) {
   form.value.location = getDefaultLocationForZone(zoneId)
 }
 
-watch(() => form.value.rentalId, async (rentalId) => {
+/**
+ * Kiralamadan acilan hasarda musteri sorumlulugunu isaretler. Watcher tek basina
+ * yetmiyordu: form.rentalId zaten props.rentalId ile kuruluyor, deger hic
+ * *degismedigi* icin watcher hic tetiklenmiyordu ve iade onizlemesi hasari
+ * toplama katmiyordu.
+ */
+async function applyRentalSelection(rentalId: number | undefined) {
   if (!rentalId) {
     if (!isRentalLocked.value) {
       form.value.customerId = undefined
@@ -132,7 +138,9 @@ watch(() => form.value.rentalId, async (rentalId) => {
       selectedCustomer.value = null
     }
   }
-})
+}
+
+watch(() => form.value.rentalId, applyRentalSelection)
 
 async function loadVehicleLabel() {
   if (props.vehicleLabel) {
@@ -238,7 +246,7 @@ function finishWithDocuments() {
 onMounted(async () => {
   await Promise.all([loadVehicleRentals(), loadVehicleLabel()])
   if (props.initialZoneId) selectZone(props.initialZoneId)
-  if (props.rentalId) form.value.rentalId = props.rentalId
+  if (props.rentalId && !isEditMode.value) await applyRentalSelection(props.rentalId)
   if (isEditMode.value) await loadDamageForEdit()
 })
 </script>
