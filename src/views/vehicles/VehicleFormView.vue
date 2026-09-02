@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { matchesSearch } from '@/utils/search'
 import { useRoute, useRouter } from 'vue-router'
 import { vehiclesApi, vehicleCategoriesApi, branchesApi, referenceDataApi, filesApi } from '@/api'
 import { useValidation, rules, useToast, useReferenceData } from '@/composables'
@@ -263,8 +264,8 @@ function isServisCategoryId(categoryId: number): boolean {
   if (!cat) return false
   return (
     cat.code?.toUpperCase() === 'SERVIS' ||
-    cat.name.toLowerCase().includes('servis') ||
-    cat.name.toLowerCase().includes('minibüs')
+    matchesSearch(cat.name, 'servis') ||
+    matchesSearch(cat.name, 'minibüs')
   )
 }
 

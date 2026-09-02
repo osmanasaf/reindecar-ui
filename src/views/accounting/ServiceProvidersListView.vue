@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue'
+import { matchesSearch, toSearchQuery } from '@/utils/search'
 import { useRouter, useRoute } from 'vue-router'
 import { useAccountingStore } from '@/stores'
 import { useToast, useEnumTranslations } from '@/composables'
@@ -31,12 +32,12 @@ const filteredProviders = computed(() => {
   let result = [...list]
 
   if (searchQuery.value) {
-    const q = searchQuery.value.toLowerCase()
+    const q = toSearchQuery(searchQuery.value)
     result = result.filter(p =>
-      p.name.toLowerCase().includes(q)
-      || p.taxNumber?.toLowerCase().includes(q)
-      || p.contactPerson?.toLowerCase().includes(q)
-      || p.code?.toLowerCase().includes(q)
+      matchesSearch(p.name, q)
+      || matchesSearch(p.taxNumber, q)
+      || matchesSearch(p.contactPerson, q)
+      || matchesSearch(p.code, q)
     )
   }
 

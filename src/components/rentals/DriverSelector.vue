@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
+import { matchesSearch, toSearchQuery } from '@/utils/search'
 import { customersApi, referenceDataApi } from '@/api'
 import { useToast } from '@/composables'
 import { formatPhoneInput } from '@/utils/phone'
@@ -69,14 +70,13 @@ function formatDate(date: string): string {
 }
 
 const filteredDrivers = computed(() => {
-  const query = searchQuery.value.toLowerCase()
+  const query = toSearchQuery(searchQuery.value)
   if (!query) return drivers.value
   
   return drivers.value.filter(driver => {
-    const displayName = getDriverDisplayName(driver).toLowerCase()
-    return displayName.includes(query) ||
-      driver.licenseNumber?.toLowerCase().includes(query) ||
-      driver.nationalId?.includes(query)
+    return matchesSearch(getDriverDisplayName(driver), query) ||
+      matchesSearch(driver.licenseNumber, query) ||
+      matchesSearch(driver.nationalId, query)
   })
 })
 

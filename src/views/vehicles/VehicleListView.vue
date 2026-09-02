@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
+import { matchesSearch } from '@/utils/search'
 import { RouterLink, useRouter } from 'vue-router'
 import { vehiclesApi, vehicleCategoriesApi, branchesApi } from '@/api'
 import {
@@ -185,8 +186,8 @@ const servisCategory = computed(() =>
   categories.value.find(
     (c) =>
       c.code?.toUpperCase() === 'SERVIS' ||
-      c.name.toLowerCase().includes('servis') ||
-      c.name.toLowerCase().includes('minibüs')
+      matchesSearch(c.name, 'servis') ||
+      matchesSearch(c.name, 'minibüs')
   ) ?? null
 )
 

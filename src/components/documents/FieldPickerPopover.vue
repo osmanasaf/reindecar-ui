@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch, nextTick } from 'vue'
+import { matchesSearch, toSearchQuery } from '@/utils/search'
 import { storeToRefs } from 'pinia'
 import { useContractEditorStore } from '@/stores/contractEditor.store'
 import { groupPlaceholders } from '@/utils/placeholderLabels'
@@ -22,15 +23,15 @@ const STRUCTURAL_KEYS = new Set(['termsBlock', 'driversBlock'])
 const groups = computed(() => {
   const keys = Object.keys(placeholders.value).filter((k) => !STRUCTURAL_KEYS.has(k))
   const grouped = groupPlaceholders(keys)
-  const term = search.value.trim().toLocaleLowerCase('tr')
+  const term = toSearchQuery(search.value)
   if (!term) return grouped
   return grouped
     .map((g) => ({
       group: g.group,
       items: g.items.filter(
         (item) =>
-          item.label.toLocaleLowerCase('tr').includes(term) ||
-          (placeholders.value[item.key] ?? '').toLocaleLowerCase('tr').includes(term),
+          matchesSearch(item.label, term) ||
+          matchesSearch(placeholders.value[item.key], term),
       ),
     }))
     .filter((g) => g.items.length > 0)

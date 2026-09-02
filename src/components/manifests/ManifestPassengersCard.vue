@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, computed } from 'vue'
+import { matchesSearch, toSearchQuery } from '@/utils/search'
 import { serviceManifestsApi } from '@/api'
 import { useToast, useFeatures } from '@/composables'
 import FeatureGate from '@/components/common/FeatureGate.vue'
@@ -76,10 +77,10 @@ const conflictCount = computed(
 )
 
 const filtered = computed(() => {
-  const q = search.value.trim().toLowerCase()
+  const q = toSearchQuery(search.value)
   if (!q) return passengers.value
   return passengers.value.filter((p) =>
-    `${p.fullName} ${p.idNumber ?? ''} ${p.seatNumber ?? ''}`.toLowerCase().includes(q),
+    matchesSearch(`${p.fullName} ${p.idNumber ?? ''} ${p.seatNumber ?? ''}`, q),
   )
 })
 
