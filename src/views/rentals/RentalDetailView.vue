@@ -223,7 +223,7 @@ const timelineEvents = computed(() => {
     { label: 'Planlanan bitiş', at: rental.value.openEnded ? 'Belirsiz' : formatDate(r.endDate) },
   ]
   if (r.actualReturnDate) {
-    events.push({ label: 'Fiili iade', at: formatDateTime(r.actualReturnDate), tone: 'success' })
+    events.push({ label: 'Fiili iade', at: formatDate(r.actualReturnDate), tone: 'success' })
   }
   if (r.isOverdue) {
     events.push({ label: 'Gecikme', at: `${r.overdueDays} gün`, tone: 'warn' })
@@ -783,7 +783,7 @@ onActivated(() => {
               </div>
               <div v-if="rental.actualReturnDate" class="date-item">
                 <span class="label">Fiili İade</span>
-                <span class="value">{{ formatDateTime(rental.actualReturnDate) }}</span>
+                <span class="value">{{ formatDate(rental.actualReturnDate) }}</span>
               </div>
             </div>
           </div>
