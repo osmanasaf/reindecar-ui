@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue'
+import { matchesSearch, toSearchQuery } from '@/utils/search'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores'
 import { useAppSettingsStore } from '@/stores/appSettings.store'
@@ -130,9 +131,9 @@ function badgeFor(id: SettingsTab): string | null {
 }
 
 const navGroups = computed(() => {
-  const q = query.value.trim().toLowerCase()
+  const q = toSearchQuery(query.value)
   const matches = (item: NavItemMeta) =>
-    !q || item.label.toLowerCase().includes(q) || item.keywords.toLowerCase().includes(q)
+    !q || matchesSearch(item.label, q) || matchesSearch(item.keywords, q)
 
   const groups: { section: string; items: NavItemMeta[] }[] = [
     { section: 'Hesap', items: accountItems.filter(matches) },

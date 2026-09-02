@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
+import { matchesSearch, toSearchQuery } from '@/utils/search'
 import { vehiclesApi, vehicleCategoriesApi } from '@/api'
 import { SearchableSelect } from '@/components/common'
 import type { Vehicle, VehicleCategory, RentalType } from '@/types'
@@ -31,8 +32,8 @@ const serviceCategoryId = computed(() => {
   const match = categories.value.find(
     (c) =>
       c.code?.toUpperCase() === 'SERVIS' ||
-      c.name.toLowerCase().includes('servis') ||
-      c.name.toLowerCase().includes('minibüs')
+      matchesSearch(c.name, 'servis') ||
+      matchesSearch(c.name, 'minibüs')
   )
   return match?.id ?? null
 })
@@ -59,11 +60,11 @@ const filteredVehicles = computed(() => {
   }
 
   if (searchQuery.value.trim()) {
-    const query = searchQuery.value.toLowerCase()
+    const query = toSearchQuery(searchQuery.value)
     result = result.filter(v => 
-      v.brand.toLowerCase().includes(query) ||
-      v.model.toLowerCase().includes(query) ||
-      v.plateNumber.toLowerCase().includes(query)
+      matchesSearch(v.brand, query) ||
+      matchesSearch(v.model, query) ||
+      matchesSearch(v.plateNumber, query)
     )
   }
 

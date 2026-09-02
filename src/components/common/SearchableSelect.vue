@@ -1,5 +1,6 @@
 <script setup lang="ts" generic="T extends string | number">
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import { matchesSearch, toSearchQuery } from '@/utils/search'
 
 interface Option {
   value: T
@@ -71,11 +72,11 @@ const selectedOption = computed(() => {
 })
 
 const filteredOptions = computed(() => {
-  const query = searchQuery.value.toLowerCase().trim()
+  const query = toSearchQuery(searchQuery.value)
   if (!query) return props.options
   
   return props.options.filter(opt => 
-    opt.label.toLowerCase().includes(query)
+    matchesSearch(opt.label, query)
   )
 })
 

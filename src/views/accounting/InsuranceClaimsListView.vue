@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
+import { matchesSearch, toSearchQuery } from '@/utils/search'
 import { useRouter } from 'vue-router'
 import { useAccountingStore } from '@/stores'
 import { useToast, useAccountingStats, useEnumTranslations } from '@/composables'
@@ -38,11 +39,11 @@ const statusChips = computed(() => [
 
 const filteredClaims = computed(() => {
   let result = [...claims.value]
-  const q = searchQuery.value.trim().toLowerCase()
+  const q = toSearchQuery(searchQuery.value)
   if (q) {
     result = result.filter(c =>
-      c.claimNumber?.toLowerCase().includes(q)
-      || c.vehiclePlate?.toLowerCase().includes(q)
+      matchesSearch(c.claimNumber, q)
+      || matchesSearch(c.vehiclePlate, q)
     )
   }
   if (statusChip.value !== 'all') {

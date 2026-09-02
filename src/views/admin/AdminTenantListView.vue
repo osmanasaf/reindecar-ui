@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { matchesSearch, toSearchQuery } from '@/utils/search'
 import { useRouter } from 'vue-router'
 import { adminTenantsApi } from '@/api'
 import { useToast } from '@/composables'
@@ -26,9 +27,9 @@ const statusMeta: Record<TenantStatus, { label: string; variant: 'success' | 'wa
 
 const filteredTenants = computed(() => {
   if (!searchQuery.value.trim()) return tenants.value
-  const q = searchQuery.value.toLowerCase()
+  const q = toSearchQuery(searchQuery.value)
   return tenants.value.filter(
-    (t) => t.name.toLowerCase().includes(q) || t.code.toLowerCase().includes(q),
+    (t) => matchesSearch(t.name, q) || matchesSearch(t.code, q),
   )
 })
 

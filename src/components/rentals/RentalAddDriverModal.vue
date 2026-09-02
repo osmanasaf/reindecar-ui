@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { matchesSearch, toSearchQuery } from '@/utils/search'
 import { customersApi, rentalsApi } from '@/api'
 import { useToast } from '@/composables'
 import { RcModal, RcButton, RcBadge } from '@/components/rc'
@@ -41,14 +42,13 @@ function displayName(driver: Driver): string {
 }
 
 const filteredDrivers = computed(() => {
-  const q = search.value.toLowerCase().trim()
+  const q = toSearchQuery(search.value)
   if (!q) return availableDrivers.value
   return availableDrivers.value.filter((d) => {
-    const name = displayName(d).toLowerCase()
     return (
-      name.includes(q) ||
-      d.licenseNumber?.toLowerCase().includes(q) ||
-      d.nationalId?.includes(q)
+      matchesSearch(displayName(d), q) ||
+      matchesSearch(d.licenseNumber, q) ||
+      matchesSearch(d.nationalId, q)
     )
   })
 })

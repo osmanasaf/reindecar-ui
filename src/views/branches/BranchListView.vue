@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, computed } from 'vue'
+import { matchesSearch, toSearchQuery } from '@/utils/search'
 import { branchesApi, vehiclesApi } from '@/api'
 import { useToast, useReferenceData, useFirstLoadStagger } from '@/composables'
 import { validators, validate, formatPhoneInput } from '@/utils/validation'
@@ -40,11 +41,11 @@ const hasFilters = computed(() => !!searchQuery.value.trim() || filterStatus.val
 const filteredBranches = computed(() => {
   let result = [...branches.value]
   if (searchQuery.value.trim()) {
-    const q = searchQuery.value.toLowerCase()
+    const q = toSearchQuery(searchQuery.value)
     result = result.filter(b =>
-      b.name.toLowerCase().includes(q) ||
-      (b.branchCode ?? b.code ?? '').toLowerCase().includes(q) ||
-      (b.city ?? '').toLowerCase().includes(q)
+      matchesSearch(b.name, q) ||
+      matchesSearch(b.branchCode ?? b.code, q) ||
+      matchesSearch(b.city, q)
     )
   }
   if (filterStatus.value === 'active') result = result.filter(b => b.active)
