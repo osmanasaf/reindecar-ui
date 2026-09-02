@@ -332,7 +332,7 @@ onMounted(async () => {
           Segment dağılımı
         </div>
         <div class="rcv-hs__lead">
-          Müşterilerin <b>%{{ corporatePct }}</b>'i kurumsal segmentte.
+          Müşterilerin <b>%{{ corporatePct }}</b>'si kurumsal segmentte.
         </div>
         <div style="font-size: 12px; color: var(--rc-text-muted); margin-top: auto">
           {{ overview.company }} kurumsal · {{ overview.personal }} bireysel
