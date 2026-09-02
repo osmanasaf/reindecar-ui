@@ -19,6 +19,13 @@
   --rc-accent: var(--rc-blue-500);
   --rc-accent-subtle: var(--rc-blue-50);
 
+  /* Solid accent fills. Beyaz/koyu metin doğrudan bunların üstüne oturduğu için
+     koyu temada DÖNMEZLER — mavi rampanın metin ucu döner, bunlar dönmemeli. */
+  --rc-blue-fill-soft:   #D6E3FF;
+  --rc-blue-fill:        #0066FF;
+  --rc-blue-fill-strong: #0052D6;
+  --rc-blue-fill-deep:   #0040A8;
+
   /* — Neutrals (warm-cool true black/white) — */
   --rc-ink-1000: #0A0A0A;  /* primary text, dark surface */
   --rc-ink-900:  #1A1A1A;
@@ -273,6 +280,24 @@
   --rc-info-800:    #93c5fd;
 
   --rc-purple-50:   rgba(107, 71, 220, 0.14);
+
+  /* Mavi rampa yukarıdaki semantik rampalarla aynı kurala uyar: tint ucu koyu
+     yüzey üstünde yarı saydam bir yıkamaya, metin ucu ise açık tonlara döner.
+     Dönmeyen solid dolgular için --rc-blue-fill-* kullanılır. */
+  --rc-blue-50:  rgba(0, 102, 255, 0.14);
+  --rc-blue-100: rgba(0, 102, 255, 0.24);
+  --rc-blue-200: rgba(0, 102, 255, 0.38);
+  --rc-blue-600: #6E9BFF;
+  --rc-blue-700: #A8C3FF;
+  --rc-blue-800: #D6E3FF;
+
+  /* Ink skalasının açık ucu yalnızca arka plan olarak kullanılıyor (34 kullanım,
+     tek bir color: yok), bu yüzden koyu yüzey rampasına eşlenir. 200 ve üstü
+     kasıtlı olarak dönmez: --rc-ink-200 AppSidebar'da metin rengi. */
+  --rc-ink-25:  #141414;
+  --rc-ink-50:  #1A1A1A;
+  --rc-ink-100: #222222;
+  --rc-ink-150: #262626;
 }
 
 /* ===== Reset (gentle) ===== */

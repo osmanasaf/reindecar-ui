@@ -137,10 +137,10 @@ onMounted(loadHistory)
             <span>Az</span>
             <div class="rcv-heatmap__scale">
               <span style="background: var(--rc-ink-100)" />
-              <span style="background: var(--rc-blue-100)" />
+              <span style="background: var(--rc-blue-fill-soft)" />
               <span style="background: var(--rc-blue-300)" />
-              <span style="background: var(--rc-blue-500)" />
-              <span style="background: var(--rc-blue-700)" />
+              <span style="background: var(--rc-blue-fill)" />
+              <span style="background: var(--rc-blue-fill-deep)" />
             </div>
             <span>Çok</span>
             <span class="rc-veh-rentals-tab__legend-item">
