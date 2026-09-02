@@ -68,8 +68,13 @@ function focusFirst() {
   ;(closeBtn && nodes.includes(closeBtn) ? closeBtn : nodes[0])?.focus()
 }
 
+/**
+ * Escape once en ustteki katmana aittir. Ic bilesenler (takvim, dropdown)
+ * olayi kendileri isledigin de preventDefault ile isaretler; o durumda modal
+ * kapanmaz ve kullanicinin girdigi veri uyarisiz gitmez.
+ */
 function onKeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape' && props.open) emit('close')
+  if (e.key === 'Escape' && props.open && !e.defaultPrevented) emit('close')
   trapFocus(e)
 }
 
