@@ -106,6 +106,12 @@ function openDropdown() {
   })
 }
 
+function onEscape(event: KeyboardEvent) {
+  if (!isOpen.value) return
+  event.preventDefault()
+  closeDropdown()
+}
+
 function closeDropdown() {
   isOpen.value = false
   searchQuery.value = ''
@@ -181,7 +187,7 @@ watch(() => props.modelValue, () => {
             type="text"
             :placeholder="searchPlaceholder"
             class="search-input"
-            @keydown.esc="closeDropdown"
+            @keydown.esc="onEscape"
           />
         </div>
 

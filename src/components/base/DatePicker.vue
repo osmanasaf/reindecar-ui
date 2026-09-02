@@ -1,6 +1,6 @@
 <script setup lang="ts">
 
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 
 import { VueDatePicker } from '@vuepic/vue-datepicker'
 
@@ -45,6 +45,20 @@ const emit = defineEmits<{
 }>()
 
 
+
+const menuOpen = ref(false)
+
+/**
+ * Escape acik takvimi kapatir, ustteki modali degil. Capture fazinda
+ * calisir cunku kutuphanenin kendi Escape isleyicisi menuOpen'i hemen
+ * false yapiyor; isaretlemeyi ondan once yapmamiz gerekiyor.
+ * preventDefault olayi durdurmaz, yalnizca 'islendi' diye isaretler:
+ * takvim yine kapanir, RcModal ise defaultPrevented'i gorup gecer.
+ */
+function onKeydownCapture(event: KeyboardEvent) {
+  if (event.key !== 'Escape' || !menuOpen.value) return
+  event.preventDefault()
+}
 
 const internalValue = computed({
 
@@ -114,7 +128,7 @@ function onUpdateModelValue(value: Date | null) {
 
 <template>
 
-  <div class="rc-datepicker-wrap notranslate" translate="no">
+  <div class="rc-datepicker-wrap notranslate" translate="no" @keydown.capture="onKeydownCapture">
 
     <label v-if="label" class="rc-datepicker-label">{{ label }}</label>
 
@@ -146,7 +160,9 @@ function onUpdateModelValue(value: Date | null) {
 
       @update:model-value="onUpdateModelValue"
 
-      @closed="emit('closed')"
+      @open="menuOpen = true"
+
+      @closed="menuOpen = false; emit('closed')"
 
     />
 
