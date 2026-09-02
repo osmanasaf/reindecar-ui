@@ -28,7 +28,7 @@ const props = defineProps<{
   returnBranchLabel?: string
 }>()
 
-const emit = defineEmits<{ close: []; activated: [rental: Rental] }>()
+const emit = defineEmits<{ close: []; activated: [rental: Rental]; documentsChanged: [] }>()
 
 const toast = useToast()
 const { isEnabled } = useFeatures()
@@ -252,6 +252,7 @@ async function downloadHandoverPdf() {
         :reference-id="rental.id"
         title="Teslim belgeleri"
         :upload-types="HANDOVER_UPLOAD_TYPES"
+        @uploaded="emit('documentsChanged')"
       />
       <p class="rcr-modal-docs__hint">
         Önce taslak tutanağı indirip imzalatın; ardından imzalı kopyayı, teslim fotoğrafı veya sözleşmeyi yükleyin.

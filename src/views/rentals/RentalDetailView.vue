@@ -424,8 +424,19 @@ const effectiveIncludedKm = computed(() => {
   })
 })
 
-async function fetchRental() {
-  loading.value = true
+/**
+ * Basarili bir islemden sonra sessiz tazeleme sart: loading kapisi tum
+ * v-else-if bloguna sarili oldugu icin acik modali unmount eder, modal
+ * basari ekranini hic boyayamaz ve acik bayragi ile yeniden mount olur.
+ */
+const documentsSectionRef = ref<{ reload: () => void } | null>(null)
+
+function reloadDocuments() {
+  documentsSectionRef.value?.reload()
+}
+
+async function fetchRental(options: { silent?: boolean } = {}) {
+  if (!options.silent) loading.value = true
   try {
     const detail = await rentalsApi.getDetail(rentalId.value)
     rental.value = detail.rental
@@ -517,7 +528,7 @@ function handleStartReturn() {
 
 function handleReturnCompleted(updatedRental: Rental) {
   rental.value = updatedRental
-  fetchRental()
+  fetchRental({ silent: true })
 }
 
 async function handleCancel() {
@@ -526,7 +537,7 @@ async function handleCancel() {
 
 function handleRentalUpdated(updated: Rental) {
   rental.value = updated
-  fetchRental()
+  fetchRental({ silent: true })
 }
 
 function handlePaymentRecorded() {
@@ -1119,7 +1130,7 @@ onActivated(() => {
             :rental-id="rental.id"
             :customer-name="customer?.displayName ?? rental.customerName"
           />
-          <DocumentsSection reference-type="RENTAL" :reference-id="rental.id" title="Kiralama belgeleri" />
+          <DocumentsSection ref="documentsSectionRef" reference-type="RENTAL" :reference-id="rental.id" title="Kiralama belgeleri" />
         </div>
 
         <!-- UETDS (yalnızca servis kiralamalar) -->
@@ -1159,6 +1170,7 @@ onActivated(() => {
           :rental-id="rentalId"
           @close="showReturnModal = false"
           @completed="handleReturnCompleted"
+          @documents-changed="reloadDocuments"
         />
 
         <RentalReserveModal
@@ -1182,6 +1194,7 @@ onActivated(() => {
           :return-branch-label="returnBranch?.name"
           @close="showActivateModal = false"
           @activated="handleRentalUpdated"
+          @documents-changed="reloadDocuments"
         />
 
         <RentalEditModal

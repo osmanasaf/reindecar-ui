@@ -21,6 +21,8 @@ const props = withDefaults(defineProps<Props>(), {
   uploadTypes: undefined,
 })
 
+const emit = defineEmits<{ uploaded: [] }>()
+
 const toast = useToast()
 const files = ref<FileRecord[]>([])
 const loading = ref(false)
@@ -102,6 +104,7 @@ async function uploadFile() {
       selectedUploadType.value as FileUploadType
     )
     files.value.unshift(uploaded)
+    emit('uploaded')
     toast.success('Belge başarıyla yüklendi')
     resetUploadForm()
   } catch (err) {
@@ -168,6 +171,9 @@ function formatDate(dateStr: string): string {
 }
 
 onMounted(loadFiles)
+
+/** Ebeveyn, baska bir yerden yapilan yuklemeden sonra listeyi tazeleyebilsin. */
+defineExpose({ reload: loadFiles })
 </script>
 
 <template>
