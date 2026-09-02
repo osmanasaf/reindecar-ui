@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
+import { formatCustomerCode } from '@/utils/customerCode'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { customersApi, driversApi, referenceDataApi, rentalsApi, receivablesApi } from '@/api'
 import { useToast, useFeatures } from '@/composables'
@@ -496,7 +497,7 @@ onMounted(() => {
         <RcAvatar size="lg" class="rc-cust-hero-avatar">{{ initials(customer.displayName) }}</RcAvatar>
         <div class="rcv-hero__info">
           <div class="rcv-hero__badges" style="margin-top: 0">
-            <span class="rcv-hero__plate">{{ customer.publicId }}</span>
+            <span class="rcv-hero__plate" :title="customer.publicId">{{ formatCustomerCode(customer.publicId) }}</span>
             <RcBadge :variant="customer.customerType === 'COMPANY' ? 'purple' : 'accent'">
               {{ typeLabels[customer.customerType] }}
             </RcBadge>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { formatCustomerCode } from '@/utils/customerCode'
 import { useRouter } from 'vue-router'
 import { customersApi, rentalsApi, receivablesApi } from '@/api'
 import { RcModal, RcButton, RcBadge, RcAvatar, RcStatusPill } from '@/components/rc'
@@ -143,7 +144,7 @@ watch(
         <RcAvatar size="lg" class="rc-cust-quick__avatar">{{ initials(customer.displayName) }}</RcAvatar>
         <div class="rc-cust-quick__identity">
           <div class="rc-cust-quick__badges">
-            <span class="rcv-hero__plate">{{ customer.publicId }}</span>
+            <span class="rcv-hero__plate" :title="customer.publicId">{{ formatCustomerCode(customer.publicId) }}</span>
             <RcBadge :variant="customer.customerType === 'COMPANY' ? 'purple' : 'accent'">
               {{ typeLabels[customer.customerType] }}
             </RcBadge>

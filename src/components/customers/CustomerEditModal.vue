@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { formatCustomerCode } from '@/utils/customerCode'
 import { customersApi, referenceDataApi } from '@/api'
 import { useValidation, rules, useToast, useReferenceData, useFeatures } from '@/composables'
 import { SearchableSelect } from '@/components/common'
@@ -512,7 +513,7 @@ watch(
           />
           {{ isCreateMode ? 'Yeni müşteri' : 'Müşteriyi düzenle' }}
         </h2>
-        <div v-if="!isCreateMode && publicId" class="rc-modal__sub">{{ publicId }} · {{ displayName }}</div>
+        <div v-if="!isCreateMode && publicId" class="rc-modal__sub" :title="publicId">{{ formatCustomerCode(publicId) }} · {{ displayName }}</div>
         <div v-else-if="isCreateMode" class="rc-modal__sub">Liste üzerinde kalır; kayıt sonrası önizleme açılır</div>
       </div>
     </template>
