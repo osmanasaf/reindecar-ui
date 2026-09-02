@@ -303,17 +303,21 @@ const totalPaid = computed(() => {
  * bölümü tutarlı olur (bkz. #4).
  */
 const totalCollectible = computed(() => {
-  if (
-    paymentSummary.value?.totalPaid != null
-    && paymentSummary.value?.totalRemaining != null
-  ) {
-    const collectible = Number(paymentSummary.value.totalPaid) + Number(paymentSummary.value.totalRemaining)
-    if (collectible === 0 && grandTotal.value > 0) {
-      return grandTotal.value
-    }
-    return collectible
+  const authoritative = rental.value?.totalCollectible
+  if (authoritative != null && Number(authoritative) > 0) {
+    return Number(authoritative)
   }
   return grandTotal.value
+})
+
+/**
+ * Geç iade ve yakıt bedeli yalnızca alacak olarak var, `Rental` entity'sinde yok.
+ * Ücret özetindeki kalemler bunları gösteremediği için farkı ayrı bir satırda
+ * veriyoruz; böylece kalemler genel toplamı gerçekten topluyor.
+ */
+const returnChargesTotal = computed(() => {
+  const diff = totalCollectible.value - grandTotal.value
+  return diff > 0 ? diff : 0
 })
 
 const penaltyTotalAmount = computed(() => {
@@ -838,10 +842,14 @@ onActivated(() => {
                 <span class="label">Ekstra KM</span>
                 <span class="value">{{ formatCurrency(rental.extraKmCharge) }}</span>
               </div>
+              <div v-if="returnChargesTotal > 0" class="price-item">
+                <span class="label">İade bedelleri (geç iade, yakıt)</span>
+                <span class="value">{{ formatCurrency(returnChargesTotal) }}</span>
+              </div>
             </div>
             <div class="price-total">
               <span class="label">Genel toplam</span>
-              <span class="value">{{ formatCurrency(grandTotal) }}</span>
+              <span class="value">{{ formatCurrency(totalCollectible) }}</span>
             </div>
           </div>
 

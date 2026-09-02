@@ -512,7 +512,7 @@ watch(searchQuery, () => {
               <RcStatusPill :status="rental.status" />
             </td>
             <td class="rc-right">
-              <div class="rcr-row__primary rc-num">{{ fmtTRY(rental.grandTotal) }}</div>
+              <div class="rcr-row__primary rc-num">{{ fmtTRY(rental.totalCollectible ?? rental.grandTotal) }}</div>
             </td>
           </tr>
         </tbody>
