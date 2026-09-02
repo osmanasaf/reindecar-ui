@@ -269,7 +269,7 @@ watch(() => props.modelValue, () => {
 
 .searchable-select.has-error .select-trigger {
   border-color: var(--color-danger);
-  background: #fff5f5;
+  background: var(--rc-danger-50);
 }
 
 .searchable-select.has-error.open .select-trigger {
