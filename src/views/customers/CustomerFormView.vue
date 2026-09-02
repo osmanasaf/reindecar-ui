@@ -846,7 +846,7 @@ watch(customerType, () => reset())
 .form-group.error input,
 .form-group.error select {
   border-color: var(--color-danger);
-  background: #fff5f5;
+  background: var(--rc-danger-50);
 }
 
 .error-text {
