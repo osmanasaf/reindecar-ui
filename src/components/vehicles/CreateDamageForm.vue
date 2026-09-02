@@ -95,6 +95,13 @@ const rentalOptions = computed(() =>
   }))
 )
 
+/** Kilitli kiralamada RNT-... numarasi gosterilir; ic id yalnizca son care. */
+const lockedRentalLabel = computed(() => {
+  if (!form.value.rentalId) return ''
+  const rental = vehicleRentals.value.find(r => r.id === form.value.rentalId)
+  return rental?.rentalNumber ?? `Kiralama #${form.value.rentalId}`
+})
+
 const modalTitle = computed(() => {
   if (savedDamageId.value) return 'Hasar kaydedildi'
   if (isEditMode.value) return 'Hasarı düzenle'
@@ -389,7 +396,7 @@ onMounted(async () => {
                 :disabled="fieldsLocked"
                 @update:model-value="(v) => form.rentalId = v ?? undefined"
               />
-              <RcInput v-else :model-value="`Kiralama #${form.rentalId}`" disabled />
+              <RcInput v-else :model-value="lockedRentalLabel" disabled />
             </RcField>
 
             <RcField v-if="form.rentalId && selectedCustomer" label="Müşteri" class="span-2">
