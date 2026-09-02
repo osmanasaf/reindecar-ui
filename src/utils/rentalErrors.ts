@@ -11,7 +11,7 @@ const GENERIC_PREFIX = /^(Geçersiz işlem|Geçersiz ehliyet bilgisi):\s*/
 const HINT_RULES: Array<{ matches: (message: string, code: string | null) => boolean; hint: string }> = [
     {
         matches: (message) => message.includes('İmzalı'),
-        hint: 'Belgeler bölümünden ilgili tutanağı/sözleşmeyi yükleyip imzalı olarak işaretledikten sonra tekrar deneyin.'
+        hint: 'Belgeler sekmesinden ilgili belgeyi "Oluştur" ile hazırlayın, kaydedin ve "İmzala" adımını tamamlayın. Dosya yüklemek bu koşulu karşılamaz.'
     },
     {
         matches: (message) => message.includes('muayene') || message.includes('sigorta'),

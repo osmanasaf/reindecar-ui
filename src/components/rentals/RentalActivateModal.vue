@@ -255,8 +255,9 @@ async function downloadHandoverPdf() {
         @uploaded="emit('documentsChanged')"
       />
       <p class="rcr-modal-docs__hint">
-        Önce taslak tutanağı indirip imzalatın; ardından imzalı kopyayı, teslim fotoğrafı veya sözleşmeyi yükleyin.
-        Belgeler anında kaydedilir ve teslimatı tamamlamadan da eklenebilir.
+        Buraya yüklenen dosyalar kayıt amaçlıdır ve teslim ön koşulunu karşılamaz.
+        Teslimat için Belgeler sekmesinden kiralama sözleşmesini ve teslim tutanağını
+        "Oluştur" ile hazırlayıp "İmzala" adımını tamamlamanız gerekir.
       </p>
     </div>
 
@@ -281,7 +282,7 @@ async function downloadHandoverPdf() {
         </div>
         <h3 class="rcr-return-modal__done-title">Teslimat tamamlandı</h3>
         <p class="rcr-return-modal__done-sub">
-          Kiralama aktif. Teslim tutanağını indirip imzalattıktan sonra imzalı kopyayı yükleyin.
+          Kiralama aktif. İmzalı teslim tutanağının kopyasını buraya yükleyerek arşivleyebilirsiniz.
         </p>
         <RcButton variant="accent" :disabled="downloadingPdf" @click="downloadHandoverPdf">
           <RcIcon name="download" :size="14" />
