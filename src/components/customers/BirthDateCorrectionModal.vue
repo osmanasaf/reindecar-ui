@@ -33,7 +33,7 @@ const formRules = computed(() => ({
   },
 }))
 
-const { validateForm, getError, hasError, touch } = useValidation(() => formRules.value)
+const { validateForm, getError, hasError, touch, reset } = useValidation(() => formRules.value)
 
 function resolveBirthDateYmd(customer: Customer | null): string {
   if (!customer) return ''
@@ -46,6 +46,7 @@ watch(
   () => [props.open, props.customer?.id] as const,
   ([isOpen]) => {
     if (!isOpen) return
+    reset()
     birthDate.value = resolveBirthDateYmd(props.customer)
   },
   { immediate: true },
