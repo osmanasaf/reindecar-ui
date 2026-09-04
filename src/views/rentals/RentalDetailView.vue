@@ -843,7 +843,7 @@ onActivated(() => {
                 <span class="value">{{ formatCurrency(rental.extraKmCharge) }}</span>
               </div>
               <div v-if="returnChargesTotal > 0" class="price-item">
-                <span class="label">İade bedelleri (geç iade, yakıt)</span>
+                <span class="label">Diğer iade bedelleri</span>
                 <span class="value">{{ formatCurrency(returnChargesTotal) }}</span>
               </div>
             </div>

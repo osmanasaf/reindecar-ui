@@ -295,7 +295,7 @@ export interface Rental {
     extraKmCharge: number
     grandTotal: number
     /** Sunucunun alacak defterinden türettiği otoriter toplam (ödenen + açık kalan). */
-    totalCollectible: number
+    totalCollectible?: number
     currency: string
     isOverdue: boolean
     overdueDays: number
