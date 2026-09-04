@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
+import { formatCustomerCode } from '@/utils/customerCode'
 import { useRoute, useRouter } from 'vue-router'
 import { customersApi } from '@/api'
 import { usePagination, useToast, useFirstLoadStagger } from '@/composables'
@@ -409,7 +410,7 @@ onMounted(async () => {
                 <RcAvatar size="sm">{{ initials(customer.displayName) }}</RcAvatar>
                 <div style="min-width: 0">
                   <div class="rcv-row__primary">{{ customer.displayName }}</div>
-                  <div class="rcv-row__plate">{{ customer.publicId }}</div>
+                  <div class="rcv-row__plate" :title="customer.publicId">{{ formatCustomerCode(customer.publicId) }}</div>
                 </div>
               </div>
             </td>
