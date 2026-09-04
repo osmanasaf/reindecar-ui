@@ -269,6 +269,24 @@ function isServisCategoryId(categoryId: number): boolean {
   )
 }
 
+const DAYS_PER_WEEK = 7
+const DAYS_PER_MONTH = 30
+
+/**
+ * Placeholder'lar sabit yazılıydı (9000/30000) ve girilen günlük fiyattan etkilenmiyordu.
+ * Backend boş bırakılan haftalık/aylık fiyatta günlük fiyat x gün sayısına düşüyor
+ * (PriceCalculationService#calculateFallbackPrice), yani gösterilen değer gerçekten
+ * uygulanacak fiyatın karşılığı.
+ */
+function multiplyDailyPrice(days: number): string {
+  const daily = Number(form.value.dailyPrice)
+  if (!Number.isFinite(daily) || daily <= 0) return ''
+  return (daily * days).toFixed(2)
+}
+
+const weeklyPricePlaceholder = computed(() => multiplyDailyPrice(DAYS_PER_WEEK))
+const monthlyPricePlaceholder = computed(() => multiplyDailyPrice(DAYS_PER_MONTH))
+
 const isServisCategory = computed(() => isServisCategoryId(form.value.categoryId))
 
 const vehicleId = computed(() => (isEditMode.value ? Number(route.params.id) : null))
@@ -903,7 +921,7 @@ onMounted(fetchData)
               type="number"
               min="0"
               step="0.01"
-              placeholder="9000.00"
+              :placeholder="weeklyPricePlaceholder"
             />
             <span class="help-text">Boş bırakılırsa günlük fiyat × 7 kullanılır</span>
           </div>
@@ -915,7 +933,7 @@ onMounted(fetchData)
               type="number"
               min="0"
               step="0.01"
-              placeholder="30000.00"
+              :placeholder="monthlyPricePlaceholder"
             />
             <span class="help-text">
               {{ isServisCategory ? 'Servis kiralamasında aylık fiyat kullanılır' : 'Boş bırakılırsa günlük fiyat × 30 kullanılır' }}
