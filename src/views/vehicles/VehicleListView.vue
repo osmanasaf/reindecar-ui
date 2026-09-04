@@ -68,7 +68,6 @@ const overview = ref<VehicleOverview>({
   damaged: 0,
   inactive: 0,
   sold: 0,
-  overdueRentals: 0,
 })
 
 const {
@@ -681,7 +680,7 @@ onMounted(async () => {
           >
             <RcIcon name="clock" :size="14" />
             Geciken
-            <span class="rcv-hs__chip-count">{{ overview.overdueRentals }}</span>
+            <span v-if="overview.overdueRentals != null" class="rcv-hs__chip-count">{{ overview.overdueRentals }}</span>
           </button>
           <button
             type="button"
