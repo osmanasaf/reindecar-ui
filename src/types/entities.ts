@@ -155,6 +155,8 @@ export interface VehicleOverview {
     damaged: number
     inactive: number
     sold: number
+    /** Bitiş tarihi geçmiş ve hâlâ süren kiralama sayısı; araç durumu değil, kiralamadan türetilir. Alanı henüz döndürmeyen sürümlerde gelmez. */
+    overdueRentals?: number
 }
 
 

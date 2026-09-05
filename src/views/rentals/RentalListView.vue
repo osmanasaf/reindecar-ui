@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import { rentalsApi, dashboardApi, vehiclesApi, customersApi } from '@/api'
 import type { RentalStats } from '@/api/dashboard.api'
 import { usePagination, useToast, usePageSearchHotkey, useFirstLoadStagger } from '@/composables'
@@ -30,6 +30,7 @@ const loading = ref(true)
 const rowsStagger = useFirstLoadStagger(loading)
 const error = ref<string | null>(null)
 const searchQuery = ref('')
+const route = useRoute()
 const statusView = ref<StatusView>('all')
 const typeFilter = ref<RentalType | ''>('')
 const previewRental = ref<Rental | null>(null)
@@ -292,7 +293,16 @@ function closePreview() {
   previewRental.value = null
 }
 
+/** Diğer ekranlardan gelen derin bağlantılar (ör. Araçlar > Geciken çipi) filtreyi seçebilsin. */
+function applyStatusFromQuery() {
+  const requested = route.query.status
+  if (typeof requested !== 'string') return
+  const match = statusViews.find((view) => view.id === requested)
+  if (match) statusView.value = match.id
+}
+
 onMounted(async () => {
+  applyStatusFromQuery()
   await fetchOverview()
   await fetchRentals()
 })

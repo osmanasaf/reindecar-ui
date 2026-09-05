@@ -416,6 +416,11 @@ function applyAdvancedFilters() {
   fetchVehicles()
 }
 
+/** Gecikme bir araç durumu değil, kiralamadan türetiliyor; filtreli kiralama listesine götürüyoruz. */
+function goToOverdueRentals() {
+  router.push({ name: 'rentals', query: { status: 'OVERDUE' } })
+}
+
 function setFilter(next: FilterKey) {
   if (statusFilter.value === next) return
   statusFilter.value = next
@@ -668,8 +673,14 @@ onMounted(async () => {
             İadeler
             <span class="rcv-hs__chip-count">{{ overview.rented }}</span>
           </button>
-          <button type="button" class="rcv-hs__chip rcv-hs__chip--warn" @click="toast.info('Geciken kiralamalar listesi yakında')">
+          <button
+            type="button"
+            class="rcv-hs__chip rcv-hs__chip--warn"
+            @click="goToOverdueRentals"
+          >
+            <RcIcon name="clock" :size="14" />
             Geciken
+            <span v-if="overview.overdueRentals != null" class="rcv-hs__chip-count">{{ overview.overdueRentals }}</span>
           </button>
           <button
             type="button"
