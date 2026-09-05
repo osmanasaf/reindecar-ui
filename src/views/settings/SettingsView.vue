@@ -17,8 +17,9 @@ import CategoriesManager from './CategoriesManager.vue'
 import FeaturesManager from './FeaturesManager.vue'
 import BrandingManager from './BrandingManager.vue'
 import DocumentTemplatesManager from './DocumentTemplatesManager.vue'
+import IntegrationsManager from './IntegrationsManager.vue'
 
-type SettingsTab = 'profile' | 'password' | 'notifications' | 'general' | 'features' | 'branding' | 'document-templates' | 'reference-data'
+type SettingsTab = 'profile' | 'password' | 'notifications' | 'general' | 'features' | 'integrations' | 'branding' | 'document-templates' | 'reference-data'
 type RefDataTab = 'brands' | 'cities' | 'colors' | 'categories'
 
 interface NavItemMeta {
@@ -116,6 +117,7 @@ const systemItems: NavItemMeta[] = [
   { id: 'branding', label: 'Firma / Marka', desc: 'Logo, renk ve firma bilgileri', icon: 'building', keywords: 'firma marka logo renk kurumsal branding' },
   { id: 'document-templates', label: 'Belge Şablonları', desc: 'Sözleşme ve fatura şablonları', icon: 'edit', keywords: 'belge şablon sözleşme fatura döküman template' },
   { id: 'features', label: 'Modüller', desc: 'Aktif modülleri yönet', icon: 'sparkle', keywords: 'modül özellik feature aktif' },
+  { id: 'integrations', label: 'Entegrasyonlar', desc: 'KABİS ve UETDS erişim bilgileri', icon: 'shield', keywords: 'entegrasyon kabis uetds egm unet api kullanıcı şifre erişim' },
   { id: 'reference-data', label: 'Referans Veriler', desc: 'Marka, il, renk ve kategori tanımları', icon: 'folder', keywords: 'referans veri marka model il ilçe renk kategori' },
 ]
 
@@ -201,6 +203,8 @@ onMounted(async () => {
   const tab = route.query.tab
   if (tab === 'features' && authStore.isAdmin) {
     activeTab.value = 'features'
+  } else if (tab === 'integrations' && authStore.isAdmin) {
+    activeTab.value = 'integrations'
   } else if (tab === 'document-templates') {
     activeTab.value = 'document-templates'
   }
@@ -566,6 +570,8 @@ async function handleCurrencySave() {
           <DocumentTemplatesManager v-else-if="activeTab === 'document-templates'" />
 
           <FeaturesManager v-else-if="activeTab === 'features'" />
+
+          <IntegrationsManager v-else-if="activeTab === 'integrations'" />
 
           <section v-else-if="activeTab === 'reference-data'">
             <RcTabs
