@@ -116,8 +116,27 @@ async function loadSlot(documentType: ContractDocumentType) {
   }
 }
 
+/**
+ * Tek istek: eskiden dort belge tipi icin dort ayri GET atiliyor ve olmayanlar
+ * icin backend 404 dondugu icin konsol "Contract not found" ile doluyordu.
+ */
 async function loadAll() {
-  await Promise.all(visibleSlots.value.map((type) => loadSlot(type)))
+  const types = visibleSlots.value
+  types.forEach((type) => {
+    slots[type].loading = true
+    slots[type].contract = null
+  })
+  try {
+    const contracts = await contractsApi.getAllByRentalId(props.rentalId)
+    for (const contract of contracts) {
+      const slot = slots[contract.documentType]
+      if (slot) slot.contract = contract
+    }
+  } catch (err) {
+    toast.apiError(err, 'Sözleşmeler yüklenemedi')
+  } finally {
+    types.forEach((type) => { slots[type].loading = false })
+  }
 }
 
 function openEditor(documentType: ContractDocumentType, create = false) {

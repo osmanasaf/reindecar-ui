@@ -41,6 +41,7 @@ export interface ContractDetail {
     contractNumber: string
     rentalId: number
     templateId: number
+    documentType: ContractDocumentType
     contractVersion: number
     status: ContractStatus
     validFrom: string
