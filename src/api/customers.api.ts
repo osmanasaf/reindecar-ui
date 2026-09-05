@@ -100,6 +100,14 @@ class CustomersApiService extends BaseApi {
         return this.patch(`/${id}/unblacklist`)
     }
 
+    async markAsInternal(id: number): Promise<Customer> {
+        return this.patch(`/${id}/mark-internal`)
+    }
+
+    async markAsCommercial(id: number): Promise<Customer> {
+        return this.patch(`/${id}/mark-commercial`)
+    }
+
     async deleteById(id: number): Promise<void> {
         return this.deleteByPath(`/${id}`)
     }

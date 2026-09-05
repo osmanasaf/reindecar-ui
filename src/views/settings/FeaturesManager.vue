@@ -2,6 +2,7 @@
 import { computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useFeaturesStore } from '@/stores/features.store'
+import { useAuthStore } from '@/stores'
 import { useToast } from '@/composables'
 import { RcEmpty, RcSkeletonText } from '@/components/rc'
 import {
@@ -13,8 +14,10 @@ import {
 
 const toast = useToast()
 const featuresStore = useFeaturesStore()
-const { features, loading } = storeToRefs(featuresStore)
-const { loadFeatures, updateFeature, isUpdating } = featuresStore
+const authStore = useAuthStore()
+const isSuperAdmin = computed(() => authStore.isSuperAdmin)
+const { features, loading, applyingPreset, loadFailed } = storeToRefs(featuresStore)
+const { loadFeatures, updateFeature, isUpdating, applyInternalFleetPreset } = featuresStore
 
 const groupedFeatures = computed(() => {
     const groups = new Map<FeatureCategory, TenantFeature[]>()
@@ -38,6 +41,9 @@ const configurableCount = computed(() =>
 
 onMounted(async () => {
     await loadFeatures()
+    if (loadFailed.value) {
+        toast.error('Özellik listesi yüklenemedi. Görünen ayarlar güncel olmayabilir.')
+    }
 })
 
 async function handleToggle(feature: TenantFeature) {
@@ -57,6 +63,19 @@ async function handleToggle(feature: TenantFeature) {
         toast.error(err.message || 'Özellik güncellenemedi')
     }
 }
+
+async function handleApplyPreset() {
+    if (applyingPreset.value) {
+        return
+    }
+    try {
+        await applyInternalFleetPreset()
+        toast.success('Şirket İçi Filo profili uygulandı')
+    } catch (error: unknown) {
+        const err = error as { message?: string }
+        toast.error(err.message || 'Profil uygulanamadı')
+    }
+}
 </script>
 
 <template>
@@ -65,6 +84,24 @@ async function handleToggle(feature: TenantFeature) {
       Firmanızın kullanacağı modülleri buradan açıp kapatabilirsiniz.
       Yalnızca platformda yayınlanmış özellikler yapılandırılabilir.
     </p>
+
+    <div v-if="isSuperAdmin" class="rcs-features__preset">
+      <div class="rcs-features__preset-text">
+        <span class="rcs-features__preset-title">Şirket İçi Filo profili</span>
+        <span class="rcs-features__preset-desc">
+          Fiyatlandırma, faturalama ve alacak yüzeylerini kapatır; zimmet takibi özelliklerini açar.
+          Uyguladıktan sonra her özelliği tek tek değiştirebilirsiniz.
+        </span>
+      </div>
+      <button
+        type="button"
+        class="rc-btn rc-btn--secondary"
+        :disabled="applyingPreset"
+        @click="handleApplyPreset"
+      >
+        {{ applyingPreset ? 'Uygulanıyor…' : 'Profili uygula' }}
+      </button>
+    </div>
 
     <div v-if="loading" style="padding: 24px 0">
       <RcSkeletonText :lines="6" />
@@ -94,7 +131,7 @@ async function handleToggle(feature: TenantFeature) {
               <span class="rcs-features__item-title">{{ feature.displayName }}</span>
               <span class="rcs-features__item-desc">{{ feature.description }}</span>
               <span v-if="!feature.tenantConfigurable" class="rcs-features__item-badge">
-                Platformda henüz açılmadı
+                Platform yöneticisi tarafından yönetilir
               </span>
             </div>
             <button

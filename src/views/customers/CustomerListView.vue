@@ -3,7 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { formatCustomerCode } from '@/utils/customerCode'
 import { useRoute, useRouter } from 'vue-router'
 import { customersApi } from '@/api'
-import { usePagination, useToast, useFirstLoadStagger } from '@/composables'
+import { usePagination, useToast, useFirstLoadStagger, useTerminology } from '@/composables'
 import CustomerQuickPreviewModal from '@/components/customers/CustomerQuickPreviewModal.vue'
 import CustomerEditModal from '@/components/customers/CustomerEditModal.vue'
 import { RcIcon } from '@/components/icons'
@@ -50,6 +50,7 @@ const overview = ref<CustomerOverview>({
 })
 
 const { page, totalElements, totalPages, setPage, setTotal, getParams } = usePagination()
+const { terms } = useTerminology()
 const toast = useToast()
 
 const typeLabels: Record<CustomerType, string> = {
@@ -261,7 +262,7 @@ onMounted(async () => {
 <template>
   <div class="rc-page rc-page--staggered">
     <RcPageHeader
-      title="Müşteriler"
+      :title="terms.customerPlural"
       subtitle="Müşteri tabanı, segment dağılımı ve durum özeti"
     >
       <template #actions>

@@ -6,6 +6,7 @@ import { RcAvatar, RcKbd } from '@/components/rc'
 import { useAuthStore, useFeaturesStore } from '@/stores'
 import { useShellNavCounts } from '@/composables/useShellNavCounts'
 import { useShellSearch } from '@/composables/useShellSearch'
+import { useTerminology } from '@/composables/useTerminology'
 import {
   navSections,
   isNavItemActive,
@@ -29,6 +30,16 @@ const authStore = useAuthStore()
 const featuresStore = useFeaturesStore()
 const { countForNavItem } = useShellNavCounts()
 const { openSearch } = useShellSearch()
+
+const { terms } = useTerminology()
+
+function navLabel(item: NavItem): string {
+  return item.labelKey ? terms.value[item.labelKey] : item.label
+}
+
+const searchPlaceholder = computed(
+  () => `Plaka, ${terms.value.customer.toLocaleLowerCase('tr')}, ${terms.value.rental.toLocaleLowerCase('tr')}…`,
+)
 
 function isNavItemVisible(item: NavItem): boolean {
   if (item.superAdminOnly && !authStore.isSuperAdmin) {
@@ -137,7 +148,7 @@ function formatCount(n: number | undefined): string | undefined {
     >
       <RcIcon name="search" :size="14" />
       <span v-if="!collapsed || mobileOpen" class="rc-side__search-placeholder">
-        Plaka, müşteri, kiralama…
+        {{ searchPlaceholder }}
       </span>
       <RcKbd v-if="!collapsed || mobileOpen">{{ searchKbdLabel }}</RcKbd>
     </button>
@@ -153,11 +164,11 @@ function formatCount(n: number | undefined): string | undefined {
               type="button"
               class="rc-side__item rc-side__item--group"
               :class="{ 'rc-side__item--active': visibleChildren(item).some(itemActive) }"
-              :title="collapsed && !mobileOpen ? item.label : undefined"
+              :title="collapsed && !mobileOpen ? navLabel(item) : undefined"
               @click="toggleGroup(item)"
             >
               <RcIcon :name="item.icon" />
-              <span class="rc-side__item-label">{{ item.label }}</span>
+              <span class="rc-side__item-label">{{ navLabel(item) }}</span>
               <RcIcon
                 v-if="!collapsed || mobileOpen"
                 name="chevronDown"
@@ -175,7 +186,7 @@ function formatCount(n: number | undefined): string | undefined {
                 :class="{ 'rc-side__item--active': itemActive(child) }"
               >
                 <RcIcon :name="child.icon" :size="14" />
-                <span class="rc-side__item-label">{{ child.label }}</span>
+                <span class="rc-side__item-label">{{ navLabel(child) }}</span>
                 <span
                   v-if="formatCount(countForNavItem(child.name))"
                   class="rc-side__item-count"
@@ -190,10 +201,10 @@ function formatCount(n: number | undefined): string | undefined {
             :to="{ name: item.name }"
             class="rc-side__item"
             :class="{ 'rc-side__item--active': itemActive(item) }"
-            :title="collapsed && !mobileOpen ? item.label : undefined"
+            :title="collapsed && !mobileOpen ? navLabel(item) : undefined"
           >
             <RcIcon :name="item.icon" />
-            <span class="rc-side__item-label">{{ item.label }}</span>
+            <span class="rc-side__item-label">{{ navLabel(item) }}</span>
             <span
               v-if="formatCount(countForNavItem(item.name))"
               class="rc-side__item-count"

@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, onActivated, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { rentalsApi } from '@/api'
-import { useToast, useFeatures } from '@/composables'
+import { useToast, useFeatures, useTerminology } from '@/composables'
 import ReturnCompleteModal from '@/components/rentals/ReturnCompleteModal.vue'
 import RentalReserveModal from '@/components/rentals/RentalReserveModal.vue'
 import RentalActivateModal from '@/components/rentals/RentalActivateModal.vue'
@@ -49,9 +49,15 @@ const route = useRoute()
 const router = useRouter()
 const toast = useToast()
 const { isEnabled } = useFeatures()
+const { terms } = useTerminology()
 
 const canUseContractOffers = computed(() =>
   isEnabled('MODIFIABLE_CONTRACTS') && isEnabled('PRICE_OFFER_DOCUMENTS'),
+)
+
+const showFinancialSummary = computed(() =>
+  rental.value?.purpose !== 'INTERNAL'
+  && (isEnabled('RENTAL_PRICING') || isEnabled('RECEIVABLES_MODULE')),
 )
 
 const rental = ref<Rental | null>(null)
@@ -128,12 +134,14 @@ const detailTabs = computed(() => [
     label: 'Ceza & HGS',
     count: (penalties.value.length + tolls.value.length) || undefined,
   },
-  { id: 'payments' as TabKey, label: 'Ödemeler', count: payments.value.length || undefined },
+  ...(isEnabled('RECEIVABLES_MODULE')
+    ? [{ id: 'payments' as TabKey, label: 'Ödemeler', count: payments.value.length || undefined }]
+    : []),
   { id: 'docs' as TabKey, label: 'Belgeler' },
   ...(rental.value?.rentalType === 'SERVICE' && isEnabled('UETDS_MANIFESTS')
     ? [{ id: 'uetds' as TabKey, label: 'UETDS' }]
     : []),
-  ...(isEnabled('KABIS_NOTIFICATIONS')
+  ...(isEnabled('KABIS_NOTIFICATIONS') && rental.value?.purpose !== 'INTERNAL'
     ? [{ id: 'kabis' as TabKey, label: 'KABİS' }]
     : []),
   { id: 'timeline' as TabKey, label: 'Geçmiş' },
@@ -649,7 +657,7 @@ onActivated(() => {
       <div class="rc-cust-detail-nav">
         <RouterLink to="/rentals" class="rc-btn rc-btn--ghost rc-btn--sm">
           <RcIcon name="chevronLeft" :size="14" />
-          Kiralamalar
+          {{ terms.rentalPlural }}
         </RouterLink>
       </div>
 
@@ -713,7 +721,7 @@ onActivated(() => {
         </div>
       </div>
 
-      <div class="rcv-stats rcv-stats--airy" style="margin-top: 14px">
+      <div v-if="showFinancialSummary" class="rcv-stats rcv-stats--airy" style="margin-top: 14px">
         <div class="rcv-stat">
           <div class="rcv-stat__label">Genel toplam</div>
           <div class="rcv-stat__value rc-num">{{ fmtTRY(totalCollectible) }}</div>

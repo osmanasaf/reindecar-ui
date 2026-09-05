@@ -6,6 +6,7 @@ import { RcButton, RcKbd } from '@/components/rc'
 import { useAuthStore } from '@/stores'
 import { useNotifications } from '@/composables/useNotifications'
 import { useTheme } from '@/composables/useTheme'
+import { useTerminology } from '@/composables/useTerminology'
 import AppBreadcrumb from './AppBreadcrumb.vue'
 import NotificationPanel from './NotificationPanel.vue'
 
@@ -15,6 +16,7 @@ defineEmits<{
 
 const authStore = useAuthStore()
 const router = useRouter()
+const { terms } = useTerminology()
 const { count, refresh, startPolling, stopPolling } = useNotifications()
 const { isDark, toggleTheme } = useTheme()
 
@@ -113,7 +115,7 @@ onBeforeUnmount(() => {
       <span class="rc-vr" style="height: 24px" />
       <RcButton variant="secondary" @click="goToNewRental">
         <RcIcon name="plus" />
-        Yeni Kiralama
+        {{ terms.rentalNew }}
         <RcKbd>N</RcKbd>
       </RcButton>
     </div>

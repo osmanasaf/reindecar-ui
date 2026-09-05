@@ -1,9 +1,11 @@
 import type { IconName } from '@/components/icons'
 import type { FeatureKey } from '@/types/feature'
+import type { Terminology } from '@/composables/useTerminology'
 
 export interface NavItem {
   name: string
   label: string
+  labelKey?: keyof Terminology
   icon: IconName
   adminOnly?: boolean
   superAdminOnly?: boolean
@@ -20,9 +22,15 @@ export const navSections: NavSection[] = [
   {
     items: [
       { name: 'dashboard', label: 'Dashboard', icon: 'chart' },
-      { name: 'rentals', label: 'Kiralamalar', icon: 'key' },
+      {
+        name: 'internal-fleet-assignments',
+        label: 'Zimmet Panosu',
+        icon: 'tableGrid',
+        featureKey: 'INTERNAL_FLEET_MODE',
+      },
+      { name: 'rentals', label: 'Kiralamalar', labelKey: 'rentalPlural', icon: 'key' },
       { name: 'vehicles', label: 'Araçlar', icon: 'car' },
-      { name: 'customers', label: 'Müşteriler', icon: 'users' },
+      { name: 'customers', label: 'Müşteriler', labelKey: 'customerPlural', icon: 'users' },
     ],
   },
   {
@@ -31,6 +39,7 @@ export const navSections: NavSection[] = [
       { name: 'service-manifests', label: 'UETDS Manifestoları', icon: 'globe', featureKey: 'UETDS_MANIFESTS' },
       { name: 'kabis-notifications', label: 'KABİS Bildirimleri', icon: 'shield', featureKey: 'KABIS_NOTIFICATIONS' },
       { name: 'maintenance', label: 'Bakım Takibi', icon: 'wrench', featureKey: 'MAINTENANCE_REMINDERS' },
+      { name: 'vehicle-km-readings', label: 'Kilometre Bildirimi', icon: 'bolt', featureKey: 'PERIODIC_KM_REPORTING' },
     ],
   },
   {
@@ -40,20 +49,20 @@ export const navSections: NavSection[] = [
       { name: 'insurance-claims', label: 'Sigorta Başvuruları', icon: 'shield' },
       { name: 'service-providers', label: 'Servis Sağlayıcılar', icon: 'wrench' },
       { name: 'penalties', label: 'Cezalar', icon: 'warning' },
-      { name: 'km-packages', label: 'KM Paketleri', icon: 'bolt' },
+      { name: 'km-packages', label: 'KM Paketleri', icon: 'bolt', featureKey: 'KM_PACKAGES' },
       {
         name: 'pricing-agreements',
         label: 'Fiyat Anlaşmaları',
         icon: 'cash',
         children: [
-          { name: 'campaigns', label: 'Sezonluk Kampanyalar', icon: 'bolt' },
+          { name: 'campaigns', label: 'Sezonluk Kampanyalar', icon: 'bolt', featureKey: 'PRICING_CAMPAIGNS' },
           {
             name: 'customer-contracts',
             label: 'Kurumsal Fiyat Anlaşmaları',
             icon: 'folder',
             featureKey: 'CUSTOMER_PRICING_AGREEMENTS',
           },
-          { name: 'rental-pricing', label: 'Araç/Müşteri Fiyat Kuralları', icon: 'cash' },
+          { name: 'rental-pricing', label: 'Araç/Müşteri Fiyat Kuralları', icon: 'cash', featureKey: 'RENTAL_PRICING' },
         ],
       },
     ],
@@ -61,7 +70,7 @@ export const navSections: NavSection[] = [
   {
     section: 'Sistem',
     items: [
-      { name: 'branches', label: 'Şubeler', icon: 'building', adminOnly: true },
+      { name: 'branches', label: 'Şubeler', labelKey: 'branchPlural', icon: 'building', adminOnly: true },
       { name: 'users', label: 'Kullanıcılar', icon: 'user', adminOnly: true },
       { name: 'user-invitations', label: 'Davetler', icon: 'mail', adminOnly: true },
       { name: 'settings', label: 'Ayarlar', icon: 'settings' },
@@ -97,6 +106,7 @@ export function isNavItemActive(routeName: string | undefined, path: string, ite
   }
 
   if (itemName === 'vehicles') {
+    if (routeName === 'vehicle-km-readings') return false
     return routeName === 'vehicles'
       || routeName === 'vehicle-detail'
       || routeName === 'vehicle-create'
@@ -169,6 +179,14 @@ export function isNavItemActive(routeName: string | undefined, path: string, ite
 
   if (itemName === 'maintenance') {
     return routeName === 'maintenance' || path.startsWith('/maintenance')
+  }
+
+  if (itemName === 'internal-fleet-assignments') {
+    return routeName === 'internal-fleet-assignments' || path.startsWith('/internal-fleet')
+  }
+
+  if (itemName === 'vehicle-km-readings') {
+    return routeName === 'vehicle-km-readings' || path.startsWith('/vehicles/km-readings')
   }
 
   if (itemName === 'settings') {

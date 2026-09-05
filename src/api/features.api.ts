@@ -15,6 +15,11 @@ class FeaturesApiService extends BaseApi {
     async updateFeature(key: FeatureKey, payload: UpdateTenantFeaturePayload): Promise<TenantFeature> {
         return this.put<TenantFeature>(`/${key}`, payload)
     }
+
+    async applyInternalFleetPreset(tenantId?: number): Promise<TenantFeature[]> {
+        const query = tenantId ? `?tenantId=${tenantId}` : ''
+        return this.post<TenantFeature[]>(`/presets/internal-fleet${query}`)
+    }
 }
 
 export const featuresApi = new FeaturesApiService()

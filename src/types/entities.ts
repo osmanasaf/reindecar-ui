@@ -215,6 +215,7 @@ export interface Customer {
     address: string
     city: string
     blacklisted: boolean
+    internal: boolean
     blacklistReason?: string
     creditScore: number
     creditRating: CreditRating
@@ -262,6 +263,7 @@ export interface Rental {
     id: number
     rentalNumber: string
     rentalType: RentalType
+    purpose: 'COMMERCIAL' | 'INTERNAL'
     status: RentalStatus
     vehicleId: number
     vehicle?: Vehicle

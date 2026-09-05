@@ -29,11 +29,14 @@ import {
   RcTableSkeleton,
   RcListSkeleton,
 } from '@/components/rc'
+import { useAuthStore } from '@/stores'
 
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
 const { isEnabled } = useFeatures()
+const authStore = useAuthStore()
+const isSuperAdmin = computed(() => authStore.isSuperAdmin)
 
 const customer = ref<Customer | null>(null)
 const loading = ref(true)
@@ -321,6 +324,30 @@ const blacklistReason = ref('')
 const processingBlacklist = ref(false)
 const showArchiveModal = ref(false)
 const archivingCustomer = ref(false)
+const processingInternalFlag = ref(false)
+
+async function handleToggleInternal() {
+  if (!customer.value || processingInternalFlag.value) {
+    return
+  }
+  const goingInternal = !customer.value.internal
+  processingInternalFlag.value = true
+  try {
+    const updated = goingInternal
+      ? await customersApi.markAsInternal(customerId.value)
+      : await customersApi.markAsCommercial(customerId.value)
+    customer.value = updated
+    toast.success(
+      goingInternal
+        ? 'Müşteri şirket içi olarak işaretlendi; kiralamaları ücretlendirilmeyecek'
+        : 'Müşteri ticari olarak işaretlendi',
+    )
+  } catch (err: unknown) {
+    toast.apiError(err, goingInternal ? 'Şirket içi işaretlenemedi' : 'Ticariye çevrilemedi')
+  } finally {
+    processingInternalFlag.value = false
+  }
+}
 
 async function handleBlacklist() {
   showBlacklistModal.value = true
@@ -501,6 +528,7 @@ onMounted(() => {
             <RcBadge :variant="customer.customerType === 'COMPANY' ? 'purple' : 'accent'">
               {{ typeLabels[customer.customerType] }}
             </RcBadge>
+            <RcBadge v-if="customer.internal" variant="purple" dot>Şirket içi</RcBadge>
             <RcBadge v-if="customer.blacklisted" variant="danger" dot>Kara liste</RcBadge>
             <RcBadge v-else variant="success" dot>{{ statusLabels[customer.status] ?? 'Aktif' }}</RcBadge>
           </div>
@@ -553,6 +581,14 @@ onMounted(() => {
             @click="handleBlacklist"
           >
             Kara listeye ekle
+          </RcButton>
+          <RcButton
+            v-if="isSuperAdmin"
+            variant="ghost"
+            :disabled="processingInternalFlag"
+            @click="handleToggleInternal"
+          >
+            {{ customer.internal ? 'Ticariye çevir' : 'Şirket içi yap' }}
           </RcButton>
           <RcButton variant="ghost" @click="showArchiveModal = true">
             Listeden kaldır

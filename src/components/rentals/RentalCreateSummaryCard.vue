@@ -4,7 +4,10 @@ import { RcBadge } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
 import { fmtTRY } from '@/utils/format'
 import { formatIncludedKmDisplay } from '@/utils/km'
+import { useFeatures } from '@/composables'
 import type { RentalType, KmPackage } from '@/types'
+
+const { isEnabled } = useFeatures()
 
 const props = defineProps<{
   currentStep: number
@@ -63,21 +66,23 @@ const rows = computed((): SumRow[] => {
       value: props.customerLabel || (props.customerSelected ? 'Seçildi' : '—'),
       done: props.currentStep >= 4 && props.customerSelected,
     },
-    {
-      label: 'KM paketi',
-      value: props.kmPackage?.name || '—',
-      sub: props.kmPackage && !props.kmPackage.unlimited
-        ? formatIncludedKmDisplay(
-            props.rentalType,
-            props.kmPackage.includedKm,
-            props.totalDays,
-            props.kmPackage.unlimited,
-          )
-        : props.kmPackage?.unlimited
-          ? 'Sınırsız KM'
-          : undefined,
-      done: props.currentStep >= 5,
-    },
+    ...(isEnabled('KM_PACKAGES')
+      ? [{
+          label: 'KM paketi',
+          value: props.kmPackage?.name || '—',
+          sub: props.kmPackage && !props.kmPackage.unlimited
+            ? formatIncludedKmDisplay(
+                props.rentalType,
+                props.kmPackage.includedKm,
+                props.totalDays,
+                props.kmPackage.unlimited,
+              )
+            : props.kmPackage?.unlimited
+              ? 'Sınırsız KM'
+              : undefined,
+          done: props.currentStep >= 5,
+        }]
+      : []),
     {
       label: 'Ek kalemler',
       value: props.extraItemsCount === 0 ? 'Yok' : `${props.extraItemsCount} adet`,
@@ -108,6 +113,7 @@ const rows = computed((): SumRow[] => {
         </div>
       </div>
     </div>
+    <template v-if="isEnabled('RENTAL_PRICING')">
     <hr class="rc-hr" style="margin: 0" />
     <div class="rcr-create-summary__pricing">
       <div class="rcr-price-line">
@@ -127,5 +133,6 @@ const rows = computed((): SumRow[] => {
         <span class="rc-num">{{ fmtTRY(finalTotal) }}</span>
       </div>
     </div>
+    </template>
   </div>
 </template>
