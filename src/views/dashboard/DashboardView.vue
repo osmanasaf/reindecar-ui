@@ -22,6 +22,7 @@ import {
   useToast,
   usePermissions,
   useFeatures,
+  useTerminology,
   useFirstLoadIntro,
   useCountUp,
 } from '@/composables'
@@ -51,6 +52,7 @@ const toast = useToast()
 const authStore = useAuthStore()
 const { canViewRevenue } = usePermissions()
 const { isEnabled, loaded: featuresLoaded, loadFeatures } = useFeatures()
+const { terms } = useTerminology()
 const {
   stats,
   revenue,
@@ -182,7 +184,7 @@ const kpiCards = computed<KpiCard[]>(() => {
   return [
     {
       id: 'active',
-      label: 'Aktif kiralama',
+      label: `Aktif ${terms.value.rental.toLocaleLowerCase('tr')}`,
       value: String(safeNum(s.activeRentals)),
       count: safeNum(s.activeRentals),
       sub: `${safeNum(s.totalRentals)} toplam`,
@@ -203,7 +205,7 @@ const kpiCards = computed<KpiCard[]>(() => {
     },
     {
       id: 'customers',
-      label: 'Müşteriler',
+      label: terms.value.customerPlural,
       value: String(safeNum(s.totalCustomers)),
       count: safeNum(s.totalCustomers),
       sub: 'kayıtlı müşteri',
@@ -218,15 +220,17 @@ const kpiCards = computed<KpiCard[]>(() => {
       sub: `${safeNum(s.tomorrowReturns)} yarın`,
       icon: 'calendar',
     },
-    {
-      id: 'net',
-      label: 'Net pozisyon',
-      value: a ? formatCompactTRY(a.netPosition) : '—',
-      sub: a ? (a.netPositive ? 'Pozitif bakiye' : 'Negatif bakiye') : '—',
-      icon: 'trend',
-      spark: revValues.length >= 2 ? revValues.slice(-8) : undefined,
-      sparkColor: a?.netPositive ? 'var(--rc-success-500)' : 'var(--rc-danger-500)',
-    },
+    ...(isEnabled('RECEIVABLES_MODULE')
+      ? [{
+          id: 'net',
+          label: 'Net pozisyon',
+          value: a ? formatCompactTRY(a.netPosition) : '—',
+          sub: a ? (a.netPositive ? 'Pozitif bakiye' : 'Negatif bakiye') : '—',
+          icon: 'trend' as const,
+          spark: revValues.length >= 2 ? revValues.slice(-8) : undefined,
+          sparkColor: a?.netPositive ? 'var(--rc-success-500)' : 'var(--rc-danger-500)',
+        }]
+      : []),
     ...(maintenanceKpi.value ? [maintenanceKpi.value] : []),
   ]
 })
@@ -363,7 +367,7 @@ onMounted(async () => {
         </RcButton>
         <RcButton variant="accent" @click="go('/rentals/create')">
           <RcIcon name="plus" :size="16" />
-          Kiralama oluştur
+          {{ terms.rentalNew }}
         </RcButton>
       </template>
     </RcPageHeader>
@@ -407,7 +411,7 @@ onMounted(async () => {
 
     <!-- Revenue + Fleet -->
     <div class="rc-two">
-      <div v-if="canViewRevenue" class="rc-card">
+      <div v-if="canViewRevenue && isEnabled('RECEIVABLES_MODULE')" class="rc-card">
         <div class="rc-card__head">
           <div>
             <div class="rc-card__title">Aylık ciro</div>

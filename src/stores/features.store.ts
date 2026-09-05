@@ -8,6 +8,7 @@ export const useFeaturesStore = defineStore('features', () => {
     const loaded = ref(false)
     const loading = ref(false)
     const updatingKeys = ref<Set<FeatureKey>>(new Set())
+    const applyingPreset = ref(false)
 
     const enabledKeys = computed(() =>
         new Set(features.value.filter((feature) => feature.enabled).map((feature) => feature.key)),
@@ -51,11 +52,21 @@ export const useFeaturesStore = defineStore('features', () => {
         return updatingKeys.value.has(key)
     }
 
+    async function applyInternalFleetPreset(): Promise<void> {
+        applyingPreset.value = true
+        try {
+            features.value = await featuresApi.applyInternalFleetPreset()
+        } finally {
+            applyingPreset.value = false
+        }
+    }
+
     function reset(): void {
         features.value = []
         loaded.value = false
         loading.value = false
         updatingKeys.value = new Set()
+        applyingPreset.value = false
     }
 
     return {
@@ -67,6 +78,8 @@ export const useFeaturesStore = defineStore('features', () => {
         loadFeatures,
         updateFeature,
         isUpdating,
+        applyingPreset: readonly(applyingPreset),
+        applyInternalFleetPreset,
         reset,
     }
 })

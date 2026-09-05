@@ -807,6 +807,38 @@
   line-height: 1.5;
 }
 
+.rcs-features__preset {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin: 0 0 24px;
+  padding: 16px;
+  border: 1px solid var(--rc-border);
+  border-radius: var(--rc-radius-lg, 12px);
+  background: var(--rc-surface-2, var(--rc-surface));
+}
+
+.rcs-features__preset-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 240px;
+  flex: 1 1 320px;
+}
+
+.rcs-features__preset-title {
+  font-weight: 600;
+  color: var(--rc-text);
+}
+
+.rcs-features__preset-desc {
+  color: var(--rc-text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .rcs-features__groups {
   display: flex;
   flex-direction: column;

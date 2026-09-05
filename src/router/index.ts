@@ -276,6 +276,18 @@ const router = createRouter({
             meta: { requiresAuth: true, featureKey: 'MAINTENANCE_REMINDERS' }
         },
         {
+            path: '/internal-fleet/assignments',
+            name: 'internal-fleet-assignments',
+            component: () => import('@/views/internal-fleet/AssignmentBoardView.vue'),
+            meta: { requiresAuth: true, featureKey: 'INTERNAL_FLEET_MODE' }
+        },
+        {
+            path: '/vehicles/km-readings',
+            name: 'vehicle-km-readings',
+            component: () => import('@/views/vehicles/KmReadingView.vue'),
+            meta: { requiresAuth: true, featureKey: 'PERIODIC_KM_REPORTING' }
+        },
+        {
             path: '/admin/tenants',
             name: 'admin-tenants',
             component: () => import('@/views/admin/AdminTenantListView.vue'),

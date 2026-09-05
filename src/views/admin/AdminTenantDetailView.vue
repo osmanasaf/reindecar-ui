@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
-import { adminTenantsApi, adminTenantFeaturesApi } from '@/api'
+import { adminTenantsApi, adminTenantFeaturesApi, featuresApi } from '@/api'
 import { useToast } from '@/composables'
 import { RcPageHeader, RcButton, RcBadge, RcField, RcInput, RcSkeletonText } from '@/components/rc'
 import { RcIcon } from '@/components/icons'
@@ -26,6 +26,7 @@ const savingTenant = ref(false)
 const features = ref<TenantFeature[]>([])
 const loadingFeatures = ref(true)
 const updatingKey = ref<string | null>(null)
+const applyingPreset = ref(false)
 
 const editName = ref('')
 const editStatus = ref<TenantStatus>('ACTIVE')
@@ -121,6 +122,19 @@ async function handleToggleFeature(feature: TenantFeature) {
   }
 }
 
+async function handleApplyPreset() {
+  if (applyingPreset.value) return
+  applyingPreset.value = true
+  try {
+    features.value = await featuresApi.applyInternalFleetPreset(tenantId.value)
+    toast.success('Şirket İçi Filo profili uygulandı')
+  } catch (err) {
+    toast.apiError(err, 'Profil uygulanamadı')
+  } finally {
+    applyingPreset.value = false
+  }
+}
+
 onMounted(() => {
   void loadTenant()
   void loadFeatures()
@@ -174,6 +188,19 @@ onMounted(() => {
           değiştirebilir.
         </p>
 
+        <div class="rcs-features__preset">
+          <div class="rcs-features__preset-text">
+            <span class="rcs-features__preset-title">Şirket İçi Filo profili</span>
+            <span class="rcs-features__preset-desc">
+              Bu firmayı zimmet takibi paketine geçirir: fiyatlandırma, faturalama ve alacak
+              yüzeylerini kapatır, şirket içi filo modülünü açar.
+            </span>
+          </div>
+          <RcButton variant="secondary" :disabled="applyingPreset" @click="handleApplyPreset">
+            {{ applyingPreset ? 'Uygulanıyor…' : 'Profili uygula' }}
+          </RcButton>
+        </div>
+
         <div v-if="loadingFeatures" style="padding: 16px 0">
           <RcSkeletonText :lines="6" />
         </div>
@@ -186,6 +213,9 @@ onMounted(() => {
                 <div class="rcs-features__item-text">
                   <span class="rcs-features__item-title">{{ feature.displayName }}</span>
                   <span class="rcs-features__item-desc">{{ feature.description }}</span>
+                  <span v-if="!feature.tenantConfigurable" class="rcs-features__item-badge">
+                    Yalnızca platform yönetir
+                  </span>
                 </div>
                 <button
                   type="button"

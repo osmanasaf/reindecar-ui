@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
+import { useTerminology } from '@/composables/useTerminology'
 
 interface BreadcrumbItem {
   label: string
@@ -8,6 +9,18 @@ interface BreadcrumbItem {
 }
 
 const route = useRoute()
+const { terms } = useTerminology()
+
+const terminologyOverrides = computed<Record<string, string>>(() => ({
+  rentals: terms.value.rentalPlural,
+  'rental-create': terms.value.rentalNew,
+  'rental-detail': `${terms.value.rental} Detayı`,
+  customers: terms.value.customerPlural,
+  'customer-create': terms.value.customerNew,
+  'customer-edit': `${terms.value.customer} Düzenle`,
+  'customer-detail': `${terms.value.customer} Detayı`,
+  branches: terms.value.branchPlural,
+}))
 
 const breadcrumbLabels: Record<string, string> = {
   dashboard: 'Dashboard',
@@ -38,6 +51,8 @@ const breadcrumbLabels: Record<string, string> = {
   'installments-dashboard': 'Araç Taksitleri',
   'installment-detail': 'Taksit Detayı',
   'km-packages': 'KM Paketleri',
+  'internal-fleet-assignments': 'Zimmet Panosu',
+  'vehicle-km-readings': 'Kilometre Bildirimi',
   penalties: 'Cezalar',
   'penalty-detail': 'Ceza Detayı',
   'service-manifests': 'UETDS Manifestoları',
@@ -54,17 +69,17 @@ const breadcrumbs = computed<BreadcrumbItem[]>(() => {
   }
 
   const items: BreadcrumbItem[] = []
-  const label = breadcrumbLabels[routeName] ?? routeName
+  const label = terminologyOverrides.value[routeName] ?? breadcrumbLabels[routeName] ?? routeName
 
   const sectionMap: Record<string, { label: string; to: string }> = {
     'vehicle-create': { label: 'Araçlar', to: '/vehicles' },
     'vehicle-edit': { label: 'Araçlar', to: '/vehicles' },
     'vehicle-detail': { label: 'Araçlar', to: '/vehicles' },
-    'customer-create': { label: 'Müşteriler', to: '/customers' },
-    'customer-edit': { label: 'Müşteriler', to: '/customers' },
-    'customer-detail': { label: 'Müşteriler', to: '/customers' },
-    'rental-create': { label: 'Kiralamalar', to: '/rentals' },
-    'rental-detail': { label: 'Kiralamalar', to: '/rentals' },
+    'customer-create': { label: terms.value.customerPlural, to: '/customers' },
+    'customer-edit': { label: terms.value.customerPlural, to: '/customers' },
+    'customer-detail': { label: terms.value.customerPlural, to: '/customers' },
+    'rental-create': { label: terms.value.rentalPlural, to: '/rentals' },
+    'rental-detail': { label: terms.value.rentalPlural, to: '/rentals' },
     'receivable-detail': { label: 'Alacak / Verecek', to: '/accounting/receivables' },
     'payable-detail': { label: 'Alacak / Verecek', to: '/accounting/payables' },
     'claim-detail': { label: 'Sigorta Başvuruları', to: '/accounting/insurance-claims' },

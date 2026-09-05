@@ -165,6 +165,10 @@ class VehiclesApiService extends BaseApi {
     async deleteImage(vehicleId: number): Promise<void> {
         return this.deleteByPath(`/${vehicleId}/image`)
     }
+
+    async recordBulkKmReadings(payload: BulkKmReadingPayload): Promise<BulkKmReadingResult> {
+        return this.post<BulkKmReadingResult>('/km-readings/bulk', payload)
+    }
 }
 
 export interface UpdateVehicleCategoryPayload extends Partial<VehicleCategory> {
@@ -205,6 +209,25 @@ class VehicleCategoriesApiService extends BaseApi {
     async deleteById(id: number): Promise<void> {
         return this.deleteByPath(`/${id}`)
     }
+
+    async recordBulkKmReadings(payload: BulkKmReadingPayload): Promise<BulkKmReadingResult> {
+        return this.post<BulkKmReadingResult>('/km-readings/bulk', payload)
+    }
+}
+
+export interface KmReadingEntry {
+    vehicleId: number
+    km: number
+    readingDate?: string
+}
+
+export interface BulkKmReadingPayload {
+    readings: KmReadingEntry[]
+}
+
+export interface BulkKmReadingResult {
+    applied: Array<{ vehicleId: number; plateNumber: string; previousKm: number; newKm: number; kmDelta: number }>
+    rejected: Array<{ vehicleId: number; reason: string }>
 }
 
 export const vehiclesApi = new VehiclesApiService()

@@ -3,7 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { rentalsApi, dashboardApi, vehiclesApi, customersApi } from '@/api'
 import type { RentalStats } from '@/api/dashboard.api'
-import { usePagination, useToast, usePageSearchHotkey, useFirstLoadStagger } from '@/composables'
+import { usePagination, useToast, usePageSearchHotkey, useFirstLoadStagger, useTerminology } from '@/composables'
 import RentalQuickModal from '@/components/rentals/RentalQuickModal.vue'
 import { RcIcon } from '@/components/icons'
 import {
@@ -51,6 +51,7 @@ const overview = ref({
 })
 
 const { page, totalElements, totalPages, setPage, setTotal, getParams } = usePagination()
+const { terms } = useTerminology()
 const toast = useToast()
 
 const typeLabels: Record<RentalType, string> = {
@@ -304,7 +305,7 @@ watch(searchQuery, () => {
 
 <template>
   <div class="rc-page rc-page--staggered">
-    <RcPageHeader title="Kiralamalar" :subtitle="pageSubtitle">
+    <RcPageHeader :title="terms.rentalPlural" :subtitle="pageSubtitle">
       <template #actions>
         <RouterLink to="/rentals/create" class="rc-btn rc-btn--accent">
           <RcIcon name="plus" :size="14" />

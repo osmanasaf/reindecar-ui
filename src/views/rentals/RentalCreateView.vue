@@ -2,7 +2,7 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter, useRoute, RouterLink } from 'vue-router'
 import { rentalsApi, branchesApi, kmPackagesApi, rentalExtraItemApi, customersApi } from '@/api'
-import { useToast, useValidation, rules, useFeatures } from '@/composables'
+import { useToast, useValidation, rules, useFeatures, useTerminology } from '@/composables'
 import FeatureGate from '@/components/common/FeatureGate.vue'
 import { SearchableSelect } from '@/components/common'
 import { RcIcon } from '@/components/icons'
@@ -28,6 +28,7 @@ const router = useRouter()
 const route = useRoute()
 const toast = useToast()
 const { isEnabled } = useFeatures()
+const { terms } = useTerminology()
 
 const currentStep = ref(1)
 const submitting = ref(false)
@@ -66,7 +67,7 @@ const wizardSteps = computed(() => {
     { id: 2, label: 'Tarih' },
     { id: 3, label: 'Araç' },
     { id: 4, label: 'Müşteri' },
-    { id: 5, label: 'KM paketi' },
+    { id: 5, label: isEnabled('KM_PACKAGES') ? 'KM paketi' : 'Vade' },
     { id: 6, label: 'Ek kalemler' },
     { id: 7, label: 'Onay' },
   ] as const
@@ -95,6 +96,7 @@ const endDatePickerMin = computed(() => (startDate.value ? addDaysYmd(startDate.
 const openEndedEnabled = computed(
   () => isEnabled('OPEN_ENDED_RENTAL') && !isLeasing.value && !isService.value,
 )
+
 
 const pricingEndDate = computed(() => {
   if (openEnded.value && !endDate.value && startDate.value) {
@@ -169,7 +171,7 @@ const canProceed = computed(() => {
         selectedDriverIds.value.length > 0 &&
         !!primaryDriverId.value &&
         selectedDriverIds.value.includes(primaryDriverId.value)
-    case 5: return kmPackages.value.length === 0 || !!selectedKmPackageId.value
+    case 5: return !isEnabled('KM_PACKAGES') || kmPackages.value.length === 0 || !!selectedKmPackageId.value
     case 6: return true
     case 7: return true
     case 8: return !!createdRentalId.value
@@ -181,6 +183,16 @@ const isLastStep = computed(() => currentStep.value === totalSteps.value)
 
 const isLeasing = computed(() => rentalType.value === RentalType.LEASING)
 const isService = computed(() => rentalType.value === RentalType.SERVICE)
+
+watch(
+  openEndedEnabled,
+  (enabled) => {
+    if (enabled && isEnabled('INTERNAL_FLEET_MODE')) {
+      openEnded.value = true
+    }
+  },
+  { immediate: true },
+)
 
 function validateDates(): boolean {
   if (!startDate.value) return false
@@ -244,7 +256,7 @@ function isStepComplete(step: number): boolean {
         selectedDriverIds.value.length > 0 &&
         !!primaryDriverId.value &&
         selectedDriverIds.value.includes(primaryDriverId.value)
-    case 5: return kmPackages.value.length === 0 || !!selectedKmPackageId.value
+    case 5: return !isEnabled('KM_PACKAGES') || kmPackages.value.length === 0 || !!selectedKmPackageId.value
     case 6: return true
     case 7: return true
     case 8: return !!createdRentalId.value
@@ -518,7 +530,7 @@ function onWizardKeydown(e: KeyboardEvent) {
 <template>
   <div class="rc-page rcr-create">
     <RcPageHeader
-      title="Yeni kiralama"
+      :title="terms.rentalNew"
       :subtitle="`Adım ${currentStep}/${totalSteps} · ${currentStepLabel}`"
     >
       <template #actions>
@@ -698,14 +710,14 @@ function onWizardKeydown(e: KeyboardEvent) {
         <!-- Step 5 -->
         <div v-else-if="currentStep === 5" class="rc-card">
           <div class="rc-card__head">
-            <div class="rc-card__title">KM paketi ve vade</div>
+            <div class="rc-card__title">{{ isEnabled('KM_PACKAGES') ? 'KM paketi ve vade' : 'Vade' }}</div>
           </div>
           <div class="rc-card__body rcr-create__step-body">
             <div v-if="isLeasing && selectedVehicleCategoryId" class="term-section">
               <h3 class="rcr-create__section-title">Vade süresi</h3>
               <TermSelector v-model="selectedTermMonths" :category-id="selectedVehicleCategoryId" />
             </div>
-            <div v-if="kmPackages.length > 0" class="km-package-section">
+            <div v-if="kmPackages.length > 0 && isEnabled('KM_PACKAGES')" class="km-package-section">
               <h3 class="rcr-create__section-title">KM paketi</h3>
               <div class="package-grid">
                 <button
@@ -729,7 +741,7 @@ function onWizardKeydown(e: KeyboardEvent) {
                 </button>
               </div>
             </div>
-            <div class="km-override-section">
+            <div v-if="isEnabled('KM_PACKAGES')" class="km-override-section">
               <h3 class="rcr-create__section-title">KM override (opsiyonel)</h3>
               <div class="rcv-form-grid">
                 <RcField label="Özel dahil KM">
@@ -817,7 +829,7 @@ function onWizardKeydown(e: KeyboardEvent) {
                     </div>
                   </div>
                 </div>
-                <div class="summary-card">
+                <div v-if="isEnabled('RENTAL_PRICING')" class="summary-card">
                   <h4>Fiyat</h4>
                   <PricingCalculator
                     v-if="selectedVehicleId && selectedCustomerId && (openEnded ? startDate : endDate)"
