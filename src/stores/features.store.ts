@@ -3,9 +3,19 @@ import { computed, ref, readonly } from 'vue'
 import { featuresApi } from '@/api/features.api'
 import type { FeatureKey, TenantFeature } from '@/types/feature'
 
+const SURFACES_ENABLED_BEFORE_FLAGS: ReadonlySet<FeatureKey> = new Set<FeatureKey>([
+    'RENTAL_PRICING',
+    'RENTAL_EXTRA_CHARGES',
+    'KM_PACKAGES',
+    'PRICING_CAMPAIGNS',
+    'RENTAL_INVOICING',
+    'RECEIVABLES_MODULE',
+])
+
 export const useFeaturesStore = defineStore('features', () => {
     const features = ref<TenantFeature[]>([])
     const loaded = ref(false)
+    const loadFailed = ref(false)
     const loading = ref(false)
     const updatingKeys = ref<Set<FeatureKey>>(new Set())
     const applyingPreset = ref(false)
@@ -15,6 +25,9 @@ export const useFeaturesStore = defineStore('features', () => {
     )
 
     function isEnabled(key: FeatureKey): boolean {
+        if (loadFailed.value) {
+            return SURFACES_ENABLED_BEFORE_FLAGS.has(key)
+        }
         return enabledKeys.value.has(key)
     }
 
@@ -23,9 +36,12 @@ export const useFeaturesStore = defineStore('features', () => {
         loading.value = true
         try {
             features.value = await featuresApi.listFeatures()
+            loadFailed.value = false
             loaded.value = true
-        } catch {
+        } catch (error) {
+            console.error('[Features] Ozellik listesi yuklenemedi', error)
             features.value = []
+            loadFailed.value = true
             loaded.value = true
         } finally {
             loading.value = false
@@ -56,6 +72,7 @@ export const useFeaturesStore = defineStore('features', () => {
         applyingPreset.value = true
         try {
             features.value = await featuresApi.applyInternalFleetPreset()
+            loadFailed.value = false
         } finally {
             applyingPreset.value = false
         }
@@ -64,6 +81,7 @@ export const useFeaturesStore = defineStore('features', () => {
     function reset(): void {
         features.value = []
         loaded.value = false
+        loadFailed.value = false
         loading.value = false
         updatingKeys.value = new Set()
         applyingPreset.value = false
@@ -72,6 +90,7 @@ export const useFeaturesStore = defineStore('features', () => {
     return {
         features: readonly(features),
         loaded: readonly(loaded),
+        loadFailed: readonly(loadFailed),
         loading: readonly(loading),
         enabledKeys,
         isEnabled,

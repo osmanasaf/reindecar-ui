@@ -16,7 +16,7 @@ const toast = useToast()
 const featuresStore = useFeaturesStore()
 const authStore = useAuthStore()
 const isSuperAdmin = computed(() => authStore.isSuperAdmin)
-const { features, loading, applyingPreset } = storeToRefs(featuresStore)
+const { features, loading, applyingPreset, loadFailed } = storeToRefs(featuresStore)
 const { loadFeatures, updateFeature, isUpdating, applyInternalFleetPreset } = featuresStore
 
 const groupedFeatures = computed(() => {
@@ -41,6 +41,9 @@ const configurableCount = computed(() =>
 
 onMounted(async () => {
     await loadFeatures()
+    if (loadFailed.value) {
+        toast.error('Özellik listesi yüklenemedi. Görünen ayarlar güncel olmayabilir.')
+    }
 })
 
 async function handleToggle(feature: TenantFeature) {
