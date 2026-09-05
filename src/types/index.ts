@@ -33,3 +33,5 @@ export * from './kabis'
 export * from './contract'
 
 export * from './tenant'
+
+export * from './integration'

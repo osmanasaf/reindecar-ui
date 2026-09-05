@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue'
-import { useRouter } from 'vue-router'
-import { kabisApi } from '@/api'
+import { useRouter, RouterLink } from 'vue-router'
+import { kabisApi, integrationsApi } from '@/api'
+import { useAuthStore } from '@/stores'
 import { useToast } from '@/composables'
 import KabisStatusBadge from '@/components/kabis/KabisStatusBadge.vue'
 import { RcPageHeader, RcEmpty, RcBadge, RcTableSkeleton } from '@/components/rc'
@@ -16,8 +17,10 @@ import {
 
 const router = useRouter()
 const toast = useToast()
+const authStore = useAuthStore()
 
 const notifications = ref<KabisNotification[]>([])
+const credentialsMissing = ref(false)
 const loading = ref(true)
 const totalCount = ref(0)
 const currentPage = ref(0)
@@ -180,9 +183,20 @@ async function retrySelected() {
   }
 }
 
+async function loadCredentialState() {
+  if (!authStore.isAdmin) return
+  try {
+    const credentials = await integrationsApi.list()
+    credentialsMissing.value = !credentials.find((item) => item.key === 'KABIS')?.configured
+  } catch (err) {
+    toast.apiError(err, 'Entegrasyon durumu alınamadı')
+  }
+}
+
 onMounted(() => {
   void loadNotifications()
   void loadStats()
+  void loadCredentialState()
 })
 </script>
 
@@ -201,6 +215,11 @@ onMounted(() => {
           Entegrasyon açılana kadar dışarıya gönderim yapılmaz; başarısız kayıtlar açıldığında
           otomatik yeniden denenir.
         </span>
+        <div v-if="credentialsMissing" style="margin-top: 6px">
+          EGM erişim bilgileri tanımlı değil.
+          <RouterLink :to="{ name: 'settings', query: { tab: 'integrations' } }">Ayarlar › Entegrasyonlar</RouterLink>
+          bölümünden girin.
+        </div>
       </div>
     </div>
 
